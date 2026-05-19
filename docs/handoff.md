@@ -1,11 +1,15 @@
-# Coiny — Project Handoff Document
+# Coiny — Project Handoff
+
+Read this first. Then read `docs/phase1-spec.md` if starting Phase 1.
+
+---
 
 ## What Is Coiny
 
-A portable Tamagotchi-like carry device (~50mm, <25g) linked to the user's bank account
-via Teller API. The device reacts in real time to financial behavior — animated face,
-RGB LED color, vibration, and sound effects — when the user does things aligned or
-misaligned with their personal finance goals.
+A portable Tamagotchi-like carry device linked to the user's bank account
+via Teller. The device reacts in real time to financial behavior —
+animated face, color LED, vibration, and sound — when the user does things
+aligned or misaligned with their personal finance goals.
 
 ---
 
@@ -13,155 +17,42 @@ misaligned with their personal finance goals.
 
 - **URL**: https://github.com/pamplemousse-glitch/Coiny (private)
 - **Owner**: pamplemousse-glitch (Antoine)
-- **Collaborator**: qiaomein (write access, invitation sent)
 - **Local path**: `/Users/antoinewiley/Tamogatchi`
+- **Team**: Solo (Antoine). Code is written by Claude Code; Antoine handles
+  physical setup, hardware, phone testing, and signups.
 
 ---
 
-## Current Repo Structure
+## Repo Structure
 
 ```
 Coiny/
 ├── firmware/          # ESP32-S3 C++ (PlatformIO) — empty scaffolding
-├── backend/           # Node.js/TypeScript (Fastify) — empty scaffolding
-├── mobile/            # React Native (Expo) — empty scaffolding
-├── shared/            # MQTT/BLE schemas, pet model types — empty scaffolding
-├── hardware/          # Schematics, PCB Gerbers, STL files — empty scaffolding
+├── backend/           # Node.js / TypeScript (Fastify) — empty scaffolding
+├── mobile/            # React Native / Expo — empty scaffolding
+├── shared/            # BLE schemas, pet model types — empty scaffolding
+├── hardware/
+│   └── case/          # OpenSCAD designs (coin_v1.scad + renders)
+├── bin/               # Helper scripts (load-secrets.sh, etc.)
 └── docs/
-    ├── architecture.md       — full system design, BLE flow, hardware spec
-    ├── development-plan.md   — phased roadmap, component list, open questions
-    ├── mqtt-topics.md        — BLE command schema, financial event mappings
-    ├── ota-process.md        — empty, to be written
-    └── handoff.md            — this file
+    ├── architecture.md      System design, BLE flow, hardware spec
+    ├── development-plan.md  Phased roadmap, decisions, hardware list
+    ├── sprint-plan.md       7-day MVP sprint plan
+    ├── phase1-spec.md       Phase 1 deliverables (read before starting)
+    ├── mqtt-topics.md       BLE command schema, event mappings
+    ├── security.md          Threat model + per-phase security checklist
+    ├── ota-process.md       (empty)
+    └── handoff.md           This file
 ```
 
 ---
 
-## Key Architectural Decisions (Made)
-
-| Decision | Choice | Reason |
-|---|---|---|
-| Device connectivity | **BLE** (not WiFi) | 2–3 day battery vs 12–16hr; phone always nearby |
-| Bank API | **Teller** | Near real-time (seconds) for major US banks |
-| Prototype hardware | **M5StickS3** (~$21) | Has speaker + mic built in; 48×24×15mm; 20g |
-| Backend framework | **Node.js + Fastify** | TypeScript-first, fast, built-in schema validation |
-| Mobile framework | **React Native + Expo** | Single codebase iOS + Android |
-| Monorepo tooling | **pnpm workspaces + Turborepo** | Shared BLE schema types across firmware/backend/mobile |
-| Form factor | **Portable carry device** | Pocketable alongside phone, not desktop |
-| Display (prototype) | **Color LCD** (built into M5StickS3) | Fast animation, built-in |
-| Display (v2) | **Color OLED** | True black = lower power, more vivid |
-| Haptics (prototype) | **Coin vibration motor** ($1) | Basic buzz, direct GPIO |
-| Haptics (v2) | **DRV2605L driver IC** | Named waveform patterns, premium feel |
-
----
-
-## Key Architectural Decisions (Open)
-
-See `docs/development-plan.md` — Open Architectural Decisions section for full detail.
-
-| Decision | Options | Status |
-|---|---|---|
-| iOS background BLE | Core Bluetooth background mode vs WiFi hybrid | Must validate in Phase 3 week 1 |
-| Bank API fallback | Teller only vs Teller + Plaid | Defer to beta feedback |
-| Button layout | 2 front + 1 side (proposed) | Not finalized |
-| Form factor shape | Egg vs coin (round) vs stick | Not finalized |
-| Pet personality/sound design | TBD | Not started |
-
----
-
-## Prototype Component List (~$38 total)
-
-| Component | Purpose | Cost |
-|---|---|---|
-| M5StickS3 | Main board (display, speaker, mic, BLE, battery) | ~$21 |
-| Coin vibration motor (10mm) | Haptic feedback | ~$1 |
-| WS2812B RGB LED (single) | Mood color indicator | ~$0.50 |
-| 2N2222 transistor | GPIO motor driver | ~$0.10 |
-| 100Ω resistor | LED data line protection | ~$0.05 |
-| Half-size breadboard | Prototyping | ~$3 |
-| Jumper wire kit | Connections | ~$5 |
-
-**Order from Amazon Prime** (1–2 day delivery to Edinburg, TX).
-Search "M5StickS3" — available on Amazon with Prime.
-Soldering iron (~$20) needed to attach motor + LED directly to GPIO pins (no breadboard
-in final carry prototype).
-
----
-
-## Development Phases
-
-| Phase | Goal | Timeline |
-|---|---|---|
-| 1 | Backend + Teller sandbox integration + terminal simulator | Weeks 1–3 |
-| 2 | Firmware + hardware prototype (M5StickS3) | Weeks 3–6 |
-| 3 | Mobile app + BLE relay (parallel with Phase 2) | Weeks 5–8 |
-| 4 | Real bank data (Teller production) | Week 8+ |
-| 5 | Polish, custom PCB, beta users | Weeks 10–14 |
-
-**Immediate next step**: Initialize the backend — `package.json`, TypeScript config,
-Fastify setup, Teller sandbox account at teller.io.
-
----
-
-## Team Split
-
-| qiaomein | Antoine |
-|---|---|
-| Backend + Teller integration | Mobile app (React Native/Expo) |
-| Rule engine | Onboarding + BLE pairing UX |
-| Push notification dispatch | Goal configuration screens |
-| Device simulator | BLE relay + iOS background BLE validation |
-| Firmware (Phase 2) | Hardware testing |
-
----
-
-## Tools Installed on This Machine
-
-| Tool | Purpose | Status |
-|---|---|---|
-| OpenSCAD 2026.04.26 | 3D enclosure CAD | Installed via Homebrew |
-| OpenSCAD MCP server | Render 3D models in Claude Code | Configured in `~/.claude.json` |
-| gh CLI | GitHub repo management | Installed, authenticated as pamplemousse-glitch |
-| pnpm | Package manager | Available |
-| uv | Python package manager (for MCP server) | Installed |
-
-**OpenSCAD MCP**: Restart Claude Code to activate. Once active, Claude can write
-OpenSCAD code and render PNG images of 3D models directly in the conversation.
-
----
-
-## Design Tools (Not Yet Installed)
-
-| Tool | Purpose | URL |
-|---|---|---|
-| Flux.ai | AI-assisted PCB schematic design | flux.ai |
-| Wokwi | ESP32 circuit simulator (browser) | wokwi.com |
-| Zoo.dev | Text-to-CAD AI for enclosure | zoo.dev |
-| Fusion 360 | Enclosure refinement CAD | autodesk.com/fusion360 |
-
----
-
-## Legal Concerns
-
-- **GLBA**: Reading bank data puts Coiny in scope. Requires written security program,
-  privacy notice, FTC breach notification. Budget $15–30K for fintech attorney.
-  Do this before any real users connect bank accounts.
-- **FCC**: Pre-certified ESP32-S3-MINI module covers prototype. Custom PCB needs
-  Declaration of Conformity review.
-- **Teller ToS**: Cannot resell or share transaction data. Read before building
-  data-export features.
-- **App Store**: Apple requires privacy policy and additional review for financial
-  data apps. Research requirements before submitting.
-- **CCPA/GDPR**: Applies if any users in California or EU.
-
----
-
-## Data Flow (BLE Architecture)
+## Architecture in One Picture
 
 ```
 Bank Transaction
       ↓
-Teller webhook → Backend (Node.js/Fastify)
+Teller webhook  ─── mTLS ────► Backend (Fastify / TS)
       ↓
 Rule engine evaluates vs user goals
       ↓
@@ -169,26 +60,157 @@ Push notification → Companion app (Expo)
       ↓
 App relays BLE command to Coiny in pocket
       ↓
-Device: animated face + LED color + vibration + sound
+Device: animated face + LED + vibration + sound
 ```
 
----
-
-## Battery Life Target
-
-**12–16 hours** from a 600–800mAh flat LiPo (v2 custom PCB).
-M5StickS3 prototype: ~6–8 hours with BLE modem sleep (polls every 60s).
-BLE draws 5–10x less power than WiFi — key reason for BLE architecture choice.
+Device is BLE-only. Phone is the internet bridge → 2–3 day battery target.
 
 ---
 
-## What Has NOT Been Started
+## Key Decisions (Made)
 
-- No code written anywhere (all files are empty scaffolding)
-- No Teller sandbox account created
-- No Expo project initialized
-- No PCB design started
-- No enclosure designed
-- No sound/animation assets created
-- GLBA compliance work not started
-- Teller production access not applied for
+| Decision | Choice | Reason |
+|---|---|---|
+| Device connectivity | **BLE** | 2–3 day battery vs 12–16 hr for WiFi |
+| Bank API | **Teller** (mTLS) | Near real-time for major US banks; daily SLA worst case |
+| Investments (deferred) | **Plaid Investments** | Teller's investment coverage is narrow |
+| Prototype hardware | **M5StickS3** (~$22) | All-in-one ESP32-S3 dev board with speaker + mic + battery |
+| Haptics (prototype) | **Adafruit DRV2605L + 10mm coin motor** | 123 named haptic patterns, no breadboard |
+| Display (prototype) | M5StickS3's built-in 1.14" color LCD | Built into the board |
+| Backend | **Node 22 + Fastify + TypeScript + Zod** | Fast, type-safe, lean |
+| Mobile | **React Native + Expo** | Single codebase iOS + Android |
+| Monorepo | **pnpm workspaces + Turborepo** | Already configured |
+| Local secrets | **macOS Keychain** via `security` CLI | Encrypted at rest, no plaintext `.env` |
+
+---
+
+## Key Decisions (Open)
+
+| Decision | Status |
+|---|---|
+| iOS background BLE reliability | Must validate in Phase 3 |
+| Form factor (coin / chip / rectangle) | Deferred to v2 ID phase; driven by battery measurements |
+| v2 chip (ESP32-S3 vs Nordic nRF52840) | Decide post-MVP, after measuring power |
+| Pet personality & sound design | TBD |
+| Pricing model | Tentative: $79 hardware + $3.99/month |
+
+---
+
+## What Has Been Done
+
+- ✅ Repo created (private GitHub, pamplemousse-glitch/Coiny)
+- ✅ All docs written (architecture, development plan, sprint plan, security, BLE schema)
+- ✅ Teller sandbox account created
+- ✅ Teller mTLS cert + private key downloaded to `~/Documents/coiny-secrets/teller-sandbox/`, `chmod 600`
+- ✅ Sandbox API call verified end-to-end (cert auth works, returned fake Chase accounts)
+- ✅ Teller Application ID stored in macOS Keychain under `coiny-teller-application-id`
+- ✅ Sandbox Teller Connect enrollment created (fake Chase, 3 accounts)
+- ✅ Node 22, pnpm 11.1.3 installed
+- ✅ OpenSCAD 2026.04.26 installed; first coin-case sketch at `hardware/case/coin_v1.scad`
+- ✅ Form factor explicitly deferred to v2 design phase
+
+## What Has NOT Been Done
+
+- ❌ No backend code written yet (Phase 1 begins fresh from here)
+- ❌ Hardware not yet ordered (on hold per Antoine's call)
+- ❌ Teller signing secret not generated (no webhook configured yet — Phase 1 wires this up)
+- ❌ Apple Developer Program not yet signed up ($99/year, needed Phase 3)
+- ❌ Expo project not initialized
+- ❌ Firmware project not initialized
+- ❌ Teller production access not applied for
+- ❌ GLBA compliance work not started
+
+---
+
+## Local Secrets Convention
+
+**Cert + private key (files):**
+```
+~/Documents/coiny-secrets/teller-sandbox/certificate.pem   (chmod 600)
+~/Documents/coiny-secrets/teller-sandbox/private_key.pem   (chmod 600)
+```
+These are outside the repo so they can never be accidentally committed.
+
+**Other secrets (macOS Keychain via `security` CLI):**
+```
+coiny-teller-application-id        ✅ stored
+coiny-teller-signing-secret        ⏳ create when webhook URL is set
+coiny-teller-sandbox-token         optional (regenerable from dashboard)
+```
+
+**Read with:**
+```bash
+security find-generic-password -a "$USER" -s "coiny-teller-application-id" -w
+```
+
+**Production**: secrets move to Railway/AWS Secrets Manager. Same env var
+contract; only the loader changes.
+
+---
+
+## Hardware Plan (1 unit MVP, paused on ordering)
+
+| Source | Item | Cost |
+|---|---|---|
+| Amazon Prime | Adafruit DRV2605L (PID 2305) | ~$8 |
+| Amazon Prime | SparkFun Qwiic-to-Grove cable | ~$3 |
+| Amazon Prime | 10× pack 10mm coin vibration motor 3V | ~$8 |
+| Amazon Prime | Anker PowerLine III USB-C data cable | ~$10 |
+| DigiKey / M5Stack | M5StickS3 | ~$22 |
+| **Total** | | **~$60** |
+
+Soldering required: 1 joint (motor leads → DRV2605L pads). Antoine has an iron.
+
+WS2812B LED removed from list — M5StickS3's LCD covers mood color via background.
+Breadboard + jumper wires removed — Grove + STEMMA QT is solderless via cable.
+
+---
+
+## Development Phases (Sprint Plan = 7 Days)
+
+See `docs/sprint-plan.md` for day-by-day. Realistic with breakage tax: 9–10 days.
+
+| Phase | Goal | Days | Needs hardware? |
+|---|---|---|---|
+| 1 | Backend + Teller sandbox + terminal simulator | 1–2 | No |
+| 2 | Firmware on M5StickS3 | 3–4 | Yes |
+| 3 | Expo app (BLE pair, Teller Connect, push relay, iOS bg BLE) | 5–6 | Yes (phone) |
+| 4 | Full integration end-to-end | 7 | Yes |
+| 5 | Real Teller production, custom PCB, beta | Weeks 10–14 | Yes |
+
+**Phase 1 doesn't need hardware.** It can start immediately while hardware ships.
+
+---
+
+## Economics (Reference)
+
+- MVP cost: ~$60 hardware + $99/year Apple Developer = ~$160
+- Production BOM at 1K units: ~$20
+- Retail target: $59–$79 hardware + $3.99/month
+- Per-user/month cost: $0.30 (Teller only) to $4 (Teller + Plaid Investments)
+- Bank-data APIs dominate opex; subscription is structurally required
+
+---
+
+## Legal (Reference)
+
+- **GLBA**: applies because we read bank data. Written security program +
+  privacy notice required. Engage fintech attorney ($15–30K) before real users.
+- **FCC**: pre-certified ESP32-S3 module covers prototype. Custom PCB needs DoC.
+- **Teller ToS**: cannot resell or share transaction data.
+- **App Store**: financial app requires extra Apple review + privacy policy.
+- **CCPA / GDPR**: applies if any users in CA / EU.
+
+Full per-phase security checklist in `docs/security.md`.
+
+---
+
+## Resuming Work
+
+Start a fresh Claude Code session in `/Users/antoinewiley/Tamogatchi` and say:
+
+> Read `docs/handoff.md`, `docs/phase1-spec.md`, `docs/architecture.md`,
+> `docs/security.md`, `docs/sprint-plan.md`, and `docs/mqtt-topics.md`.
+> Then scaffold Phase 1 per the spec.
+
+That's the entire context transfer.

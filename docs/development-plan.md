@@ -88,8 +88,10 @@ Dedicated haptic driver with named waveform patterns (sharp tap, heartbeat, ramp
 These need answers before or during Phase 5. Not blockers for prototype.
 
 ### Hardware / Physical
-- [ ] **Form factor**: egg-shaped? coin-shaped (round, matches the name)? stick?
-      The name "Coiny" implies round — worth committing to this and designing around it.
+- [ ] **Form factor**: explicitly deferred to v2 industrial design phase. MVP uses
+      M5StickS3 rectangular dev board — final shape decision driven by battery
+      measurements + ID exploration. Coin shape is brand-aligned but not locked;
+      rectangular gives more display options and ~25% more battery capacity.
 - [ ] **Exact dimensions**: target is ~50mm longest dimension, <20g
 - [ ] **Button count and placement**: recommendation is 2 front + 1 side (3 total)
       but not finalized. What gestures should buttons trigger?
@@ -273,13 +275,9 @@ Everything needed to build a working proof-of-concept. Order all of this before 
 
 ## Who Does What
 
-| qiaomein | Antoine |
-|---|---|
-| Backend + Teller integration | Mobile app |
-| Rule engine | Onboarding + BLE pairing UX |
-| Push notification dispatch | Goal configuration screens |
-| Device simulator | BLE relay + iOS background BLE |
-| Firmware (Phase 2) | Hardware testing |
+Solo project. Code is written by Claude Code; Antoine handles physical
+setup, hardware assembly, phone testing, and signups. No collaborator
+contributing work.
 
 ---
 
