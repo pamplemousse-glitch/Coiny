@@ -61,6 +61,10 @@ Thumbs.db
 .vscode/
 .idea/
 
+# ─── Claude Code ─────────────────────────────────────────────────
+# Personal overrides — never commit. Shared settings.json + hooks/ ARE committed.
+.claude/settings.local.json
+
 # ─── Logs ────────────────────────────────────────────────────────
 *.log
 npm-debug.log*
