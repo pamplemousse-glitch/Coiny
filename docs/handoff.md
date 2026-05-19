@@ -116,15 +116,54 @@ Device is BLE-only. Phone is the internet bridge → 2–3 day battery target.
 - ✅ Branch-guard hook installed: `git commit` on main is blocked. Use feature branches.
 - ✅ `CLAUDE.md` written with project conventions (auto-loaded each session)
 
+## What Has Been Done (Phase 1 — complete as of 2026-05-19)
+
+- ✅ Phase 1 backend fully shipped and merged to main (PR #2)
+  - Fastify server, pino logging, rate limiting
+  - Teller mTLS client (undici Agent, cert+key at startup)
+  - Webhook handler with HMAC-SHA256 signature verification + replay protection
+  - Rule engine: 5 rules (paycheck, overspend, savings milestone, bill paid, large purchase)
+  - Terminal reaction dispatcher (Phase 1 stub)
+  - `pnpm sim` CLI for all 5 events
+  - 20 Vitest tests, all passing
+- ✅ Teller signing secret generated and stored in Keychain (`coiny-teller-signing-secret`)
+- ✅ Webhook registered in Teller dashboard — real sandbox events now fire through pipeline
+- ✅ Hookdeck CLI tunnel set up (stable URL: `https://hkdk.events/3yv62dpjlcg6bo`)
+  - Forwards `transactions.processed` + `enrollment.disconnected` to local backend
+- ✅ Security review + simplify pass completed on Phase 1 code
+- ✅ Production guard: `TELLER_SIGNING_SECRET` required at startup when `NODE_ENV=production`
+
 ## What Has NOT Been Done
 
-- ❌ No backend code written yet (Phase 1 begins fresh from here)
-- ❌ Teller signing secret not generated (no webhook configured yet — Phase 1 wires this up)
 - ❌ Apple Developer Program not yet signed up ($99/year, needed Phase 3)
-- ❌ Expo project not initialized
-- ❌ Firmware project not initialized
+- ❌ Expo project not initialized (partial work possible pre-hardware — see below)
+- ❌ Firmware project not initialized (needs hardware)
 - ❌ Teller production access not applied for
 - ❌ GLBA compliance work not started
+- ❌ Backend: webhook idempotency (dedup on payload.id)
+- ❌ Backend: health score calculator (rolling 30-day)
+- ❌ Backend: /api/pets and /api/spending endpoints (needed by mobile in Phase 3)
+
+## Pre-Hardware Work (can start now)
+
+These can be built and tested before the M5StickS3 arrives:
+
+### Backend
+1. **Webhook idempotency** — in-memory Set dedup on `payload.id`; prevents double-reactions on Teller retries
+2. **Health score calculator** — rolling 30-day financial health score (in architecture.md)
+3. **REST API** — `/api/pets` (pet state, goals, history) and `/api/spending` (transaction feed)
+
+### Mobile (Expo)
+4. **Project init** — Expo + React Native scaffold, navigation skeleton
+5. **Goal config screens** — budget categories, savings targets (testable in iOS Simulator)
+6. **Pet status view** — health score, recent reactions
+7. **Teller Connect OAuth flow** — bank linking (testable in iOS Simulator, no BLE needed)
+8. **Push notification subscription** — Expo Push token registration
+
+### Not buildable pre-hardware
+- BLE scanning/pairing
+- BLE relay (push notification → BLE command to device)
+- iOS background BLE validation (the #1 architectural risk)
 
 ---
 
@@ -140,7 +179,7 @@ These are outside the repo so they can never be accidentally committed.
 **Other secrets (macOS Keychain via `security` CLI):**
 ```
 coiny-teller-application-id        ✅ stored
-coiny-teller-signing-secret        ⏳ create when webhook URL is set
+coiny-teller-signing-secret        ✅ stored (webhook registered 2026-05-19)
 coiny-teller-sandbox-token         optional (regenerable from dashboard)
 ```
 
@@ -228,8 +267,17 @@ Full per-phase security checklist in `docs/security.md`.
 
 Start a fresh Claude Code session in `/Users/antoinewiley/Tamogatchi` and say:
 
-> Read `docs/handoff.md`, `docs/phase1-spec.md`, `docs/architecture.md`,
-> `docs/security.md`, `docs/sprint-plan.md`, and `docs/mqtt-topics.md`.
-> Then scaffold Phase 1 per the spec.
+> Read `docs/handoff.md`, `docs/architecture.md`, `docs/security.md`,
+> `docs/sprint-plan.md`, and `docs/mqtt-topics.md`.
+> Phase 1 is complete. Continue pre-hardware work per the "Pre-Hardware Work"
+> section of handoff.md.
 
-That's the entire context transfer.
+### Local dev startup (two terminals)
+```bash
+# Terminal 1 — tunnel
+hookdeck listen 3000 teller-webhooks --path /webhooks/teller
+
+# Terminal 2 — backend
+cd /Users/antoinewiley/Tamogatchi
+source bin/load-secrets.sh && pnpm --filter coiny-backend dev
+```
