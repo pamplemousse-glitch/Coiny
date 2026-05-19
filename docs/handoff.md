@@ -109,10 +109,16 @@ Device is BLE-only. Phone is the internet bridge → 2–3 day battery target.
 - ✅ OpenSCAD 2026.04.26 installed; first coin-case sketch at `hardware/case/coin_v1.scad`
 - ✅ Form factor explicitly deferred to v2 design phase
 
+## What Has Been Done (cont.)
+
+- ✅ All MVP hardware ordered — see Hardware Plan section below for vendor + ETA
+- ✅ USB-C data cable already owned (Anker 240W / 40 Gbps — overkill but works)
+- ✅ Branch-guard hook installed: `git commit` on main is blocked. Use feature branches.
+- ✅ `CLAUDE.md` written with project conventions (auto-loaded each session)
+
 ## What Has NOT Been Done
 
 - ❌ No backend code written yet (Phase 1 begins fresh from here)
-- ❌ Hardware not yet ordered (on hold per Antoine's call)
 - ❌ Teller signing secret not generated (no webhook configured yet — Phase 1 wires this up)
 - ❌ Apple Developer Program not yet signed up ($99/year, needed Phase 3)
 - ❌ Expo project not initialized
@@ -148,20 +154,33 @@ contract; only the loader changes.
 
 ---
 
-## Hardware Plan (1 unit MVP, paused on ordering)
+## Hardware (1 unit MVP — all ordered as of 2026-05-19)
 
-| Source | Item | Cost |
-|---|---|---|
-| Amazon Prime | Adafruit DRV2605L (PID 2305) | ~$8 |
-| Amazon Prime | SparkFun Qwiic-to-Grove cable | ~$3 |
-| Amazon Prime | 10× pack 10mm coin vibration motor 3V | ~$8 |
-| Amazon Prime | Anker PowerLine III USB-C data cable | ~$10 |
-| DigiKey / M5Stack | M5StickS3 | ~$22 |
-| **Total** | | **~$60** |
+| Source | Item | Cost | Status | ETA |
+|---|---|---|---|---|
+| MTools Tec | M5StickS3 (K150) | $36.59 (incl. ship + tax) | ✅ Ordered | 5–10 business days |
+| DigiKey | Adafruit DRV2605L (1528-1346-ND / PID 2305) | $7.95 + ship | ✅ Ordered | 2–3 business days |
+| Amazon | SparkFun Qwiic-to-Grove cable (100mm) | $7.95 + $5.97 ship | ✅ Ordered | by 2026-05-26 |
+| Amazon | uxcell 10× 10mm coin vibration motor 3V pack | $8.99 | ✅ Ordered | by 2026-05-24 |
+| (already owned) | Anker USB-C to USB-C cable (240W / 40 Gbps data) | $0 | ✅ Own | — |
+| **Total spend** | | **~$75** | | |
 
-Soldering required: 1 joint (motor leads → DRV2605L pads). Antoine has an iron.
+**Procurement notes (for v2 reference):**
+- M5StickS3 supply is tight as of May 2026 (4 months post-launch). M5Stack
+  direct + DigiKey + Mouser + Amazon all out at order time. MTools Tec (US-based
+  M5Stack reseller, Texas) had 9 units in stock at $24.99 + shipping. Backup:
+  eBay's Official M5Stack listing.
+- DRV2605L: Adafruit direct + Amazon listing both out at order time. DigiKey
+  had 982 units in stock at $7.95 — best single source for the breakout.
+- Grove-to-STEMMA-QT cable: Adafruit (PID 4528) out; SparkFun PRT-15109 on
+  Amazon is the functional equivalent (Qwiic = STEMMA QT physically).
+- USB-C cable: any data-capable USB-C-to-USB-C cable works. Charge-only cables
+  silently fail to flash firmware. Cables rated for USB 2.0+ or any data
+  spec are safe. Avoid "charging only" listings.
 
-WS2812B LED removed from list — M5StickS3's LCD covers mood color via background.
+Soldering required: 1 joint (motor leads → DRV2605L pads). Antoine has iron + solder.
+
+WS2812B LED removed — M5StickS3's LCD covers mood color via background.
 Breadboard + jumper wires removed — Grove + STEMMA QT is solderless via cable.
 
 ---
@@ -184,7 +203,7 @@ See `docs/sprint-plan.md` for day-by-day. Realistic with breakage tax: 9–10 da
 
 ## Economics (Reference)
 
-- MVP cost: ~$60 hardware + $99/year Apple Developer = ~$160
+- MVP cost: ~$75 hardware (actual) + $99/year Apple Developer = ~$175
 - Production BOM at 1K units: ~$20
 - Retail target: $59–$79 hardware + $3.99/month
 - Per-user/month cost: $0.30 (Teller only) to $4 (Teller + Plaid Investments)

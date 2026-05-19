@@ -183,45 +183,35 @@ These need answers before or during Phase 5. Not blockers for prototype.
 
 ---
 
-## Prototype Component List
+## Prototype Component List (as ordered, 2026-05-19)
 
-Everything needed to build a working proof-of-concept. Order all of this before Phase 2.
+Everything needed for the 1-unit MVP. Order status, vendors, and actual costs.
 
-### Core Board
-| Component | Purpose | Cost | Link |
-|---|---|---|---|
-| M5StickS3 | Main dev board — ESP32-S3, 1.14" color display, speaker, mic, battery, USB-C | ~$21 | shop.m5stack.com |
+### Hardware
+| Component | Purpose | Vendor | Cost | Status |
+|---|---|---|---|---|
+| M5StickS3 (K150) | Main dev board — ESP32-S3, 1.14" color LCD, 1W speaker + codec, mic, BLE 5.0, 250mAh battery, USB-C | MTools Tec | $36.59 | ✅ Ordered |
+| Adafruit DRV2605L (PID 2305) | Haptic driver IC — I2C, STEMMA QT, 123 named waveforms | DigiKey (1528-1346-ND) | $7.95 + ship | ✅ Ordered |
+| SparkFun Qwiic-to-Grove cable, 100mm | Connects DRV2605L (STEMMA QT) to M5StickS3 (Grove) | Amazon | $7.95 + ship | ✅ Ordered |
+| uxcell 10mm coin vibration motor, 3V, 10-pack | Haptic feedback motor + 9 spares | Amazon | $8.99 | ✅ Ordered |
+| USB-C to USB-C cable (data-capable) | Flash firmware + charge | (already owned) | $0 | ✅ |
+| **Total spent** | | | **~$75** | |
 
-### Add-on Components
-| Component | Purpose | Cost | Notes |
-|---|---|---|---|
-| Coin vibration motor (3V) | Haptic feedback | ~$1 | Any 10mm coin motor |
-| WS2812B RGB LED (single) | Mood color indicator | ~$0.50 | Any single WS2812B breakout |
-| 100Ω resistor | WS2812B data line protection | ~$0.05 | Standard 1/4W |
-| 1N4001 diode | Motor flyback protection | ~$0.10 | Protects GPIO from motor voltage spike |
-| NPN transistor (2N2222) | Motor GPIO driver | ~$0.10 | GPIO can't source enough current for motor directly |
-
-### Wiring + Prototyping
-| Component | Purpose | Cost |
-|---|---|---|
-| Half-size breadboard | Component mounting without soldering | ~$3 |
-| Jumper wire kit (M-M, M-F, F-F) | Connections | ~$5 |
-| USB-C cable | Power + flashing firmware | ~$2 |
+### Why these choices
+- **DRV2605L over bare motor + transistor + diode**: skips analog motor drive
+  circuit, gives 123 distinct haptic patterns, plugs in via Grove cable with
+  one solder joint (motor leads → driver pads). +$10 vs raw motor, but
+  eliminates breadboard and gives premium haptic vocabulary.
+- **WS2812B LED removed**: M5StickS3's color LCD background covers mood color.
+- **Breadboard + jumpers removed**: Grove + STEMMA QT is solderless via cable.
+- **1 unit, not 2**: solo project; no second collaborator.
 
 ### Development Tools
 | Tool | Purpose | Cost |
 |---|---|---|
-| Wokwi (browser) | Simulate circuit before wiring | Free |
-| PlatformIO (VS Code extension) | Firmware development environment | Free |
-| M5Stack Arduino library | Display, speaker, BLE drivers | Free |
-
-### Total Prototype Hardware Cost
-| | |
-|---|---|
-| M5StickS3 | $21.00 |
-| Add-on components | $6.75 |
-| Wiring / breadboard | $10.00 |
-| **Total** | **~$38** |
+| PlatformIO (VS Code extension) | Firmware dev | Free |
+| M5Unified Arduino library | Display, speaker, BLE drivers | Free |
+| Wokwi (browser) | ESP32 circuit simulation if needed before wiring | Free |
 
 ---
 
