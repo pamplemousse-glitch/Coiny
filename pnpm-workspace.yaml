@@ -5,3 +5,7 @@ packages:
 
 onlyBuiltDependencies:
   - esbuild
+
+# Native module pulled in by eslint-config-expo; needs its postinstall to build.
+allowBuilds:
+  unrs-resolver: true
