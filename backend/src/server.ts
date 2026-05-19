@@ -33,6 +33,9 @@ async function start() {
   try {
     await app.listen({ port: config.PORT, host: '0.0.0.0' });
     app.log.info('Coiny backend ready');
+    if (!config.TELLER_SIGNING_SECRET) {
+      app.log.warn('⚠ TELLER_SIGNING_SECRET not set — webhook endpoint is unauthenticated (warn-mode). Register a webhook in the Teller dashboard to enable signature verification.');
+    }
   } catch (err) {
     app.log.error(err);
     process.exit(1);
