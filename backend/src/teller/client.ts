@@ -1,0 +1,25 @@
+import { readFileSync } from 'node:fs';
+import { Agent, fetch as undiciFetch } from 'undici';
+import { config } from '../config.js';
+
+// Read certs eagerly so bad paths fail at startup, not on first request.
+const agent = new Agent({
+  connect: {
+    cert: readFileSync(config.TELLER_CERT_PATH),
+    key: readFileSync(config.TELLER_KEY_PATH),
+  },
+});
+
+export async function tellerGet(path: string, accessToken: string): Promise<unknown> {
+  const res = await undiciFetch(`https://api.teller.io${path}`, {
+    dispatcher: agent,
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${accessToken}:`).toString('base64')}`,
+    },
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Teller ${res.status}: ${body}`);
+  }
+  return res.json();
+}
