@@ -3,6 +3,9 @@ import { verifyTellerSignature } from '../teller/signature.js';
 import { TellerWebhookPayloadSchema } from '../teller/types.js';
 import { evaluate } from '../rules/engine.js';
 import { dispatchReaction } from '../reactions/dispatch.js';
+import { isAlreadyProcessed, markProcessed } from '../store/events.js';
+import { applyHealthDelta, recordReaction } from '../store/pet.js';
+import { deltaForEvent } from '../health/score.js';
 import { config } from '../config.js';
 
 export function registerTellerWebhook(app: FastifyInstance): void {
@@ -46,11 +49,19 @@ export function registerTellerWebhook(app: FastifyInstance): void {
           return;
         }
 
+        if (isAlreadyProcessed(payload.id)) {
+          req.log.warn({ id: payload.id }, 'duplicate webhook payload — skipping');
+          return;
+        }
+        markProcessed(payload.id);
+
         const transactions = payload.payload?.transactions ?? [];
         for (const tx of transactions) {
-          const reaction = evaluate(tx);
-          if (reaction) {
-            dispatchReaction(reaction);
+          const match = evaluate(tx);
+          if (match) {
+            applyHealthDelta(deltaForEvent(match.name));
+            recordReaction(match.name, match.reaction);
+            dispatchReaction(match.reaction);
           }
         }
       });

@@ -1,5 +1,6 @@
 import type { TellerTransaction } from '../teller/types.js';
 import type { Reaction } from '../reactions/types.js';
+import { getGoals } from '../store/pet.js';
 
 export type Rule = {
   name: string;
@@ -8,11 +9,7 @@ export type Rule = {
 };
 
 // Hardcoded Phase 1 goals — replaced by per-user config in Phase 3.
-const PAYCHECK_MIN_AMOUNT = 500;
-const LARGE_PURCHASE_THRESHOLD = 200;
 const WEEKLY_BUDGET_CATEGORIES = new Set(['groceries', 'food_and_drink', 'restaurants']);
-const WEEKLY_BUDGET_LIMIT = 150;
-const SAVINGS_GOAL = 1000;
 const SAVINGS_MILESTONES = [0.25, 0.5, 1.0] as const;
 const KNOWN_BILLERS = ['electric company', 'water utilities', 'internet provider', 'insurance'];
 
@@ -36,7 +33,7 @@ export const rules: Rule[] = [
   {
     name: 'paycheck_received',
     match(tx) {
-      return isCredit(tx) && parseDollar(tx.amount) >= PAYCHECK_MIN_AMOUNT;
+      return isCredit(tx) && parseDollar(tx.amount) >= getGoals().paycheckMinAmount;
     },
     react(tx) {
       return {
@@ -54,7 +51,8 @@ export const rules: Rule[] = [
     match(tx) {
       if (!isDebit(tx)) return false;
       const category = tx.details?.category?.toLowerCase() ?? '';
-      return WEEKLY_BUDGET_CATEGORIES.has(category) && parseDollar(tx.amount) > WEEKLY_BUDGET_LIMIT;
+      const limit = getGoals().weeklyBudgetByCategory[category] ?? null;
+      return limit !== null && WEEKLY_BUDGET_CATEGORIES.has(category) && parseDollar(tx.amount) > limit;
     },
     react(tx) {
       const category = tx.details?.category ?? 'unknown';
@@ -73,13 +71,14 @@ export const rules: Rule[] = [
     match(tx) {
       if (!tx.running_balance) return false;
       const balance = parseFloat(tx.running_balance);
-      const pct = balance / SAVINGS_GOAL;
-      const prevPct = (balance - parseFloat(tx.amount)) / SAVINGS_GOAL;
+      const goal = getGoals().savingsGoal;
+      const pct = balance / goal;
+      const prevPct = (balance - parseFloat(tx.amount)) / goal;
       return SAVINGS_MILESTONES.some((m) => prevPct < m && pct >= m);
     },
     react(tx) {
       const balance = parseFloat(tx.running_balance ?? '0');
-      const pct = Math.round((balance / SAVINGS_GOAL) * 100);
+      const pct = Math.round((balance / getGoals().savingsGoal) * 100);
       const isComplete = pct >= 100;
       return {
         animation: isComplete ? 'celebrate' : 'happy',
@@ -113,7 +112,7 @@ export const rules: Rule[] = [
   {
     name: 'large_purchase',
     match(tx) {
-      return isDebit(tx) && parseDollar(tx.amount) > LARGE_PURCHASE_THRESHOLD;
+      return isDebit(tx) && parseDollar(tx.amount) > getGoals().largePurchaseThreshold;
     },
     react(tx) {
       return {

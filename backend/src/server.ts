@@ -1,9 +1,12 @@
 import Fastify from 'fastify';
 import rateLimit from '@fastify/rate-limit';
+import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import { loggerOptions } from './plugins/logger.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
 import { registerTellerWebhook } from './webhook/teller.js';
+import { registerPetsApi } from './api/pets.js';
+import { registerSpendingApi } from './api/spending.js';
 
 async function buildApp() {
   const app = Fastify({
@@ -21,6 +24,8 @@ async function buildApp() {
   });
 
   registerTellerWebhook(app);
+  registerPetsApi(app);
+  registerSpendingApi(app);
 
   app.get('/health', async () => ({ ok: true }));
 
@@ -45,4 +50,7 @@ async function start() {
 export { buildApp };
 export default start;
 
-start();
+// Only auto-start when run directly, not when imported by tests or other modules.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  start();
+}
