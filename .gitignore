@@ -1,23 +1,67 @@
+# ─── Dependencies ────────────────────────────────────────────────
 node_modules/
-.env
-.env.local
+.pnp
+.pnp.js
+
+# ─── Builds ──────────────────────────────────────────────────────
 dist/
 build/
-.DS_Store
-
-# Firmware
-firmware/.pio/
-firmware/.vscode/
-
-# Mobile
-mobile/.expo/
-mobile/ios/
-mobile/android/
-
-# Backend
+out/
+.next/
 backend/dist/
 
-# Secrets
+# ─── Environment & Secrets ───────────────────────────────────────
+# Catch .env at any depth — never commit API keys
+.env
+.env.*
+!.env.example        # keep the template
+**/.env
+**/.env.*
+!**/.env.example
+
+# Keychain / credential files
 *.pem
 *.key
 *.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+secrets/
+credentials/
+**/secrets/
+**/credentials/
+
+# AWS / GCP / cloud credential files
+.aws/
+.gcp/
+service-account*.json
+*-service-account.json
+
+# iOS signing (never commit provisioning profiles or certs)
+*.mobileprovision
+*.cer
+*.p8
+AuthKey_*.p8
+
+# ─── Firmware ────────────────────────────────────────────────────
+firmware/.pio/
+firmware/.vscode/
+
+# ─── Mobile ──────────────────────────────────────────────────────
+mobile/.expo/
+mobile/ios/
+mobile/android/
+mobile/google-services.json
+mobile/GoogleService-Info.plist
+
+# ─── OS / Editor ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ─── Logs ────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
