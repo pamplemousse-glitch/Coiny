@@ -1,0 +1,23 @@
+node_modules/
+.env
+.env.local
+dist/
+build/
+.DS_Store
+
+# Firmware
+firmware/.pio/
+firmware/.vscode/
+
+# Mobile
+mobile/.expo/
+mobile/ios/
+mobile/android/
+
+# Backend
+backend/dist/
+
+# Secrets
+*.pem
+*.key
+*.crt
