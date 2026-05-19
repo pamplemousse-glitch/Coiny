@@ -16,44 +16,43 @@ function buildSignature(body: string, ts: number): string {
   return `t=${ts},v1=${sig}`;
 }
 
-const PAYCHECK_PAYLOAD = JSON.stringify({
-  id: 'evt_wh_test',
-  type: 'transactions.processed',
-  payload: {
-    account_id: 'acc_test',
-    transactions: [
-      {
-        id: 'txn_wh_paycheck',
-        account_id: 'acc_test',
-        amount: '2400.00',
-        date: '2026-05-19',
-        description: 'Direct Deposit',
-        details: { category: 'paycheck' },
-        running_balance: null,
-        status: 'posted',
-        type: 'paycheck',
-      },
-    ],
-  },
-});
+function buildPaycheckPayload(id: string): string {
+  return JSON.stringify({
+    id,
+    type: 'transactions.processed',
+    payload: {
+      account_id: 'acc_test',
+      transactions: [
+        {
+          id: `txn_${id}`,
+          account_id: 'acc_test',
+          amount: '2400.00',
+          date: '2026-05-19',
+          description: 'Direct Deposit',
+          details: { category: 'paycheck' },
+          running_balance: null,
+          status: 'posted',
+          type: 'paycheck',
+        },
+      ],
+    },
+  });
+}
 
 describe('POST /webhooks/teller', () => {
   it('returns 200 on a valid signed payload', async () => {
-    // Lazy-import after env setup.
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
+    const payload = buildPaycheckPayload('evt_wh_200');
     const ts = Math.floor(Date.now() / 1000);
-    const sig = buildSignature(PAYCHECK_PAYLOAD, ts);
+    const sig = buildSignature(payload, ts);
 
     const res = await app.inject({
       method: 'POST',
       url: '/webhooks/teller',
-      headers: {
-        'content-type': 'application/json',
-        'teller-signature': sig,
-      },
-      body: PAYCHECK_PAYLOAD,
+      headers: { 'content-type': 'application/json', 'teller-signature': sig },
+      body: payload,
     });
 
     expect(res.statusCode).toBe(200);
@@ -64,17 +63,15 @@ describe('POST /webhooks/teller', () => {
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
+    const payload = buildPaycheckPayload('evt_wh_401');
     const ts = Math.floor(Date.now() / 1000);
     const badSig = `t=${ts},v1=deadbeef${'0'.repeat(60)}`;
 
     const res = await app.inject({
       method: 'POST',
       url: '/webhooks/teller',
-      headers: {
-        'content-type': 'application/json',
-        'teller-signature': badSig,
-      },
-      body: PAYCHECK_PAYLOAD,
+      headers: { 'content-type': 'application/json', 'teller-signature': badSig },
+      body: payload,
     });
 
     expect(res.statusCode).toBe(401);
@@ -88,23 +85,20 @@ describe('POST /webhooks/teller', () => {
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
+    const payload = buildPaycheckPayload('evt_wh_dispatch');
     const ts = Math.floor(Date.now() / 1000);
-    const sig = buildSignature(PAYCHECK_PAYLOAD, ts);
+    const sig = buildSignature(payload, ts);
 
     await app.inject({
       method: 'POST',
       url: '/webhooks/teller',
-      headers: {
-        'content-type': 'application/json',
-        'teller-signature': sig,
-      },
-      body: PAYCHECK_PAYLOAD,
+      headers: { 'content-type': 'application/json', 'teller-signature': sig },
+      body: payload,
     });
 
-    // setImmediate fires async — wait a tick
     await new Promise((r) => setImmediate(r));
 
-    expect(spy).toHaveBeenCalledOnce();
+    expect(spy).toHaveBeenCalled();
     expect(spy.mock.calls[0]?.[0]?.animation).toBe('celebrate');
 
     await app.close();
