@@ -1,0 +1,14 @@
+name: Mobile CI
+on:
+  push:
+    paths: ['mobile/**', 'shared/**']
+  pull_request:
+    paths: ['mobile/**', 'shared/**']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder
+        run: echo "Mobile CI — Expo typecheck and EAS build to be added"

@@ -1,0 +1,14 @@
+name: Firmware CI
+on:
+  push:
+    paths: ['firmware/**']
+  pull_request:
+    paths: ['firmware/**']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder
+        run: echo "Firmware CI — PlatformIO build step to be added"

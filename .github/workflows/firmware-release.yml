@@ -1,0 +1,12 @@
+name: Firmware Release
+on:
+  push:
+    tags: ['fw/v*']
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder
+        run: echo "Firmware release — PlatformIO build + OTA upload to be added"
