@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import rateLimit from '@fastify/rate-limit';
 import { config } from './config.js';
-import { loggerOptions, registerLogger } from './plugins/logger.js';
+import { loggerOptions } from './plugins/logger.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
 import { registerTellerWebhook } from './webhook/teller.js';
 
@@ -11,10 +11,8 @@ async function buildApp() {
       level: config.LOG_LEVEL,
       ...loggerOptions,
     },
-    disableRequestLogging: false,
   });
 
-  registerLogger(app);
   registerErrorHandler(app);
 
   await app.register(rateLimit, {

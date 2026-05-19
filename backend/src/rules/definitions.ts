@@ -14,7 +14,7 @@ const WEEKLY_BUDGET_CATEGORIES = new Set(['groceries', 'food_and_drink', 'restau
 const WEEKLY_BUDGET_LIMIT = 150;
 const SAVINGS_GOAL = 1000;
 const SAVINGS_MILESTONES = [0.25, 0.5, 1.0] as const;
-const KNOWN_BILLERS = new Set(['electric company', 'water utilities', 'internet provider', 'insurance']);
+const KNOWN_BILLERS = ['electric company', 'water utilities', 'internet provider', 'insurance'];
 
 function parseDollar(amount: string): number {
   return Math.abs(parseFloat(amount));
@@ -74,11 +74,8 @@ export const rules: Rule[] = [
       if (!tx.running_balance) return false;
       const balance = parseFloat(tx.running_balance);
       const pct = balance / SAVINGS_GOAL;
-      return SAVINGS_MILESTONES.some((m) => {
-        const prevBalance = balance - parseFloat(tx.amount);
-        const prevPct = prevBalance / SAVINGS_GOAL;
-        return prevPct < m && pct >= m;
-      });
+      const prevPct = (balance - parseFloat(tx.amount)) / SAVINGS_GOAL;
+      return SAVINGS_MILESTONES.some((m) => prevPct < m && pct >= m);
     },
     react(tx) {
       const balance = parseFloat(tx.running_balance ?? '0');
@@ -99,7 +96,7 @@ export const rules: Rule[] = [
     match(tx) {
       if (!isDebit(tx)) return false;
       const counterparty = tx.details?.counterparty?.name?.toLowerCase() ?? '';
-      return Array.from(KNOWN_BILLERS).some((b) => counterparty.includes(b));
+      return KNOWN_BILLERS.some((b) => counterparty.includes(b));
     },
     react(tx) {
       const counterparty = tx.details?.counterparty?.name ?? 'biller';

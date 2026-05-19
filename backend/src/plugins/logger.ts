@@ -1,10 +1,3 @@
-import type { FastifyInstance } from 'fastify';
-
-export function registerLogger(_app: FastifyInstance): void {
-  // Fastify registers pino automatically via the logger option in server.ts.
-  // This module exists as an extension point for custom serializers.
-}
-
 export const loggerOptions = {
   serializers: {
     req(req: { method: string; url: string; headers: Record<string, string> }) {

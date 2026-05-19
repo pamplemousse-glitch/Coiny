@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { buildSignatureHeader } from '../teller/signature.js';
 
 type EventName = 'paycheck' | 'overspend' | 'savings-milestone' | 'large-purchase' | 'bill-paid';
 
@@ -110,32 +110,23 @@ const EVENTS: Record<EventName, object> = {
 };
 
 async function main() {
-  const eventName = process.argv[2] as EventName | undefined;
+  const eventArg = process.argv[2];
 
-  if (!eventName || !Object.prototype.hasOwnProperty.call(EVENTS, eventName)) {
+  if (!eventArg || !(eventArg in EVENTS)) {
     console.error(`Usage: pnpm sim <event>`);
     console.error(`Events: ${Object.keys(EVENTS).join(' | ')}`);
     process.exit(1);
   }
 
-  const payload = EVENTS[eventName];
-  const body = JSON.stringify(payload);
+  const eventName = eventArg as EventName;
+  const body = JSON.stringify(EVENTS[eventName]);
   const bodyBuf = Buffer.from(body, 'utf8');
-
-  const port = process.env['PORT'] ?? '3000';
   const secret = process.env['TELLER_SIGNING_SECRET'] ?? '';
-  const ts = Math.floor(Date.now() / 1000);
+  const port = process.env['PORT'] ?? '3000';
 
-  let signatureHeader: string;
-  if (secret) {
-    const sig = createHmac('sha256', secret)
-      .update(`${ts}.${body}`)
-      .digest('hex');
-    signatureHeader = `t=${ts},v1=${sig}`;
-  } else {
-    // No secret — send without a real sig. Server will warn but still process.
-    signatureHeader = `t=${ts},v1=nosecret`;
-  }
+  const signatureHeader = secret
+    ? buildSignatureHeader(bodyBuf, secret)
+    : `t=${Math.floor(Date.now() / 1000)},v1=nosecret`;
 
   let res;
   try {
@@ -146,9 +137,9 @@ async function main() {
         'Teller-Signature': signatureHeader,
         'Content-Length': String(bodyBuf.length),
       },
-      body: body,
+      body,
     });
-  } catch (err) {
+  } catch {
     console.error(`\n✗ Could not reach server at http://localhost:${port}/webhooks/teller`);
     console.error(`  Make sure the server is running: source bin/load-secrets.sh && pnpm dev\n`);
     process.exit(1);
