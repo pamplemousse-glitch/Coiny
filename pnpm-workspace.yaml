@@ -1,0 +1,7 @@
+packages:
+  - 'backend'
+  - 'shared'
+  - 'mobile'
+
+onlyBuiltDependencies:
+  - esbuild
