@@ -8,73 +8,266 @@ loop works — then add hardware.
 
 ---
 
-## Phase 1 — Backend + Teller Integration
-**Timeline: Weeks 1–3**
-**Goal: prove transactions flow through to a reaction.**
+## Open Architectural Decisions
 
-- [ ] Initialize Node.js/TypeScript backend with Fastify
-- [ ] Connect Teller sandbox (fake bank data, no real account needed)
-- [ ] Build webhook receiver — Teller fires → transaction lands in system
-- [ ] Build spending rule engine — categorize transaction, evaluate against goals
-- [ ] Set up push notification dispatch (Expo Push → phone)
-- [ ] Build software device simulator — terminal script that receives push events
-      and logs reactions (acts as a fake device)
+These are either/or choices that will affect the entire build. Decide before Phase 2.
 
-**End state**: trigger a fake bank transaction in Teller sandbox, watch a reaction
-appear in the terminal. Full pipeline proven, no hardware required.
+### 1. Device Connectivity: BLE-only vs. BLE + WiFi hybrid
+**Option A — BLE only (current plan)**
+Device talks only to phone over BLE. Phone relays commands from backend.
+- Pro: 2–3 day battery life, simpler device firmware, no WiFi credentials on device
+- Con: device is silent when phone is away or dead; iOS background BLE needs validation
+- Risk: iOS `bluetooth-central` background mode must be tested early in Phase 3
+
+**Option B — BLE + WiFi hybrid**
+BLE for local interaction and status; WiFi for receiving reaction commands directly.
+- Pro: device works independently of phone; more reliable command delivery
+- Con: higher power draw (~12–16hr battery), more complex firmware, WiFi credentials on device
+
+**Current recommendation**: Option A. Validate iOS background BLE in Phase 3 week 1.
+If it fails reliably, switch to Option B before going further.
 
 ---
 
-## Phase 2 — Firmware + Hardware Prototype
-**Timeline: Weeks 3–6**
-**Goal: replace the terminal simulator with a real device.**
+### 2. Bank API: Teller vs. Plaid
+**Option A — Teller (current plan)**
+Direct bank API connections. Near real-time (seconds to minutes) for major US banks.
+Covers Chase, BoA, Wells Fargo, Citi, US Bank (~70% of US checking accounts).
+- Pro: faster transaction data, better quality connections, simpler pricing
+- Con: ~50 institutions only; users at credit unions or small banks get no connection
 
-- [ ] Order M5StickS3 (~$21) + coin vibration motor + WS2812B LED
-- [ ] Write firmware: BLE server, advertise service, receive command characteristic
-- [ ] Display happy/sad face on color TFT based on BLE command
+**Option B — Plaid**
+Screen-scraping + bank APIs. Covers 12,000+ institutions but data syncs 1–4x per day.
+- Pro: widest coverage, mature ecosystem, free sandbox
+- Con: not real-time — Coiny reacts to yesterday's transactions, not today's
+
+**Option C — Teller primary + Plaid fallback**
+Teller for supported banks (real-time), Plaid for everything else (delayed).
+- Pro: best of both worlds
+- Con: two integrations to maintain
+
+**Current recommendation**: Start with Teller only. Add Plaid fallback in v2 if
+coverage complaints come in from beta users.
+
+---
+
+### 3. Display: Color OLED vs. Color LCD
+**Option A — Color OLED (v2 plan)**
+True black pixels = zero power when off. More vivid. Better for battery life.
+- Pro: premium look, lower average power draw, true black backgrounds
+- Con: more expensive (~$15–20 vs $5), OLED burn-in over years, fewer small modules available
+- Specific module to evaluate: SSD1351 128×128 or SSD1306 for mono
+
+**Option B — Color IPS LCD (prototype plan, M5StickS3 built-in)**
+Constant backlight power regardless of content.
+- Pro: cheap, widely available, fast refresh, M5StickS3 already has one
+- Con: backlight always on = higher idle power
+
+**Current recommendation**: LCD for prototype (it's built into M5StickS3).
+OLED for v2 custom PCB.
+
+---
+
+### 4. Haptics: Basic coin motor vs. DRV2605L driver
+**Option A — Basic coin vibration motor (prototype)**
+Direct GPIO → motor. Feels like a phone buzz.
+- Pro: $1, 2 wires, trivial to wire
+- Con: imprecise, all reactions feel the same
+
+**Option B — DRV2605L haptic driver IC (v2)**
+Dedicated haptic driver with named waveform patterns (sharp tap, heartbeat, ramp).
+- Pro: premium feel, distinct patterns per financial event, same approach as Apple Taptic Engine
+- Con: requires I2C wiring, $2 IC, more firmware work
+
+**Current recommendation**: Coin motor for prototype. DRV2605L on v2 custom PCB.
+
+---
+
+## Open Design Questions
+
+These need answers before or during Phase 5. Not blockers for prototype.
+
+### Hardware / Physical
+- [ ] **Form factor**: egg-shaped? coin-shaped (round, matches the name)? stick?
+      The name "Coiny" implies round — worth committing to this and designing around it.
+- [ ] **Exact dimensions**: target is ~50mm longest dimension, <20g
+- [ ] **Button count and placement**: recommendation is 2 front + 1 side (3 total)
+      but not finalized. What gestures should buttons trigger?
+- [ ] **Color options at launch**: how many colorways?
+- [ ] **Clip vs. lanyard**: how does user carry it? keychain loop? belt clip? loose in pocket?
+- [ ] **Display model for v2**: which specific color OLED module? Need to evaluate
+      SSD1351, GC9A01 (round), and SH8601 options.
+
+### Software / Product
+- [ ] **Offline behavior**: what does Coiny do when phone is away for hours?
+      Options: sleep animation, slowly get "hungry", stay at last known state.
+- [ ] **Pet personality**: what is Coiny's character? Cheeky? Calm? Anxious?
+      This defines animation style, sound design, and copy in the app.
+- [ ] **Health score formula**: exact algorithm for rolling 30-day financial health score.
+      What weights different events? How fast does it recover after bad spending?
+- [ ] **Growth stages**: how many? What triggers each? What visually changes?
+- [ ] **Pet types at launch**: 1 or multiple? If multiple, do they behave differently
+      or just look different?
+- [ ] **Sound design**: who makes the audio files? What do they sound like?
+      Retro 8-bit? Soft organic tones? Voice?
+- [ ] **Onboarding experience**: exact flow from unboxing to first reaction.
+
+### Legal / Business
+- [ ] GLBA compliance — engage fintech attorney before any real bank data
+- [ ] Teller production access — apply when backend is proven in sandbox
+- [ ] FCC certification path — pre-certified ESP32-S3-MINI module handles this for prototype;
+      custom PCB needs a Declaration of Conformity review
+- [ ] Pricing — hardware and subscription not decided
+- [ ] App Store submission — Apple financial app review requirements need research
+
+---
+
+## User Experience + Mechanics
+
+### Core Loop
+1. User carries Coiny in pocket alongside phone
+2. User makes a financial transaction (swipe card, tap phone, online purchase)
+3. Teller detects transaction within seconds–minutes (for supported banks)
+4. Backend evaluates: was this good or bad relative to user's goals?
+5. Push notification sent to phone
+6. Companion app relays BLE command to Coiny
+7. Coiny reacts: face changes, LED pulses, vibrates, plays sound
+8. User feels emotional feedback without looking at a screen
+
+### Pet Mood System
+- Mood is a 0–100 score updated by financial events
+- Mood decays slowly over time if no positive events occur (encourages engagement)
+- Score is NOT account balance — it reflects behavior vs. goals (avoids penalizing
+  lower-income users for having less money)
+- Mood maps to display state: 80–100 = happy/healthy, 50–79 = neutral, 20–49 = tired,
+  0–19 = sick/wilting
+
+### Reaction Design Principles
+- **Never punish catastrophically**: pet gets sick but never dies. Always shows recovery path.
+- **Variable rewards**: occasional rare "jackpot" celebration for the same positive event.
+  Dopamine fires on unpredictable rewards — don't make every reaction identical.
+- **Proportional response**: paying a small bill = gentle tap + chime.
+  Hitting a savings goal = full celebration with sound + rainbow LED + animation.
+- **Shame-free negatives**: sad/concerned reactions are gentle and brief.
+  Never aggressive or guilt-inducing.
+
+### Button Interactions (Proposed)
+| Button | Short Press | Long Press |
+|---|---|---|
+| Main (front) | Wake screen / acknowledge reaction | Open quick status |
+| Back (rear) | Dismiss / snooze reaction | — |
+| Side (right edge) | Cycle status screens | Trigger BLE re-pair |
+
+### Haptic Language (v2 with DRV2605L)
+| Event | Haptic Pattern |
+|---|---|
+| Paycheck received | Sharp triple tap + escalating rumble |
+| Savings goal hit | Clean double tap |
+| Bill paid on time | Single crisp tap |
+| Overspent in category | Slow heavy pulse |
+| Budget exceeded | Repeated dull throb (until dismissed) |
+| Button press | Subtle click (confirms input) |
+| Device wakes | Gentle single tap |
+
+### Onboarding Flow (To Be Designed)
+1. User unboxes Coiny — device boots, shows welcome animation
+2. User downloads companion app, opens it
+3. App scans for Coiny over BLE, pairs automatically
+4. User links bank account via Teller Connect (OAuth in-app)
+5. App pulls 90 days of transaction history, suggests budget categories
+6. User approves suggested goals (opt-out, not opt-in)
+7. First reaction fires — demo transaction triggers celebration
+8. Done — Coiny is live
+
+---
+
+## Prototype Component List
+
+Everything needed to build a working proof-of-concept. Order all of this before Phase 2.
+
+### Core Board
+| Component | Purpose | Cost | Link |
+|---|---|---|---|
+| M5StickS3 | Main dev board — ESP32-S3, 1.14" color display, speaker, mic, battery, USB-C | ~$21 | shop.m5stack.com |
+
+### Add-on Components
+| Component | Purpose | Cost | Notes |
+|---|---|---|---|
+| Coin vibration motor (3V) | Haptic feedback | ~$1 | Any 10mm coin motor |
+| WS2812B RGB LED (single) | Mood color indicator | ~$0.50 | Any single WS2812B breakout |
+| 100Ω resistor | WS2812B data line protection | ~$0.05 | Standard 1/4W |
+| 1N4001 diode | Motor flyback protection | ~$0.10 | Protects GPIO from motor voltage spike |
+| NPN transistor (2N2222) | Motor GPIO driver | ~$0.10 | GPIO can't source enough current for motor directly |
+
+### Wiring + Prototyping
+| Component | Purpose | Cost |
+|---|---|---|
+| Half-size breadboard | Component mounting without soldering | ~$3 |
+| Jumper wire kit (M-M, M-F, F-F) | Connections | ~$5 |
+| USB-C cable | Power + flashing firmware | ~$2 |
+
+### Development Tools
+| Tool | Purpose | Cost |
+|---|---|---|
+| Wokwi (browser) | Simulate circuit before wiring | Free |
+| PlatformIO (VS Code extension) | Firmware development environment | Free |
+| M5Stack Arduino library | Display, speaker, BLE drivers | Free |
+
+### Total Prototype Hardware Cost
+| | |
+|---|---|
+| M5StickS3 | $21.00 |
+| Add-on components | $6.75 |
+| Wiring / breadboard | $10.00 |
+| **Total** | **~$38** |
+
+---
+
+## Phase Roadmap
+
+### Phase 1 — Backend + Teller Integration (Weeks 1–3)
+- [ ] Initialize Node.js/TypeScript backend with Fastify
+- [ ] Connect Teller sandbox
+- [ ] Build webhook receiver
+- [ ] Build spending rule engine
+- [ ] Set up push notification dispatch (Expo Push)
+- [ ] Build software device simulator (terminal script)
+
+**End state**: fake transaction → terminal reaction. Pipeline proven.
+
+### Phase 2 — Firmware + Hardware Prototype (Weeks 3–6)
+- [ ] Order components from prototype list above
+- [ ] Write firmware: BLE server, command characteristic
+- [ ] Display happy/sad face based on BLE command
 - [ ] Trigger vibration motor on reaction
 - [ ] Trigger WS2812B LED color on reaction
-- [ ] Play sound effect via built-in speaker on reaction
-- [ ] Test end-to-end: Teller sandbox → backend → push → app → BLE → device reacts
+- [ ] Play sound effect via built-in speaker
+- [ ] Test end-to-end with backend
 
-**End state**: physical device in pocket reacting to fake bank transactions via phone.
+**End state**: physical Coiny in pocket reacting to fake transactions.
 
----
-
-## Phase 3 — Mobile App
-**Timeline: Weeks 5–8 (parallel with Phase 2)**
-**Goal: connect the phone as the BLE bridge.**
-
+### Phase 3 — Mobile App (Weeks 5–8, parallel with Phase 2)
 - [ ] Initialize Expo project
-- [ ] Build BLE scanning + device pairing flow (onboarding)
-- [ ] Build Teller Connect bank linking flow
-- [ ] Build goal/budget configuration screens
-- [ ] Connect to backend API (save goals, fetch pet status)
-- [ ] Implement BLE relay: push notification received → write command to device
-- [ ] Background BLE relay (app relays even when not in foreground)
+- [ ] **Validate iOS background BLE first** — this is the top risk
+- [ ] BLE scanning + device pairing flow
+- [ ] Teller Connect bank linking
+- [ ] Goal/budget configuration screens
+- [ ] BLE relay: push notification → BLE command to device
+- [ ] Background BLE relay
 
----
-
-## Phase 4 — Connect Real Bank Data
-**Timeline: Week 8+**
-**Goal: use a real bank account.**
-
+### Phase 4 — Real Bank Data (Week 8+)
 - [ ] Apply for Teller production access
-- [ ] Test with a real account
-- [ ] Tune rule engine against real transaction data
-- [ ] Handle edge cases (failed connections, token expiry, merchant name quirks)
+- [ ] Test with real account
+- [ ] Tune rule engine on real transactions
+- [ ] Handle edge cases
 
----
-
-## Phase 5 — Polish + Beta
-**Timeline: Weeks 10–14**
-
-- [ ] OTA firmware update pipeline (WiFi, triggered from app)
-- [ ] Growth stages + health score system
-- [ ] 2–3 animation sets / pet personalities
-- [ ] Upgrade display to color OLED for v2 PCB
-- [ ] Custom PCB design (Flux.ai + freelancer)
-- [ ] Recruit 5–10 beta users
+### Phase 5 — Polish + Beta (Weeks 10–14)
+- [ ] OTA firmware update pipeline
+- [ ] Growth stages + health score
+- [ ] Animation sets + sound design
+- [ ] Custom PCB design (Flux.ai)
+- [ ] Upgrade to color OLED + DRV2605L haptics
+- [ ] 5–10 beta users
 
 ---
 
@@ -85,7 +278,7 @@ appear in the terminal. Full pipeline proven, no hardware required.
 | Backend + Teller integration | Mobile app |
 | Rule engine | Onboarding + BLE pairing UX |
 | Push notification dispatch | Goal configuration screens |
-| Device simulator | BLE relay implementation |
+| Device simulator | BLE relay + iOS background BLE |
 | Firmware (Phase 2) | Hardware testing |
 
 ---
@@ -93,34 +286,23 @@ appear in the terminal. Full pipeline proven, no hardware required.
 ## Design & Prototyping Tools
 
 ### PCB / Schematic Design
-- **Flux.ai** — AI-assisted browser-based PCB design. Describe components in plain
-  language, AI helps generate schematic. Collaborative (both of you can work in browser).
-  Best tool for the custom PCB phase.
-- **EasyEDA Pro** — free, browser-based, directly integrated with JLCPCB for ordering.
-  Good for first PCB if not using Flux. AI component search built in.
-- **KiCad** — open-source, industry standard. Use for production-ready designs.
-  Espressif publishes official KiCad libraries for all ESP32 modules.
+- **Flux.ai** — AI-assisted browser-based PCB design. Collaborative.
+- **EasyEDA Pro** — free, integrated with JLCPCB. Good for first PCB.
+- **KiCad** — open-source industry standard. Use for production designs.
 
-### 3D Enclosure / Physical Product CAD
-- **Zoo.dev** — text-to-CAD AI tool. Describe the enclosure shape in words, get a 3D
-  model. Best for generating a first draft of the egg/coin shaped Coiny body.
-- **Fusion 360** — industry standard for consumer product enclosures. Free for startups.
-  Use to refine the Zoo.dev output and prepare STL files for 3D printing.
-- **Onshape** — browser-based, fully collaborative. Both of you can design simultaneously.
-  No AI features but strong mechanical CAD. Good alternative to Fusion 360.
+### 3D Enclosure CAD
+- **Zoo.dev** — text-to-CAD AI. Describe enclosure in words, get a 3D model.
+- **Fusion 360** — industry standard for consumer enclosures. Free for startups.
+- **Onshape** — browser-based, fully collaborative. No AI but strong mechanical CAD.
 
-### Circuit Simulation / Wiring Validation
-- **Wokwi** — simulate ESP32 + components (displays, LEDs, motors) in the browser.
-  Run actual firmware code against a virtual circuit before touching real hardware.
-  Free. Use this before wiring anything physically.
-- **Fritzing** — visual wiring diagrams. Use to document how components connect for
-  reference and handoff.
+### Circuit Simulation
+- **Wokwi** — simulate ESP32 + components in browser, run real firmware. Use before
+  wiring anything physically.
+- **Fritzing** — visual wiring diagrams for documentation.
 
 ### Manufacturing
-- **JLCPCB** — PCB fabrication + PCBA (they solder components for you). Ships from
-  Shenzhen. Cheapest option for prototype quantities.
-- **PCBWay** — alternative to JLCPCB. Slightly better quality, slower, offers a PCB
-  design service (~$200–800 for layout if needed).
+- **JLCPCB** — PCB fab + PCBA. Cheapest for prototype quantities.
+- **PCBWay** — alternative, slightly better quality, offers design services.
 
 ---
 
