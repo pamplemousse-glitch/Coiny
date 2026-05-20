@@ -46,6 +46,15 @@ export const plaidItems = pgTable('plaid_items', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Expo push tokens. Phase 1 single-user — multi-user split adds user_id in T2.2.
+// `token` is the Expo push notification token; `platform` is 'ios' | 'android'.
+export const deviceTokens = pgTable('device_tokens', {
+  token: text('token').primaryKey(),
+  platform: text('platform').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // User-defined category overrides. Looked up by lowercased merchant name;
 // overrides Plaid's personal_finance_category mapping when present.
 // Phase 1 single-user — multi-user split adds user_id column in T2.2.
