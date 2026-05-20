@@ -12,6 +12,7 @@ vibration, and sound.
 - `docs/feature-backlog.md` — forward-looking feature list (pet customization, audio, net worth, etc.)
 - `docs/product-brief.md` — the product north star (target user, voice, principles). Every feature decision references this.
 - `docs/stack-map.md` — complete visual map: every hardware component + software layer with purpose
+- `docs/launch-readiness.md` — actionable blocker checklist split by MVP-Prototype vs Full Launch
 - `docs/architecture.md` — system design
 - `docs/plaid-integration.md` — Plaid API contract reference (auth, webhooks, sync semantics, taxonomy)
 - `docs/security.md` — security model + per-phase checklist
