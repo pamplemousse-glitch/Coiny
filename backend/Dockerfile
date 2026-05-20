@@ -29,6 +29,7 @@ COPY shared/package.json ./shared/
 RUN pnpm install --frozen-lockfile --filter coiny-backend... --prod
 
 COPY --from=builder /app/backend/dist ./backend/dist/
+COPY backend/drizzle ./backend/drizzle/
 COPY backend/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 

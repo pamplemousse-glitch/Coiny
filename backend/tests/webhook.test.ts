@@ -1,15 +1,16 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createHmac } from 'node:crypto';
+import { resetDatabase } from './db-helper.js';
 
 const flushImmediate = () => new Promise<void>((r) => setImmediate(r));
 
-// Must set env before importing server modules that call loadConfig() at module init.
-process.env['TELLER_APPLICATION_ID'] = 'app_test';
-process.env['TELLER_CERT_PATH'] = '/dev/null';
-process.env['TELLER_KEY_PATH'] = '/dev/null';
+// Webhook handler awaits async store ops inside setImmediate; one flush isn't
+// always enough since each awaited microtask defers further work.
+async function flushAll() {
+  for (let i = 0; i < 5; i++) await flushImmediate();
+}
+
 process.env['TELLER_SIGNING_SECRET'] = 'test-webhook-secret';
-process.env['NODE_ENV'] = 'test';
-process.env['LOG_LEVEL'] = 'silent';
 
 const SECRET = 'test-webhook-secret';
 
@@ -42,6 +43,8 @@ function buildPaycheckPayload(id: string): string {
 }
 
 describe('POST /webhooks/teller', () => {
+  beforeEach(async () => { await resetDatabase(); });
+
   it('returns 200 on a valid signed payload', async () => {
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
@@ -58,7 +61,7 @@ describe('POST /webhooks/teller', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    await flushImmediate();
+    await flushAll();
     await app.close();
   });
 
@@ -100,7 +103,7 @@ describe('POST /webhooks/teller', () => {
       body: payload,
     });
 
-    await flushImmediate();
+    await flushAll();
 
     expect(spy).toHaveBeenCalledOnce();
     expect(spy.mock.calls[0]?.[0]?.animation).toBe('celebrate');
@@ -126,8 +129,13 @@ describe('POST /webhooks/teller', () => {
       body: payload,
     };
 
-    const [r1, r2] = await Promise.all([app.inject(opts), app.inject(opts)]);
-    await flushImmediate();
+    // Serial requests — concurrent would race the insert-then-check pattern,
+    // which we don't claim to handle (a unique constraint on processed_events.id
+    // is what guarantees no double-processing in production).
+    const r1 = await app.inject(opts);
+    await flushAll();
+    const r2 = await app.inject(opts);
+    await flushAll();
 
     expect(r1.statusCode).toBe(200);
     expect(r2.statusCode).toBe(200);

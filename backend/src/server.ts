@@ -7,8 +7,14 @@ import { registerErrorHandler } from './plugins/error-handler.js';
 import { registerTellerWebhook } from './webhook/teller.js';
 import { registerPetsApi } from './api/pets.js';
 import { registerSpendingApi } from './api/spending.js';
+import { initDb } from './db/client.js';
+import { runMigrations, seedPetStateIfMissing } from './db/migrate.js';
 
 async function buildApp() {
+  await initDb();
+  await runMigrations();
+  await seedPetStateIfMissing();
+
   const app = Fastify({
     logger: {
       level: config.LOG_LEVEL,

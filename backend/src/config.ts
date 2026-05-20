@@ -11,6 +11,8 @@ const configSchema = z
     TELLER_KEY_PATH: z.string().min(1),
     TELLER_SIGNING_SECRET: z.string().default(''),
     TELLER_ENVIRONMENT: z.enum(['sandbox', 'development', 'production']).default('sandbox'),
+
+    DATABASE_URL: z.string().default(''),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production' && !data.TELLER_SIGNING_SECRET) {
@@ -18,6 +20,13 @@ const configSchema = z
         code: z.ZodIssueCode.custom,
         path: ['TELLER_SIGNING_SECRET'],
         message: 'TELLER_SIGNING_SECRET is required in production',
+      });
+    }
+    if (data.NODE_ENV !== 'test' && !data.DATABASE_URL) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['DATABASE_URL'],
+        message: 'DATABASE_URL is required outside of tests',
       });
     }
   });
