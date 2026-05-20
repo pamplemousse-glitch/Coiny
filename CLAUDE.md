@@ -6,9 +6,11 @@ vibration, and sound.
 
 **Read these docs first before any work:**
 - `docs/handoff.md` — current state, what's done, what's not
+- `docs/tech-stack.md` — quality-first stack decisions (firmware, mobile, backend, hosting, observability, security, auth)
+- `docs/proposed-changes.md` — summary table of every proposed change from the 2026-05-20 quality audit
+- `docs/implementation-plan.md` — execution sequence + milestones for the audit changes
 - `docs/architecture.md` — system design
 - `docs/plaid-integration.md` — Plaid API contract reference (auth, webhooks, sync semantics, taxonomy)
-- `docs/plaid-swap-plan.md` — execution plan for the Teller→Plaid migration (in-progress)
 - `docs/security.md` — security model + per-phase checklist
 - `docs/sprint-plan.md` — 7-day sprint cadence
 - `docs/mqtt-topics.md` — BLE command schema
@@ -96,7 +98,7 @@ chore: bump pino to 9.5.0
 ### Monorepo (pnpm workspaces + Turborepo)
 
 - `backend/` — Fastify TS server (Phase 1)
-- `firmware/` — ESP32-S3 C++ via PlatformIO (Phase 2)
+- `firmware/` — nRF52840 + Zephyr (nRF Connect SDK) — Phase 2. See `docs/tech-stack.md` §1 for the rationale (ESP32-S3 was the original plan, swapped 2026-05-20 for battery life).
 - `mobile/` — Expo React Native (Phase 3)
 - `shared/` — cross-package TS types (BLE schema, pet state)
 - `hardware/case/` — OpenSCAD CAD files
