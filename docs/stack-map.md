@@ -1,10 +1,12 @@
-# Coiny — Complete Tech Stack Map
+# Coiny — Complete Tech Stack Map (Quality-Only)
 
-Visual one-stop reference. Every layer, every tool, every chip, with what
-it's used for. Updated 2026-05-20.
+Visual one-stop reference for the **quality-only stack** locked in
+`docs/tech-stack.md`. Every layer, every tool, every chip — with what it's
+used for. Updated 2026-05-20.
 
-For decision rationale see `docs/tech-stack.md`. For execution sequence see
-`docs/implementation-plan.md`. This doc is the *map*, not the *plan*.
+For decision rationale: `docs/tech-stack.md`.
+For execution sequence: `docs/implementation-plan.md`.
+This doc is the *map*, not the *plan*.
 
 ---
 
@@ -13,527 +15,399 @@ For decision rationale see `docs/tech-stack.md`. For execution sequence see
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                                                                          │
-│  USER'S BANK ──[OAuth]──► PLAID ──[webhook]──► COINY BACKEND ──► PET     │
-│                                                       │           ▲      │
-│                                                  Postgres        BLE     │
-│                                                       │           │      │
-│                                                       └───►  MOBILE APP  │
-│                                                                          │
+│  USER'S BANK ──[OAuth]──► PLAID + FINICITY ──[webhook]──► COINY BACKEND  │
+│                                                              │           │
+│                                                          AWS Aurora      │
+│                                                              │           │
+│  iOS (Swift) + Apple Watch + Widgets + Live Activities ◄────┘           │
+│  Android (Kotlin) + Wear OS + Widgets                                    │
+│                          │                                               │
+│                       Direct                                             │
+│                        BLE                                               │
+│                          │                                               │
+│              ┌───────────▼───────────┐                                   │
+│              │  COINY DEVICE          │                                  │
+│              │  nRF54L15 + Memory LCD │                                  │
+│              │  + LRA + APA102        │                                  │
+│              └────────────────────────┘                                  │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-User links bank in mobile app → Plaid sends transaction webhooks → backend
-runs rule engine → reactions dispatched to mobile (push notification) and
-to the physical pet device (BLE).
+User links bank in native mobile app → Plaid sends transaction webhooks →
+Go backend on AWS verifies, persists in Aurora, runs rule engine →
+reactions dispatched to mobile (direct APNs/FCM push) and to the physical
+nRF54L15 device (BLE).
 
 ---
 
 ## Complete end-to-end stack (one graphic)
 
-The full product stack, top (user) to bottom (user's bank). Every layer
-labeled with its tools.
+The full quality-only product stack, top (user) to bottom (user's bank).
+Every layer labeled with its tools.
 
 ```
                   ╔═══════════════════════════════════════════════╗
                   ║                    USER                        ║
-                  ║       carries device · uses phone app          ║
+                  ║       carries device · uses iPhone / Android   ║
                   ╚═══════════════════════════════════════════════╝
                           │                              │
                   ┌───────┴──────┐               ┌──────┴────────────┐
-                  │   touches +  │               │     opens app +   │
-                  │   sees pet   │               │     gets pushes   │
+                  │  device      │               │  native app +     │
+                  │  in pocket   │               │  watch + widgets  │
                   ▼              ▼               ▼                   ▼
    ╔══════════════════════════════════╗   ╔══════════════════════════════════════╗
-   ║         COINY DEVICE             ║   ║            MOBILE APP                 ║
+   ║         COINY DEVICE             ║   ║      NATIVE MOBILE STACK              ║
    ║  ┌─────────────────────────────┐ ║   ║  ┌─────────────────────────────────┐ ║
-   ║  │ HARDWARE                    │ ║   ║  │ React Native + Expo SDK 54 + TS │ ║
-   ║  │  • nRF52840 MCU (prod)      │ ║   ║  ├─────────────────────────────────┤ ║
-   ║  │    (M5StickS3/ESP32-S3 now) │ ║   ║  │ Auth:        Clerk (planned)    │ ║
-   ║  │  • Sharp Memory LCD         │ ║◄──║  │ Bank link:   Plaid Link RN SDK  │ ║
-   ║  │  • LRA haptic motor         │ ║BLE║  │ BLE module:  Swift + Kotlin     │ ║
-   ║  │  • RGB LED (WS2812)         │ ║   ║  │              (Expo Modules API) │ ║
-   ║  │  • 1-2 tactile buttons      │ ║   ║  │ Push:        Expo Push          │ ║
-   ║  │  • LiPo + USB-C charging    │ ║   ║  │ Audio:       Expo AV            │ ║
-   ║  │  • MAX17048 fuel gauge      │ ║   ║  │ HTTP:        fetch              │ ║
-   ║  ├─────────────────────────────┤ ║   ║  │ Crash trk:   Sentry (planned)   │ ║
-   ║  │ FIRMWARE                    │ ║   ║  │ Build:       EAS Build          │ ║
-   ║  │  • Zephyr RTOS              │ ║   ║  └─────────────────────────────────┘ ║
-   ║  │  • Nordic SoftDevice BLE    │ ║   ╚════════════════╤═════════════════════╝
-   ║  │  • C++ via nRF Connect SDK  │ ║                    │
-   ║  │  • MCUmgr OTA               │ ║                    │ HTTPS
-   ║  └─────────────────────────────┘ ║                    │ + Clerk JWT (planned)
-   ╚══════════════════════════════════╝                    │
+   ║  │ HARDWARE                    │ ║   ║  │ iOS — Swift + SwiftUI + Combine │ ║
+   ║  │  • Nordic nRF54L15 MCU      │ ║   ║  │       + SwiftData + Xcode       │ ║
+   ║  │    (BLE 5.4, 30% better      │ ║   ║  ├─────────────────────────────────┤ ║
+   ║  │     power than nRF52840)    │ ║◄──║  │ Apple Watch companion (watchOS) │ ║
+   ║  │  • Sharp Memory LCD          │ ║BLE║  │ iOS Widgets (small/med/large +  │ ║
+   ║  │    LS013B7DH06 (color, µA)  │ ║   ║  │   lock-screen accessory family) │ ║
+   ║  │  • LRA + DRV2605L driver    │ ║   ║  │ Live Activities + Dynamic Island│ ║
+   ║  │  • APA102 single RGB LED    │ ║   ║  │ Auth:  WorkOS AuthKit Swift SDK │ ║
+   ║  │  • 1-2 tactile buttons      │ ║   ║  │ Bank:  Plaid Link iOS SDK       │ ║
+   ║  │  • 200mAh LiPo + USB-C PD   │ ║   ║  │ BLE:   CoreBluetooth (native)   │ ║
+   ║  │  • MAX77654 integrated PMIC │ ║   ║  │ Push:  Direct APNs              │ ║
+   ║  │  • Knowles I2S MEMS speaker │ ║   ║  │ Obs:   Datadog RUM iOS SDK      │ ║
+   ║  │  • Chip antenna + RF shield │ ║   ║  ├─────────────────────────────────┤ ║
+   ║  ├─────────────────────────────┤ ║   ║  │ Android — Kotlin + Jetpack      │ ║
+   ║  │ FIRMWARE                    │ ║   ║  │   Compose + Coroutines + Hilt   │ ║
+   ║  │  • Zephyr RTOS              │ ║   ║  │   + Room (3-6 mo after iOS)     │ ║
+   ║  │  • Nordic SoftDevice (BLE)  │ ║   ║  ├─────────────────────────────────┤ ║
+   ║  │  • Nordic nRF Connect SDK   │ ║   ║  │ Wear OS companion               │ ║
+   ║  │  • NSIB secure boot         │ ║   ║  │ Android Widgets (Jetpack Glance)│ ║
+   ║  │  • MCUmgr signed OTA        │ ║   ║  │ Plaid Link Android SDK          │ ║
+   ║  └─────────────────────────────┘ ║   ║  │ BluetoothLeScanner + fg service │ ║
+   ║                                  ║   ║  │ Direct FCM                      │ ║
+   ║  Manufacturing: premium CM        ║   ║  │ Datadog RUM Android SDK         │ ║
+   ║  (Jabil-tier, not Seeed)          ║   ║  └─────────────────────────────────┘ ║
+   ║  Industrial design: contracted    ║   ║                                       ║
+   ║  ID firm; injection-molded PC/ABS ║   ║  Two codebases, one monorepo:         ║
+   ║  Certifications: FCC + CE + UL    ║   ║   ios/   android/                     ║
+   ╚══════════════════════════════════╝   ╚════════════════╤═════════════════════╝
+                                                            │
+                                                            │ HTTPS (TLS 1.3)
+                                                            │ + WorkOS session JWT
                                                             ▼
                   ╔══════════════════════════════════════════════════════════════╗
-                  ║                    COINY BACKEND                              ║
+                  ║                COINY BACKEND (Go + chi)                       ║
                   ║                                                               ║
                   ║   ┌───────────────────────────────────────────────────────┐  ║
-                  ║   │  Node 22 + Fastify + TypeScript + Zod                  │  ║
                   ║   │                                                         │  ║
                   ║   │  ┌──────────────────────┐  ┌────────────────────────┐  │  ║
-                  ║   │  │  /webhooks/plaid     │  │  /api/* (REST)         │  │  ║
-                  ║   │  │  JWT ES256 (jose)    │  │  pets · spending ·     │  │  ║
-                  ║   │  │  request_body_sha256 │  │  plaid-link · devices ·│  │  ║
-                  ║   │  │  + replay protection │  │  subscriptions ·       │  │  ║
-                  ║   │  │                      │  │  overrides             │  │  ║
+                  ║   │  │ POST /webhooks/plaid │  │ /api/* (REST + OpenAPI)│  │  ║
+                  ║   │  │ verify ES256 JWT     │  │ pets · spending ·      │  │  ║
+                  ║   │  │ (crypto/ecdsa)       │  │ subscriptions · etc.   │  │  ║
+                  ║   │  │ + request_body_sha256│  │ + WorkOS auth middleware│  │  ║
                   ║   │  └─────────┬────────────┘  └──────────┬─────────────┘  │  ║
                   ║   │            │                          │                │  ║
                   ║   │            ▼                          ▼                │  ║
                   ║   │  ┌─────────────────────────────────────────────────┐   │  ║
-                  ║   │  │            Rule Engine (pure TS)                 │   │  ║
-                  ║   │  │   paycheck · overspend · savings_milestone ·    │   │  ║
-                  ║   │  │   bill_paid · large_purchase · subscription     │   │  ║
+                  ║   │  │            Rule Engine (pure Go)                 │   │  ║
+                  ║   │  │   paycheck · overspend · savings · bill · large  │   │  ║
+                  ║   │  │   purchase · subscription · investment milestone │   │  ║
+                  ║   │  │   · debt paydown · net-worth threshold           │   │  ║
                   ║   │  └─────────┬──────────────────────────────────────┘   │  ║
                   ║   │            │                                            │  ║
                   ║   │            ▼                                            │  ║
                   ║   │  ┌─────────────────────────────────────────────────┐   │  ║
-                  ║   │  │      Reaction Dispatcher                         │   │  ║
-                  ║   │  │   → animation · sound · LED · haptic · duration  │   │  ║
+                  ║   │  │  Reaction Dispatcher (Asynq jobs via Redis)      │   │  ║
+                  ║   │  │   → animation · sound · LED · haptic            │   │  ║
+                  ║   │  │   → push via direct APNs/FCM                    │   │  ║
+                  ║   │  │   → BLE command relayed by mobile               │   │  ║
                   ║   │  └─────────────────────────────────────────────────┘   │  ║
                   ║   └────────────────────────┬───────────────────────────────┘  ║
-                  ║                            │ Drizzle ORM                       ║
+                  ║                            │ sqlc + Atlas migrations           ║
                   ║                            ▼                                   ║
                   ║   ┌──────────────────────────────────────────────────────┐    ║
-                  ║   │  NEON · serverless Postgres · us-east-1               │    ║
+                  ║   │ AWS AURORA SERVERLESS v2 · Postgres 16 · VPC-private  │    ║
                   ║   │   pet_state · reaction_history · processed_events ·   │    ║
                   ║   │   plaid_items · transactions · category_overrides ·   │    ║
-                  ║   │   device_tokens · audit_log (planned)                 │    ║
+                  ║   │   device_tokens · audit_log · users · sessions ·      │    ║
+                  ║   │   subscriptions · investments · liabilities · income  │    ║
                   ║   └──────────────────────────────────────────────────────┘    ║
                   ║                                                               ║
-                  ║   Hosting:        Fly.io (coiny-backend.fly.dev, iad)        ║
-                  ║   Outbound HTTP:  undici  ────────────────► Plaid API        ║
-                  ║   Observability:  Sentry + Grafana Cloud via OpenTelemetry   ║
-                  ║                   (planned, M1)                               ║
-                  ║   Idempotency:    transaction_id in processed_events table   ║
-                  ║   Rate limit:     @fastify/rate-limit  (100 req/sec)         ║
-                  ║   Tests:          Vitest + PGlite (in-memory Postgres)       ║
+                  ║   Hosting:        AWS ECS Fargate (us-east-1 + us-west-2)    ║
+                  ║                   active-active, private subnets             ║
+                  ║   CDN + WAF:      CloudFront + AWS WAF (managed + custom)    ║
+                  ║   Secrets:        AWS Secrets Manager + KMS, auto-rotation   ║
+                  ║   Cache:          AWS ElastiCache (Redis) for Asynq + kid    ║
+                  ║                   cache + rate limit                         ║
+                  ║   Observability:  Datadog APM + Logs + Metrics + RUM +       ║
+                  ║                   Synthetics + Profiler + Error Tracking     ║
+                  ║   Feature flags:  LaunchDarkly                                ║
+                  ║   Auth:           WorkOS AuthKit                              ║
+                  ║   Email:          Postmark (transactional)                   ║
+                  ║   Status page:    Better Uptime managed                       ║
+                  ║   Outbound HTTP:  net/http → Plaid + Finicity APIs            ║
+                  ║   Idempotency:    Postgres advisory locks + transaction_id   ║
+                  ║   Tests:          stdlib + testify + dockertest (real PG)   ║
+                  ║                   90%+ coverage required                     ║
                   ╚════════════════════════════════╤════════════════════════════╝
                                                    │
                                                    │ HTTPS + auth body
-                                                   │ (client_id + secret)
                                                    ▼
                                        ╔════════════════════════════╗
-                                       ║          PLAID              ║
+                                       ║   PLAID PRODUCTION         ║
                                        ║                             ║
-                                       ║  Sandbox (now)              ║
-                                       ║  → Production (Phase 5)     ║
+                                       ║  Products enabled day 1:    ║
+                                       ║   • Transactions            ║
+                                       ║   • Investments             ║
+                                       ║   • Liabilities             ║
+                                       ║   • Income                  ║
                                        ║                             ║
-                                       ║  /transactions/sync         ║
-                                       ║  /link/token/create         ║
-                                       ║  /item/public_token/        ║
-                                       ║    exchange                 ║
-                                       ║  /webhook_verification_     ║
-                                       ║    key/get                  ║
-                                       ╚══════════════╤══════════════╝
-                                                      │ OAuth + screen-scrape
-                                                      ▼
+                                       ║  Webhook: ES256 JWT signed  ║
+                                       ╚════════════════════════════╝
+                                                   │
+                                       (fallback for coverage gaps)
+                                                   │
+                                                   ▼
+                                       ╔════════════════════════════╗
+                                       ║   FINICITY                  ║
+                                       ║   (Mastercard Data Connect) ║
+                                       ║   Secondary aggregator      ║
+                                       ║   ~5-10% coverage gap fill  ║
+                                       ╚════════════════════════════╝
+                                                   │
+                                                   │ OAuth + screen-scrape
+                                                   ▼
                                        ╔════════════════════════════╗
                                        ║      USER'S BANK            ║
                                        ║   Chase, BoA, Wells Fargo,  ║
                                        ║   Capital One, ~11,000 US   ║
-                                       ║   banks supported by Plaid  ║
+                                       ║   banks                     ║
                                        ╚════════════════════════════╝
 
 
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║                    BUILD / DEPLOY (sidecar to runtime)                    ║
 ║                                                                           ║
-║   Developer  ──git push──►  GitHub (pamplemousse-glitch/Coiny, private)   ║
+║   Developer  ──git push──►  GitHub (pamplemousse-glitch/Coiny)            ║
 ║                                  │                                        ║
 ║                                  ├──► Dependabot (weekly grouped PRs)     ║
 ║                                  │                                        ║
-║                                  ├──► CI workflows                        ║
-║                                  │      backend-ci.yml  → Biome · tsc ·   ║
-║                                  │                        vitest          ║
-║                                  │      mobile-ci.yml   → tsc · expo lint ║
-║                                  │      security.yml    → Semgrep ·       ║
-║                                  │                        Gitleaks · Trivy║
+║                                  ├──► Required CI checks                  ║
+║                                  │      backend-ci.yml  → go test, lint,  ║
+║                                  │                        90% coverage    ║
+║                                  │      ios-ci.yml      → XCTest +        ║
+║                                  │                        XCUITest        ║
+║                                  │      android-ci.yml  → JUnit + Compose ║
+║                                  │                        UI tests        ║
+║                                  │      security.yml    → Semgrep +       ║
+║                                  │                        Snyk + CodeQL + ║
+║                                  │                        Gitleaks +      ║
+║                                  │                        Trivy           ║
+║                                  │      Required: 2-reviewer approval     ║
+║                                  │                + signed commits         ║
 ║                                  │                                        ║
 ║                                  ▼                                        ║
 ║                          Squash-merge to main                             ║
 ║                                  │                                        ║
-║                                  │ `fly deploy` (manual or CD)            ║
+║                                  │ OIDC-trusted GitHub Actions → AWS     ║
 ║                                  ▼                                        ║
-║                          Fly.io ──► Docker image ──► coiny-backend.fly.dev║
+║                          AWS CodeDeploy canary deployment                 ║
+║                          10% → 50% → 100% over 30 min                    ║
+║                          auto-rollback on Datadog SLI breach              ║
 ║                                  │                                        ║
-║                                  ├──► Neon (DATABASE_URL)                 ║
-║                                  └──► Fly Secrets (PLAID_*, etc.)         ║
+║                                  ├──► ECS Fargate (Go binary)             ║
+║                                  ├──► AWS Aurora (Atlas migrations)       ║
+║                                  ├──► AWS Secrets Manager (rotation)      ║
+║                                  └──► CloudFront cache invalidation       ║
 ║                                                                           ║
-║   Local secrets:  macOS Keychain  + `bin/load-secrets.sh`                 ║
-║   Monorepo:       pnpm workspaces + Turborepo                             ║
-║   Branch guard:   pre-commit hook blocks direct commits to main           ║
-║   Conventions:    Conventional Commits, squash-merge only                 ║
+║   IaC: AWS CDK in TypeScript                                              ║
+║   Mobile builds: Xcode Cloud + Gradle CI (post-launch);                   ║
+║                  EAS Build during early native rewrite phase              ║
+║   App Store: EAS Submit (interim) / Xcode upload + ASC                    ║
+║   Play Store: Gradle play-publisher                                        ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 ```
 
 ---
 
-## Layer 1 — Hardware (Phase 2)
+## Layer-by-layer breakdown
 
-The physical Coiny device. Prototype on M5StickS3 dev board today; ship on
-nRF52840 production design later.
+### Layer 1 — Hardware
 
-```
-┌──────────────────────────────────────────────────────┐
-│                  COINY DEVICE                        │
-│                                                       │
-│  ┌──────────┐  ┌─────────┐  ┌────────┐  ┌─────────┐  │
-│  │ Display  │  │ Speaker │  │ Haptic │  │ Battery │  │
-│  └────┬─────┘  └────┬────┘  └───┬────┘  └────┬────┘  │
-│       │             │           │            │       │
-│  ┌────┴─────────────┴───────────┴────────────┴────┐  │
-│  │              MCU + BLE radio                    │  │
-│  │       (Bluetooth Low Energy → phone)            │  │
-│  └─────────────────────────────────────────────────┘  │
-│                                                       │
-│  ┌────────┐  ┌─────────┐                              │
-│  │ Buttons│  │ RGB LED │                              │
-│  └────────┘  └─────────┘                              │
-└──────────────────────────────────────────────────────┘
-```
+| Component | Part | Why this exact part |
+|---|---|---|
+| **MCU** | Nordic nRF54L15 | BLE 5.4, 30% better power than nRF52840, RISC-V coprocessor, smaller package |
+| **Display** | Sharp Memory LCD LS013B7DH06 | 3-bit color, always-on at µA draw, 144×168 pixel |
+| **Haptic** | LRA motor + DRV2605L driver | Apple-Watch-grade taps, 123 waveform library |
+| **RGB LED** | APA102 single | Better color accuracy + faster refresh than WS2812 |
+| **Battery** | 200mAh single-cell LiPo | Right size for coin form, USB-C PD rechargeable |
+| **PMIC** | Maxim MAX77654 | Integrated charger + fuel gauge + 3 LDOs (one chip) |
+| **Speaker** | Knowles SPH0645LM4H-B I2S MEMS (or omit) | Best quality at lowest power if audio in scope |
+| **Antenna** | Saluki chip antenna + matching network | Omnidirectional, well-matched 2.4GHz |
+| **RF shield** | Stamped sheet metal can over radio | Eases FCC certification, reduces interference |
+| **Case** | PC/ABS injection-molded | Premium feel, polished or soft-touch finish |
+| **Charging port** | USB-C with PD-compliant negotiation | Modern standard |
 
-### Components
-
-| Component | Prototype (today) | Production (Phase 2 PCB) | Why / Purpose |
-|---|---|---|---|
-| **MCU** | M5StickS3 (ESP32-S3) | **nRF52840** (Nordic Semi) | Runs the firmware. Production chip is nRF52840 because BLE-only workloads last 9-12 months on a coin cell vs ESP32-S3's 3-5 days. Same chip Pebble / Oura / Fitbit / Tile use. |
-| **BLE radio** | Integrated in MCU | Integrated in MCU | Bluetooth Low Energy connection to user's phone. The only way the pet receives reactions. |
-| **Display** | M5StickS3 backlit color LCD | **Sharp Memory LCD** (LS013B7DH03 or similar) | Shows the pet sprite + animations. Memory LCD draws ~µA when static — enables the "always-on pet" feel without crushing battery. |
-| **Haptic driver** | Adafruit DRV2605L (I2C) | Same DRV2605L (transfers) | Drives the vibration motor with 123 named haptic patterns. I2C — works with any MCU. |
-| **Haptic motor** | 10mm ERM coin motor | **LRA motor** | LRA gives Apple-Watch-style taps, not ERM's buzz. Better "personality" feel. Drives subtle pet reactions when audio would be intrusive. |
-| **Battery** | M5StickS3's built-in 250mAh LiPo + USB-C charging | **150-200mAh LiPo + USB-C** | Rechargeable LiPo vs swap-coin-cell because users expect plug-in charging in 2026. |
-| **Charging IC + fuel gauge** | M5StickS3 built-in | **MCP73831 charging + MAX17048 fuel gauge** | Fuel gauge enables accurate battery % display. Users notice when this is wrong. |
-| **Speaker** | M5StickS3 1W speaker + mic | **Drop or piezo only** | Most BLE wearables skip audio (office-friendliness + battery). Rich celebration audio plays on the user's phone, not the device. |
-| **Buttons** | M5StickS3 2 built-in buttons | **1-2 tactile switches** | Tamagotchi feel: "feed pet," "check status," "interact." |
-| **RGB LED** | (None on prototype) | **1 WS2812 or APA102** | Color-coded mood feedback (green=good, amber=warning, red=overspend). Visible even when screen is off. |
-| **Antenna** | Internal M5StickS3 trace | **Chip antenna + matching network** | More forgiving RF for first PCB; lowers FCC certification risk. |
-| **Case** | OpenSCAD 3D-printed prototype | Injection-molded ABS/PC | $0.50-2/unit at 1k volume. |
-
-### Firmware toolchain
-
-| Layer | Prototype | Production | Purpose |
-|---|---|---|---|
-| **RTOS** | ESP-IDF / Arduino-flavored | **Zephyr RTOS** | Schedules tasks, manages power, runs BLE stack |
-| **BLE stack** | NimBLE (ESP) | **Nordic SoftDevice** | The industry-standard BLE stack; certified by Nordic |
-| **Build system** | PlatformIO | **nRF Connect SDK** (`west`) | Compile + flash. Both have great VS Code integration. |
-| **Language** | C++ | C / C++ | Standard embedded toolchain |
-| **OTA updates** | TBD | **MCUmgr / SMP** (Zephyr-native) | Push firmware updates over BLE without USB |
-
----
-
-## Layer 2 — Mobile App
-
-```
-┌──────────────────────────────────────────────────┐
-│              MOBILE APP (iOS + Android)           │
-│                                                   │
-│   ┌────────────────────────────────────────────┐ │
-│   │      React Native + Expo + TypeScript      │ │
-│   │   ┌──────────────┐    ┌──────────────────┐ │ │
-│   │   │  UI screens  │    │  State / hooks   │ │ │
-│   │   └──────┬───────┘    └────────┬─────────┘ │ │
-│   │          │                     │           │ │
-│   │          ▼                     ▼           │ │
-│   │   ┌──────────────┐    ┌──────────────────┐ │ │
-│   │   │  Plaid Link  │    │   API client     │ │ │
-│   │   │   SDK (RN)   │    │   (undici)       │ │ │
-│   │   └──────────────┘    └──────────────────┘ │ │
-│   └────────────────────────────────────────────┘ │
-│                                                   │
-│   ┌────────────────────────────────────────────┐ │
-│   │   Native BLE module (Phase 2)              │ │
-│   │   Swift on iOS + Kotlin on Android         │ │
-│   │   wraps CoreBluetooth / BluetoothLeScanner │ │
-│   └────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────┘
-```
-
-### Components
+### Layer 2 — Firmware
 
 | Layer | Tool | Purpose |
 |---|---|---|
-| **Framework** | React Native | Cross-platform iOS + Android from one codebase |
-| **Meta-framework** | Expo (SDK 54) | Build tooling, OTA updates, EAS Build, native module wrappers |
-| **Language** | TypeScript (strict) | Type-safe code |
-| **Router** | `expo-router` | File-based routing, deep links |
-| **Sign-in** | **Clerk** (planned, M2) | Auth UI + session management. Easier than custom JWT for fintech. |
-| **Bank linking** | `react-native-plaid-link-sdk` | Drop-in Plaid Link flow → returns `public_token` |
-| **HTTP client** | Native `fetch` (Expo) | Talks to backend `/api/*` endpoints |
-| **Push notifications** | Expo Push | Receives reaction notifications |
-| **BLE (Phase 2)** | Native Swift module (Expo Modules API) + Native Kotlin module | Wraps CoreBluetooth (iOS) and BluetoothLeScanner (Android). Handles background BLE. Needed because `react-native-ble-plx` background story is fragile. |
-| **Audio (Phase 3)** | Expo Audio | Plays celebration sounds + personalized recordings |
-| **Local storage** | AsyncStorage / SecureStore | Personal voice recordings stay on phone (privacy-by-default) |
-| **Lint** | Expo ESLint (default) | Code style |
-| **Error tracking** | **Sentry** for Expo (planned, M1) | Capture mobile crashes |
-| **Build** | EAS Build | Hosted iOS + Android builds without local Xcode pain |
+| **RTOS** | Zephyr | Preemptive multitasking, power management |
+| **BLE stack** | Nordic SoftDevice | Production-grade, certified, gold standard |
+| **SDK** | Nordic nRF Connect SDK | Build + flash via `west` |
+| **Bootloader** | NSIB (Nordic Secure Immutable Bootloader) | Signed firmware verification |
+| **OTA** | MCUmgr / SMP | Signed firmware updates over BLE |
+| **Language** | C / C++ | Embedded standard |
 
----
-
-## Layer 3 — Backend
-
-```
-┌────────────────────────────────────────────────────────────┐
-│                        BACKEND                              │
-│                                                             │
-│   ┌──────────────────────────────────────────────────────┐ │
-│   │           Fastify + TypeScript + Zod                  │ │
-│   │                                                       │ │
-│   │   ┌─────────────────┐    ┌─────────────────────────┐ │ │
-│   │   │ /webhooks/plaid │    │  /api/* (REST)          │ │ │
-│   │   │  (JWT verify)   │    │  pets / spending /      │ │ │
-│   │   │                 │    │  plaid-link / devices / │ │ │
-│   │   │                 │    │  subscriptions / etc.   │ │ │
-│   │   └────────┬────────┘    └────────┬────────────────┘ │ │
-│   │            │                      │                  │ │
-│   │            ▼                      ▼                  │ │
-│   │   ┌──────────────────────────────────────────────┐  │ │
-│   │   │           Rule Engine (pure TS)              │  │ │
-│   │   │   paycheck / overspend / savings / bill /    │  │ │
-│   │   │   large_purchase / subscription_detected     │  │ │
-│   │   └────────┬─────────────────────────────────────┘  │ │
-│   │            │                                         │ │
-│   │            ▼                                         │ │
-│   │   ┌──────────────────────────────────────────────┐  │ │
-│   │   │       Reaction dispatcher                     │  │ │
-│   │   │   → push notification → mobile               │  │ │
-│   │   │   → BLE command (via mobile) → device        │  │ │
-│   │   └──────────────────────────────────────────────┘  │ │
-│   └──────────────────────────────────────────────────────┘ │
-│                                                             │
-│   Drizzle ORM ──► Postgres                                  │
-│   jose (JWT) ──► Plaid signature verify                     │
-│   undici ────► outbound Plaid API calls                     │
-└────────────────────────────────────────────────────────────┘
-```
-
-### Components
+### Layer 3 — iOS
 
 | Layer | Tool | Purpose |
 |---|---|---|
-| **Runtime** | Node 22 | Server runtime |
-| **Language** | TypeScript (strict) | Type safety + shared types with mobile |
-| **HTTP framework** | **Fastify** | Fast, type-friendly, near-Go performance for I/O-bound workloads |
-| **Schema validation** | **Zod** | Validates env vars, HTTP bodies, webhook payloads |
-| **ORM** | **Drizzle** | Type-safe SQL queries, schema-as-code, idiomatic migrations |
-| **Database driver** | `postgres` (PG production) / `@electric-sql/pglite` (tests + dev fallback) | Connection pool to Postgres |
-| **HTTP client** | **`undici`** | Calls to Plaid API |
-| **JWT verification** | **`jose`** | Verifies Plaid webhook signatures (ES256) |
-| **Linter** | **Biome 2.0** | Single-binary lint + format |
-| **Test runner** | **Vitest** | Fast, ESM-native, in-memory test execution |
-| **Test DB** | **PGlite** (in-memory Postgres) | Hermetic tests with real Postgres semantics |
-| **Migrations** | `drizzle-kit` | Generates SQL migrations from schema |
-| **Rate limiting** | `@fastify/rate-limit` | Protects webhook + API endpoints from floods |
-| **Logging** | `pino` (Fastify built-in) | Fast JSON logs |
-| **Error tracking** | **Sentry** for Node (planned, M1) | Captures backend errors |
-| **Observability** | **OpenTelemetry → Grafana Cloud** (planned, M1) | Metrics, logs, traces |
+| **Language** | Swift (latest) | Apple-native |
+| **UI** | SwiftUI | Modern, declarative, Metal-rendered |
+| **State** | Combine + SwiftData | Reactive streams + persistence |
+| **Build** | Xcode + Xcode Cloud | Apple-native CI |
+| **Auth SDK** | WorkOS Swift SDK | Sign-in flow |
+| **Bank link** | Plaid Link iOS SDK | Drop-in bank-link UI |
+| **BLE** | CoreBluetooth (native) | Background BLE + CoreBluetooth state restoration |
+| **Push** | Direct APNs (UserNotifications framework) | Live Activity payloads + critical alerts |
+| **Observability** | Datadog iOS SDK (RUM + crash + APM) | Mobile telemetry |
+| **Watch** | watchOS SwiftUI + ClockKit complications | Wrist app |
+| **Widgets** | WidgetKit | All sizes + lock screen accessory |
+| **Live Activities** | ActivityKit + Dynamic Island | Pro-tier polish |
+| **Tests** | XCTest + XCUITest + AWS Device Farm | 90%+ coverage |
 
-### Backend tables (Postgres schema)
-
-```
-pet_state           ── singleton (id=1): mood, health, lastReactionAt, goals
-reaction_history    ── append-only: every reaction with timestamp
-processed_events    ── idempotency keyed on Plaid transaction_id
-plaid_items         ── per-Item: access_token, cursor, sync state
-category_overrides  ── user-defined merchant → category
-device_tokens       ── Expo push tokens
-transactions        ── all Plaid txns persisted (subscription detection)
-```
-
----
-
-## Layer 4 — Data + integrations
-
-```
-                 ┌───────────────────────┐
-                 │       PLAID           │
-                 │  (US bank aggregator) │
-                 └──────────┬────────────┘
-                            │
-                            │ webhooks (JWT ES256)
-                            │ /transactions/sync
-                            ▼
-   ┌────────────────────────────────────────────────┐
-   │                COINY BACKEND                    │
-   │                                                 │
-   │  Drizzle ──► Postgres                           │
-   └─────────────┬──────────────────────────────────┘
-                 │
-                 ▼
-        ┌─────────────────┐
-        │      NEON       │
-        │  Serverless PG  │
-        │  (us-east-1)    │
-        └─────────────────┘
-```
-
-### Components
-
-| Service | Tool | Purpose | Replaces with at scale |
-|---|---|---|---|
-| **Bank data** | **Plaid** (sandbox now → production Phase 5) | Connects to ~11,000 US banks. Sends transaction webhooks. | (stays Plaid; Finicity as secondary for coverage gaps in Phase 5) |
-| **Database** | **Neon** (serverless Postgres) | Persistence layer. Scales to zero. Branching for staging. | **AWS Aurora Serverless v2** in VPC at scale (SOC 2 requires VPC + KMS + CloudTrail) |
-| **Auth (planned)** | **Clerk** | User identity, session management | (stays Clerk, or WorkOS at enterprise scale) |
-| **Hosting** | **Fly.io** (`coiny-backend.fly.dev`) | Runs Docker container, handles HTTPS, manages secrets | **AWS ECS Fargate** in VPC at scale |
-| **Push notifications** | Expo Push (planned) | Sends notifications to mobile | Direct APNs + FCM at scale |
-| **Feature flags (planned)** | **GrowthBook** self-hosted | Kill switches + rollouts | (stays GrowthBook, or LaunchDarkly enterprise) |
-
----
-
-## Layer 5 — DevOps / Infra
-
-```
-┌────────────────────────────────────────────────────────────────┐
-│                  GitHub (pamplemousse-glitch/Coiny)             │
-│                                                                 │
-│  ┌──────────────────────┐   ┌────────────────────────────────┐ │
-│  │  Branches            │   │   CI / Workflows               │ │
-│  │   main (protected)   │   │                                │ │
-│  │   feat/*  fix/*      │   │   backend-ci.yml               │ │
-│  │   docs/*  chore/*    │   │   mobile-ci.yml                │ │
-│  └──────────────────────┘   │   security.yml                 │ │
-│                             │     ├─ Semgrep (SAST)          │ │
-│  ┌──────────────────────┐   │     ├─ Gitleaks (secrets)     │ │
-│  │  Dependabot          │   │     └─ Trivy (CVE scan)       │ │
-│  │  weekly grouped      │   └────────────────────────────────┘ │
-│  └──────────────────────┘                                       │
-└────────────────────────────────────────────────────────────────┘
-                              │
-                              │ gh CLI: fly deploy
-                              ▼
-                ┌──────────────────────────┐
-                │        Fly.io            │
-                │   coiny-backend.fly.dev  │
-                │   iad region (Virginia)  │
-                └──────────────────────────┘
-                              │
-                              │ Postgres connection (SSL)
-                              ▼
-                ┌──────────────────────────┐
-                │     Neon Postgres        │
-                │   us-east-1 (Virginia)   │
-                └──────────────────────────┘
-```
-
-### Components
+### Layer 4 — Android
 
 | Layer | Tool | Purpose |
 |---|---|---|
-| **Source control** | **GitHub** | Code repository |
-| **CI** | **GitHub Actions** | Runs tests, lint, typecheck, security scans on every PR |
-| **Dependency updates** | **Dependabot** | Weekly grouped PRs for npm + GitHub Actions |
-| **SAST** | **Semgrep** (CI) | Static analysis — finds insecure patterns |
-| **Secret scanning** | **Gitleaks** (CI) | Catches committed secrets |
-| **Container scanning** | **Trivy** (CI) | Scans Docker image for CVEs |
-| **Branch protection** | (paywalled until GH Pro $4/mo on private repo) | Prevents force-pushes, requires CI green |
-| **Container build** | **Docker** (multi-stage) | Produces lean ~100MB Alpine image |
-| **Hosting** | **Fly.io** | Runs Docker container, auto-restart, secrets vault |
-| **Local secrets** | **macOS Keychain** + `bin/load-secrets.sh` | Never in `.env` files |
-| **Production secrets** | **Fly secrets** (encrypted at rest) | `PLAID_CLIENT_ID`, `PLAID_SECRET`, `DATABASE_URL` |
-| **CDN** | (none yet; Fly serves directly) | At scale: CloudFront in front of ALB |
-| **DNS** | Fly's automatic | `coiny-backend.fly.dev` |
+| **Language** | Kotlin (latest) | Google-native |
+| **UI** | Jetpack Compose | Modern, declarative |
+| **State** | Coroutines + Hilt | Async + DI |
+| **DB** | Room | Local persistence |
+| **Build** | Gradle + Android Studio | Standard |
+| **Auth SDK** | WorkOS Kotlin SDK | Same auth flow as iOS |
+| **Bank link** | Plaid Link Android SDK | Drop-in |
+| **BLE** | BluetoothLeScanner + foreground service | Background BLE |
+| **Push** | Direct FCM (Firebase Cloud Messaging) | Direct delivery |
+| **Observability** | Datadog Android SDK | Mobile telemetry |
+| **Watch** | Wear OS via Wearable Data Layer | Wrist companion |
+| **Widgets** | Jetpack Glance | Compose-native widgets |
+| **Tests** | JUnit + Compose UI + Espresso + Firebase Test Lab | 90%+ coverage |
 
----
+### Layer 5 — Backend (Go)
 
-## Layer 6 — Monorepo + tooling
+| Layer | Tool | Purpose |
+|---|---|---|
+| **Runtime** | Go 1.23+ | Server runtime |
+| **Router** | chi | Lightweight, idiomatic |
+| **Logging** | zerolog | Structured, fast, low alloc |
+| **Validation** | ozzo-validation | Composable rules |
+| **Database driver** | pgx | Type-safe Postgres |
+| **Query layer** | sqlc | Type-safe Go from raw SQL |
+| **Migrations** | Atlas | Declarative |
+| **Background jobs** | Asynq (Redis-backed) | Push fan-out, scheduled tasks |
+| **JWT verification** | crypto/ecdsa stdlib | Plaid webhook verification |
+| **HTTP client** | net/http stdlib | Calls to Plaid + Finicity |
+| **Tests** | stdlib testing + testify + dockertest | Real Postgres in tests, 90%+ coverage |
+| **OpenAPI** | swag from code annotations | iOS + Android SDK generation |
 
-| Tool | Purpose |
+### Layer 6 — Data + integrations
+
+| Service | Tool | Purpose |
+|---|---|---|
+| **Bank data primary** | Plaid Production (Transactions + Investments + Liabilities + Income) | All four products enabled day 1 |
+| **Bank data secondary** | Finicity (Mastercard Data Connect) | Coverage gap fill |
+| **Database engine** | Postgres 16 | Industry default |
+| **Database host** | AWS Aurora Serverless v2 in VPC | Multi-AZ, PITR, KMS, CloudTrail |
+| **Cache** | AWS ElastiCache (Redis) | Asynq, kid cache, rate limit |
+| **Auth** | WorkOS AuthKit | SAML/SSO/SCIM-ready |
+| **Push** | Direct APNs + FCM | Full delivery control |
+| **Email** | Postmark | Transactional |
+| **Feature flags** | LaunchDarkly | Enterprise-grade |
+| **Observability** | Datadog | Full suite |
+
+### Layer 7 — DevOps / Infra
+
+| Layer | Tool | Purpose |
+|---|---|---|
+| **Source control** | GitHub | Standard |
+| **CI** | GitHub Actions | Tests, lint, security scans |
+| **Required reviews** | 2-reviewer mandatory | Quality gate |
+| **Signed commits** | GPG/SSH-signed | Supply chain |
+| **IaC** | AWS CDK in TypeScript | Reproducible infra |
+| **Deploy** | AWS CodeDeploy canary | 10% → 50% → 100% with auto-rollback |
+| **Container builds** | Multi-stage Docker → AWS ECR | Lean images |
+| **Secrets** | AWS Secrets Manager + KMS | Auto-rotation |
+| **WAF** | AWS WAF | Managed + custom rules |
+| **CDN** | CloudFront | Geographic latency + DDoS protection |
+| **DNS** | Route 53 | Apex management |
+| **Status page** | Better Uptime managed | Public ops surface |
+| **Synthetic monitoring** | Datadog Synthetics | 5-region uptime |
+| **Penetration testing** | Cobalt or HackerOne quarterly | External validation |
+| **SAST** | Semgrep + Snyk + CodeQL | Defense in depth |
+| **Container scanning** | Trivy on every image | CVE catches |
+| **Secret scanning** | Gitleaks (pre-commit + CI) | Catch leaks |
+| **SBOM** | Syft + Sigstore signed | Supply chain artifact |
+| **SOC 2** | Vanta + A-LIGN auditor | Year-1 audit window |
+
+### Layer 8 — Compliance + insurance
+
+| Item | Detail |
 |---|---|
-| **pnpm** (v11.1.3) | Package manager — fast, disk-efficient, monorepo-native |
-| **pnpm workspaces** | Defines `backend/`, `mobile/`, `shared/` as workspace packages |
-| **Turborepo** | Build cache + task orchestration across packages |
-| **Conventional Commits** | Commit message standard (`feat(scope): subject`) |
-| **branch-guard hook** | Local git hook blocking direct commits to `main` |
+| **Privacy Policy** | Lawyer-drafted, annual review |
+| **Terms of Service** | Lawyer-drafted, annual review |
+| **Cyber liability insurance** | $5M coverage (Coalition or Embroker) |
+| **General liability insurance** | $2M (hardware product liability) |
+| **E&O insurance** | $2M (fintech advice/automation) |
+| **D&O insurance** | Once board exists |
+| **Trademark** | USPTO Class 9 + Class 36 filed pre-launch |
+| **GDPR + CCPA + CPRA** | Delete-my-account endpoint + audit logging |
+| **GLBA review** | Outside counsel annually |
+| **PCI DSS** | SAQ A via Stripe |
+| **SOC 2 Type 2** | Year-1 audit window, annual renewal |
 
 ---
 
-## Layer 7 — Documentation
+## What stays from the original plan
 
-| Doc | Purpose |
-|---|---|
-| `README.md` | Quickstart + repo map |
-| `CLAUDE.md` | Working conventions for code agents |
-| `docs/handoff.md` | Current state, what's done, what's not |
-| `docs/architecture.md` | System design + BLE flow |
-| `docs/tech-stack.md` | Layer-by-layer decision rationale |
-| `docs/proposed-changes.md` | Summary of every quality-audit change |
-| `docs/implementation-plan.md` | 5-milestone PR sequence |
-| `docs/feature-backlog.md` | Forward-looking feature list |
-| `docs/product-brief.md` | Product north star (fill-in template) |
-| `docs/plaid-integration.md` | Plaid API contract reference |
-| `docs/security.md` | Security model |
-| `docs/aggregators.md` | Why Plaid (with landscape) |
-| **`docs/stack-map.md`** | **This doc — the visual map** |
+- Plaid as primary aggregator (now full product suite)
+- Postgres engine (now on Aurora)
+- GitHub source control + Actions CI (now with required gates)
+- Conventional Commits + semantic versioning
+- Squash-merge workflow
+- macOS Keychain for local secrets (during dev)
+- Monorepo structure (now `ios/` + `android/` + `backend/` + `firmware/`)
 
 ---
 
-## End-to-end product flow (one example)
+## What's deleted from the original plan
 
-A user gets paid. Here's what happens:
-
-```
-1. EMPLOYER ACH ──► USER'S CHASE ACCOUNT
-                              │
-2.                            │ (Plaid pollers see the new transaction)
-                              ▼
-                        ┌────────────┐
-                        │   PLAID    │
-                        └─────┬──────┘
-                              │
-3.                            │ POST https://coiny-backend.fly.dev/webhooks/plaid
-                              │ Plaid-Verification: <JWT signed with ES256>
-                              ▼
-                  ┌────────────────────────┐
-                  │   COINY BACKEND        │
-                  │   (Fly.io, Fastify)    │
-                  └────────┬───────────────┘
-                           │
-4. JWT verified via `jose` (kid → /webhook_verification_key/get)
-   200 returned immediately
-5. setImmediate(async () => { ... })
-                           │
-6.                         │ POST /transactions/sync (cursor, paginate)
-                           │
-                           ▼
-                  ┌────────────────────────┐
-                  │   PLAID                │
-                  │   returns 1 added tx:  │
-                  │   {amount: -2400.00,   │
-                  │    name: "ACH DEPOSIT",│
-                  │    pfc: INCOME_WAGES}  │
-                  └────────────────────────┘
-                           │
-7. plaidTxToInternal()     │  (sign-flips, maps PFC)
-8. persistTransactions()   ▼
-                  ┌────────────────────────┐
-                  │   NEON Postgres        │
-                  │   transactions += 1    │
-                  └────────────────────────┘
-9. claimEvent(txn_id) → true (first time)
-10. rule engine: evaluate(tx, goals)
-    → matches paycheck_received
-11. applyHealthDelta(+10), recordReaction("paycheck_received", {animation: celebrate, ...})
-                           │
-                           ▼
-12. dispatchReaction()
-    → push notification to mobile  ───► PHONE
-    → BLE command via mobile       ───► PET (animation + sound + LED + haptic)
-```
-
-End-to-end: ~1-3 seconds from bank transaction settling to pet doing a
-victory dance.
+- React Native + Expo (except week-1 throwaway prototype)
+- Drizzle ORM → sqlc
+- Neon → AWS Aurora
+- Fly.io → AWS ECS Fargate
+- Sentry + Grafana free tier → Datadog full suite
+- Clerk → WorkOS AuthKit
+- GrowthBook → LaunchDarkly
+- Expo Push → Direct APNs + FCM
+- Resend → Postmark
+- M5StickS3 → nRF54L15-DK from day 1 of firmware
+- nRF52840 as production target → nRF54L15
+- WS2812 → APA102
+- MAX17048 + MCP73831 → MAX77654 (one chip)
+- AI-generated sprites → commissioned indie pixel artist
+- CC0 sounds → commissioned sound design
+- Seeed Studio / JLCPCB → premium CM (Jabil-tier)
+- Self-merge → 2-reviewer mandatory (when team ≥3)
+- "Phase 5 Investments" → day 1 Investments
+- "Phase 4 Apple Watch" → ships with iOS v1.0
+- "Trigger event for native rewrite" → native from MVP+1, locked
 
 ---
 
-## What's missing / planned upgrades
+## Throwaway prototype lane (separate path)
 
-See `docs/tech-stack.md` for full reasoning. Headlines:
+For week-1 validation only, the previously-documented RN-based prototype
+path (`docs/3-day-sprint.md`) still exists as a *throwaway*. Its purpose
+is purely: prove the concept resonates with 3 friends, produce a 30-second
+Loom for the landing page, get a yes/no on whether to build the real
+quality-only stack.
 
-| Now | Upgrading to | When |
-|---|---|---|
-| No error tracking | **Sentry** (backend + mobile) | M1 (this week, needs your free signup) |
-| No metrics | **OpenTelemetry → Grafana Cloud** | M1 |
-| No auth (hardcoded user_1) | **Clerk** | M2 (before multi-user) |
-| Fly + Neon (sandbox-ready) | **AWS Aurora + ECS Fargate in VPC** | Before first real-money user |
-| ESP32-S3 prototype | **nRF52840 production** | At PCB tape-out |
-| `react-native-ble-plx` | **Native Swift + Kotlin BLE module** | Phase 2 |
-| No feature flags | **GrowthBook** self-hosted | Before first real user |
+**The RN prototype code does not evolve into the production codebase.**
+It's deleted when the native iOS rewrite begins.
