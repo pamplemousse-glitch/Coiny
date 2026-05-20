@@ -1,0 +1,97 @@
+name: Coiny
+options:
+  bundleIdPrefix: app.coiny
+  deploymentTarget:
+    iOS: "17.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+  generateEmptyDirectories: false
+  groupSortPosition: top
+  xcodeVersion: "16.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    DEVELOPMENT_TEAM: ""
+
+# Build configurations — Debug for local + Simulator, Release for TestFlight + App Store
+configs:
+  Debug: debug
+  Release: release
+
+targets:
+  Coiny:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Coiny
+        excludes:
+          - "**/*.md"
+    resources:
+      - path: Coiny/Resources
+    info:
+      path: Coiny/Info.plist
+      properties:
+        CFBundleDisplayName: Coiny
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        UILaunchScreen:
+          UIColorName: ""
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIRequiresFullScreen: false
+        UIBackgroundModes:
+          - bluetooth-central
+        NSBluetoothAlwaysUsageDescription: >-
+          Coiny pairs with your Coiny device over Bluetooth to deliver reactions
+          like animations, lights, and haptics when your pet has something to say.
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.coiny.ios
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+        GCC_TREAT_WARNINGS_AS_ERRORS: YES
+        # Free "Personal Team" signing works for Simulator + 7-day device builds
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "Apple Development"
+    dependencies: []
+
+  CoinyTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: CoinyTests
+    dependencies:
+      - target: Coiny
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.coiny.ios.tests
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Coiny.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Coiny"
+
+schemes:
+  Coiny:
+    build:
+      targets:
+        Coiny: all
+        CoinyTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - CoinyTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
