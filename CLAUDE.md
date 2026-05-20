@@ -9,6 +9,7 @@ vibration, and sound.
 - `docs/tech-stack.md` — quality-first stack decisions (firmware, mobile, backend, hosting, observability, security, auth)
 - `docs/proposed-changes.md` — summary table of every proposed change from the 2026-05-20 quality audit
 - `docs/implementation-plan.md` — execution sequence + milestones for the audit changes
+- `docs/feature-backlog.md` — forward-looking feature list (pet customization, audio, net worth, etc.)
 - `docs/architecture.md` — system design
 - `docs/plaid-integration.md` — Plaid API contract reference (auth, webhooks, sync semantics, taxonomy)
 - `docs/security.md` — security model + per-phase checklist
