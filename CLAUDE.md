@@ -10,6 +10,7 @@ vibration, and sound.
 - `docs/proposed-changes.md` — summary table of every proposed change from the 2026-05-20 quality audit
 - `docs/implementation-plan.md` — execution sequence + milestones for the audit changes
 - `docs/feature-backlog.md` — forward-looking feature list (pet customization, audio, net worth, etc.)
+- `docs/product-brief.md` — the product north star (target user, voice, principles). Every feature decision references this.
 - `docs/architecture.md` — system design
 - `docs/plaid-integration.md` — Plaid API contract reference (auth, webhooks, sync semantics, taxonomy)
 - `docs/security.md` — security model + per-phase checklist
