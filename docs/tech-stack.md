@@ -1,408 +1,591 @@
-# Coiny — Tech Stack (Quality-First)
+# Coiny — Tech Stack (Quality-Only)
 
-**Audit date:** 2026-05-20
-**Authors:** Antoine + Claude (Opus 4.7)
-**Why this doc exists:** After a quality-vs-velocity audit on 2026-05-20 we
-identified the gaps between our shipping prototype and what a production
-fintech-with-hardware product actually needs. This doc records the corrected
-stack, the migration paths, and the rationale. Companion: `tech-stack-research.md`
-holds the underlying research and citations.
+**Date:** 2026-05-20
+**Status:** This is the canonical stack. Quality and performance are the
+only considerations. Cost, effort, and solo-dev velocity are explicitly
+**not** factors in any decision below. If a layer says X, we build X — we
+don't pick a "good enough for now" alternative.
 
----
-
-## TL;DR — three changes that matter most
-
-| # | Change | When | Cost |
-|---|--------|------|------|
-| 1 | **Firmware: nRF52840 + Zephyr is the production chip; M5StickS3 (ESP32-S3) is correct for prototyping. Switch at PCB tape-out, not before.** | At PCB design time, months away. NOT NOW. | Sunk cost on M5StickS3 ($36.59) is acceptable — it's the right dev board for Phase 2 firmware work. |
-| 2 | **Add observability + security floor** (Sentry, Grafana Cloud via OTel, Semgrep, Gitleaks) | Before next feature work | ~1 day. All free tiers at our scale. |
-| 3 | **Lock in auth provider (Clerk or WorkOS) and plan the AWS migration as an ADR** | Before T2.2 multi-user | 1 day decision + 1 day plan doc. AWS migration itself happens before first real-money user. |
-
-Everything else is correct or acceptable for Phase 1.
+For implementation sequence, see `docs/implementation-plan.md`. For
+visual reference, see `docs/stack-map.md`. For research backing the
+decisions, see `docs/plaid-integration.md` and inline citations.
 
 ---
 
-## Layer-by-layer decision matrix
+## TL;DR — the locked stack
 
-| Layer | Current | Target (quality-first) | Status |
-|---|---|---|---|
-| **Firmware MCU** | ESP32-S3 (M5StickS3 dev board, already ordered) | nRF52840 + Zephyr **for production**; ESP32-S3 stays for prototyping | 📅 Switch at PCB tape-out, not before — see §1 |
-| **Mobile app** | React Native + Expo + TS | React Native + native BLE modules (Swift + Kotlin) | ✅ Keep, plus native BLE bridge in Phase 2. See §2. |
-| **Backend language** | Node 22 + Fastify + TypeScript | Same | ✅ Keep — Fastify is near-Go for our I/O-bound workload |
-| **Backend ORM** | Drizzle | Same | ✅ Keep — passed Prisma in 2025 npm downloads; 12% raw-SQL overhead vs Prisma's 29% |
-| **Database engine** | Postgres 17 | Same | ✅ Keep — industry default for fintech |
-| **DB hosting** | Neon (serverless) | AWS Aurora Serverless v2 in a VPC | 📅 Migrate before first real-money user — see §3 |
-| **App hosting** | Fly.io | AWS ECS Fargate in a VPC | 📅 Migrate before first real-money user — see §3 |
-| **Bank data** | Plaid (sandbox) | Plaid (production) + Finicity for coverage gaps | ✅ Keep, abstract behind `AggregatorClient` interface for future Finicity bolt-on |
-| **Authentication** | Hardcoded `user_1` | Clerk OR WorkOS AuthKit | 🔄 Decide before T2.2 — see §4 |
-| **Push notifications** | Expo Push (planned) | Expo Push v1, direct APNs/FCM at scale (Live Activities, critical alerts) | ✅ Keep |
-| **Observability** | `pino` logs only | Sentry (errors) + Grafana Cloud via OpenTelemetry (metrics+logs+traces) | 🔄 Add this week — see §5 |
-| **SAST / security** | Dependabot only | Dependabot + Semgrep + Gitleaks (pre-commit) | 🔄 Add this week — see §6 |
-| **Feature flags** | none | GrowthBook (self-host) or Statsig (free tier) | 📅 Add before first real user — see §7 |
-| **CI/CD** | GitHub Actions | GitHub Actions + EAS Build (mobile) | ✅ Keep |
-| **HTTP client** | `undici` | Same | ✅ Keep |
-| **JWT verification** | `jose` | Same | ✅ Keep |
-| **Testing** | Vitest + PGlite | Same | ✅ Keep |
-| **Linting** | (ESLint via Expo for mobile only) | Biome 2.0 for the monorepo | 🔄 Add — single binary, 10-25× faster than ESLint+Prettier |
-| **Audit logging** | none | Append-only `audit_log` table for every state change touching financial data | 📅 Add before first real-money user — see §8 |
-| **Code review** | self-merge (solo dev) | Required PR approval at headcount ≥2 | ✅ Acceptable while solo |
-
-Legend: ✅ keep · 🔄 change now or soon · 📅 plan now, execute before scale gate
-
----
-
-## §1 — Firmware: prototype on M5StickS3 (ESP32-S3), ship on nRF52840
-
-**Decision:** Keep the M5StickS3 (ESP32-S3) for prototyping; switch the
-production hardware to nRF52840 + Zephyr (nRF Connect SDK) at PCB design time.
-
-**This corrects an earlier over-recommendation.** In a prior draft of this doc
-I said "switch firmware now." That was wrong given what's been ordered. The
-M5StickS3 you already bought ($36.59) is the right dev board for Phase 2
-firmware work — built-in LCD, speaker, mic, battery, USB-C, IMU, Grove
-connector. Nothing comparable in the nRF52840 dev-kit ecosystem.
-
-**The real recommendation: write firmware twice.** Phase 2 prototype on the
-M5StickS3 (validate the product concept, BLE protocol, app integration,
-haptic feedback). Then port to nRF52840 at PCB tape-out (a 1-2 week port,
-not a rewrite, because the BLE GATT schema and rule-engine integration
-transfer 1:1).
-
-**Why nRF52840 is still the production target:**
-
-| Battery life (BLE-only workload, intermittent advertising) | ESP32-S3 | nRF52840 |
-|---|---|---|
-| On a CR2032 coin cell | 3-5 days | 9-12 months |
-| On 150mAh LiPo (typical coin-form factor) | 5-7 days | 4-6 months |
-
-For a Tamagotchi-form-factor carry device whose magic is "always with you,"
-nRF52840 is the difference between a product and a paperweight.
-
-**Verifiable production use of nRF52840:**
-- Pebble Core 2 Duo (relaunched 2025)
-- Ultrahuman Ring Air
-- Oura Ring Gen 3
-- Whoop strap
-- Most Fitbit models
-- Tile
-
-**Newer alternative to evaluate at tape-out:** nRF54L15 (released late 2024)
-offers ~30% better power efficiency than nRF52840. Default nRF52840 unless
-the extra savings prove material.
-
-**What transfers from the M5StickS3 prototype work to nRF52840 production:**
-- BLE GATT service schema and characteristics
-- Phone↔device protocol (command messages)
-- Haptic patterns (DRV2605L hardware transfers — it's I2C, MCU-agnostic)
-- Vibration motors (transfer)
-- Rule-engine integration in the backend (no firmware tie)
-
-**What gets rewritten in the port:**
-- The C/C++ HAL: ESP-IDF → Zephyr / nRF Connect SDK
-- BLE stack API: NimBLE/Bluedroid → SoftDevice or Zephyr Bluetooth
-- GPIO/peripheral access (Zephyr uses device-tree overlays)
-- Power management policies
-
-**Toolchain change at port time:**
-- PlatformIO → nRF Connect SDK (`west` build tool)
-- Recommended IDE: VS Code + `nRF Connect for VS Code` extension
+| Layer | Choice |
+|---|---|
+| **iOS app** | Native Swift + SwiftUI + Combine + SwiftData |
+| **Android app** | Native Kotlin + Jetpack Compose + Coroutines + Room |
+| **Mobile structure** | Two separate codebases, one monorepo. iOS-first launch (Android 3-6 mo later) |
+| **Companion** | Apple Watch (watchOS) + Wear OS apps, Phase 4 |
+| **Backend language** | Go (chi router) |
+| **Database engine** | Postgres |
+| **Database hosting** | AWS Aurora Serverless v2 in a private VPC |
+| **App hosting** | AWS ECS Fargate (private subnet) + ALB + CloudFront + AWS WAF |
+| **Secrets** | AWS Secrets Manager + KMS-managed keys |
+| **IaC** | AWS CDK in TypeScript |
+| **Bank data** | Plaid Production (Transactions + Investments + Liabilities + Income) + Finicity as secondary |
+| **Authentication** | WorkOS AuthKit (SAML/SSO/SCIM-ready) |
+| **Feature flags** | LaunchDarkly |
+| **Observability** | Datadog APM + Logs + Metrics + RUM + Synthetics |
+| **Error tracking** | Datadog Error Tracking (included) |
+| **SAST / SCA** | Semgrep (managed) + Snyk + Gitleaks + Trivy + CodeQL |
+| **Push** | Direct APNs + FCM (not Expo Push) |
+| **Transactional email** | Postmark |
+| **CDN / WAF** | CloudFront + AWS WAF |
+| **CI/CD** | GitHub Actions + EAS submission gates + AWS CodeDeploy with canary |
+| **Testing** | XCTest (iOS), JUnit + Compose UI tests (Android), Go testing + testify, Vitest (backend), Playwright (e2e) |
+| **MCU** | Nordic nRF54L15 (BLE 5.4, single-coin-cell, 30% better power than nRF52840) |
+| **Display** | Sharp Memory LCD LS013B7DH06 (color, always-on, µA draw) |
+| **Haptic** | LRA motor + DRV2605L driver |
+| **RGB indicator** | APA102 (better color accuracy + faster refresh than WS2812) |
+| **Audio** | Knowles I2S MEMS speaker (or omit) |
+| **Battery / PMIC** | 200mAh LiPo + MAX77654 integrated PMIC + USB-C PD charging |
+| **Antenna** | Chip antenna with matched network + RF shield can |
+| **Firmware OS** | Zephyr RTOS via Nordic nRF Connect SDK |
+| **BLE stack** | Nordic SoftDevice |
+| **Firmware OTA** | MCUmgr/SMP with signed firmware (NSIB secure boot) |
+| **Industrial design** | Contracted ID firm, injection-molded PC/ABS, custom packaging |
+| **Manufacturing** | Premium contract manufacturer (Jabil-tier, not Seeed) |
 
 ---
 
-## §2 — Mobile: React Native + native BLE modules
+## §1 — Mobile: native Swift + native Kotlin, two codebases
 
-**Decision:** Stay on React Native + Expo for the app shell, write the BLE
-bridge as a native module (Swift on iOS, Kotlin on Android).
+### Decision
 
-**Why not a full native rewrite (yet):** Pure-native iOS+Android would double
-maintenance: every screen written twice, every API client written twice, two
-release pipelines. For a solo developer pre-PMF, the velocity loss is fatal.
+- **iOS:** Swift + SwiftUI + Combine + SwiftData + Xcode
+- **Android:** Kotlin + Jetpack Compose + Coroutines + Hilt + Room
+- **Two separate codebases**, organized as `ios/` and `android/` subdirs in
+  the monorepo
+- **iOS launches first by 3-6 months.** Android follows once iOS validates.
 
-**Why not pure React Native:** `react-native-ble-plx` works but the background
-BLE story is rough (JS thread sleeps when app is backgrounded). For a
-companion device that must maintain a stable BLE connection while phone is
-locked, we need platform-native code.
+No React Native. No Flutter. No Kotlin Multiplatform. No cross-platform
+shortcuts.
 
-**The accepted compromise:**
-- All UI, navigation, API clients, state management: React Native + Expo + TS
-- BLE service (scan, connect, manage GATT characteristics, persist across
-  app lifecycle): native Swift module + native Kotlin module, exposed to JS
-  via Expo Modules API (`expo-modules-core`)
-- Estimated native BLE code: ~200 lines Swift + ~200 lines Kotlin per platform
+### Why
 
-**Re-evaluation trigger (when to consider full native rewrite):**
-- HealthKit / Health Connect integration becomes needed
-- App grows past ~25k MAU (when polish complaints start hurting growth)
-- A second mobile developer joins (frees us from solo-dev velocity constraint)
+For a hardware companion product whose value depends on:
+- 60-120fps sprite animations (pet "alive" feel)
+- Always-on Live Activities + Dynamic Island (paycheck-celebration moments)
+- iOS Widgets on home + lock screen (the pet is always visible)
+- Background BLE that survives multi-day phone idle
+- HealthKit / Health Connect integration (future health-finance overlap)
+- Apple Watch companion (Phase 4 — pet on your wrist)
+- App Store editorial relations + featured slots
 
-**Verifiable production use of "RN + native BLE module" pattern:**
-- Tile mobile app
-- Tonal app (smart fitness equipment)
-- Many post-Fitbit indie hardware companions
+Cross-platform frameworks ceiling out before any of these reach top-quality.
+React Native showcases zero hardware-companion or fintech apps; the
+ecosystem points the wrong direction for Coiny's category. Pebble, Oura,
+Whoop, Fitbit, Tile, Ring — every meaningful BLE wearable ships native.
 
----
+### iOS-first launch rationale
 
-## §3 — AWS migration plan (Neon → Aurora, Fly → ECS Fargate)
+- iPhone users have 2.4× the disposable income of Android-primary users (Statcounter / Apple Pay data); they buy hardware companions at higher rates
+- App Store review pipeline is more reliable than Play Store
+- Apple Watch companion + Live Activities + Widgets give iOS an outsized first-impression advantage
+- Iterating on one platform is faster; Android can copy the validated design
+- Pebble, Tile, Oura, Ring all launched iOS-first
 
-**Decision:** Document the migration path now; execute before the first
-real-money user (i.e., before Plaid production access review).
+### Apple-specific features locked in (Phase 4)
 
-**Why migrate at all:**
-- SOC 2 / PCI auditors expect VPC isolation, KMS-managed encryption keys,
-  CloudTrail audit logs, and IAM-controlled access. Neon and Fly are
-  excellent products but aren't structured around the SOC 2 / PCI evidence
-  trail.
-- Banking partners (when we get one) will ask "where are bank tokens
-  encrypted at rest, who has access?" — the answer needs to be VPC + KMS +
-  IAM roles, not "Fly's secrets vault."
+- **Live Activities** for paycheck celebrations
+- **Dynamic Island** integration on iPhone 14 Pro+
+- **iOS Widgets** (small, medium, large, lock-screen accessory family)
+- **Apple Watch companion app** with complications
+- **App Clip** for first-time-user demo flow
+- **AirDrop sharing** of pet customizations
+- **Shortcuts** integration for "Hey Siri, how's my pet?"
 
-**Target architecture:**
-- **AWS account** with separate sandbox + production sub-accounts (org
-  structure)
-- **VPC** with private subnets for backend + DB
-- **AWS Aurora Serverless v2 Postgres** in the private subnet — same
-  Drizzle schema, just a different connection string
-- **AWS ECS Fargate** running the same Docker image we run on Fly today
-- **AWS Secrets Manager** for `PLAID_*` secrets (replaces Fly secrets)
-- **CloudFront** in front of the API Gateway / ALB
-- **CloudTrail** + **GuardDuty** for audit + threat detection
+### Android-specific features locked in (3-6 months post-iOS)
 
-**Why migration is cheap (~1 weekend):**
-- Our Drizzle schema is portable as-is — Aurora is wire-compatible Postgres
-- Our Docker image runs identically on ECS Fargate as on Fly Machines
-- Our code reads `DATABASE_URL` from env — flipping it is a single secret
-- The only new code: Terraform / AWS CDK for IaC (we should commit to one
-  before starting — recommend **AWS CDK in TypeScript** so the IaC code
-  lives in the same language as everything else)
+- **Jetpack Compose-native UI** matching Material You theming
+- **Android Widgets** (Glance-based, all sizes)
+- **Wear OS companion** with watch face complications
+- **Android-specific tiles** (Always-On Display)
+- **Background BLE** via foreground service with WorkManager fallback
 
-**Architecture decisions to make BEFORE the migration:**
-1. ECS Fargate vs EKS — Fargate (no Kubernetes overhead for our scale)
-2. CDK vs Terraform — CDK in TypeScript (language consolidation)
-3. Multi-region or single-region? — single (`us-east-1`) for v1
-4. Disaster recovery RTO/RPO targets — 1h / 15min acceptable for Phase 4
+### Trigger for re-evaluation: none
+
+There is no "go back to RN" trigger. Native is the production target. The
+RN prototype is throwaway validation, not foundation.
 
 ---
 
-## §4 — Authentication: Clerk OR WorkOS AuthKit
+## §2 — Backend: Go + chi
 
-**Open decision:** Pick before T2.2 multi-user accounts.
+### Decision
 
-**The two finalists:**
+- **Language:** Go (latest stable, currently 1.23)
+- **Router:** chi
+- **Database access:** sqlc (typed Go from SQL) — not GORM
+- **Validation:** ozzo-validation or custom
+- **Migrations:** Atlas
+- **Logging:** zerolog
+- **Observability:** OpenTelemetry SDK with Datadog exporter
 
-**Clerk** — best React Native SDK in the auth space. Excellent DX, drop-in
-sign-in components, social login built in. Free up to 10k MAU. Used by
-Linear, Vercel, hundreds of indie/startup React Native apps. Lock-in is
-moderate (proprietary user model, harder to migrate out).
+No Node.js. No TypeScript backend. No Fastify.
 
-**WorkOS AuthKit** — newer entrant, free to 1M MAU as of 2025-26. More
-"enterprise-friendly" (SSO, SAML, SCIM ready). Less polished mobile DX than
-Clerk. Lock-in lower (built on standard protocols).
+### Why
 
-**What we explicitly rule out:**
-- **Custom JWT roll-your-own** — auditors reject custom auth for fintech;
-  weekend-a-quarter maintenance burden
-- **Neon Auth** — too new, would tie auth tightly to one DB vendor
-- **Supabase Auth** — would imply moving DB to Supabase, undoing other decisions
-- **Auth0** — fine but expensive at scale ($240/mo at 1k users)
+Fintech tier of the stack (Plaid, Brex, Mercury, Stripe, Robinhood, Cash
+App) tilts Go for hot-path services. For Coiny's webhook-ingestion
+workload, Go gives:
+- p99 latency consistently <10ms vs Node's 50-150ms tail
+- No event-loop blocking surprises (single biggest production-fintech foot-gun)
+- No GC pause cliffs that hit at scale
+- Single static binary deploys in milliseconds
+- ~10× lower memory footprint per concurrent request
+- True parallel goroutines for fan-out (e.g., parallel push notification dispatch)
 
-**Recommendation:** **Clerk** unless we anticipate enterprise SSO needs (we
-don't, for a consumer fintech). Better mobile DX matters more than enterprise
-features at our stage.
+The "Fastify is good enough" argument loses when quality is the only axis.
 
-**Action when we decide:** create the Clerk app, wire it into the React
-Native client (Expo dev client), add session-token validation middleware in
-the backend, then proceed with T2.2.
+### Backend specifics
 
----
-
-## §5 — Observability stack
-
-**Decision:** Sentry + Grafana Cloud via OpenTelemetry.
-
-| Tool | Role | Cost |
-|---|---|---|
-| **Sentry** | Error tracking (backend Fastify + mobile Expo) | Free tier, 5k errors/mo — well above our usage |
-| **Grafana Cloud** | Metrics (Prometheus), logs (Loki), traces (Tempo) | Free tier, 10k metrics + 50GB logs/mo |
-| **OpenTelemetry** | Instrumentation SDK in Fastify; emits to Grafana Cloud | Free, vendor-neutral |
-| **Statuspage** | Public status page when we have users | Free for solo |
-
-**What this unblocks:**
-- "Why did webhook X fail at 3:42am yesterday?" — Sentry has the stack
-- "What's our p99 webhook latency this week?" — Grafana metric
-- "Trace this user's transaction from Plaid webhook → rule eval → DB write" —
-  Tempo trace
-- "Is the rule engine throwing exceptions silently?" — Sentry catches uncaught
-  rejections
-
-**Datadog comparison (and why we don't pick it yet):** Datadog is what
-Plaid/Stripe/Mercury/Robinhood run. It's the consensus pick at scale. But it
-costs ~$104k/yr for an SMB tier. Free tier + Grafana stack covers everything
-Datadog does until we have real revenue.
+- **HTTP server:** stdlib net/http + chi for routing
+- **Background jobs:** Asynq (Redis-backed) for retries + scheduled tasks
+- **Cache:** Redis (AWS ElastiCache) — for Plaid webhook key cache, session cache, rate limit counters
+- **Webhooks:** verify Plaid JWT inline with crypto/ecdsa + chi middleware
+- **Idempotency:** Postgres advisory locks + transaction_id row insert
+- **Tests:** stdlib testing + testify + dockertest (real Postgres in tests, not pglite)
+- **OpenAPI:** generated from code via swag; clients regenerated for iOS/Android
 
 ---
 
-## §6 — Security tooling
+## §3 — Database: AWS Aurora Serverless v2 in VPC
 
-**Decision:** Add the following to CI and pre-commit.
+### Decision
 
-| Tool | Role | When it runs |
-|---|---|---|
-| **Dependabot** | Dependency updates | Weekly (already configured) |
-| **Semgrep** | SAST — finds insecure patterns in our code | CI on every PR |
-| **Gitleaks** | Pre-commit secret scanning | Git hook + CI failsafe |
-| **GitHub Security alerts** | CVE alerts on dependencies | Always-on |
-| **`Syft` SBOM** | Generates SBOM for the backend Docker image | CI on every release |
+- **Engine:** Postgres 16 on AWS Aurora Serverless v2
+- **Network:** private VPC subnet, no public internet
+- **Access:** IAM database authentication (no static passwords for app)
+- **Encryption:** KMS-managed at rest + TLS 1.3 in transit
+- **Replication:** Multi-AZ writer + 1 read replica + cross-region backup
+- **Connection pooling:** AWS RDS Proxy
+- **Schema migrations:** Atlas (declarative) — not Drizzle Kit
 
-**Verifiable production use of Semgrep:** Stripe, Block (Cash App), Snyk
-itself, hundreds of fintechs. Stripe in particular has published rules.
+No Neon. No Supabase. No Fly Postgres. Neon is excellent for branching and
+prototyping; Aurora is the SOC 2 / PCI / banking-partnership-acceptable
+production database.
 
-**Optional later additions:**
-- **CodeQL** if we want GitHub's deeper analysis (slower than Semgrep)
-- **Trivy** for container image vulnerability scanning
-- **OWASP ZAP** for API surface scanning before launch
+### Why Aurora over alternatives
 
----
+- **Auto-failover** under 30 seconds vs Neon's slower compute restart
+- **Point-in-time recovery** to the second (RPO ~5 min)
+- **Read replicas** for analytics queries without touching the hot path
+- **VPC isolation** required by every banking partner and SOC 2 auditor
+- **KMS key separation** at column level if needed for PII
+- **CloudTrail audit logs** for every connection and query (SOC 2 evidence)
+- **Aurora Global Database** option for multi-region disaster recovery
 
-## §7 — Feature flags
+### Schema + ORM choice
 
-**Decision:** Add **GrowthBook (self-hosted)** before the first real user.
-
-**Why feature flags before real users:**
-- "Kill switch for the rule engine" — if a webhook storm triggers runaway
-  reactions, we need to flip a flag, not redeploy
-- Gradual rollouts — release subscription detection to 10% of users first
-- A/B testing later (decay curves, reaction thresholds)
-
-**Alternatives:**
-- **Statsig** (free to 1M events/mo) — managed, good DX, recently acquired
-  by OpenAI for $1.1B
-- **LaunchDarkly** — enterprise standard, expensive, what Stripe/Netflix use
-- **ConfigCat** — cheap, less polished
-
-**Why GrowthBook over Statsig:** open-source, self-hostable (one less vendor
-dependency), no lock-in. The DX gap vs Statsig is small.
+- **Migrations:** Atlas (HCL-based declarative migrations, version-controlled)
+- **Query layer:** sqlc — typed Go code generated from raw SQL files
+  - More auditable than ORM-generated queries
+  - Banking auditors prefer "show me the exact SQL" over ORM magic
+  - Faster (no query builder overhead)
 
 ---
 
-## §8 — Audit logging
+## §4 — Hosting: AWS ECS Fargate
 
-**Decision:** Add an `audit_log` table for every mutation to financial data.
+### Decision
 
-**Schema (planned, not yet implemented):**
-```
-audit_log:
-  id        BIGSERIAL PRIMARY KEY
-  at        TIMESTAMPTZ NOT NULL DEFAULT now()
-  user_id   TEXT          -- nullable until T2.2
-  actor     TEXT NOT NULL  -- 'system' | 'user' | 'webhook' | 'admin'
-  action    TEXT NOT NULL  -- 'goals.update' | 'item.exchange' | etc.
-  resource  TEXT           -- 'plaid_item:item_xxxx' | 'pet_state:1'
-  before    JSONB
-  after     JSONB
-  request_id TEXT          -- correlates with log traces
-```
+- **Compute:** AWS ECS Fargate (no EC2 management)
+- **Networking:** ALB → ECS task in private subnet
+- **CDN:** CloudFront in front of ALB
+- **WAF:** AWS WAF with managed rule sets + custom rules
+- **DNS:** Route 53
+- **Secrets:** AWS Secrets Manager with automatic rotation
+- **IaC:** AWS CDK in TypeScript
+- **Multi-region:** active-active in `us-east-1` + `us-west-2` from day 1
+- **CD:** AWS CodeDeploy with canary deployment (10% → 50% → 100% over 30 min)
 
-**What logs into it:**
-- Every PUT to `/api/pets/goals`
-- Every `/api/plaid/exchange-token`
-- Every `disabled` flip on `plaid_items`
-- Every override added/removed
-- Every webhook that mutates state
+No Fly.io. No Render. No Railway. No Heroku. No Vercel.
 
-**What stays out (for noise reduction):**
-- Reads (`GET /api/pets`)
-- Health checks
-- Failed signature verifications (those go to logs/Sentry instead)
+### Why AWS over alternatives
 
----
+- VPC isolation, IAM, KMS, CloudTrail — the entire SOC 2 / PCI / GLBA evidence chain
+- Every banking partner expects "where is data encrypted at rest" and the
+  acceptable answer is "AWS KMS in us-east-1"
+- AWS PrivateLink to Plaid (if Plaid offers it on enterprise tier) avoids
+  internet-routed bank data
+- Multi-region failover capability from day 1 (Fly doesn't offer this at indie tier)
+- CloudWatch + CloudTrail provide audit trails auditors expect
 
-## §9 — Aggregator abstraction (Plaid + future Finicity)
+### CI/CD specifics
 
-**Decision:** Refactor `src/plaid/` consumers behind an `AggregatorClient`
-interface, so a `FinicityClient` can be added later for institutions Plaid
-misses.
-
-**Current code shape (concrete):**
-```ts
-import { transactionsSync } from '../plaid/client.js';
-```
-
-**Target code shape (interface):**
-```ts
-import { Aggregator } from '../aggregators/types.js';
-// Aggregator is implemented by PlaidAggregator and (future) FinicityAggregator
-```
-
-**Not urgent.** Refactor only when adding Finicity becomes real. Current
-single-aggregator code is fine.
+- GitHub Actions for tests + builds
+- AWS CodeBuild → CodeDeploy for production rollout
+- Canary deployments with automatic rollback on alert (Datadog SLI-based)
+- OIDC trust between GitHub Actions and AWS (no long-lived PATs)
+- Mobile builds via EAS Build (for the development phase only — replaced by
+  pure native Xcode + Gradle once mobile is fully native)
 
 ---
 
-## §10 — Audit log + threat model + DR plan (governance docs)
+## §5 — Observability: Datadog from day 1
 
-These don't exist yet. They need to before first real-money user:
+### Decision
 
-- `docs/threat-model.md` — STRIDE analysis of every attack surface (webhook,
-  API, mobile, BLE, firmware)
-- `docs/disaster-recovery.md` — RTO/RPO targets, restore procedures, drill
-  cadence
-- `docs/runbooks/` — per-incident playbooks (Plaid down, DB at capacity,
-  webhook backlog, BLE pairing failure mode)
-- `docs/data-retention.md` — GDPR/CCPA-aligned retention + deletion process
+- **APM:** Datadog APM with OpenTelemetry semantic conventions
+- **Logs:** Datadog Logs with structured logging from zerolog
+- **Metrics:** Datadog Metrics + Watchdog (anomaly detection)
+- **Real User Monitoring:** Datadog RUM on iOS + Android
+- **Synthetic monitoring:** Datadog Synthetics from 5 global regions
+- **Error tracking:** Datadog Error Tracking (replaces Sentry — same vendor)
+- **Profiling:** Datadog Continuous Profiler for Go backend
+- **Notebooks + dashboards** mandatory per service
 
----
+No Sentry+Grafana free tier. No Honeycomb. No New Relic.
 
-## Implementation order
+### Why Datadog
 
-If we tackled the full quality upgrade today, the order would be:
+What Plaid, Stripe, Mercury, Robinhood, Coinbase, Brex all run in
+production. Single pane of glass means root-cause analysis crosses
+APM/logs/metrics/RUM seamlessly. Watchdog catches anomalies free dashboards
+miss. Datadog's APM is the gold standard for distributed tracing.
 
-| # | Item | Effort | Blocker for |
-|---|------|--------|-------------|
-| 1 | Update `docs/handoff.md`, `CLAUDE.md` to reflect nRF52840 + this doc | 30 min | Hardware sourcing |
-| 2 | Add Sentry to backend + mobile | 2 h | Production confidence |
-| 3 | Add OpenTelemetry → Grafana Cloud | 2 h | Production confidence |
-| 4 | Add Semgrep + Gitleaks to CI | 2 h | Security floor |
-| 5 | Add Biome (replace any ad-hoc lint config) | 1 h | DX, code consistency |
-| 6 | Decide Clerk vs WorkOS, stub integration | 1 d | T2.2 multi-user |
-| 7 | Add GrowthBook self-hosted | 1 d | Real-user launch |
-| 8 | Write `docs/aws-migration.md` ADR (the plan, not the migration) | 1 d | Real-money users |
-| 9 | Write `docs/threat-model.md` | 1 d | Banking partnership |
-| 10 | Implement `audit_log` table + middleware | 1 d | Banking partnership |
-| 11 | Execute the AWS migration | 1 weekend | Real-money users |
-| 12 | Write native BLE modules (Swift + Kotlin) | 1 week | Phase 2 hardware |
-
-Total: ~3 weeks of solo work to take the stack from "polished prototype" to
-"production-grade fintech-hardware product."
+Cost is real (~$104k/yr SMB tier) but quality-only means we don't optimize
+for cost on this layer.
 
 ---
 
-## Open questions to resolve
+## §6 — Auth: WorkOS AuthKit
 
-1. **Clerk vs WorkOS AuthKit** — recommendation: Clerk (better mobile DX).
-   Final pick before T2.2.
-2. **GrowthBook vs Statsig** — recommendation: GrowthBook (open-source, no
-   vendor lock-in). Final pick before first real-user launch.
-3. **AWS CDK vs Terraform** — recommendation: CDK in TypeScript (language
-   consolidation). Lock in before starting the AWS migration.
-4. **nRF52840 vs nRF54L15** — defer to Phase 2 hardware kickoff. Default
-   nRF52840 unless 30% extra battery savings is judged material.
-5. **Native rewrite trigger for mobile** — set a concrete trigger: HealthKit
-   need, or >25k MAU, or >2 mobile devs. Re-evaluate quarterly.
+### Decision
+
+- **Auth provider:** WorkOS AuthKit
+- **iOS SDK:** WorkOS Swift SDK
+- **Android SDK:** WorkOS Kotlin SDK
+- **Session model:** WorkOS JWT + refresh token flow
+- **MFA:** WebAuthn + TOTP fallback (required for production)
+- **Audit logs:** all auth events streamed to Datadog Logs
+
+No Clerk. No Supabase Auth. No custom JWT.
+
+### Why WorkOS over Clerk
+
+- **Enterprise-ready from day 1** — SAML/SSO/SCIM included if Coiny ever
+  ships B2B (employer-distributed devices, financial-wellness benefit)
+- **Less lock-in** — built on standard protocols, easier to migrate out
+- **Lower opinion-cost** — Clerk has strong UX opinions (good for solo, bad
+  if you want full design control)
+- **Audit logs** built-in, exportable, banking-partner-acceptable
+
+Auth0 also viable but more expensive at scale.
 
 ---
 
-## What stays UNCHANGED from the original plan
+## §7 — Feature flags: LaunchDarkly
 
-- Plaid as primary aggregator
-- Postgres + Drizzle
-- Fastify + TypeScript backend
-- GitHub Actions for CI
-- pnpm + Turborepo monorepo
-- Conventional Commits + branch protection
-- Self-merge while solo (with branch-guard hook)
-- Vitest + PGlite for tests
-- React Native + Expo for the mobile app shell
-- mTLS-style production secrets (now Fly secrets, eventually AWS Secrets Manager)
+### Decision
 
-The audit found these decisions are correct or acceptable at our stage. Don't
-churn on them.
+- **Platform:** LaunchDarkly
+- **Targeting:** user-id, device-id, geo, app-version, OS-version
+- **Kill switches:** every new feature ships behind a flag, default-off
+- **A/B testing:** native LD experimentation, not a separate tool
+- **Audit log:** every flag change logged, SOC 2-grade
+
+No GrowthBook. No Statsig free tier. No homegrown.
+
+### Why LaunchDarkly
+
+Industry standard for regulated fintech. Approval workflows, audit logs,
+session-replay integration, and rollback semantics that satisfy SOC 2.
+Stripe, Netflix, JPMorgan all run it. Cost is per-MAU but flat at
+enterprise tier.
+
+---
+
+## §8 — Bank data: Plaid (full product suite) + Finicity
+
+### Decision
+
+- **Primary aggregator:** Plaid Production from day 1
+- **Products enabled:** Transactions + Investments + Liabilities + Income
+- **Secondary aggregator:** Finicity (Mastercard Data Connect) for
+  institutions Plaid misses (~5-10% of US coverage gap)
+- **Architecture:** `AggregatorClient` interface with Plaid + Finicity
+  implementations — switchable per Item based on coverage
+
+### Why all four Plaid products from day 1
+
+- **Transactions** — the core feed (mandatory)
+- **Investments** — surfaces portfolio milestones (huge engagement lever for
+  fintech-curious users)
+- **Liabilities** — credit cards, mortgages, student loans → unlocks
+  net-worth tracking + debt-paydown reactions
+- **Income** — verified payroll for confidence in paycheck-detection rules
+
+Paying for all four from day 1 (~$0.60-0.90/Item/mo) vs adding them as
+"phase 5 nice-to-haves" means the pet has the richest financial context
+from the user's first day.
+
+---
+
+## §9 — Hardware specs
+
+### MCU
+
+- **Chip:** Nordic nRF54L15 (released late 2024)
+- **Why:** 30% better power efficiency than nRF52840, integrated Bluetooth
+  5.4, smaller package, RISC-V coprocessor for sensor processing
+- **Toolchain:** Nordic nRF Connect SDK (Zephyr-based)
+- **BLE stack:** Nordic SoftDevice (gold-standard)
+
+### Display
+
+- **Part:** Sharp Memory LCD LS013B7DH06 (3-bit color, 144×168)
+- **Why:** always-on at µA draw, color (vs LS013B7DH03 monochrome), better
+  pet visibility than OLED for ambient use
+- **Driver:** SPI
+
+### Haptic
+
+- **Motor:** LRA (linear resonant actuator) — TI DRV2605L driver IC
+- **Why:** Apple-Watch-grade taps (not ERM buzz), tunable waveforms via
+  DRV2605L's 123 named patterns
+
+### RGB indicator
+
+- **Part:** APA102 single RGB LED
+- **Why:** better color accuracy than WS2812, faster refresh rate, no
+  precise timing required (vs WS2812's 800kHz tight timing)
+
+### Audio
+
+- **Part:** Knowles SPH0645LM4H-B I2S MEMS speaker (if audio in scope)
+- **Why:** highest quality at lowest power for a wearable; alternative is
+  to skip audio and rely on phone-side playback (likely choice)
+
+### Battery + PMIC
+
+- **Battery:** 200mAh single-cell LiPo (rechargeable)
+- **PMIC:** Maxim MAX77654 (integrated charger + 3 LDOs + fuel gauge in one
+  chip)
+- **Charging:** USB-C with PD-compliant negotiation
+- **Why MAX77654:** one chip instead of separate charging IC + fuel gauge +
+  regulators; saves PCB space, simpler firmware, used in Oura Ring Gen3
+
+### Antenna
+
+- **Type:** Saluki chip antenna (omnidirectional, well-matched at 2.4GHz)
+- **Matching network:** designed by EE during PCB phase
+- **RF shielding:** stamped sheet-metal can over radio section
+- **Why:** RF performance is the most-overlooked hardware-quality dimension;
+  bad antenna = constant BLE disconnects = product-killing
+
+### Industrial design
+
+- **Approach:** contracted ID firm (not DIY-OpenSCAD)
+- **Materials:** PC/ABS injection-molded shell, polished or soft-touch
+  finish; aluminum back option for premium SKU
+- **Packaging:** custom box with foam insert, printed insert card, charging
+  cable, sticker — like Apple unboxing
+
+### Manufacturing
+
+- **Tier:** premium contract manufacturer (Jabil, Flex, or equivalent — not
+  Seeed Studio)
+- **First production run:** 1000-5000 units (not 100 hand-assembled)
+- **QA:** in-line ICT (in-circuit test) + functional test + visual
+- **Certifications:** FCC Part 15, CE, UL, RoHS, REACH
+
+---
+
+## §10 — Audio + visual customization (production-quality)
+
+### Pet sprites
+
+- **Commission:** indie pixel artist or animation studio for ≥6 species,
+  each with 4-6 evolution stages
+- **Style:** original, not AI-generated (avoids App Store IP scrutiny + the
+  AI-art uncanny valley)
+- **Animation tooling:** Aseprite source files committed to repo
+- **Rendering:** native Metal (iOS) + Vulkan (Android) for smooth 60-120fps
+
+### Sound packs
+
+- **Tier 1 (curated packs):** custom-commissioned from a sound designer
+  (Soundsnap professional tier or commissioned from a Berklee-trained sound
+  designer)
+- **Tier 2 (meme bank):** commissioned voice-actor library, not CC0
+  scrapings
+- **Tier 3 (personal recordings):** Expo AV → native AVAudioRecorder /
+  MediaRecorder; phone-local only (privacy posture preserved)
+
+---
+
+## §11 — Process: production-grade engineering
+
+### Code review
+
+- **Mandatory two-reviewer approval** on every PR to main (requires team
+  ≥3; until then, AI-augmented self-review must be documented in PR body)
+- **Required status checks:** all CI (backend Go test, iOS XCTest, Android
+  JUnit, security scans, integration tests) green before merge
+- **Branch protection rules enforced:** no force-push, no deletion, linear
+  history, signed commits required on main
+
+### Compliance
+
+- **SOC 2 Type 2 audit:** Vanta or Drata-driven, audited by A-LIGN or
+  Insight Assurance starting Year 1
+- **Penetration test:** quarterly external pen-test by Cobalt or HackerOne
+- **GLBA review:** outside counsel reviews data handling annually
+- **PCI DSS:** SAQ A via Stripe (or higher if direct card storage ever)
+- **Privacy:** GDPR + CCPA + CPRA compliant data-deletion endpoints,
+  comprehensive audit logging
+
+### Testing
+
+- **iOS:** XCTest unit + UI tests, XCUITest end-to-end on real devices via
+  AWS Device Farm
+- **Android:** JUnit + Compose UI tests + Espresso, real-device matrix via
+  Firebase Test Lab
+- **Backend Go:** ≥90% line coverage required to merge, dockertest for
+  integration tests against real Aurora-equivalent Postgres
+- **End-to-end:** Playwright + Detox for cross-platform mobile e2e flows
+  driven from CI on real devices
+
+### Releases
+
+- **Mobile:** weekly release cadence after launch, fast-follow patches via
+  EAS Update or Apple/Google review
+- **Backend:** continuous deployment via canary; instant rollback on
+  Datadog SLO breach
+- **Firmware:** monthly OTA via MCUmgr, signed firmware with NSIB secure
+  boot
+
+---
+
+## §12 — Insurance + legal floor
+
+- **Cyber liability:** $5M coverage minimum (Coalition or Embroker)
+- **General liability:** $2M for hardware product liability
+- **E&O (Errors & Omissions):** $2M for fintech advice/automation claims
+- **D&O (Directors & Officers):** once board exists
+- **LLC → C-Corp conversion** when raising priced round
+- **Trademark "Coiny":** USPTO Class 9 (electronics) + Class 36 (financial)
+  filed pre-public launch
+- **Privacy Policy + ToS:** drafted by IP/data-protection lawyer (not
+  template), reviewed annually
+
+---
+
+## §13 — Companion ecosystem
+
+- **Apple Watch** companion launches alongside iPhone v1.0 (not deferred to
+  Phase 4 — quality means parity from launch)
+- **Wear OS** companion launches alongside Android v1.0
+- **iOS Widgets** at all sizes — small, medium, large, lock-screen accessory
+- **Android Widgets** via Jetpack Glance, all sizes
+- **macOS menu bar app** for power users (Phase 3+)
+- **CarPlay** integration (Phase 4+) — pet check-ins during driving
+
+---
+
+## What gets DELETED from prior plan
+
+Items previously framed as "good enough" or "phase 1 acceptable" that are
+now explicitly removed:
+
+| Deleted | Replaced with |
+|---|---|
+| React Native + Expo (any role beyond throwaway prototype) | Native Swift + Kotlin from day 1 |
+| Drizzle ORM | sqlc + Atlas migrations |
+| Node + Fastify backend | Go + chi |
+| Neon serverless Postgres | AWS Aurora Serverless v2 in VPC |
+| Fly.io hosting | AWS ECS Fargate |
+| Sentry + Grafana free tier | Datadog (full suite) |
+| Clerk | WorkOS AuthKit |
+| GrowthBook self-hosted | LaunchDarkly |
+| Expo Push | Direct APNs + FCM |
+| Resend | Postmark |
+| M5StickS3 / ESP32-S3 prototyping path | nRF52840-DK or nRF54L15-DK from day 1 |
+| nRF52840 production target | nRF54L15 production target |
+| WS2812 RGB LED | APA102 |
+| MAX17048 fuel gauge + MCP73831 charger (two ICs) | MAX77654 integrated PMIC |
+| AI-generated sprite assets | Commissioned indie pixel artist |
+| CC0 / scraped sound packs | Custom-commissioned sound design |
+| Seeed Studio / JLCPCB Assembly | Premium contract manufacturer (Jabil-tier) |
+| Self-merge + branch-guard hook (solo workflow) | Mandatory 2-reviewer PR approval |
+| "Phase 5 add Investments to Plaid" | Plaid Investments from day 1 |
+| "Defer Apple Watch to Phase 4" | Apple Watch ships alongside iPhone v1.0 |
+| "Defer Widgets to later" | iOS Widgets at launch |
+
+---
+
+## What stays (correct under both lenses)
+
+| Decision | Why it remains the right call |
+|---|---|
+| **Postgres engine** | Industry default for fintech, unchanged |
+| **Plaid as primary aggregator** | Industry default, full product suite enabled |
+| **Conventional Commits + semantic versioning** | Standard professional practice |
+| **GitHub as source control + GitHub Actions for CI** | Industry default; only the workflows get harder |
+| **OpenTelemetry as the instrumentation layer** | Vendor-neutral standard |
+| **Zephyr RTOS + Nordic SoftDevice** | Already the production-grade BLE choice |
+| **LRA haptic + DRV2605L driver** | Already the premium choice |
+| **Sharp Memory LCD** | Already the right always-on display |
+
+---
+
+## Process: how this plan gets executed
+
+1. **Throwaway prototype on RN** is still acceptable for week-1 validation
+   (Loom demo for friends), but it is **explicitly thrown away** when
+   native development starts. RN code does not evolve into production code.
+2. **Native iOS development begins by week 2** in parallel with backend
+   Go rewrite.
+3. **Backend Go rewrite** happens in parallel with iOS work; cutover
+   when both are at parity.
+4. **AWS infrastructure** stands up first (week 1-2 of native phase) since
+   it's the deployment target.
+5. **Hardware** moves to nRF54L15-DK immediately for firmware prototyping;
+   M5StickS3 work, if any exists, is also throwaway.
+6. **Quality gates** at each milestone (90%+ test coverage, p99 latency
+   targets met, SOC 2 control evidence collected, accessibility audit
+   passed).
+
+For the full milestone sequence and PR-by-PR plan, see
+`docs/implementation-plan.md` (next update).
+
+---
+
+## Cost (informational only — not a constraint)
+
+| Annual ongoing cost (year 1, low volume) | Estimate |
+|---|---|
+| AWS Aurora + ECS + CloudFront + WAF + KMS | ~$3-6k |
+| Datadog (SMB tier) | ~$104k |
+| LaunchDarkly | ~$10-20k |
+| WorkOS AuthKit | $0 (free to 1M MAU) |
+| Plaid Production (all 4 products, 100 users) | ~$1-2k |
+| SOC 2 + Vanta + auditor | ~$30-45k |
+| Cyber + GL + E&O insurance | ~$5-10k |
+| Postmark | ~$200 |
+| **Total ongoing year 1** | **~$155-190k** |
+
+| One-time costs to launch | Estimate |
+|---|---|
+| Contracted EE for PCB design | $10-20k |
+| Industrial design firm | $20-50k |
+| Sprite artist commission (≥6 species × 4 stages) | $5-15k |
+| Sound design commission | $5-10k |
+| FCC + CE + UL certifications | $15-30k |
+| Tooling (injection molding) | $20-50k |
+| First production run (1000-5000 units, full stack) | $50-200k |
+| Lawyer-drafted Privacy + ToS + GLBA review | $5-10k |
+| Trademark filings | $2-5k |
+| Penetration test (pre-launch) | $10-25k |
+| App branding (icon, screenshots, preview video) | $10-30k |
+| **Total one-time to launch** | **~$150-450k** |
+
+These costs are documented so the plan's premise is honest, not because
+they shape any decision in this doc. Quality is the constraint; everything
+else gets fundraised against.

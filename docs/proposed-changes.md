@@ -1,113 +1,129 @@
-# Coiny — Proposed Changes (Quality Audit, 2026-05-20)
+# Coiny — Proposed Changes (Quality-Only Plan)
 
-A summary of every change proposed from the 2026-05-20 quality audit. For
-full context see `docs/tech-stack.md`; for execution order see
-`docs/implementation-plan.md`.
+Summary of every change between the current prototype and the
+quality-only target locked in `docs/tech-stack.md`. No velocity-aware
+compromises. For execution sequence see `docs/implementation-plan.md`.
 
-**Reading guide:** rows in 🟢 are "do now," 🟡 are "do before milestone X,"
-⚪ are "decided, deferred." Don't act on this doc — act on the
-implementation plan.
+**Status legend:** 🟢 do now · 🟡 do before launch · ⚪ post-launch / Phase 4+
 
 ---
 
 ## Hardware changes
 
-| # | Change | Current | Proposed | Why | Cost | When | Status |
-|---|--------|---------|----------|-----|------|------|--------|
-| H1 | **Production MCU** | ESP32-S3 (planned) | nRF52840 + Zephyr (production); keep ESP32-S3 (M5StickS3) for prototyping | Battery life: 9-12 months vs 3-5 days on coin cell. Industry standard for BLE wearables (Pebble, Oura, Whoop, Fitbit, Tile). | $0 now; $50 for nRF52840-DK at PCB time | At PCB tape-out, not before | 🟡 |
-| H2 | **Display (production)** | TBD | Sharp Memory LCD (LS013B7DH03 or similar) | Always-on at ~µA draw. Tamagotchi "pet is always there" feel. Pebble uses these. | $30 at production design time | PCB design phase | 🟡 |
-| H3 | **Battery (production)** | TBD | Rechargeable LiPo (~150-200mAh) + USB-C charging | Coin-cell swap is user friction; modern UX expects plug-in charging | ~$15 (LiPo + charging IC) | PCB design phase | 🟡 |
-| H4 | **Haptics motor (production)** | ERM (eccentric mass) — already ordered | LRA (Linear Resonant Actuator) | Apple Watch-style taps vs ERM buzzes. Better "personality" feel. DRV2605L driver supports both — no driver swap needed. | $3-5 swap at production | PCB design phase | 🟡 |
-| H5 | **Audio (production)** | Speaker on M5StickS3 | Drop entirely, or use cheap piezo | Most wearables skip audio. Office-friendliness. Power savings. | -$2 to +$1 | PCB design phase | 🟡 |
-| H6 | **PMIC / fuel gauge (production)** | None | MAX17048 fuel gauge + dedicated charging IC (MCP73831 or BQ24074) | LiPo without fuel gauge gives bad battery % readings — users notice | ~$15 BOM | PCB design phase | 🟡 |
-| H7 | **RGB LED (production)** | None | Single WS2812 or APA102 RGB LED | One RGB > monochrome for color-coded reactions (green=good, amber=warn, red=overspend) | ~$1 BOM | PCB design phase | 🟡 |
-| H8 | **EE / PCB design help** | DIY assumed | Contract a freelance EE for PCB layout + RF + FCC pre-cert | RF design + DFM is real engineering. Solo software-eng doing it doubles project risk. | ~$5-10k engagement | Phase 2 hardware kickoff | 🟡 |
+| # | Change | Current | Target | Why | When |
+|---|--------|---------|--------|-----|------|
+| H1 | **MCU** | M5StickS3 (ESP32-S3) prototype | **Nordic nRF54L15** (BLE 5.4, 30% better power than nRF52840) | Battery life + RF performance + production-grade chip | 🟡 At PCB tape-out |
+| H2 | **Display** | TBD | **Sharp Memory LCD LS013B7DH06** (3-bit color, always-on, µA draw) | "Pet is always visible" feel; color > monochrome | 🟡 PCB design |
+| H3 | **Battery** | Coin cell (if any) | **200mAh LiPo + USB-C PD charging** | User expects plug-in charging | 🟡 PCB design |
+| H4 | **Haptic** | ERM (already ordered) | **LRA + DRV2605L driver** | Apple-Watch-grade taps vs ERM buzz | 🟡 PCB design |
+| H5 | **PMIC** | None | **Maxim MAX77654** (integrated charger + 3 LDOs + fuel gauge) | One chip vs three; less PCB space; better firmware UX (used by Oura Ring Gen3) | 🟡 PCB design |
+| H6 | **RGB indicator** | None | **APA102** RGB LED | Better color accuracy + faster refresh than WS2812 | 🟡 PCB design |
+| H7 | **Audio** | M5StickS3 built-in speaker | **Knowles I2S MEMS speaker** OR omit entirely | Best quality at lowest power; alternative is phone-only audio | 🟡 PCB design |
+| H8 | **Antenna + shielding** | None planned | **Chip antenna with matched network + RF shield can** over radio | RF performance is the #1 hardware-quality dimension; bad antenna = BLE disconnects | 🟡 PCB design |
+| H9 | **Industrial design** | DIY OpenSCAD prints | **Contracted ID firm + injection-molded PC/ABS shell + custom packaging** | Apple-unboxing-grade first impression | 🟡 Pre-manufacturing |
+| H10 | **Contract manufacturer** | TBD | **Premium-tier CM (Jabil, Flex, or similar)** | Not Seeed Studio / JLCPCB Assembly; QA, certifications, supply chain | 🟡 Manufacturing prep |
+| H11 | **Firmware OS** | PlatformIO/Arduino | **Zephyr RTOS via Nordic nRF Connect SDK** | Production-grade BLE stack, OTA, secure boot | 🟡 Firmware development |
+| H12 | **Secure boot + signed firmware** | None | **NSIB secure boot + signed OTA via MCUmgr** | Required for any consumer hardware; tamper resistance | 🟡 Firmware development |
+| H13 | **Certifications** | None | **FCC Part 15 + CE + UL + RoHS + REACH** | Required for any US/EU consumer sale | 🟡 Pre-launch |
 
-**Hardware sunk cost note:** $36.59 M5StickS3 stays in the prototyping kit.
-DRV2605L ($7.95) + Qwiic-to-Grove cable ($7.95) + coin motors (10-pack $8.99)
-all transfer to the production design — they're I2C/MCU-agnostic. **No
-component you've ordered is wasted.**
+## Software changes
 
----
-
-## Software / infrastructure changes
-
-| # | Change | Current | Proposed | Why | Cost | When | Status |
-|---|--------|---------|----------|-----|------|------|--------|
-| S1 | **Error tracking** | None — pino logs only | Sentry on backend (Fastify SDK) + mobile (Expo SDK) | Production fintech non-negotiable. Catches silent throws, surfaces real user errors. | $0 free tier | This week | 🟢 |
-| S2 | **Metrics + traces** | None | OpenTelemetry SDK → Grafana Cloud (Prometheus + Loki + Tempo) | "Why did webhook X fail at 3:42am?" "What's our p99 latency?" — currently unanswerable | $0 free tier | This week | 🟢 |
-| S3 | **SAST in CI** | None | Semgrep on every PR | Static analysis catches insecure patterns. Used by Stripe, Block. | $0 free | This week | 🟢 |
-| S4 | **Secret scanning** | None | Gitleaks pre-commit hook + CI failsafe | Prevents committing API keys / tokens. Cheap insurance. | $0 free | This week | 🟢 |
-| S5 | **Linting** | Expo ESLint only on mobile; backend has no linter | Biome 2.0 across the monorepo | Single binary, 10-25× faster than ESLint+Prettier, one config | $0 free | This week | 🟢 |
-| S6 | **Audit logging** | None — silent state changes | `audit_log` table + middleware on every financial-data mutation | SOC 2 / banking partnerships require it. "Who changed what, when" must be answerable. | 1 day to build | Before first real-money user | 🟡 |
-| S7 | **Auth provider** | Hardcoded `user_1` | Clerk (recommended) OR WorkOS AuthKit | Custom JWT for fintech = auditors reject. Clerk has best React Native SDK. | $0 free tier (Clerk: 10k MAU, WorkOS: 1M MAU) | Before T2.2 multi-user | 🟡 |
-| S8 | **Feature flags** | None | GrowthBook (self-hosted) — or Statsig free tier | "Kill switch" for rule engine during a webhook storm. Required before real users. | $0 self-host | Before first real-user launch | 🟡 |
-| S9 | **DB hosting** | Neon serverless | AWS Aurora Serverless v2 in a VPC | SOC 2 / PCI auditors expect VPC + KMS + CloudTrail. Neon stays fine for sandbox. | ~$50-100/mo at low volume | Before first real-money user | 🟡 |
-| S10 | **App hosting** | Fly.io | AWS ECS Fargate in a VPC | Same reasoning as S9. Same Docker image runs on both. | ~$30-100/mo at low volume | Before first real-money user | 🟡 |
-| S11 | **IaC** | None (config in fly.toml, dashboards) | AWS CDK in TypeScript | Reproducible infra. Language consolidation with backend. Beats Terraform for our stack. | 1 day to scaffold | Before AWS migration | 🟡 |
-| S12 | **Native BLE module (mobile)** | None | Swift + Kotlin native module wrapping CoreBluetooth / BluetoothLeScanner, exposed via Expo Modules API | `react-native-ble-plx` background story is rough — JS thread sleeps when app is backgrounded. Need platform-native code for the BLE state machine. | 1 week | Phase 2 (when firmware is talking) | 🟡 |
-| S13 | **Aggregator abstraction** | Direct Plaid imports | `AggregatorClient` interface; PlaidAggregator implements it; future FinicityAggregator bolt-on | Decouples rule engine from vendor. Lets us add Finicity for coverage gaps without refactoring. | 4-6 hours | When adding 2nd aggregator (not urgent) | ⚪ |
-| S14 | **Threat model doc** | None | `docs/threat-model.md` — STRIDE per surface (webhook, API, mobile, BLE, firmware) | Required for any banking partnership or security review | 1 day | Before first banking partner conversation | 🟡 |
-| S15 | **Disaster recovery plan** | None | `docs/disaster-recovery.md` — RTO/RPO, restore procedure, drill cadence | Required for SOC 2 / banking partnership | 1 day | Before first real-money user | 🟡 |
-| S16 | **Data retention plan** | None | `docs/data-retention.md` — GDPR/CCPA-aligned retention + deletion process | Banking partner blocker | 0.5 day | Before banking partnership | 🟡 |
-| S17 | **Runbooks** | None | `docs/runbooks/` — playbooks per incident class | Operational maturity for on-call | 1 day initial | Before launch | 🟡 |
-| S18 | **Push notifications backend** | None — `device_tokens` table only | Expo Push integration on backend (send via Expo's push API) | T2.5 ✅ persistence done; T2.3 = actually sending. Needs APNs key + FCM creds from Antoine. | 1 day + your account setup | After APNs + FCM setup | 🟡 |
-| S19 | **Container image scanning** | None | Trivy scan of Docker images in CI | Catches known CVEs in base images / deps | 1 hour | This week | 🟢 |
-| S20 | **SBOM generation** | None | Syft (in CI) produces SBOM per release | Banking partnerships ask for it; SOC 2 nice-to-have | 1 hour | Before banking partnership | 🟡 |
-
----
+| # | Change | Current | Target | Why | When |
+|---|--------|---------|--------|-----|------|
+| S1 | **iOS app** | React Native + Expo + TS | **Native Swift + SwiftUI + Combine + SwiftData** | 60-120fps animations, Widgets, Live Activities, Dynamic Island, Watch | 🟢 Begin immediately after RN prototype validates |
+| S2 | **Android app** | React Native + Expo + TS | **Native Kotlin + Jetpack Compose + Coroutines + Room** | Same reasons, Android-native idioms | 🟡 3-6 mo after iOS native launch |
+| S3 | **Mobile structure** | One RN codebase | **Two separate codebases, one monorepo (`ios/` + `android/`)** | No cross-platform abstraction tax | 🟢 With S1 |
+| S4 | **iOS-first launch** | Simultaneous iOS+Android assumed | **iOS launches 3-6 months before Android** | Higher disposable income, better review pipeline, Apple Watch tie-in | 🟢 Strategic choice |
+| S5 | **Apple Watch companion** | Not planned for v1 | **Ships with iOS v1.0** (not Phase 4) | "Pet on your wrist" is unfair engagement; complications + watch face | 🟢 With iOS launch |
+| S6 | **iOS Widgets + Live Activities + Dynamic Island** | Not planned | **All three at launch** (small/medium/large/lock-screen widget + Live Activity for paycheck + Dynamic Island integration) | Always-glanceable pet; massive engagement multiplier | 🟢 With iOS launch |
+| S7 | **Wear OS companion** | Not planned | **Ships with Android v1.0** | Parity with Apple Watch on Android side | 🟡 With Android launch |
+| S8 | **Android Widgets** (Jetpack Glance) | Not planned | **All sizes at Android launch** | Android home-screen parity | 🟡 With Android launch |
+| S9 | **Backend language** | Node + Fastify + TS | **Go + chi + sqlc** | <10ms p99 vs Node's 50-150ms tail; predictable concurrency; lower memory; what real fintech runs server-side | 🟢 Rewrite in parallel with native mobile |
+| S10 | **Database hosting** | Neon (serverless Postgres) | **AWS Aurora Serverless v2 in private VPC** | SOC 2 / banking partnership-acceptable; multi-AZ; PITR; KMS-encrypted; CloudTrail audit | 🟡 Before any production user |
+| S11 | **ORM / data layer** | Drizzle ORM | **sqlc + Atlas migrations** | Generated typed Go from raw SQL; banking auditors prefer SQL transparency over ORM magic; declarative migrations | 🟢 With Go backend |
+| S12 | **Hosting** | Fly.io | **AWS ECS Fargate in VPC + ALB + CloudFront + WAF** | VPC isolation, IAM-controlled, CloudTrail audit | 🟡 Before any production user |
+| S13 | **IaC** | None | **AWS CDK in TypeScript** | Reproducible infra, multi-env, OIDC-trusted deploys | 🟡 With S12 |
+| S14 | **Multi-region deployment** | Single region (iad) | **Active-active in us-east-1 + us-west-2** | Banking-grade availability | 🟡 Pre-launch |
+| S15 | **Secrets** | Fly secrets | **AWS Secrets Manager + KMS-managed keys + auto-rotation** | Audit-trail, IAM-controlled, SOC 2 acceptable | 🟡 With S12 |
+| S16 | **Authentication** | None (hardcoded `user_1`) | **WorkOS AuthKit** (SAML/SSO/SCIM-ready) | Standards-based, less lock-in than Clerk, B2B-ready, audit logs | 🟢 Day 1 of native rewrite |
+| S17 | **Multi-user data model** | Singleton | **`user_id` FK on every table; per-user isolation** | Required for multi-user; banking-partner-acceptable | 🟢 With S16 |
+| S18 | **Feature flags** | None | **LaunchDarkly** | Approval workflows, audit logs, rollback semantics auditors love | 🟡 Pre-launch |
+| S19 | **Observability** | `pino` logs + planned Sentry + planned Grafana free tier | **Datadog full suite** (APM + Logs + Metrics + RUM + Synthetics + Profiler + Error Tracking) | Single pane of glass; cross-signal root cause; what every meaningful fintech runs | 🟢 Day 1 of native rewrite |
+| S20 | **SAST / SCA / secret scanning** | Semgrep + Gitleaks + Trivy + Dependabot ✅ | **Add Snyk + CodeQL + Trivy + signed commits required** | Defense in depth; CodeQL catches what Semgrep misses; signed commits = supply-chain | 🟡 Pre-launch |
+| S21 | **Audit logging** | None | **`audit_log` table + middleware on every financial-data mutation** | SOC 2 + GLBA + banking partner requirements | 🟢 With S16 |
+| S22 | **Push notifications** | None / planned Expo Push | **Direct APNs + FCM** (native SDKs in iOS/Android) | Full control over delivery, Live Activity payloads, critical alerts, no Expo middleman | 🟢 With native apps |
+| S23 | **Transactional email** | None | **Postmark** | Best deliverability + transactional templating; not Resend (newer) | 🟡 With user registration |
+| S24 | **CDN** | None (Fly direct) | **CloudFront in front of ALB** | DDoS protection + geographic latency + WAF coverage | 🟡 With S12 |
+| S25 | **WAF** | None | **AWS WAF with managed rules + custom rules** | Required for banking-grade API protection | 🟡 With S12 |
+| S26 | **Mobile sprite assets** | Plan was AI-generated for prototype | **Commissioned indie pixel artist; ≥6 species × 4 evolution stages; Aseprite source files in repo** | App Store IP-clean; uncanny-valley-free; brand voice consistent | 🟡 Pre-launch |
+| S27 | **Audio packs** | Plan was CC0 placeholders | **Custom-commissioned sound design** (Berklee-trained or Soundsnap pro) for all curated packs | Production-grade audio; brand-consistent | 🟡 Pre-launch |
+| S28 | **Plaid product suite** | Transactions only | **Transactions + Investments + Liabilities + Income from day 1** | Net worth + portfolio milestones + debt paydown reactions + verified income | 🟢 Day 1 of Plaid Production access |
+| S29 | **Aggregator abstraction** | Direct Plaid imports | **`AggregatorClient` interface; Plaid + Finicity as second source** | Coverage gaps in Plaid (~5-10% US) filled by Finicity | 🟡 Before launch |
+| S30 | **Tests** | Vitest + PGlite | **iOS: XCTest + XCUITest on real devices via AWS Device Farm; Android: JUnit + Compose UI + Espresso via Firebase Test Lab; Backend Go: stdlib + testify + dockertest; e2e: Playwright + Detox** | Production-grade testing across the matrix | 🟢 With native rewrite |
+| S31 | **Code coverage floor** | None | **90%+ on every package** | Quality-only standard | 🟢 With native rewrite |
 
 ## Process changes
 
-| # | Change | Current | Proposed | Why | When | Status |
-|---|--------|---------|----------|-----|------|--------|
-| P1 | **Conventional Commits** | ✅ in place | (no change) | — | — | ✅ |
-| P2 | **Branch protection** | ✅ in place (branch-guard hook) | (no change) | — | — | ✅ |
-| P3 | **PR review** | Self-merge while solo | Required 2-reviewer approval at headcount ≥2 | SOX/SOC 2 require it; not relevant while solo | When 2nd dev joins | ⚪ |
-| P4 | **ADRs for non-trivial decisions** | Ad-hoc (some captured in docs) | Numbered ADR per non-trivial decision, in `docs/adr/` | Decision provenance for future contributors and auditors | Going forward, one per decision | 🟡 |
+| # | Change | Current | Target | When |
+|---|--------|---------|--------|------|
+| P1 | **PR review** | Self-merge while solo | **Mandatory 2-reviewer approval on every PR to main** | When team ≥3; until then, AI-augmented self-review documented in PR body |
+| P2 | **Required status checks** | Advisory only | **All CI gates blocking** (backend Go test, iOS XCTest, Android JUnit, security scans, integration, coverage floor) | 🟢 Immediate |
+| P3 | **Signed commits on main** | None | **Required GPG/SSH-signed commits on main; `Verified` badge mandatory** | 🟢 Immediate (GitHub Pro or public repo) |
+| P4 | **Canary deployments** | None (atomic Fly deploy) | **CodeDeploy canary 10% → 50% → 100% over 30 min with auto-rollback on Datadog SLI breach** | 🟡 With S12 AWS migration |
+| P5 | **Quarterly external penetration test** | None | **Cobalt or HackerOne** | 🟡 Year 1 |
+| P6 | **SOC 2 Type 2 audit** | None | **Vanta/Drata + A-LIGN auditor — start collecting evidence immediately, first audit window Year 1** | 🟡 Year 1 |
+| P7 | **GLBA review** | None | **Outside counsel review annually** | 🟡 Year 1 |
+| P8 | **Linear git history on main** | Not enforced | **Required + force-push disabled** | 🟢 Immediate |
+| P9 | **OIDC trust GitHub Actions → AWS** | None (PAT-based) | **OIDC required; no long-lived tokens in CI** | 🟡 With S12 |
+| P10 | **SBOM generation per release** | None | **Syft + signed in transparency log (Sigstore)** | 🟡 Pre-launch |
 
----
+## Compliance + insurance
 
-## What we got RIGHT — keep, do not churn
+| # | Change | Target | When |
+|---|--------|--------|------|
+| C1 | **Privacy Policy + ToS** | **Lawyer-drafted; not template; reviewed annually** | Pre-launch |
+| C2 | **Cyber liability insurance** | **$5M coverage (Coalition or Embroker)** | Pre-launch |
+| C3 | **General liability insurance** | **$2M (hardware product liability)** | Pre-launch |
+| C4 | **E&O insurance** | **$2M (fintech advice/automation)** | Pre-launch |
+| C5 | **D&O insurance** | **Once board exists** | Post-Series A |
+| C6 | **Trademark "Coiny"** | **USPTO Class 9 (electronics) + Class 36 (financial services)** | Pre-public-launch |
+| C7 | **GDPR + CCPA + CPRA compliance** | **Audited delete-my-account endpoint; comprehensive audit logging** | Pre-launch |
 
-These showed up in the audit as correctly-chosen and don't need to change:
+## Decisions LOCKED (no longer open)
 
-- **Plaid** as bank data aggregator
-- **Postgres** as DB engine
-- **Drizzle ORM** (passed Prisma in 2025; smaller bundle; better fintech audit story than ORM-heavy alternatives)
-- **Fastify + Node.js + TypeScript** for backend (workload is I/O-bound)
-- **React Native + Expo** for mobile app shell (with native BLE module bridge)
-- **GitHub Actions** for CI
-- **pnpm + Turborepo** monorepo
-- **Vitest + PGlite** for tests
-- **`jose`** for JWT verification
-- **`undici`** for HTTP client
-- **Dependabot** (added 2026-05-20)
+These were marked "open decisions" in prior drafts — now committed:
 
----
+- ✅ **Mobile:** native Swift + Kotlin, two codebases, iOS-first
+- ✅ **Backend:** Go + chi + sqlc + Atlas
+- ✅ **DB host:** AWS Aurora Serverless v2 in VPC (not Neon, not Supabase, not Fly Postgres)
+- ✅ **App host:** AWS ECS Fargate (not Fly, not Render, not Vercel)
+- ✅ **Auth:** WorkOS AuthKit (not Clerk, not Auth0, not custom)
+- ✅ **Feature flags:** LaunchDarkly (not GrowthBook, not Statsig)
+- ✅ **Observability:** Datadog (not Sentry+Grafana split)
+- ✅ **IaC:** AWS CDK in TypeScript (not Terraform)
+- ✅ **MCU:** Nordic nRF54L15 (not nRF52840, not ESP32-S3)
+- ✅ **RGB LED:** APA102 (not WS2812)
+- ✅ **PMIC:** Maxim MAX77654 (not separate MCP73831 + MAX17048)
 
-## Recommended skips
+## What gets DELETED from the prior plan
 
-Things we discussed but decided NOT to change at our stage:
+Items that were "good enough for solo dev" and are now removed:
 
-- **Backend language switch (Node → Go)** — Fastify's perf is near-Go for our I/O workload. Not the limiting factor. Revisit if rule evaluation becomes hot.
-- **Native iOS + Native Android full rewrite** — RN with native BLE bridge handles our case. Trigger for full rewrite: HealthKit need, >25k MAU, or 2+ mobile devs.
-- **Datadog / New Relic** — Sentry + Grafana free tiers do the same job at our scale.
-- **LaunchDarkly** — GrowthBook self-hosted covers our needs.
-- **Auth0** — too expensive at scale; Clerk/WorkOS are better for our case.
-- **Kubernetes / EKS** — Fargate is the right managed-container target. K8s only worth it at much larger scale.
-
----
-
-## Decisions still owed
-
-Decisions that need to be made before the relevant work can start. None are
-blocking today's work; flagged for visibility.
-
-| Decision | Default if no input | When required |
-|---|---|---|
-| Clerk vs WorkOS AuthKit | Clerk | Before T2.2 multi-user |
-| GrowthBook vs Statsig | GrowthBook (self-host) | Before first real-user launch |
-| AWS CDK vs Terraform | AWS CDK (TypeScript) | Before AWS migration starts |
-| nRF52840 vs nRF54L15 | nRF52840 | Phase 2 hardware kickoff |
-| Native rewrite trigger for mobile | "HealthKit or 25k MAU or 2+ mobile devs" | Quarterly re-evaluation |
+- React Native + Expo (anywhere beyond a week-1 throwaway validation prototype)
+- Drizzle ORM
+- Neon serverless Postgres
+- Fly.io hosting
+- Clerk auth
+- GrowthBook feature flags
+- Sentry + Grafana free tier split observability
+- Expo Push
+- M5StickS3 / ESP32-S3 as a production path
+- nRF52840 as the locked production MCU (replaced by nRF54L15)
+- WS2812 RGB LED
+- MAX17048 + MCP73831 two-chip power approach
+- AI-generated sprite assets for production
+- CC0-scraped sound packs for production
+- Seeed Studio / JLCPCB Assembly as the manufacturing path
+- "Phase 5 Plaid Investments" deferral (Investments enabled from day 1)
+- "Phase 4 Apple Watch companion" deferral (ships with iOS v1.0)
+- Self-merge workflow on main (replaced by mandatory 2-reviewer when team ≥3)

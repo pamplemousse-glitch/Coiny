@@ -1,15 +1,12 @@
-# Coiny — Software Implementation Plan
+# Coiny — Implementation Plan (Quality-Only)
 
-Executable sequence for the software changes proposed in `docs/proposed-changes.md`.
+Executable milestone sequence to deliver the quality-only stack locked in
+`docs/tech-stack.md`. No velocity-aware compromises. Cost and effort are
+documented but never used to downgrade a decision.
 
-This is a working doc — items get checked off as they ship, gates get marked as
-they pass. The order is chosen to (a) front-load the cheap wins, (b) put quality
-foundations under the next round of feature work, and (c) gate the bigger
-migrations behind validation milestones.
-
-**Target horizon:** ~3 weeks of solo dev work to go from "polished prototype"
-to "production-grade fintech-hardware product, ready for first real-money
-user pilot."
+**This is the production-build plan.** A separate `docs/3-day-sprint.md`
+exists for a throwaway RN validation prototype only — that code does not
+evolve into the production codebase.
 
 ---
 
@@ -17,172 +14,316 @@ user pilot."
 
 | Milestone | Definition | What unlocks |
 |---|---|---|
-| **M1: Quality floor** | S1-S5, S19 shipped. Sentry catches errors. CI runs Semgrep + Gitleaks. Biome lints everything. | Confidence to ship features without flying blind |
-| **M2: Auth + flags** | S7 (Clerk or WorkOS) + S8 (GrowthBook) shipped. T2.2 multi-user implemented. | Multi-user features possible. Real-user beta is unblocked. |
-| **M3: Compliance docs** | S14, S15, S16, S17 written. S6 audit-log table shipped. | Conversation with banking partner is possible. |
-| **M4: Production infra** | S9 (Aurora) + S10 (ECS Fargate) + S11 (CDK) live. Old Neon + Fly retired. | First real-money user can be onboarded. |
-| **M5: Phase 2 prep** | S12 native BLE module written. Plaid aggregator abstraction (S13) optional. | Firmware Phase 2 can integrate against a stable mobile BLE layer. |
+| **M0 — Throwaway prototype** | RN demo on iOS Simulator validates the concept with friends (existing `docs/3-day-sprint.md`) | Decision-to-proceed gate; code is discarded |
+| **M1 — AWS infrastructure** | Aurora + ECS Fargate + CloudFront + WAF + Secrets Manager + CDK in `us-east-1` + `us-west-2` live with the existing Node backend running on them | Production-grade hosting for Go rewrite to land on |
+| **M2 — Backend Go rewrite + Datadog + WorkOS** | Coiny backend reimplemented in Go (chi + sqlc + Atlas) with full Datadog observability and WorkOS auth | Backend is production-grade; mobile teams have a target API |
+| **M3 — Native iOS app + Apple Watch + Widgets + Live Activities** | Swift + SwiftUI app with full Plaid Link, Apple Watch companion, Widgets, Live Activities. Plaid Investments + Liabilities + Income wired. Native BLE via CoreBluetooth. | iOS-first launch ready |
+| **M4 — iOS public launch on App Store** | App Store submission, marketing site live, waitlist converted, hardware shipping | First public users |
+| **M5 — Native Android app + Wear OS + Widgets** | Kotlin + Jetpack Compose app with full Plaid + Wear OS companion + Widgets | Android-first users 3-6 months after iOS |
+| **M6 — Hardware production (nRF54L15 + Sharp Memory LCD + LRA + APA102 + MAX77654)** | First production run (1000-5000 units) shipped from contracted CM, FCC + CE + UL certified | Hardware in user hands |
 
 ---
 
-## Sprint plan
+## M1 — AWS infrastructure stand-up
 
-Sequence of PRs. Each row is one focused PR; each PR squash-merges to main.
-Estimated effort assumes solo work + my (Claude) coding speed.
+Estimated effort: ~3-4 weeks solo, ~1-2 weeks with help.
 
-### M1 — Quality floor (target: this week, ~1-2 days)
+| # | PR / task | Output |
+|---|-----------|--------|
+| 1.1 | AWS account + Organizations setup (sandbox + production sub-accounts) | IAM-isolated environments |
+| 1.2 | CDK in TS scaffold + VPC + private subnets + NAT gateway + Route 53 zone | Networking foundation |
+| 1.3 | Aurora Serverless v2 cluster + RDS Proxy + Secrets Manager + KMS key | Database in private subnet |
+| 1.4 | ECS Fargate cluster + ALB + target group + health checks | Compute target |
+| 1.5 | CloudFront distribution + AWS WAF with managed rule sets | CDN + DDoS protection |
+| 1.6 | OpenTelemetry collector deployed as ECS sidecar; OIDC trust GitHub Actions → AWS | Observability + deploy path |
+| 1.7 | GitHub Actions: build Docker image → push to ECR → CodeDeploy canary | CI/CD pipeline |
+| 1.8 | Migrate existing Node backend to ECS Fargate temporarily (interim) | Sandbox environment proven |
+| 1.9 | Atlas migrations from Drizzle schema | Same schema, new home |
+| 1.10 | Decommission Fly + Neon **after** Aurora cutover + 1 week soak | Old infra retired |
+| 1.11 | Multi-region active-active replication (us-east-1 + us-west-2) | Geographic resilience |
+| 1.12 | DR drill: take a region down, fail over, restore, validate | RTO/RPO verified |
 
-| # | PR title | Effort | Notes |
-|---|----------|--------|-------|
-| 1 | `chore(ci): add Semgrep SAST + Trivy container scan` | 2 h | New `.github/workflows/security.yml`. Use Semgrep auto config. Trivy on Docker image. |
-| 2 | `chore(ci): add Gitleaks pre-commit + CI failsafe` | 1 h | `.pre-commit-config.yaml` + `.gitleaks.toml` + workflow step. |
-| 3 | `chore: add Biome 2.0 to monorepo` | 2 h | `biome.json` at root. Replace Expo ESLint where it conflicts. Run Biome in CI. |
-| 4 | `feat(backend): wire Sentry SDK into Fastify` | 1 h | Free Sentry project. SENTRY_DSN as Fly secret. |
-| 5 | `feat(mobile): wire Sentry Expo SDK` | 1 h | Same Sentry project, different DSN. Source maps via Expo build hook. |
-| 6 | `feat(backend): wire OpenTelemetry SDK → Grafana Cloud` | 3 h | Free Grafana Cloud account, OTLP endpoint creds as Fly secrets, instrument Fastify routes. |
-
-**Gate M1:** `fly logs` quieter (errors flow to Sentry instead); Grafana
-dashboard shows p50/p95/p99 webhook latency; security workflow green on a
-test PR.
-
-### Pause for re-evaluation (decision points)
-
-Before continuing, lock these decisions:
-- **Auth provider:** Clerk or WorkOS AuthKit (default: Clerk)
-- **AWS IaC tool:** CDK in TypeScript or Terraform (default: CDK)
-- **APNs key + FCM creds:** Antoine sets up Apple Developer account ($99/yr)
-  and Firebase project (free) so T2.3 push pipeline can be built
-
-### M2 — Auth + multi-user (target: week 2, ~3-4 days)
-
-| # | PR title | Effort | Notes |
-|---|----------|--------|-------|
-| 7 | `feat(backend): integrate Clerk session validation middleware` | 1 d | Verify Clerk session JWT on every `/api/*` route. Wire `user_id` into request context. |
-| 8 | `feat(mobile): integrate Clerk RN SDK` | 1 d | Sign-in screen, session storage, attach session to API calls. |
-| 9 | `feat(backend): multi-user schema migration (T2.2)` | 1 d | Add `user_id` column to: `pet_state`, `plaid_items`, `device_tokens`, `category_overrides`, `transactions`. Backfill existing rows with `user_1`. |
-| 10 | `feat(backend): scope all queries by user_id` | 1 d | Update every store function. Add user-id-isolation tests. |
-| 11 | `chore(infra): add GrowthBook self-hosted on Fly` | 0.5 d | Second Fly app for GrowthBook. Wire SDK into backend. |
-
-**Gate M2 (G4 in handoff):** Two test users see only their own data.
-
-### M3 — Compliance + audit logging (target: week 2 end, ~2 days)
-
-| # | PR title | Effort | Notes |
-|---|----------|--------|-------|
-| 12 | `feat(backend): add audit_log table + middleware` | 1 d | New table; middleware logs every mutation with `actor` / `action` / `before` / `after`. |
-| 13 | `docs: threat model + disaster recovery + data retention + runbooks` | 1 d | `docs/threat-model.md`, `docs/disaster-recovery.md`, `docs/data-retention.md`, `docs/runbooks/`. |
-
-**Gate M3:** Audit-log table populates on every PUT/POST that touches financial
-data; compliance doc bundle complete.
-
-### M4 — Production infra migration (target: week 3, ~3-5 days)
-
-This milestone is gated by the "first real-money user" conversation — don't
-execute until that's imminent. But have the plan ready.
-
-| # | PR title | Effort | Notes |
-|---|----------|--------|-------|
-| 14 | `feat(infra): AWS CDK scaffold + VPC + Aurora Serverless v2` | 1 d | New `infra/` directory. `cdk synth` produces CloudFormation. |
-| 15 | `feat(infra): ECS Fargate service for backend + ALB` | 1 d | Same Docker image as Fly. ALB in front, target group, health checks. |
-| 16 | `feat(infra): Secrets Manager for PLAID_* + DATABASE_URL` | 0.5 d | Migrate from Fly secrets, IAM-managed access. |
-| 17 | `chore: switch CI deploy from Fly → AWS ECS` | 1 d | `aws-actions/configure-aws-credentials` + `aws-actions/amazon-ecs-deploy-task-definition`. |
-| 18 | `chore: cut over DNS + decommission Fly + Neon` | 0.5 d | DNS flip, soak old infra for 24h, then delete. |
-
-**Gate M4 (G2-Plaid re-validation):** New AWS-deployed backend handles a
-sandbox Plaid webhook end-to-end. CloudWatch + Sentry show traffic. Old
-infra retired.
-
-### M5 — Mobile native BLE + Phase 2 prep (target: week 3-4, ~1 week)
-
-This dovetails with Phase 2 hardware work.
-
-| # | PR title | Effort | Notes |
-|---|----------|--------|-------|
-| 19 | `feat(mobile): native BLE module (iOS Swift)` | 2-3 d | Expo Modules API. Wraps CoreBluetooth. Handles background. |
-| 20 | `feat(mobile): native BLE module (Android Kotlin)` | 2-3 d | Wraps BluetoothLeScanner. Foreground service for background BLE. |
-| 21 | `feat(mobile): JS interface to BLE module` | 1 d | React hook + state machine. |
-
-**Gate M5:** Phone can scan for Coiny device, connect, write to a test
-characteristic, hold connection through app backgrounding.
+**M1 gate:** sandbox webhook from Plaid lands on the AWS-deployed
+backend, signature verified, transactions persisted in Aurora, traces in
+Datadog, region failover drill successful.
 
 ---
 
-## Pending feature backlog (paused during quality floor)
+## M2 — Backend Go rewrite + Datadog + WorkOS
 
-These items were already in the pre-hardware backlog before this audit. They
-resume after M1:
+Estimated effort: ~6-8 weeks solo.
 
-- **T2.3** Push pipeline backend → APNs/FCM (needs Antoine's Apple Dev + Firebase)
-- **T2.4** Already done as Plaid Link endpoints (rename to `/api/banks/connect` if desired)
-- **mobile/plaid-link-mobile** Mobile bank-link screen wiring (uses Plaid Link RN SDK)
+| # | PR / task | Output |
+|---|-----------|--------|
+| 2.1 | Go module scaffold + chi router + zerolog + ozzo-validation | Go skeleton |
+| 2.2 | sqlc + Atlas migrations matching existing Postgres schema | Type-safe query layer |
+| 2.3 | Plaid webhook signature verifier in Go (crypto/ecdsa) | Webhook security |
+| 2.4 | `/transactions/sync` paginated handler + idempotency via Postgres advisory locks | Sync flow |
+| 2.5 | Rule engine ported to pure Go (paycheck, overspend, savings, bill_paid, large_purchase, subscription) | Business logic |
+| 2.6 | Asynq + Redis (ElastiCache) for background jobs | Push fan-out, scheduled tasks |
+| 2.7 | Datadog APM SDK + Logs + Profiler + Custom Metrics wired | Full observability |
+| 2.8 | WorkOS AuthKit middleware (JWT verification + refresh flow) | Auth |
+| 2.9 | `user_id` FK on every table; multi-user data isolation | Multi-user |
+| 2.10 | `audit_log` table + middleware on every financial-data mutation | SOC 2 evidence |
+| 2.11 | LaunchDarkly SDK wired for kill switches | Production-safe feature gates |
+| 2.12 | Plaid Investments + Liabilities + Income product integrations | Full Plaid stack |
+| 2.13 | `AggregatorClient` interface + PlaidAggregator + stub FinicityAggregator | Multi-vendor ready |
+| 2.14 | OpenAPI spec generated from Go code; iOS + Android SDKs auto-generated | Type-safe clients |
+| 2.15 | 90%+ test coverage via stdlib testing + testify + dockertest | Quality floor |
+| 2.16 | Decommission Node backend; cutover to Go | Single backend |
 
----
-
-## What's needed from Antoine
-
-| When | Item | How |
-|------|------|-----|
-| **Before M1** | Sentry account | sentry.io free signup, give me the DSN |
-| **Before M1** | Grafana Cloud account | grafana.com/products/cloud free tier, give me the OTLP endpoint + token |
-| **Before M2** | Auth decision (Clerk vs WorkOS) | Read §4 in `docs/tech-stack.md`, pick one |
-| **Before M2** | Clerk account (or WorkOS) | Sign up, give me publishable key + secret |
-| **Before M2** | APNs key + Firebase project | Apple Developer ($99/yr) + Firebase console (free); hand me both credential bundles |
-| **Before M4** | AWS account | Console signup, IAM user with admin for migration; later restrict |
-| **Before M5** (Phase 2) | M5StickS3 firmware loaded with test BLE service | Physical hardware testing |
-| **Phase 2** | Hardware EE contractor | Find via Upwork / Toptal / referral; ~$5-10k engagement |
-
----
-
-## What I (Claude) execute alone — no blocker
-
-Everything in M1 except the Sentry DSN + Grafana token (you give me those, I
-do everything else). Same for M2 / M3 / M4 — I write the code, you provide
-the third-party account credentials.
-
-For the **firmware port (M5StickS3 → nRF52840)** and the **PCB design**, I
-can write firmware code and review schematics, but I cannot place a PCB
-order or pre-certify FCC. Those need you or a hired EE.
+**M2 gate:** Datadog dashboard shows p99 webhook latency <10ms; 90%+
+test coverage; WorkOS sign-in working from a test iOS client; LaunchDarkly
+kill switch flips traffic in <60s.
 
 ---
 
-## Status tracking
+## M3 — Native iOS app + Watch + Widgets + Live Activities
 
-Check items off as you ship them. Updated 2026-05-20.
+Estimated effort: ~10-14 weeks solo (iOS app + Watch + Widgets in parallel).
 
-- [ ] M1 — Quality floor
-  - [ ] PR 1 — Semgrep + Trivy
-  - [ ] PR 2 — Gitleaks
-  - [ ] PR 3 — Biome
-  - [ ] PR 4 — Sentry backend
-  - [ ] PR 5 — Sentry mobile
-  - [ ] PR 6 — OpenTelemetry + Grafana Cloud
-- [ ] M2 — Auth + multi-user
-  - [ ] Decision: Clerk vs WorkOS
-  - [ ] PR 7 — Clerk backend middleware
-  - [ ] PR 8 — Clerk mobile integration
-  - [ ] PR 9 — Multi-user schema migration
-  - [ ] PR 10 — Scope queries by user_id
-  - [ ] PR 11 — GrowthBook
-- [ ] M3 — Compliance + audit
-  - [ ] PR 12 — audit_log table
-  - [ ] PR 13 — compliance docs bundle
-- [ ] M4 — AWS migration
-  - [ ] PR 14 — CDK + Aurora
-  - [ ] PR 15 — ECS Fargate
-  - [ ] PR 16 — Secrets Manager
-  - [ ] PR 17 — CI/CD cutover
-  - [ ] PR 18 — DNS + decommission
-- [ ] M5 — Native BLE module
-  - [ ] PR 19 — iOS Swift module
-  - [ ] PR 20 — Android Kotlin module
-  - [ ] PR 21 — JS interface
+### iOS app (Swift + SwiftUI)
+
+| # | PR / task | Output |
+|---|-----------|--------|
+| 3.1 | Xcode project scaffold + SwiftUI app structure + SwiftData models | App skeleton |
+| 3.2 | WorkOS SDK integration + sign-in/sign-up screens | Auth |
+| 3.3 | Datadog RUM iOS SDK | Mobile observability |
+| 3.4 | Plaid Link iOS SDK + bank-linking flow | Bank connection |
+| 3.5 | Pet view (Metal-rendered sprites at 120fps, full animation set) | Core pet UX |
+| 3.6 | Onboarding flow (Welcome → Link Bank → Meet Pet → notification permission) | First-launch |
+| 3.7 | Goals + settings screens + delete-account flow | Account management |
+| 3.8 | Spending feed + subscription detection UI | Insights |
+| 3.9 | Net worth tracking (uses Plaid Liabilities + Investments) | Killer feature |
+| 3.10 | Cash flow forecast UI | Killer feature |
+| 3.11 | Pet customization (≥6 species + evolution stages, commissioned art) | Engagement |
+| 3.12 | Sound packs (Tier 1 curated + Tier 2 meme bank + Tier 3 personal recordings) | Audio polish |
+| 3.13 | Direct APNs registration + handling (Live Activity tokens, critical alerts) | Push |
+| 3.14 | Accessibility audit: VoiceOver + Dynamic Type + Reduce Motion | App Store-grade |
+
+### Apple Watch companion (watchOS)
+
+| # | PR / task | Output |
+|---|-----------|--------|
+| 3.15 | watchOS app target + SwiftUI Watch UI | Wrist app |
+| 3.16 | Watch complications (corner, modular, infograph) | Always-on glance |
+| 3.17 | Background notification handling on watch | Wrist-first reactions |
+| 3.18 | Pet "tap to feed" gesture from watch face | Wrist interaction |
+
+### iOS Widgets
+
+| # | PR / task | Output |
+|---|-----------|--------|
+| 3.19 | WidgetKit small/medium/large widgets | Home screen presence |
+| 3.20 | Lock Screen accessory widgets (inline, rectangular, circular) | Lock screen |
+| 3.21 | Widget intent configuration | User-configurable |
+
+### Live Activities + Dynamic Island
+
+| # | PR / task | Output |
+|---|-----------|--------|
+| 3.22 | ActivityKit integration for paycheck celebration | Ambient Live Activity |
+| 3.23 | Dynamic Island compact + expanded + minimal layouts | Pro-tier polish |
+
+### Native BLE module
+
+| # | PR / task | Output |
+|---|-----------|--------|
+| 3.24 | CoreBluetooth wrapper: scan + connect + write + subscribe | BLE foundation |
+| 3.25 | Background BLE mode (`bluetooth-central` Info.plist) + reconnection logic | Pocket-grade reliability |
+| 3.26 | Reaction → BLE command translator | Device control |
+| 3.27 | OTA firmware update via MCUmgr from app | Firmware updateable |
+
+### Testing
+
+| # | PR / task | Output |
+|---|-----------|--------|
+| 3.28 | XCTest unit tests for view models + services (90%+) | Unit coverage |
+| 3.29 | XCUITest end-to-end on real iPhones via AWS Device Farm | E2E coverage |
+| 3.30 | Performance tests — frame rate, BLE latency, battery drain | Quality gates |
+
+**M3 gate:** TestFlight build runs end-to-end on real iPhone (Plaid Link
+→ pet reacts to sandbox transactions → Widgets show pet → Live Activity
+fires on paycheck → Watch complication updates). Real-device test passes
+on iPhone 14, 15, 16. Accessibility audit clean.
 
 ---
 
-## Out of scope for this plan
+## M4 — iOS public launch
 
-- Hardware design (PCB, BOM finalization) — separate Phase 2 firmware/hardware plan
-- Apple App Store + Google Play submission — Phase 3
-- Marketing site, billing, support tooling — Phase 4
-- ML / data science for transaction enrichment — explicit defer, would be a separate Python service if/when needed
-- International expansion (TrueLayer/Tink for EU) — Phase 5
+Estimated effort: ~4-6 weeks (mostly external dependencies).
+
+| # | PR / task | Output |
+|---|-----------|--------|
+| 4.1 | Plaid Production approval submission + responses | Real bank access |
+| 4.2 | SOC 2 readiness evidence collection complete; Year-1 audit window begins | Audit started |
+| 4.3 | Penetration test (Cobalt or HackerOne); remediation | Pre-launch security validated |
+| 4.4 | Privacy Policy + ToS lawyer-drafted; reviewed | Legal floor |
+| 4.5 | Cyber + GL + E&O insurance bound | Risk floor |
+| 4.6 | Trademark filings submitted (Class 9 + Class 36) | IP protection started |
+| 4.7 | App Store submission + Apple review iterations | App Store approval |
+| 4.8 | Marketing site (Framer or Next.js + Vercel) + waitlist + press kit | Acquisition surface |
+| 4.9 | Status page (Better Uptime managed) | Public ops surface |
+| 4.10 | Customer support inbox (Front or Help Scout) + help center | Support surface |
+| 4.11 | Postmark transactional email wired | Onboarding emails |
+| 4.12 | Launch (announce + waitlist conversion + Product Hunt) | Public availability |
+
+**M4 gate:** app live on App Store; first 100 real users onboarded; SOC
+2 audit evidence collection running; Datadog dashboard shows production
+traffic under SLO targets.
+
+---
+
+## M5 — Native Android + Wear OS + Widgets
+
+Estimated effort: ~10-14 weeks (~3-6 months after iOS launch).
+
+Parallels M3 but in Kotlin + Compose. Each iOS item has an Android twin:
+
+| iOS item | Android equivalent |
+|---|---|
+| Swift + SwiftUI app | Kotlin + Jetpack Compose app |
+| WorkOS Swift SDK | WorkOS Kotlin SDK |
+| Datadog iOS RUM | Datadog Android RUM |
+| Plaid Link iOS SDK | Plaid Link Android SDK |
+| Apple Watch companion | Wear OS companion |
+| iOS Widgets (WidgetKit) | Android Widgets (Jetpack Glance) |
+| Live Activities + Dynamic Island | Android-native Always-On Display tiles |
+| CoreBluetooth wrapper | BluetoothLeScanner + foreground service |
+| XCTest + XCUITest + AWS Device Farm | JUnit + Espresso + Compose UI tests + Firebase Test Lab |
+
+**M5 gate:** Google Play production release; Android user count
+ramps; both platforms maintain feature parity.
+
+---
+
+## M6 — Hardware production
+
+Estimated effort: ~6-9 months from PCB design start to first units shipping.
+
+### Sub-milestones
+
+| # | Task | Effort |
+|---|------|--------|
+| 6.1 | Contracted EE for PCB design (nRF54L15 + Sharp Memory LCD + LRA + APA102 + MAX77654 + chip antenna + RF shield) | 4-6 weeks |
+| 6.2 | Industrial design firm engaged (case + packaging + branding) | 6-8 weeks |
+| 6.3 | First PCB rev fabricated + assembled (engineering build, 20 units) | 4 weeks |
+| 6.4 | Firmware development on real PCB (port from nRF54L15-DK) | 4-6 weeks |
+| 6.5 | Internal testing + bug fixes + EE rev 2 if needed | 2-4 weeks |
+| 6.6 | FCC Part 15 + CE + UL certifications (parallel tracks) | 4-8 weeks |
+| 6.7 | Pre-production run (50-100 units) at premium CM | 4-6 weeks |
+| 6.8 | Beta program to ~100 alpha testers | 4-8 weeks |
+| 6.9 | First mass production run (1000-5000 units) | 8-12 weeks |
+| 6.10 | Fulfillment partner integration (ShipBob or Shipmonk) | 2 weeks |
+
+**M6 gate:** units shipping to paying customers; reliability metrics
+within target (>99% BLE uptime, >6-month battery life on a single charge,
+<0.5% RMA rate).
+
+---
+
+## What I (Claude) can execute alone
+
+All software development across M1-M5 in pure code: backend Go rewrite,
+native iOS app, native Android app, infrastructure CDK, all integrations,
+all tests.
+
+## What requires Antoine (or contractors)
+
+| Item | Owner | When |
+|---|------|------|
+| AWS account + payment | Antoine | M1 start |
+| Datadog account ($104k/yr) | Antoine | M2 start |
+| LaunchDarkly account | Antoine | M2 |
+| WorkOS account | Antoine | M2 start |
+| Plaid Production approval (security questionnaire) | Antoine + Claude help | M4 |
+| Apple Developer Program organization (requires LLC + D-U-N-S) | Antoine | M3 start |
+| Google Play Console organization | Antoine | M5 start |
+| LLC + EIN + business bank | Antoine | M1 start |
+| Cyber + GL + E&O insurance | Antoine | M4 |
+| Trademark filings | Antoine + IP lawyer | M4 |
+| Privacy Policy + ToS lawyer drafting | Antoine + lawyer | M4 |
+| SOC 2 readiness platform + auditor | Antoine | M3-M4 |
+| Penetration test engagement | Antoine | M4 |
+| Pet sprite artist commission | Antoine + artist | M3 |
+| Sound design commission | Antoine + sound designer | M3 |
+| Contracted EE for PCB | Antoine + EE | M6 start |
+| Industrial design firm | Antoine + ID firm | M6 |
+| FCC + CE + UL certification labs | Antoine | M6 |
+| Premium CM relationship (Jabil-tier) | Antoine | M6 |
+| App Store + Play Store submissions | Antoine | M4, M5 |
+
+---
+
+## Estimated total timeline
+
+If everything is funded and contractors are available:
+
+- **M1 (AWS):** months 1-2
+- **M2 (Go backend):** months 2-4 (overlaps M1 end)
+- **M3 (native iOS + Watch + Widgets):** months 3-7 (parallel with M2)
+- **M4 (iOS launch):** months 7-9
+- **M5 (Android):** months 9-13
+- **M6 (hardware production):** months 4-13 in parallel (long lead time)
+
+**End-to-end: 12-14 months** from quality-only plan kickoff to hardware
+shipping with iOS + Android live.
+
+Faster paths require either compromising quality (we are not doing this)
+or hiring engineers (acceptable — adds ~$300k/yr per senior eng).
+
+---
+
+## Cost summary (estimated, year 1)
+
+| Category | Cost |
+|---|---|
+| AWS infrastructure (year 1, low volume) | $5-10k |
+| Datadog (SMB tier) | ~$104k |
+| LaunchDarkly | $15-25k |
+| WorkOS | $0 (free to 1M MAU) |
+| Plaid Production (all 4 products, ~1k users) | $5-10k |
+| SOC 2 (Vanta + audit) | $30-50k |
+| Penetration test | $10-25k |
+| Cyber + GL + E&O insurance | $5-15k |
+| Privacy + ToS legal | $5-15k |
+| Trademark filings | $2-5k |
+| Apple Dev + Google Play | $124 |
+| EE contractor for PCB | $20-40k |
+| Industrial design firm | $30-60k |
+| Pet art commission | $10-30k |
+| Sound design commission | $10-20k |
+| FCC + CE + UL certifications | $20-40k |
+| First production run (1000 units) | $80-200k |
+| Marketing site + branding | $10-30k |
+| Postmark + Better Uptime + ancillary tools | $1-3k |
+| **Total year 1** | **~$360-700k** |
+
+These are costs to acknowledge, not to optimize against. Quality is the
+constraint.
+
+---
+
+## What got cut from the prior plan
+
+Items previously in `docs/implementation-plan.md` that no longer exist
+because they were velocity compromises:
+
+- ❌ "M1 quality floor" (Sentry+Grafana, Semgrep, Biome) — replaced by full Datadog from day 1 of M2
+- ❌ "M2 auth + multi-user with Clerk" — replaced by WorkOS in M2
+- ❌ "M3 compliance docs" as a separate step — folded into M4 launch readiness
+- ❌ "M4 AWS migration" as a *future* step — moved to M1, the foundation
+- ❌ "M5 native BLE module inside RN shell" — replaced by full native iOS+Android (M3, M5)
+- ❌ "21 PR sequence over 3 weeks" — replaced by month-scale milestones because the work is real
+
+The RN-with-native-BLE-bridge compromise no longer exists in this plan.
+
+---
+
+## Reference
+
+- Stack rationale: `docs/tech-stack.md`
+- Change summary: `docs/proposed-changes.md`
+- Visual map: `docs/stack-map.md` (will be updated to reflect quality-only stack)
+- Launch readiness: `docs/launch-readiness.md` (will be updated)
+- Throwaway prototype path: `docs/3-day-sprint.md` (kept as validation step only)
