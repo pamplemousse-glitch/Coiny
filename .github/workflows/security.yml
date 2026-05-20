@@ -1,0 +1,66 @@
+name: Security
+
+on:
+  push:
+    branches-ignore: [main]
+  pull_request:
+
+# Cancel in-progress runs for the same ref when a new push lands.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  semgrep:
+    name: Semgrep SAST
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # `auto` selects rulesets based on detected languages.
+      # See https://semgrep.dev/explore for rulesets that get pulled.
+      - uses: semgrep/semgrep-action@v1
+        with:
+          config: auto
+        env:
+          SEMGREP_TIMEOUT: 300
+
+  gitleaks:
+    name: Gitleaks secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need full history so gitleaks can scan everything pushed.
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Gitleaks defaults are sensible; .gitleaks.toml at repo root overrides.
+
+  trivy:
+    name: Trivy container scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.3
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Build backend Docker image
+        run: docker build -t coiny-backend:scan -f backend/Dockerfile .
+
+      - name: Scan image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: coiny-backend:scan
+          format: table
+          # Fail on HIGH/CRITICAL vulns; allow MEDIUM/LOW for now.
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: true
