@@ -11,7 +11,6 @@
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "sim": "tsx src/sim/cli.ts",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio"
@@ -20,6 +19,7 @@
     "@fastify/rate-limit": "^9.1.0",
     "drizzle-orm": "^0.45.2",
     "fastify": "^4.28.1",
+    "jose": "^6.2.3",
     "postgres": "^3.4.9",
     "undici": "^6.19.8",
     "zod": "^3.23.8"

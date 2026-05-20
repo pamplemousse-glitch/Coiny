@@ -1,11 +1,11 @@
-import type { TellerTransaction } from '../teller/types.js';
+import type { Transaction } from '../types/transaction.js';
 import type { Reaction } from '../reactions/types.js';
 import type { PetGoals } from '../store/pet.js';
 
 export type Rule = {
   name: string;
-  match: (tx: TellerTransaction, goals: PetGoals) => boolean;
-  react: (tx: TellerTransaction, goals: PetGoals) => Reaction;
+  match: (tx: Transaction, goals: PetGoals) => boolean;
+  react: (tx: Transaction, goals: PetGoals) => Reaction;
 };
 
 const WEEKLY_BUDGET_CATEGORIES = new Set(['groceries', 'food_and_drink', 'restaurants']);
@@ -16,11 +16,11 @@ function parseDollar(amount: string): number {
   return Math.abs(parseFloat(amount));
 }
 
-function isCredit(tx: TellerTransaction): boolean {
+function isCredit(tx: Transaction): boolean {
   return parseFloat(tx.amount) > 0;
 }
 
-function isDebit(tx: TellerTransaction): boolean {
+function isDebit(tx: Transaction): boolean {
   return parseFloat(tx.amount) < 0;
 }
 

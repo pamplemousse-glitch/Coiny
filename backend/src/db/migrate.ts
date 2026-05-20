@@ -7,8 +7,10 @@ const migrationsFolder = join(dirname(fileURLToPath(import.meta.url)), '..', '..
 
 export async function runMigrations(): Promise<void> {
   const database = db();
+  const usePglite = config.NODE_ENV === 'test'
+    || (config.NODE_ENV === 'development' && !config.DATABASE_URL);
 
-  if (config.NODE_ENV === 'test') {
+  if (usePglite) {
     const { migrate } = await import('drizzle-orm/pglite/migrator');
     await migrate(database as never, { migrationsFolder });
   } else {

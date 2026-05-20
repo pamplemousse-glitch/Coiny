@@ -1,4 +1,4 @@
-import { integer, jsonb, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, integer, jsonb, pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';
 import type { Reaction } from '../reactions/types.js';
 
 // Singleton row (id = 1) holding the pet's mood + goals.
@@ -24,9 +24,24 @@ export const reactionHistory = pgTable('reaction_history', {
   reaction: jsonb('reaction').$type<Reaction>().notNull(),
 });
 
-// Idempotency table — one row per Teller webhook event id we've handled.
-// Teller retries unacknowledged webhooks; presence here means "already processed."
+// Idempotency table — one row per processed event id. With Plaid this is keyed
+// on `transaction_id` (Plaid webhook deliveries don't have unique ids; the txn
+// id is the stable dedup key).
 export const processedEvents = pgTable('processed_events', {
   id: text('id').primaryKey(),
   processedAt: timestamp('processed_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// One row per linked Plaid Item (= one bank login). Phase 1 single-user has
+// at most one row. `cursor` is the /transactions/sync pagination anchor —
+// null until the first sync runs. `initial_sync_complete` gates rule
+// evaluation: the first sync (90 days of history) ingests but doesn't react.
+// `disabled` set on USER_PERMISSION_REVOKED — we stop syncing after that.
+export const plaidItems = pgTable('plaid_items', {
+  itemId: text('item_id').primaryKey(),
+  accessToken: text('access_token').notNull(),
+  cursor: text('cursor'),
+  initialSyncComplete: boolean('initial_sync_complete').notNull().default(false),
+  disabled: boolean('disabled').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

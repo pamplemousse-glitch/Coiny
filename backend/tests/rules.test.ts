@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { evaluate } from '../src/rules/engine.js';
-import type { TellerTransaction } from '../src/teller/types.js';
+import type { Transaction } from '../src/types/transaction.js';
 import type { PetGoals } from '../src/store/pet.js';
 
 const DEFAULT_GOALS: PetGoals = {
@@ -10,7 +10,7 @@ const DEFAULT_GOALS: PetGoals = {
   largePurchaseThreshold: 200,
 };
 
-function tx(overrides: Partial<TellerTransaction> = {}): TellerTransaction {
+function tx(overrides: Partial<Transaction> = {}): Transaction {
   return {
     id: 'txn_test',
     account_id: 'acc_test',

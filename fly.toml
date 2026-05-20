@@ -8,7 +8,8 @@ primary_region = 'iad'
   NODE_ENV = 'production'
   LOG_LEVEL = 'info'
   PORT = '3000'
-  TELLER_ENVIRONMENT = 'sandbox'
+  PLAID_ENV = 'sandbox'
+  PLAID_WEBHOOK_URL = 'https://coiny-backend.fly.dev/webhooks/plaid'
 
 [http_service]
   internal_port = 3000

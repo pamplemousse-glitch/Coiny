@@ -10,7 +10,12 @@ let _db: DB | null = null;
 export async function initDb(): Promise<DB> {
   if (_db) return _db;
 
-  if (config.NODE_ENV === 'test') {
+  // Tests always use PGlite. Dev falls back to PGlite when DATABASE_URL is empty
+  // so `pnpm dev` works without spinning up a Postgres locally.
+  const usePglite = config.NODE_ENV === 'test'
+    || (config.NODE_ENV === 'development' && !config.DATABASE_URL);
+
+  if (usePglite) {
     const [{ drizzle }, { PGlite }] = await Promise.all([
       import('drizzle-orm/pglite'),
       import('@electric-sql/pglite'),
