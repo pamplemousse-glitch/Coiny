@@ -86,65 +86,169 @@ licensed)
 
 ---
 
-### F2. Audio customization (sounds + sound packs)
+### F2. Audio customization (sound packs + meme bank + personal recordings)
 
-**What:** The pet plays sounds on financial events. User picks a sound pack
-(e.g., "8-bit Tamagotchi," "Kawaii Cute," "Subtle Minimalist," "Synth-wave"),
-or customizes per-event-type sounds individually.
+**What:** The pet plays sounds on financial events. Three tiers of sound
+source, all mixable:
+
+1. **Curated sound packs** — themed sets ("8-bit Tamagotchi," "Kawaii Cute,"
+   "Synth-wave") with one sound per event type.
+2. **Meme audio bank** — in-app library of viral-style clips ("victory horn,"
+   "dramatic gasp," "yas queen") that the user browses, previews, and assigns
+   per event.
+3. **Personal recordings** — user records their own voice/sounds in-app and
+   assigns them per event.
 
 **Why it matters:** Sound is half the personality of a Tamagotchi. Coiny's
 existing rule engine already names reactions like `fanfare` / `chime` /
 `coin` / `warning` — but no actual audio assets exist yet. Filling this in is
-table-stakes for the "alive" feel.
+table-stakes for the "alive" feel. Meme audio + personalization 10× the
+engagement vs static packs because every user's pet sounds different.
 
-**Scope:**
+**Event types that fire sound:**
 
-- **Sound asset library** — 5-8 starter sound packs, each with a sound per
-  event type:
-  - `paycheck_received` (celebratory)
-  - `bill_paid_on_time` (satisfying chime)
-  - `savings_milestone` (triumphant)
-  - `overspent_in_category` (sad/concerned)
-  - `large_purchase` (warning)
-  - `idle_happy` (occasional contented chirp)
-  - `idle_sad` (occasional whimper, when mood is low)
-  - `pet_interaction` (when user opens the app)
-- **Pack selector** — user picks one pack in settings
-- **Per-event override** — power-user can swap individual sounds across packs
+- `paycheck_received` (celebratory)
+- `bill_paid_on_time` (satisfying chime)
+- `savings_milestone` (triumphant)
+- `overspent_in_category` (sad/concerned)
+- `large_purchase` (warning)
+- `subscription_detected` (TBD vibe)
+- `idle_happy` / `idle_sad` (ambient pet mood)
+- `pet_interaction` (when user opens the app)
+
+#### Tier 1 — Curated sound packs
+
+5-8 starter packs. Each fully covers every event type so the user gets a
+coherent "vibe" with one pick. Examples:
+
+- **8-bit Tamagotchi** — chiptune throwbacks
+- **Kawaii Cute** — soft, anime-inspired chirps
+- **Synth-wave** — 80s retro-future
+- **Minimalist** — tasteful pings, no melody (office-friendly)
+- **Cinematic** — orchestral stings (paycheck horns, ominous overspend strings)
+
+Asset sourcing: licensed packs (Soundsnap, Pond5) + CC0 sources (Pixabay,
+Freesound) curated for cohesion.
+
+#### Tier 2 — Meme audio bank
+
+In-app library of ~30-50 clips users can preview, favorite, and assign per
+event type.
+
+**The licensing constraint (non-negotiable):** Most actual viral memes are
+copyrighted. App stores DMCA-strike apps that bundle the "bruh" sound, Vine
+boom, etc. — even 1-second clips. Three sourcing options:
+
+| Path | Cost | Pros | Cons |
+|---|---|---|---|
+| Original "meme-flavor" recordings (commissioned Fiverr/Upwork voice actors) | $200-500 for ~30 clips | Safe, can custom-tailor to event vibes | Won't be the *exact* memes users know |
+| CC0 / public domain only (Freesound, Pixabay) | $0 | Free, safe | Less meme-energy, lower hit rate |
+| Licensed clips from rights-holders | $$$$ | Real memes | Expensive, complex, often refused |
+
+**Recommendation:** original meme-flavor + CC0 supplements. ~30 clips for v1.
+
+Bank metadata each clip needs:
+- Title, duration, category (celebrate / sad / surprise / sus / etc.)
+- Attribution string for "Credits" screen
+- Tags for search
+
+#### Tier 3 — Personal recordings
+
+User records up to 10 second clips in the app, names them, assigns per event.
+
+**Privacy + storage decision (locked):**
+- **Phone-local only.** Recordings live in app sandbox storage, never
+  uploaded to backend.
+- **Trade-off accepted:** if the user changes phones, recordings don't sync.
+  Acceptable because (a) avoids GDPR/CCPA voice data handling burden,
+  (b) zero cloud cost, (c) strongest privacy posture, (d) v1 simplicity.
+- Future: optional iCloud / Google Drive backup for recoveries — defer.
+
+Mobile flow:
+1. Tap "Record" → record 1-10s
+2. Trim + preview
+3. Name + assign to event type(s)
+4. Stored as `{id, name, file_uri, duration, event_assignments}`
+   in AsyncStorage / SecureStore on phone
+
+**Permissions required:** microphone access — request lazily on first
+recording attempt, with clear "your recordings stay on this device" message.
+
+#### Shared controls (across all 3 tiers)
+
+- **Per-event override** — pick any sound (pack/meme/personal) for any event
 - **Volume control** — global + per-event-type
 - **Quiet hours** — no audio between configurable hours
+- **Master sound on/off** — global mute
 
-**Playback split:**
+#### Playback split
 
 | Sound | Where it plays | Why |
 |---|---|---|
-| Quick chirps (idle, interaction) | Device speaker (piezo or small spk) | Tamagotchi feel, doesn't need phone in hand |
-| Rich celebration audio | Mobile (Expo Audio) | Higher fidelity, only fires when phone is unlocked or via push notification with custom sound |
+| Quick chirps (idle, interaction) | Device speaker (piezo or small spk) | Tamagotchi feel, no phone needed |
+| Rich celebration audio (packs, memes, recordings) | **Mobile only** (Expo Audio) | Higher fidelity; device speaker can't render voice/memes well |
 | Pure haptic patterns | Device LRA | Subtler reactions when audio would be intrusive |
 
-**Schema additions:**
+#### Schema additions
+
 ```
-sound_preferences (singleton in Phase 1, per-user in Phase 2)
-  pack             TEXT NOT NULL DEFAULT 'tamagotchi_8bit'
-  overrides        JSONB DEFAULT '{}'    -- {event_type: sound_id}
-  volume           INTEGER DEFAULT 80    -- 0-100
-  quiet_hours      JSONB                 -- {start: '22:00', end: '07:00'}
+sound_assets (server-side catalog — packs + meme bank, NOT personal recordings)
+  id              TEXT PRIMARY KEY      -- 'pack:tamagotchi_8bit:paycheck' | 'meme:victory_horn'
+  source          TEXT NOT NULL          -- 'pack' | 'meme'
+  pack_id         TEXT                   -- nullable; only for source='pack'
+  display_name    TEXT NOT NULL
+  category        TEXT                   -- 'celebrate' | 'sad' | 'surprise' | etc.
+  duration_ms     INTEGER NOT NULL
+  url             TEXT NOT NULL          -- CDN URL
+  attribution     TEXT                   -- credit/copyright notice
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+
+sound_preferences (per-user, will get user_id in T2.2)
+  active_pack       TEXT DEFAULT 'tamagotchi_8bit'
+  overrides         JSONB DEFAULT '{}'    -- {event_type: sound_id-or-"custom:<phone-local-id>"}
+  volume            INTEGER DEFAULT 80
+  quiet_hours       JSONB                 -- {start: '22:00', end: '07:00'}
+  global_mute       BOOLEAN DEFAULT FALSE
 ```
 
-**Dependencies:**
-- Asset pipeline — sound files (need a sound designer or licensed packs from
-  Pixabay/Freesound + curation)
-- Mobile — Expo Audio integration for rich playback + APNs custom-sound
-  attachments
-- Firmware — piezo/speaker driver, ability to load short PCM samples or use
-  parameterized synthesis for size-constrained device sounds
-- Backend — preference store, sound-asset CDN URLs
+Personal recordings live in phone storage; `overrides` JSONB references them
+as `custom:<uuid>` and mobile resolves to the local file URI at playback.
 
-**Effort:** ~1 week mobile + backend + asset curation; firmware (when Phase 2
-hardware exists) ~3-4 days for speaker driver + sample loader
+#### Dependencies
 
-**Status:** 🟢 Phase 3 — pairs with F1 (customization) as the engagement
-feature pair
+- **Asset pipeline:** licensed/CC0 sound packs (Tier 1) + commissioned
+  meme-flavor library (Tier 2). Budget: ~$300-700 for a strong launch set.
+- **Mobile:** Expo Audio for playback. Expo AV for recording (Tier 3).
+  AsyncStorage / SecureStore for personal recordings registry.
+- **Backend:** `sound_assets` catalog (CDN-hosted via S3 or Fly's bucket
+  service), `sound_preferences` table.
+- **Firmware:** Tier 1 quick chirps only (parameterized tones, not PCM).
+  Tiers 2 + 3 never touch the device speaker.
+
+#### Effort
+
+- Tier 1 (curated packs): 3-4 days (mobile + backend + asset curation)
+- Tier 2 (meme bank): 5-7 days (asset commissioning + catalog UI + preview/assign UX)
+- Tier 3 (personal recordings): 4-5 days (recording UI + trim + per-event assignment)
+- Total: ~2-3 weeks for the full F2 across all three tiers
+
+**Status:** 🟢 Phase 3 — pairs with F1 (visual customization) as the
+engagement layer. Tiers 1 + 3 ship together; Tier 2 (meme bank) requires
+the asset commissioning lead time (~2-4 weeks for a freelance voice actor
+batch).
+
+#### Open decisions (call out before implementation)
+
+1. **Meme bank sourcing:** commission Fiverr/Upwork voice actors, or
+   curate CC0 only? Default: commission ~30 originals + 10-20 CC0
+   supplements.
+2. **Personal recording cloud backup:** keep phone-local forever, or add
+   iCloud/Google Drive opt-in later? Default: phone-local in v1; revisit in
+   Phase 4 if users ask.
+3. **Sharing personal recordings:** "share your pet's voice pack with a
+   friend" — defer to Phase 5 social features.
+4. **Length cap on personal recordings:** 10s default; reconsider if users
+   want longer monologues.
 
 ---
 
