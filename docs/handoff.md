@@ -153,30 +153,137 @@ Device is BLE-only. Phone is the internet bridge → 2–3 day battery target.
 
 ## What Has NOT Been Done
 
-- ❌ Apple Developer Program not yet signed up ($99/year, needed Phase 3)
-- ❌ Expo project not initialized (needs hardware for BLE, but goal/status screens are buildable)
-- ❌ Firmware project not initialized (needs hardware)
-- ❌ Teller production access not applied for
-- ❌ GLBA compliance work not started
+- ❌ Apple Developer Program ($99/yr) — needed before TestFlight (Phase 3)
+- ❌ Firmware project not initialized (limited utility without hardware)
+- ❌ Teller production access — apply when sandbox is proven end-to-end
+- ❌ GLBA compliance — sandbox stage needs nothing; see `docs/security.md` cost ladder
+- ❌ LLC formation — recommended before TestFlight / Teller production (see `docs/security.md`)
 
 ## Pre-Hardware Work Status
 
-### Backend (all done ✅)
-1. ~~Webhook idempotency~~ — ✅ shipped PR #5
-2. ~~Health score calculator~~ — ✅ shipped PR #5
-3. ~~REST API~~ — ✅ shipped PR #5
+### Done ✅
 
-### Mobile (Expo — can start now, no hardware needed)
-4. **Project init** — Expo + React Native scaffold, navigation skeleton
-5. **Goal config screens** — budget categories, savings targets (testable in iOS Simulator)
-6. **Pet status view** — health score, recent reactions from `GET /api/pets`
-7. **Teller Connect OAuth flow** — bank linking (testable in iOS Simulator, no BLE needed)
-8. **Push notification subscription** — Expo Push token registration
+**Backend** (PRs #2, #5)
+- Phase 1: Fastify server, Teller mTLS, signed webhooks, rule engine, terminal dispatcher, 24 Vitest tests
+- Webhook idempotency, health score, REST API (`GET /api/pets`, `PUT /api/pets/goals`, `GET /api/spending`)
+- Hookdeck tunnel + webhook registered in Teller dashboard
+
+**Mobile** (PR #7)
+- Expo SDK 54 + expo-router scaffold, TypeScript strict, monorepo Metro config
+- Pet tab (health, mood, recent reactions), Activity tab, Settings hub
+- Goal config screens (wired to `PUT /api/pets/goals`)
+- Teller Connect via `react-native-webview` (institution name only — enrollment not yet POSTed to backend)
+- Expo push token registration UI (token not yet POSTed to backend)
 
 ### Not buildable pre-hardware
-- BLE scanning/pairing
-- BLE relay (push notification → BLE command to device)
-- iOS background BLE validation (the #1 architectural risk)
+- BLE scanning / pairing
+- BLE relay (push → BLE command to device)
+- iOS background BLE validation (#1 architectural risk)
+- Production firmware testing
+- Battery measurement
+- DRV2605L + motor soldering
+
+### Pre-Hardware Backlog — actionable tickets
+
+A fresh Claude Code session should execute these top-to-bottom. Each item is sized to fit in a single session. **C** = Claude can do it; **A** = needs Antoine; **C+A** = Claude scaffolds, Antoine provides account/asset.
+
+#### Tier 1 — Unblockers (do first)
+
+- [ ] **T1.1  Backend hosting on Fly.io or Railway** (C+A · 2–4 h)
+      Deploys backend so the mobile app can reach it from a physical device.
+      New: `backend/Dockerfile`, `backend/fly.toml`. Secrets via Fly secrets (Keychain → Fly). Antoine creates account + provides API token.
+- [ ] **T1.2  GitHub Actions CI** (C · 1 h)
+      `.github/workflows/ci.yml` — Node 22, pnpm 11.1.3 — runs `pnpm --filter coiny-backend test`, `pnpm --filter coiny-mobile typecheck`, `pnpm --filter coiny-mobile lint` on every PR.
+- [ ] **T1.3  Sentry error tracking** (C+A · 2 h)
+      Free tier. `backend/src/plugins/sentry.ts`, `mobile/services/sentry.ts`. Antoine creates Sentry org + provides DSN as env var.
+- [ ] **T1.4  LLC formation (Wyoming, ~$200)** (A · 90 min)
+      Northwest Registered Agent. Then EIN (IRS, free), Mercury account (free), BOI report to FinCEN. Unblocks Apple Developer Org account and Teller production.
+
+#### Tier 2 — Backend feature work (highest leverage)
+
+- [ ] **T2.1  Persistent storage (Postgres on Supabase or Neon)** (C+A · 1–2 d)
+      Replaces `store/pet.ts`, `store/events.ts` with Postgres. Migrations in `backend/migrations/`. Pick `pg` or `drizzle-orm`. Antoine creates Supabase/Neon project + provides connection string.
+- [ ] **T2.2  Multi-user accounts** (C · 2–3 d)
+      `users` table; all API routes derive `userId` from auth. Auth: magic-link email via Resend/Postmark, or Apple/Google sign-in via Expo. Depends on T2.1.
+- [ ] **T2.3  Push pipeline backend → APNs/FCM via Expo Push API** (C · 4–6 h)
+      New: `services/push.ts`. Wire into `reactions/dispatch.ts`. Depends on T2.1, T2.5.
+- [ ] **T2.4  `POST /api/banks/connect`** (C · 4–6 h)
+      Receives Teller enrollment from mobile, stores `(user_id, encrypted_access_token, enrollment_id, institution_name)`. Encrypt access token with env-supplied key. Depends on T2.1, T2.2.
+- [ ] **T2.5  `POST /api/devices/push-token`** (C · 2–3 h)
+      Receives Expo push token, stores `(user_id, token, platform, last_seen)`. Depends on T2.1, T2.2.
+- [ ] **T2.6  Subscription detection** (C · 1–2 d)
+      New: `subscriptions/detector.ts` (group by merchant + amount, infer cadence from gaps). New: `store/transactions.ts` (bounded ring buffer, 90-day window). New rule `new_subscription_detected` fires on 3rd matching charge. Update privacy-policy retention disclosure (see `docs/security.md`).
+- [ ] **T2.7  Mood / health decay over time** (C · 2–3 h)
+      Cron tick decrements `healthScore` by N per day if no recent reactions. Pet gets sad if ignored. Add to test suite.
+- [ ] **T2.8  Categorization override layer** (C · 3–4 h)
+      `rules/categorize.ts` — regex on `counterparty.name` → canonical category. Fixes Teller miscategorizations (Uber Eats → food_and_drink, not transportation).
+- [ ] **T2.9  More rules** (C · 4–6 h total)
+      Weekend spending, time-of-day rules, payday streak, subscription price bump. One PR per 1–2 rules to keep them reviewable.
+- [ ] **T2.10  Test suite expansion** (C · 4–6 h)
+      Target 50+ tests (currently 24). Cover the new rules, store, subscription detector.
+
+#### Tier 3 — Mobile integration (most depend on Tier 2)
+
+- [ ] **T3.1  Wire link-bank → `POST /api/banks/connect`** (C · 1–2 h) · depends T2.4
+- [ ] **T3.2  Wire push registration → `POST /api/devices/push-token`** (C · 1 h) · depends T2.5
+- [ ] **T3.3  Onboarding flow** (C · 4–6 h) · depends T3.1, T3.2
+      `app/onboarding/` multi-step: welcome → goals → bank link → push opt-in. First-run gate via AsyncStorage.
+- [ ] **T3.4  Account signup / login UI** (C · 4–6 h) · depends T2.2
+- [ ] **T3.5  Manual transaction entry** (C · 4–6 h)
+      For cash. Mobile form → `POST /api/transactions`. Flows into the same rule engine.
+- [ ] **T3.6  Dark-mode QA + state polish** (C · 2–4 h)
+      Loading shimmers, empty states, error toasts.
+- [ ] **T3.7  E2E tests with Maestro on iOS Simulator** (C · 4–6 h)
+      `mobile/.maestro/` flow files covering onboarding, goals edit, link-bank happy path.
+
+#### Tier 4 — Design / content (Antoine, parallelizable)
+
+- [ ] **T4.1  App icon + splash design** (A) — replace default Expo art in `mobile/assets/images/`
+- [ ] **T4.2  Pet animation frames** (A) — 6 mood faces × N frames each (PNG sequence or sprite sheet)
+- [ ] **T4.3  Sound design** (A) — `.wav` files for chime / fanfare / warning / coin
+- [ ] **T4.4  Brand** (A) — logo, name lockup, color palette
+- [ ] **T4.5  Pet personality bible** (A) — `docs/personality.md`, voice + tone for reactions
+
+#### Tier 5 — Business / launch prep (mostly Antoine)
+
+- [ ] **T5.1  LLC formation** (A) — see T1.4 (listed in both tiers because it unblocks downstream items)
+- [ ] **T5.2  Domain** (A) — `coiny.app` or `.io`
+- [ ] **T5.3  Landing page + email waitlist** (C+A) — Framer or static HTML on Vercel; Claude can scaffold
+- [ ] **T5.4  Termly privacy policy + ToS** (A) — free tier; needs domain + LLC name
+- [ ] **T5.5  Apple Developer Program** (A · $99/yr) — Organization account after LLC + DUNS
+- [ ] **T5.6  Public roadmap on Canny** (A) — free tier
+
+#### Tier 6 — DevOps polish
+
+- [ ] **T6.1  Renovate or Dependabot** (C · 1 h) — `renovate.json` or `.github/dependabot.yml`
+- [ ] **T6.2  Backup + restore plan** (C · 2 h doc) — document Supabase/Neon restore procedure · depends T2.1
+
+#### Tier 7 — Firmware scaffolding (no flashing yet — useful prep for hardware day)
+
+- [ ] **T7.1  PlatformIO project structure** (C · 2–3 h) — `firmware/platformio.ini`, `firmware/src/main.cpp` for ESP32-S3 / M5StickS3
+- [ ] **T7.2  BLE command serialization / schema code** (C · 3–4 h) — matches `docs/mqtt-topics.md`
+
+#### Tier 8 — Hardware case iteration
+
+- [ ] **T8.1  OpenSCAD case iteration** (C+A) — Claude can edit `hardware/case/coin_v1.scad` via OpenSCAD MCP; Antoine prints
+- [ ] **T8.2  3D print test shells** (A)
+
+### Execution order recommendation
+
+Fresh Claude session, optimizing for leverage:
+
+1. **T1.2 CI** (1 h) — fail-fast for everything below
+2. **T1.1 Hosting** (3 h) — backend reachable from real device
+3. **T2.1 Postgres** (1–2 d) — state survives restart
+4. **T2.6 Subscription detection** (1–2 d) — highest-value new feature
+5. **T2.7 Mood decay** (3 h) — gives the pet life
+6. **T2.8 Categorization** (4 h) — existing rules become accurate
+7. **T6.1 Dependabot** (1 h) — set and forget
+8. **T7.1 + T7.2 Firmware scaffolding** (6 h) — ready for hardware day
+
+Then the **"ready for friends" track** (~1–2 weeks): T2.2 → T2.3 → T2.4 → T2.5 → T3.1 → T3.2 → T3.3.
+
+Antoine attacks Tier 4 + Tier 5 in parallel.
 
 ---
 
@@ -290,9 +397,11 @@ See `docs/sprint-plan.md` for day-by-day. Realistic with breakage tax: 9–10 da
 Start a fresh Claude Code session in `/Users/antoinewiley/Tamogatchi` and say:
 
 > Read `docs/handoff.md`, `docs/architecture.md`, `docs/security.md`,
-> `docs/sprint-plan.md`, and `docs/mqtt-topics.md`.
-> Phase 1 is complete. Continue pre-hardware work per the "Pre-Hardware Work"
-> section of handoff.md.
+> `docs/aggregators.md`, `docs/sprint-plan.md`, and `docs/mqtt-topics.md`.
+> Phase 1 + the pre-hardware mobile work are complete (PRs #2, #5, #7).
+> Execute the "Pre-Hardware Backlog" in `docs/handoff.md` top-to-bottom,
+> starting with T1.2 (CI). Open one PR per ticket; squash-merge after the
+> simplify skill passes. Ask before touching items marked **A** (Antoine).
 
 ### Local dev startup (two terminals)
 ```bash
