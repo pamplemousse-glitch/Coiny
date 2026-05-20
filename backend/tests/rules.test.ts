@@ -95,6 +95,27 @@ describe('rule engine', () => {
       );
       expect(match).toBeNull();
     });
+
+    it('does not fire when running_balance is null', () => {
+      const match = evaluate(
+        tx({ amount: '60.00', type: 'transfer', running_balance: null }),
+      );
+      expect(match).toBeNull();
+    });
+
+    it('fires celebrate animation at 100% milestone', () => {
+      // balance goes from 999 → 1000, crosses 100%
+      const match = evaluate(
+        tx({
+          amount: '1.00',
+          type: 'transfer',
+          running_balance: '1000.00',
+          details: { category: 'transfer' },
+        }),
+      );
+      expect(match?.name).toBe('savings_milestone');
+      expect(match?.reaction.animation).toBe('celebrate');
+    });
   });
 
   describe('bill_paid_on_time', () => {
