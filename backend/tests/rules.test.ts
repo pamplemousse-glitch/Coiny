@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { evaluate } from '../src/rules/engine.js';
-import type { Transaction } from '../src/types/transaction.js';
 import type { PetGoals } from '../src/store/pet.js';
+import type { Transaction } from '../src/types/transaction.js';
 
 const DEFAULT_GOALS: PetGoals = {
   weeklyBudgetByCategory: { groceries: 150, food_and_drink: 150, restaurants: 150 },
@@ -109,10 +109,7 @@ describe('rule engine', () => {
     });
 
     it('does not fire when running_balance is null', () => {
-      const match = evaluate(
-        tx({ amount: '60.00', type: 'transfer', running_balance: null }),
-        DEFAULT_GOALS,
-      );
+      const match = evaluate(tx({ amount: '60.00', type: 'transfer', running_balance: null }), DEFAULT_GOALS);
       expect(match).toBeNull();
     });
 

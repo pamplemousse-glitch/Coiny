@@ -1,10 +1,7 @@
 import { db } from '../db/client.js';
 import { deviceTokens } from '../db/schema.js';
 
-export async function upsertDeviceToken(args: {
-  token: string;
-  platform: 'ios' | 'android';
-}): Promise<void> {
+export async function upsertDeviceToken(args: { token: string; platform: 'ios' | 'android' }): Promise<void> {
   await db()
     .insert(deviceTokens)
     .values({ token: args.token, platform: args.platform })

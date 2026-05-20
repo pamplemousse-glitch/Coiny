@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { resetDatabase } from './db-helper.js';
 
 describe('claimEvent', () => {
-  beforeEach(async () => { await resetDatabase(); });
+  beforeEach(async () => {
+    await resetDatabase();
+  });
 
   it('returns true for the first claim of an id', async () => {
     const { claimEvent } = await import('../src/store/events.js');

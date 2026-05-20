@@ -2,8 +2,8 @@ import { request } from 'undici';
 import { config } from '../config.js';
 import {
   type LinkTokenCreateResponse,
-  type PlaidErrorResponse,
   PlaidApiError,
+  type PlaidErrorResponse,
   type PublicTokenExchangeResponse,
   type TransactionsSyncResponse,
   type WebhookVerificationKeyGetResponse,
@@ -11,9 +11,12 @@ import {
 
 function baseUrl(): string {
   switch (config.PLAID_ENV) {
-    case 'sandbox': return 'https://sandbox.plaid.com';
-    case 'development': return 'https://development.plaid.com';
-    case 'production': return 'https://production.plaid.com';
+    case 'sandbox':
+      return 'https://sandbox.plaid.com';
+    case 'development':
+      return 'https://development.plaid.com';
+    case 'production':
+      return 'https://production.plaid.com';
   }
 }
 
@@ -32,8 +35,17 @@ async function plaidPost<T>(path: string, body: Record<string, unknown>): Promis
 
   if (res.statusCode >= 400) {
     let err: PlaidErrorResponse;
-    try { err = JSON.parse(text) as PlaidErrorResponse; }
-    catch { err = { error_type: 'API_ERROR', error_code: 'UNKNOWN', error_message: text, display_message: null, request_id: '' }; }
+    try {
+      err = JSON.parse(text) as PlaidErrorResponse;
+    } catch {
+      err = {
+        error_type: 'API_ERROR',
+        error_code: 'UNKNOWN',
+        error_message: text,
+        display_message: null,
+        request_id: '',
+      };
+    }
     throw new PlaidApiError(res.statusCode, err);
   }
 

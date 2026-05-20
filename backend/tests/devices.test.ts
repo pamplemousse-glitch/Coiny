@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { resetDatabase } from './db-helper.js';
 
 describe('POST /api/devices/push-token', () => {
-  beforeEach(async () => { await resetDatabase(); });
+  beforeEach(async () => {
+    await resetDatabase();
+  });
 
   it('persists a new device token', async () => {
     const { buildApp } = await import('../src/server.js');
@@ -30,8 +32,18 @@ describe('POST /api/devices/push-token', () => {
     const app = await buildApp();
     const body = JSON.stringify({ token: 'ExponentPushToken[duplicate-test]', platform: 'ios' });
 
-    await app.inject({ method: 'POST', url: '/api/devices/push-token', headers: { 'content-type': 'application/json' }, body });
-    await app.inject({ method: 'POST', url: '/api/devices/push-token', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: 'ExponentPushToken[duplicate-test]', platform: 'android' }) });
+    await app.inject({
+      method: 'POST',
+      url: '/api/devices/push-token',
+      headers: { 'content-type': 'application/json' },
+      body,
+    });
+    await app.inject({
+      method: 'POST',
+      url: '/api/devices/push-token',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token: 'ExponentPushToken[duplicate-test]', platform: 'android' }),
+    });
 
     const { listDeviceTokens } = await import('../src/store/devices.js');
     const list = await listDeviceTokens();

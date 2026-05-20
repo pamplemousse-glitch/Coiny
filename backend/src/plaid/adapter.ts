@@ -1,5 +1,5 @@
-import type { Transaction } from '../types/transaction.js';
 import { getOverride } from '../store/overrides.js';
+import type { Transaction } from '../types/transaction.js';
 import type { PlaidTransaction } from './types.js';
 
 // Plaid Personal Finance Category (detailed) → our internal category string.

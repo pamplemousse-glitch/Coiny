@@ -26,18 +26,17 @@ export async function getOverride(merchant: string | undefined): Promise<string 
 
 export async function setOverride(merchant: string, category: string): Promise<void> {
   const k = key(merchant);
-  await db()
-    .insert(categoryOverrides)
-    .values({ merchantName: k, category })
-    .onConflictDoUpdate({
-      target: categoryOverrides.merchantName,
-      set: { category },
-    });
+  await db().insert(categoryOverrides).values({ merchantName: k, category }).onConflictDoUpdate({
+    target: categoryOverrides.merchantName,
+    set: { category },
+  });
   cache = null;
 }
 
 export async function deleteOverride(merchant: string): Promise<void> {
-  await db().delete(categoryOverrides).where(eq(categoryOverrides.merchantName, key(merchant)));
+  await db()
+    .delete(categoryOverrides)
+    .where(eq(categoryOverrides.merchantName, key(merchant)));
   cache = null;
 }
 

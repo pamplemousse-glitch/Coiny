@@ -7,8 +7,8 @@
 export type Transaction = {
   id: string;
   account_id: string;
-  amount: string;           // signed decimal string
-  date: string;             // YYYY-MM-DD
+  amount: string; // signed decimal string
+  date: string; // YYYY-MM-DD
   description: string;
   status: 'pending' | 'posted';
   type: string;

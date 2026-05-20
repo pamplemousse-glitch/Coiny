@@ -1,6 +1,6 @@
-import type { Transaction } from '../types/transaction.js';
 import type { Reaction } from '../reactions/types.js';
 import type { PetGoals } from '../store/pet.js';
+import type { Transaction } from '../types/transaction.js';
 
 export type Rule = {
   name: string;

@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { resetDatabase } from './db-helper.js';
 
 describe('category overrides store', () => {
-  beforeEach(async () => { await resetDatabase(); });
+  beforeEach(async () => {
+    await resetDatabase();
+  });
 
   it('returns null for an unset merchant', async () => {
     const { getOverride } = await import('../src/store/overrides.js');
@@ -42,7 +44,9 @@ describe('category overrides store', () => {
 });
 
 describe('PUT /api/spending/overrides', () => {
-  beforeEach(async () => { await resetDatabase(); });
+  beforeEach(async () => {
+    await resetDatabase();
+  });
 
   it('persists an override via the API', async () => {
     const { buildApp } = await import('../src/server.js');

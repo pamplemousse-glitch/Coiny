@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { computeMoodWithDecay, GRACE_HOURS, DECAY_PER_DAY, FLOOR } from '../src/health/decay.js';
+import { describe, expect, it } from 'vitest';
+import { computeMoodWithDecay, DECAY_PER_DAY, FLOOR, GRACE_HOURS } from '../src/health/decay.js';
 
 function hoursAgo(h: number): Date {
   return new Date(Date.now() - h * 60 * 60 * 1000);

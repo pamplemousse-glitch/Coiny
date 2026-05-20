@@ -1,11 +1,13 @@
-import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest';
 import { createHash, webcrypto } from 'node:crypto';
-import { exportJWK, SignJWT, type JWK } from 'jose';
-import { MockAgent, setGlobalDispatcher, getGlobalDispatcher, type Dispatcher } from 'undici';
+import { exportJWK, type JWK, SignJWT } from 'jose';
+import { type Dispatcher, getGlobalDispatcher, MockAgent, setGlobalDispatcher } from 'undici';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetDatabase } from './db-helper.js';
 
 const flushImmediate = () => new Promise<void>((r) => setImmediate(r));
-async function flushAll() { for (let i = 0; i < 5; i++) await flushImmediate(); }
+async function flushAll() {
+  for (let i = 0; i < 5; i++) await flushImmediate();
+}
 
 const TEST_KID = 'test-kid-1';
 const TEST_ITEM_ID = 'item_test_1';
@@ -20,11 +22,10 @@ let originalDispatcher: Dispatcher;
 let mockAgent: MockAgent;
 
 beforeAll(async () => {
-  const keypair = (await webcrypto.subtle.generateKey(
-    { name: 'ECDSA', namedCurve: 'P-256' },
-    true,
-    ['sign', 'verify'],
-  )) as { privateKey: unknown; publicKey: unknown };
+  const keypair = (await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, [
+    'sign',
+    'verify',
+  ])) as { privateKey: unknown; publicKey: unknown };
   privateKey = keypair.privateKey as Key;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   publicJwk = (await exportJWK(keypair.publicKey as any)) as JWK & Record<string, unknown>;
@@ -118,7 +119,8 @@ describe('POST /webhooks/plaid', () => {
     const app = await buildApp();
     const signed = await signWebhook('{"different":"body"}');
     const res = await app.inject({
-      method: 'POST', url: '/webhooks/plaid',
+      method: 'POST',
+      url: '/webhooks/plaid',
       headers: { 'content-type': 'application/json', 'plaid-verification': signed },
       body: buildSyncEnvelope(),
     });
@@ -132,7 +134,16 @@ describe('POST /webhooks/plaid', () => {
     spy.mockClear();
 
     mockSync({
-      accounts: [{ account_id: 'acc_test_1', balances: { current: 5000, available: 5000, iso_currency_code: 'USD', limit: null }, name: 'Checking', official_name: null, type: 'depository', subtype: 'checking' }],
+      accounts: [
+        {
+          account_id: 'acc_test_1',
+          balances: { current: 5000, available: 5000, iso_currency_code: 'USD', limit: null },
+          name: 'Checking',
+          official_name: null,
+          type: 'depository',
+          subtype: 'checking',
+        },
+      ],
       added: [buildAddedTx()],
       modified: [],
       removed: [],
@@ -148,7 +159,8 @@ describe('POST /webhooks/plaid', () => {
     const signed = await signWebhook(body);
 
     const res = await app.inject({
-      method: 'POST', url: '/webhooks/plaid',
+      method: 'POST',
+      url: '/webhooks/plaid',
       headers: { 'content-type': 'application/json', 'plaid-verification': signed },
       body,
     });
@@ -170,7 +182,16 @@ describe('POST /webhooks/plaid', () => {
     await markInitialSyncComplete(TEST_ITEM_ID);
 
     mockSync({
-      accounts: [{ account_id: 'acc_test_1', balances: { current: 5000, available: 5000, iso_currency_code: 'USD', limit: null }, name: 'Checking', official_name: null, type: 'depository', subtype: 'checking' }],
+      accounts: [
+        {
+          account_id: 'acc_test_1',
+          balances: { current: 5000, available: 5000, iso_currency_code: 'USD', limit: null },
+          name: 'Checking',
+          official_name: null,
+          type: 'depository',
+          subtype: 'checking',
+        },
+      ],
       added: [buildAddedTx()],
       modified: [],
       removed: [],
@@ -190,7 +211,8 @@ describe('POST /webhooks/plaid', () => {
     const signed = await signWebhook(body);
 
     await app.inject({
-      method: 'POST', url: '/webhooks/plaid',
+      method: 'POST',
+      url: '/webhooks/plaid',
       headers: { 'content-type': 'application/json', 'plaid-verification': signed },
       body,
     });
@@ -207,7 +229,16 @@ describe('POST /webhooks/plaid', () => {
     await markInitialSyncComplete(TEST_ITEM_ID);
 
     const syncResponse = {
-      accounts: [{ account_id: 'acc_test_1', balances: { current: 5000, available: 5000, iso_currency_code: 'USD', limit: null }, name: 'Checking', official_name: null, type: 'depository', subtype: 'checking' }],
+      accounts: [
+        {
+          account_id: 'acc_test_1',
+          balances: { current: 5000, available: 5000, iso_currency_code: 'USD', limit: null },
+          name: 'Checking',
+          official_name: null,
+          type: 'depository',
+          subtype: 'checking',
+        },
+      ],
       added: [buildAddedTx({ transaction_id: 'txn_idem' })],
       modified: [],
       removed: [],
@@ -229,14 +260,16 @@ describe('POST /webhooks/plaid', () => {
     const signed = await signWebhook(body);
 
     await app.inject({
-      method: 'POST', url: '/webhooks/plaid',
+      method: 'POST',
+      url: '/webhooks/plaid',
       headers: { 'content-type': 'application/json', 'plaid-verification': signed },
       body,
     });
     await flushAll();
 
     await app.inject({
-      method: 'POST', url: '/webhooks/plaid',
+      method: 'POST',
+      url: '/webhooks/plaid',
       headers: { 'content-type': 'application/json', 'plaid-verification': signed },
       body,
     });
@@ -261,7 +294,8 @@ describe('POST /webhooks/plaid', () => {
     const signed = await signWebhook(body);
 
     const res = await app.inject({
-      method: 'POST', url: '/webhooks/plaid',
+      method: 'POST',
+      url: '/webhooks/plaid',
       headers: { 'content-type': 'application/json', 'plaid-verification': signed },
       body,
     });
@@ -283,7 +317,8 @@ describe('POST /webhooks/plaid', () => {
     const signed = await signWebhook(body);
 
     const res = await app.inject({
-      method: 'POST', url: '/webhooks/plaid',
+      method: 'POST',
+      url: '/webhooks/plaid',
       headers: { 'content-type': 'application/json', 'plaid-verification': signed },
       body,
     });

@@ -1,10 +1,11 @@
 import { createHash, webcrypto } from 'node:crypto';
-import { importJWK, jwtVerify, decodeProtectedHeader, type JWK } from 'jose';
+import { decodeProtectedHeader, importJWK, type JWK, jwtVerify } from 'jose';
 
 // jose's key type union spans CryptoKey | KeyObject | Uint8Array depending on the
 // import path and Node version. We never poke at it ourselves — it round-trips
 // through importJWK → jwtVerify, both jose APIs.
 type CryptoKeyLike = Awaited<ReturnType<typeof importJWK>>;
+
 import { webhookVerificationKeyGet } from './client.js';
 import type { WebhookVerificationKey } from './types.js';
 
@@ -28,7 +29,10 @@ export function _clearKeyCache(): void {
 
 export type VerifyResult =
   | { ok: true }
-  | { ok: false; reason: 'missing_header' | 'malformed_jwt' | 'unknown_kid' | 'invalid_signature' | 'expired' | 'body_mismatch' };
+  | {
+      ok: false;
+      reason: 'missing_header' | 'malformed_jwt' | 'unknown_kid' | 'invalid_signature' | 'expired' | 'body_mismatch';
+    };
 
 async function getKey(kid: string): Promise<CryptoKeyLike | null> {
   const cached = keyCache.get(kid);

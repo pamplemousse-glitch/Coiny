@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import type { StoredTransaction } from '../src/store/transactions.js';
 import { detectSubscriptions } from '../src/subscriptions/detect.js';
 import { resetDatabase } from './db-helper.js';
-import type { StoredTransaction } from '../src/store/transactions.js';
 
 function tx(overrides: Partial<StoredTransaction>): StoredTransaction {
   return {
@@ -18,10 +18,7 @@ function tx(overrides: Partial<StoredTransaction>): StoredTransaction {
 
 describe('detectSubscriptions', () => {
   it('returns empty for too few occurrences', () => {
-    const txs = [
-      tx({ transactionId: 't1', date: '2026-03-01' }),
-      tx({ transactionId: 't2', date: '2026-04-01' }),
-    ];
+    const txs = [tx({ transactionId: 't1', date: '2026-03-01' }), tx({ transactionId: 't2', date: '2026-04-01' })];
     expect(detectSubscriptions(txs)).toEqual([]);
   });
 
@@ -76,24 +73,53 @@ describe('detectSubscriptions', () => {
       tx({ transactionId: `${m}_2`, merchantName: m, amount: amt, date: '2026-03-15' }),
       tx({ transactionId: `${m}_3`, merchantName: m, amount: amt, date: '2026-04-15' }),
     ];
-    const subs = detectSubscriptions([
-      ...make('Netflix', '-15.99'),
-      ...make('Spotify', '-10.99'),
-    ]);
+    const subs = detectSubscriptions([...make('Netflix', '-15.99'), ...make('Spotify', '-10.99')]);
     expect(subs.length).toBe(2);
     expect(subs.map((s) => s.merchantName).sort()).toEqual(['Netflix', 'Spotify']);
   });
 });
 
 describe('GET /api/subscriptions', () => {
-  beforeEach(async () => { await resetDatabase(); });
+  beforeEach(async () => {
+    await resetDatabase();
+  });
 
   it('returns persisted subscriptions detected from transactions', async () => {
     const { persistTransactions } = await import('../src/store/transactions.js');
     await persistTransactions([
-      { id: 't1', account_id: 'a1', amount: '-10.99', date: '2026-02-01', description: 'Spotify', status: 'posted', type: 'card_payment', running_balance: null, details: { counterparty: { name: 'Spotify' }, category: 'entertainment' } },
-      { id: 't2', account_id: 'a1', amount: '-10.99', date: '2026-03-01', description: 'Spotify', status: 'posted', type: 'card_payment', running_balance: null, details: { counterparty: { name: 'Spotify' }, category: 'entertainment' } },
-      { id: 't3', account_id: 'a1', amount: '-10.99', date: '2026-04-01', description: 'Spotify', status: 'posted', type: 'card_payment', running_balance: null, details: { counterparty: { name: 'Spotify' }, category: 'entertainment' } },
+      {
+        id: 't1',
+        account_id: 'a1',
+        amount: '-10.99',
+        date: '2026-02-01',
+        description: 'Spotify',
+        status: 'posted',
+        type: 'card_payment',
+        running_balance: null,
+        details: { counterparty: { name: 'Spotify' }, category: 'entertainment' },
+      },
+      {
+        id: 't2',
+        account_id: 'a1',
+        amount: '-10.99',
+        date: '2026-03-01',
+        description: 'Spotify',
+        status: 'posted',
+        type: 'card_payment',
+        running_balance: null,
+        details: { counterparty: { name: 'Spotify' }, category: 'entertainment' },
+      },
+      {
+        id: 't3',
+        account_id: 'a1',
+        amount: '-10.99',
+        date: '2026-04-01',
+        description: 'Spotify',
+        status: 'posted',
+        type: 'card_payment',
+        running_balance: null,
+        details: { counterparty: { name: 'Spotify' }, category: 'entertainment' },
+      },
     ]);
 
     const { buildApp } = await import('../src/server.js');
