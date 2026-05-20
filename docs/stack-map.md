@@ -28,6 +28,146 @@ to the physical pet device (BLE).
 
 ---
 
+## Complete end-to-end stack (one graphic)
+
+The full product stack, top (user) to bottom (user's bank). Every layer
+labeled with its tools.
+
+```
+                  ╔═══════════════════════════════════════════════╗
+                  ║                    USER                        ║
+                  ║       carries device · uses phone app          ║
+                  ╚═══════════════════════════════════════════════╝
+                          │                              │
+                  ┌───────┴──────┐               ┌──────┴────────────┐
+                  │   touches +  │               │     opens app +   │
+                  │   sees pet   │               │     gets pushes   │
+                  ▼              ▼               ▼                   ▼
+   ╔══════════════════════════════════╗   ╔══════════════════════════════════════╗
+   ║         COINY DEVICE             ║   ║            MOBILE APP                 ║
+   ║  ┌─────────────────────────────┐ ║   ║  ┌─────────────────────────────────┐ ║
+   ║  │ HARDWARE                    │ ║   ║  │ React Native + Expo SDK 54 + TS │ ║
+   ║  │  • nRF52840 MCU (prod)      │ ║   ║  ├─────────────────────────────────┤ ║
+   ║  │    (M5StickS3/ESP32-S3 now) │ ║   ║  │ Auth:        Clerk (planned)    │ ║
+   ║  │  • Sharp Memory LCD         │ ║◄──║  │ Bank link:   Plaid Link RN SDK  │ ║
+   ║  │  • LRA haptic motor         │ ║BLE║  │ BLE module:  Swift + Kotlin     │ ║
+   ║  │  • RGB LED (WS2812)         │ ║   ║  │              (Expo Modules API) │ ║
+   ║  │  • 1-2 tactile buttons      │ ║   ║  │ Push:        Expo Push          │ ║
+   ║  │  • LiPo + USB-C charging    │ ║   ║  │ Audio:       Expo AV            │ ║
+   ║  │  • MAX17048 fuel gauge      │ ║   ║  │ HTTP:        fetch              │ ║
+   ║  ├─────────────────────────────┤ ║   ║  │ Crash trk:   Sentry (planned)   │ ║
+   ║  │ FIRMWARE                    │ ║   ║  │ Build:       EAS Build          │ ║
+   ║  │  • Zephyr RTOS              │ ║   ║  └─────────────────────────────────┘ ║
+   ║  │  • Nordic SoftDevice BLE    │ ║   ╚════════════════╤═════════════════════╝
+   ║  │  • C++ via nRF Connect SDK  │ ║                    │
+   ║  │  • MCUmgr OTA               │ ║                    │ HTTPS
+   ║  └─────────────────────────────┘ ║                    │ + Clerk JWT (planned)
+   ╚══════════════════════════════════╝                    │
+                                                            ▼
+                  ╔══════════════════════════════════════════════════════════════╗
+                  ║                    COINY BACKEND                              ║
+                  ║                                                               ║
+                  ║   ┌───────────────────────────────────────────────────────┐  ║
+                  ║   │  Node 22 + Fastify + TypeScript + Zod                  │  ║
+                  ║   │                                                         │  ║
+                  ║   │  ┌──────────────────────┐  ┌────────────────────────┐  │  ║
+                  ║   │  │  /webhooks/plaid     │  │  /api/* (REST)         │  │  ║
+                  ║   │  │  JWT ES256 (jose)    │  │  pets · spending ·     │  │  ║
+                  ║   │  │  request_body_sha256 │  │  plaid-link · devices ·│  │  ║
+                  ║   │  │  + replay protection │  │  subscriptions ·       │  │  ║
+                  ║   │  │                      │  │  overrides             │  │  ║
+                  ║   │  └─────────┬────────────┘  └──────────┬─────────────┘  │  ║
+                  ║   │            │                          │                │  ║
+                  ║   │            ▼                          ▼                │  ║
+                  ║   │  ┌─────────────────────────────────────────────────┐   │  ║
+                  ║   │  │            Rule Engine (pure TS)                 │   │  ║
+                  ║   │  │   paycheck · overspend · savings_milestone ·    │   │  ║
+                  ║   │  │   bill_paid · large_purchase · subscription     │   │  ║
+                  ║   │  └─────────┬──────────────────────────────────────┘   │  ║
+                  ║   │            │                                            │  ║
+                  ║   │            ▼                                            │  ║
+                  ║   │  ┌─────────────────────────────────────────────────┐   │  ║
+                  ║   │  │      Reaction Dispatcher                         │   │  ║
+                  ║   │  │   → animation · sound · LED · haptic · duration  │   │  ║
+                  ║   │  └─────────────────────────────────────────────────┘   │  ║
+                  ║   └────────────────────────┬───────────────────────────────┘  ║
+                  ║                            │ Drizzle ORM                       ║
+                  ║                            ▼                                   ║
+                  ║   ┌──────────────────────────────────────────────────────┐    ║
+                  ║   │  NEON · serverless Postgres · us-east-1               │    ║
+                  ║   │   pet_state · reaction_history · processed_events ·   │    ║
+                  ║   │   plaid_items · transactions · category_overrides ·   │    ║
+                  ║   │   device_tokens · audit_log (planned)                 │    ║
+                  ║   └──────────────────────────────────────────────────────┘    ║
+                  ║                                                               ║
+                  ║   Hosting:        Fly.io (coiny-backend.fly.dev, iad)        ║
+                  ║   Outbound HTTP:  undici  ────────────────► Plaid API        ║
+                  ║   Observability:  Sentry + Grafana Cloud via OpenTelemetry   ║
+                  ║                   (planned, M1)                               ║
+                  ║   Idempotency:    transaction_id in processed_events table   ║
+                  ║   Rate limit:     @fastify/rate-limit  (100 req/sec)         ║
+                  ║   Tests:          Vitest + PGlite (in-memory Postgres)       ║
+                  ╚════════════════════════════════╤════════════════════════════╝
+                                                   │
+                                                   │ HTTPS + auth body
+                                                   │ (client_id + secret)
+                                                   ▼
+                                       ╔════════════════════════════╗
+                                       ║          PLAID              ║
+                                       ║                             ║
+                                       ║  Sandbox (now)              ║
+                                       ║  → Production (Phase 5)     ║
+                                       ║                             ║
+                                       ║  /transactions/sync         ║
+                                       ║  /link/token/create         ║
+                                       ║  /item/public_token/        ║
+                                       ║    exchange                 ║
+                                       ║  /webhook_verification_     ║
+                                       ║    key/get                  ║
+                                       ╚══════════════╤══════════════╝
+                                                      │ OAuth + screen-scrape
+                                                      ▼
+                                       ╔════════════════════════════╗
+                                       ║      USER'S BANK            ║
+                                       ║   Chase, BoA, Wells Fargo,  ║
+                                       ║   Capital One, ~11,000 US   ║
+                                       ║   banks supported by Plaid  ║
+                                       ╚════════════════════════════╝
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                    BUILD / DEPLOY (sidecar to runtime)                    ║
+║                                                                           ║
+║   Developer  ──git push──►  GitHub (pamplemousse-glitch/Coiny, private)   ║
+║                                  │                                        ║
+║                                  ├──► Dependabot (weekly grouped PRs)     ║
+║                                  │                                        ║
+║                                  ├──► CI workflows                        ║
+║                                  │      backend-ci.yml  → Biome · tsc ·   ║
+║                                  │                        vitest          ║
+║                                  │      mobile-ci.yml   → tsc · expo lint ║
+║                                  │      security.yml    → Semgrep ·       ║
+║                                  │                        Gitleaks · Trivy║
+║                                  │                                        ║
+║                                  ▼                                        ║
+║                          Squash-merge to main                             ║
+║                                  │                                        ║
+║                                  │ `fly deploy` (manual or CD)            ║
+║                                  ▼                                        ║
+║                          Fly.io ──► Docker image ──► coiny-backend.fly.dev║
+║                                  │                                        ║
+║                                  ├──► Neon (DATABASE_URL)                 ║
+║                                  └──► Fly Secrets (PLAID_*, etc.)         ║
+║                                                                           ║
+║   Local secrets:  macOS Keychain  + `bin/load-secrets.sh`                 ║
+║   Monorepo:       pnpm workspaces + Turborepo                             ║
+║   Branch guard:   pre-commit hook blocks direct commits to main           ║
+║   Conventions:    Conventional Commits, squash-merge only                 ║
+╚══════════════════════════════════════════════════════════════════════════╝
+```
+
+---
+
 ## Layer 1 — Hardware (Phase 2)
 
 The physical Coiny device. Prototype on M5StickS3 dev board today; ship on
