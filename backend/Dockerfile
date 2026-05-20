@@ -11,7 +11,7 @@ COPY shared/package.json ./shared/
 
 RUN pnpm install --frozen-lockfile --filter coiny-backend...
 
-COPY backend/tsconfig.json ./backend/
+COPY backend/tsconfig.json backend/tsconfig.build.json ./backend/
 COPY backend/src ./backend/src/
 
 RUN pnpm --filter coiny-backend build
