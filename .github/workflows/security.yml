@@ -15,7 +15,7 @@ jobs:
     name: Semgrep SAST
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       # `auto` selects rulesets based on detected languages.
       # See https://semgrep.dev/explore for rulesets that get pulled.
       - uses: semgrep/semgrep-action@v1
@@ -28,7 +28,7 @@ jobs:
     name: Gitleaks secret scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # Need full history so gitleaks can scan everything pushed.
           fetch-depth: 0
@@ -41,7 +41,7 @@ jobs:
     name: Trivy container scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: pnpm/action-setup@v4
         with:
