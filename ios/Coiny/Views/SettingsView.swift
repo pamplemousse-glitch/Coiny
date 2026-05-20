@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(PetStore.self) private var store
+    @AppStorage("onboardingComplete") private var onboardingComplete: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -40,6 +41,12 @@ struct SettingsView: View {
                     LabeledContent("Version") {
                         Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0")
                             .font(.caption.monospaced())
+                    }
+                }
+
+                Section("Debug") {
+                    Button("Reset onboarding", role: .destructive) {
+                        onboardingComplete = false
                     }
                 }
             }

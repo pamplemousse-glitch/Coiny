@@ -59,6 +59,8 @@ private struct PetLoadedView: View {
         }
     }
 
+    @State private var breathing: Bool = false
+
     var body: some View {
         ScrollView {
             VStack(spacing: 32) {
@@ -67,6 +69,9 @@ private struct PetLoadedView: View {
                     .scaledToFit()
                     .frame(width: 180, height: 180)
                     .foregroundStyle(moodTint)
+                    .scaleEffect(breathing ? 1.04 : 1.0)
+                    .animation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true), value: breathing)
+                    .onAppear { breathing = true }
                     .padding(.top, 32)
                     .accessibilityLabel("Pet mood: \(pet.mood) out of 100")
 
