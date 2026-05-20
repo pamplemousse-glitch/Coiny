@@ -4,24 +4,13 @@ import SwiftUI
 struct CoinyApp: App {
     @State private var petStore = PetStore()
 
-    /// Persisted via UserDefaults — survives app relaunches.
-    /// Set to true at the end of OnboardingView.
-    @AppStorage("onboardingComplete") private var onboardingComplete: Bool = false
-
     var body: some Scene {
         WindowGroup {
-            Group {
-                if onboardingComplete {
-                    RootView()
-                        .environment(petStore)
-                        .task {
-                            await petStore.refresh()
-                        }
-                } else {
-                    OnboardingView(onboardingComplete: $onboardingComplete)
+            RootView()
+                .environment(petStore)
+                .task {
+                    await petStore.refresh()
                 }
-            }
-            .animation(.easeInOut, value: onboardingComplete)
         }
     }
 }
