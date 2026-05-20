@@ -3,9 +3,6 @@ packages:
   - 'shared'
   - 'mobile'
 
-onlyBuiltDependencies:
-  - esbuild
-
-# Native module pulled in by eslint-config-expo; needs its postinstall to build.
 allowBuilds:
+  esbuild: true
   unrs-resolver: true
