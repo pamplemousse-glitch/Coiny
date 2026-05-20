@@ -192,8 +192,10 @@ A fresh Claude Code session should execute these top-to-bottom. Each item is siz
 - [ ] **T1.1  Backend hosting on Fly.io or Railway** (C+A · 2–4 h)
       Deploys backend so the mobile app can reach it from a physical device.
       New: `backend/Dockerfile`, `backend/fly.toml`. Secrets via Fly secrets (Keychain → Fly). Antoine creates account + provides API token.
+      🛑 **Validate before T2.x**: in the Teller dashboard, point the webhook URL at the deployed backend → trigger a sandbox event → `fly logs` shows the webhook arrived **and signature verified**. If not, every later ticket sits on a broken pipeline.
 - [ ] **T1.2  GitHub Actions CI** (C · 1 h)
       `.github/workflows/ci.yml` — Node 22, pnpm 11.1.3 — runs `pnpm --filter coiny-backend test`, `pnpm --filter coiny-mobile typecheck`, `pnpm --filter coiny-mobile lint` on every PR.
+      🛑 **Validate**: open any PR, confirm a green check appears under "Checks". If no checks → the workflow file isn't triggering.
 - [ ] **T1.3  Sentry error tracking** (C+A · 2 h)
       Free tier. `backend/src/plugins/sentry.ts`, `mobile/services/sentry.ts`. Antoine creates Sentry org + provides DSN as env var.
 - [ ] **T1.4  LLC formation (Wyoming, ~$200)** (A · 90 min)
@@ -203,16 +205,22 @@ A fresh Claude Code session should execute these top-to-bottom. Each item is siz
 
 - [ ] **T2.1  Persistent storage (Postgres on Supabase or Neon)** (C+A · 1–2 d)
       Replaces `store/pet.ts`, `store/events.ts` with Postgres. Migrations in `backend/migrations/`. Pick `pg` or `drizzle-orm`. Antoine creates Supabase/Neon project + provides connection string.
+      🛑 **Validate before T2.2**: edit goals via the mobile app → restart the backend (`fly apps restart` or local restart) → `GET /api/pets` returns the edited goals, not defaults. If state resets, the write path or migrations are broken — freeze before adding multi-user on top.
 - [ ] **T2.2  Multi-user accounts** (C · 2–3 d)
       `users` table; all API routes derive `userId` from auth. Auth: magic-link email via Resend/Postmark, or Apple/Google sign-in via Expo. Depends on T2.1.
+      🛑 **Validate before T2.3–T2.5**: sign up two accounts, link a different sandbox bank to each, trigger an event for user A → confirm reaction appears only in user A's `GET /api/pets`, not user B's. Cross-leak → STOP. Every later ticket assumes user isolation works.
 - [ ] **T2.3  Push pipeline backend → APNs/FCM via Expo Push API** (C · 4–6 h)
       New: `services/push.ts`. Wire into `reactions/dispatch.ts`. Depends on T2.1, T2.5.
+      🛑 **Validate before T3.x**: trigger a sandbox transaction → a push lands on the physical iPhone within ~5s. Without this the "Coiny reacts in real time" thesis is unverified — don't build BLE relay on top of a broken push layer.
 - [ ] **T2.4  `POST /api/banks/connect`** (C · 4–6 h)
       Receives Teller enrollment from mobile, stores `(user_id, encrypted_access_token, enrollment_id, institution_name)`. Encrypt access token with env-supplied key. Depends on T2.1, T2.2.
+      🛑 **Validate before T3.3 onboarding**: link a sandbox bank from the iPhone → row appears in `bank_connections` table → trigger a sandbox transaction → reaction appears under the right user's history. If the wiring drops a step, onboarding will silently fail.
 - [ ] **T2.5  `POST /api/devices/push-token`** (C · 2–3 h)
       Receives Expo push token, stores `(user_id, token, platform, last_seen)`. Depends on T2.1, T2.2.
+      🛑 **Validate before T2.3**: tap "Enable notifications" on the iPhone → row appears in `device_tokens` table with the right `user_id`. T2.3 reads from this table; if it's empty the push pipeline can't even start.
 - [ ] **T2.6  Subscription detection** (C · 1–2 d)
       New: `subscriptions/detector.ts` (group by merchant + amount, infer cadence from gaps). New: `store/transactions.ts` (bounded ring buffer, 90-day window). New rule `new_subscription_detected` fires on 3rd matching charge. Update privacy-policy retention disclosure (see `docs/security.md`).
+      🛑 **Validate before privacy-policy disclosure goes live**: `pnpm sim` to send 3 identical sandbox transactions → `new_subscription_detected` appears in reaction history. If it doesn't fire, the algorithm needs tuning before you publish a retention claim you can't back up.
 - [ ] **T2.7  Mood / health decay over time** (C · 2–3 h)
       Cron tick decrements `healthScore` by N per day if no recent reactions. Pet gets sad if ignored. Add to test suite.
 - [ ] **T2.8  Categorization override layer** (C · 3–4 h)
@@ -284,6 +292,26 @@ Fresh Claude session, optimizing for leverage:
 Then the **"ready for friends" track** (~1–2 weeks): T2.2 → T2.3 → T2.4 → T2.5 → T3.1 → T3.2 → T3.3.
 
 Antoine attacks Tier 4 + Tier 5 in parallel.
+
+### Validation gates — quick reference
+
+Stops where Claude pauses to ask Antoine to confirm before moving on.
+A broken layer here silently corrupts every later ticket.
+
+| Gate | After | Antoine confirms | Stop if... |
+|---|---|---|---|
+| **G1** | T1.2 | A green CI check appears on any PR | No checks appear — workflow file isn't triggering |
+| **G2** | T1.1 | Sandbox webhook fired from Teller dashboard arrives in `fly logs` **with signature verified** | Logs silent or signature rejected — every T2.x depends on this path |
+| **G3** | T2.1 | Edit goals via app → restart backend → goals persist | Goals reset — write path or migrations broken; freeze before T2.2 |
+| **G4** | T2.2 | Two test users see only their own data | Cross-leak — STOP. Isolation is a load-bearing assumption for everything after |
+| **G5** | T2.5 | Tapping "Enable notifications" creates a `device_tokens` row with the right `user_id` | No row — T2.3 has no source of truth for who to push to |
+| **G6** | T2.3 | Sandbox transaction → push lands on the physical iPhone in ~5 s | No push — fix before BLE relay is ever attempted |
+| **G7** | T2.4 | Link sandbox bank from iPhone → transaction triggers a reaction under the right user | Reaction missing or wrong-user — onboarding will silently fail |
+| **G8** | T2.6 | `pnpm sim` of 3 identical sandbox txs fires `new_subscription_detected` | Doesn't fire — algorithm needs tuning before any retention claim is published |
+
+**Items Claude can self-validate (no Antoine action required):** T2.6 unit tests, T2.7, T2.8, T6.1, T7.1, T7.2.
+
+**Items that need Antoine because only a physical iPhone or external account can prove them:** G2, G3, G4, G5, G6, G7.
 
 ---
 
