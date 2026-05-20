@@ -8,6 +8,7 @@ import { registerPlaidWebhook } from './webhook/plaid.js';
 import { registerPlaidLinkApi } from './api/plaid-link.js';
 import { registerPetsApi } from './api/pets.js';
 import { registerSpendingApi } from './api/spending.js';
+import { registerOverridesApi } from './api/overrides.js';
 import { initDb } from './db/client.js';
 import { runMigrations, seedPetStateIfMissing } from './db/migrate.js';
 
@@ -34,6 +35,7 @@ async function buildApp() {
   registerPlaidLinkApi(app);
   registerPetsApi(app);
   registerSpendingApi(app);
+  registerOverridesApi(app);
 
   app.get('/health', async () => ({ ok: true }));
 

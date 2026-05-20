@@ -166,7 +166,7 @@ async function syncItem(
 
   for (const plaidTx of allAdded) {
     const balance = accountBalances.get(plaidTx.account_id) ?? null;
-    const tx = plaidTxToInternal(plaidTx, balance);
+    const tx = await plaidTxToInternal(plaidTx, balance);
 
     // Transaction-level idempotency: skip if we've already processed this
     // transaction_id (e.g., from a redelivered webhook).
