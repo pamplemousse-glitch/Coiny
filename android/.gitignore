@@ -1,0 +1,23 @@
+build/
+.gradle/
+.idea/
+local.properties
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+**/release/
+
+# Android Studio
+.navigation/
+*.apk
+output.json
+*.ap_
+*.dex
+proguard/
+
+# Generated wrapper jar — created on first build
+gradle/wrapper/gradle-wrapper.jar
+
+# macOS
+.DS_Store
