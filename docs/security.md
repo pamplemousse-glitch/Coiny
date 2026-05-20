@@ -19,6 +19,82 @@ This is why **backend + mobile = high-trust**, **device = low-trust**.
 
 ---
 
+## Compliance Posture & Realistic Cost Path
+
+### GLBA applies — but not at the level the $15–30K number implies
+
+Coiny is a "financial institution" under the FTC Safeguards Rule because we
+receive consumer financial info from Teller. That triggers:
+
+- The **Privacy Rule** — publish a privacy notice describing what we collect
+  / share
+- The **Safeguards Rule** — written information security program,
+  designated security lead, risk assessment, encryption, access controls,
+  incident response
+
+**Critically, until Coiny has 5,000+ customer records the FTC's small-entity
+carve-out applies** ([16 CFR § 314.6](https://www.ftc.gov/business-guidance/resources/ftc-safeguards-rule-what-your-business-needs-know)).
+That exempts us from the formal risk-assessment, continuous pen testing,
+written incident response, and annual board report requirements. We still
+need a written security program in some form — this document is the start.
+
+### What actually gets small fintechs sued
+
+A scan of published FTC / CFPB enforcement against small consumer fintechs
+(Beam Financial, BetterHelp, GoodRx, LendUp, Drizly, Chegg) shows the
+pattern. The failure mode is **always** one of:
+
+1. **Lying in marketing** (promises that don't match the product)
+2. **Sharing data after promising not to** (BetterHelp / GoodRx → ad networks)
+3. **Breach with no preparedness plan**
+4. **Dark patterns / negative-option billing**
+
+None of these cases were about missing a fancy WISP document. **Coiny's
+single highest-leverage protection is keeping marketing copy, in-app copy,
+and the privacy policy all true and consistent.**
+
+### Phase-by-phase cost ladder
+
+| Phase | What to do | Cost | Time |
+|---|---|---|---|
+| **Sandbox (now)** | Wyoming/Delaware LLC; free EIN; Termly free privacy policy; this doc as the starter WISP; no user data collected | **$100–500** | ~5–10 h |
+| **Closed beta (≤50 users)** | Termly Starter (~$10/mo); click-wrap consent in-app; expand this doc to 2–3 pages with data inventory + vendor list + incident-response steps | **+$500–1,500** | +10–20 h |
+| **Public paid launch** | Flat-fee fintech lawyer review of TOS + Privacy Policy (Faison Law, Arcline, UpCounsel); cyber liability insurance (Coalition, Vouch); Apple developer account → organization (DUNS) | **+$2,000–8,000** | +20–40 h |
+| **5,000+ users (post-launch growth)** | Small-entity carve-out lapses; formal risk assessment, written incident response plan, MFA, annual review. Optional SOC 2 Type 1 (~$10–20K) only if a B2B partner demands it | **+$10–30K / yr** | Ongoing |
+
+**The $15–30K "fintech attorney" figure is the all-in upfront program** —
+appropriate when raising a seed round, closing a B2B customer that demands
+it, or scaling past the small-entity carve-out. Until then it's the upper
+end, not the default.
+
+### Why Coiny is on "easy mode" within fintech
+
+1. **Subscription + read-only + no money movement** — the simplest
+   compliance posture in fintech. No money-transmitter licensing, no
+   banking regulations.
+2. **Teller, not Plaid** — no security questionnaire, lighter developer
+   agreement. See `docs/aggregators.md`.
+3. **Apple App Review 3.2.1(viii)** explicitly carves out apps using "a
+   public API offered by the [financial] institution in compliance with its
+   Terms & Conditions." Teller is that public API. Reviewers treat Coiny
+   closer to a quantified-self app than a banking app, provided the privacy
+   policy URL and App Privacy nutrition label match reality.
+
+### Indie precedents
+
+Bootstrapped PFM apps that operate (or operated) on the indie minimum
+described above and never publicly hit a compliance wall:
+
+- **Lunch Money** (Jen Yip, solo, Plaid-connected, ~$40K+/yr revenue)
+- **Copilot Money** (Andrés Ugarte, solo bootstrap 2018–2020)
+- **PocketSmith** (3 co-founders, never raised, 370K users in 190 countries)
+- **Rocket Money / Truebill** (started cheap, exited for $1.275B — added
+  formal compliance as revenue justified it)
+
+The pattern: lawyers and SOC 2 come **after** revenue, not before launch.
+
+---
+
 ## Already Implemented / Specified
 
 These appear in `architecture.md` and elsewhere:
@@ -174,7 +250,12 @@ Required by 16 CFR Part 314 (FTC Safeguards Rule):
 - Incident response plan (written before incident, not after)
 - Annual review and update
 
-Budget: $15K–30K for fintech attorney to draft initial program.
+**Budget:** see the "Phase-by-phase cost ladder" table near the top of this
+doc. The realistic public-launch number is **$2–8K** (lawyer review of
+TOS/PP + cyber liability insurance). The $15–30K figure is the all-in
+upfront program — only required when raising a seed round, closing a B2B
+customer that demands it, or scaling past the 5,000-user small-entity
+carve-out.
 
 ### 14. Privacy policy + Terms of Service
 

@@ -115,7 +115,9 @@ These need answers before or during Phase 5. Not blockers for prototype.
 - [ ] **Onboarding experience**: exact flow from unboxing to first reaction.
 
 ### Legal / Business
-- [ ] GLBA compliance — engage fintech attorney before any real bank data
+- [ ] GLBA compliance — start on the indie minimum (LLC + generated privacy
+      policy + `docs/security.md` as starter WISP); flat-fee lawyer review
+      ($1.5–3K) before public paid launch. Full cost ladder in `docs/security.md`
 - [ ] Teller production access — apply when backend is proven in sandbox
 - [ ] FCC certification path — pre-certified ESP32-S3-MINI module handles this for prototype;
       custom PCB needs a Declaration of Conformity review

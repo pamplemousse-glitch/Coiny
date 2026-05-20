@@ -265,14 +265,23 @@ See `docs/sprint-plan.md` for day-by-day. Realistic with breakage tax: 9–10 da
 
 ## Legal (Reference)
 
-- **GLBA**: applies because we read bank data. Written security program +
-  privacy notice required. Engage fintech attorney ($15–30K) before real users.
+- **GLBA**: applies because we read bank data. Realistic cost path is the
+  indie minimum (LLC + generated privacy policy + this-doc-as-WISP) for
+  sandbox/closed-beta, ~$2–8K for public launch (lawyer review + cyber
+  liability insurance). The $15–30K "fintech attorney" figure is the all-in
+  upfront program — only needed when raising or scaling past 5,000 users.
+  Full phase-by-phase cost ladder + indie precedents in `docs/security.md`
+  ("Compliance Posture & Realistic Cost Path").
 - **FCC**: pre-certified ESP32-S3 module covers prototype. Custom PCB needs DoC.
 - **Teller ToS**: cannot resell or share transaction data.
-- **App Store**: financial app requires extra Apple review + privacy policy.
+- **App Store**: Apple guideline 3.2.1(viii) carves out apps using a public
+  API of the financial institution (Teller qualifies). Reviewers treat Coiny
+  closer to a quantified-self app than a banking app, provided privacy policy
+  URL + App Privacy nutrition label match reality.
 - **CCPA / GDPR**: applies if any users in CA / EU.
-
-Full per-phase security checklist in `docs/security.md`.
+- **Aggregator landscape + pricing** (Teller / Plaid / MX / Yodlee / Finicity):
+  see `docs/aggregators.md`. Coiny's plan is Teller-only through Phase 4,
+  add Plaid Investments in Phase 5.
 
 ---
 
