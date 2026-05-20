@@ -1,0 +1,25 @@
+# Gitleaks config. Defaults are sensible; this file just adds Coiny-specific
+# allowlist rules so legitimate test fixtures don't trip false positives.
+# Docs: https://github.com/gitleaks/gitleaks
+
+title = "Coiny gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowlist for known-safe test fixtures"
+
+# Test JWT keys in backend/tests are generated on the fly via webcrypto;
+# they never represent real credentials. Allowlist the test files where they
+# appear so the regex scanner doesn't false-positive on PEM/JWK fragments.
+paths = [
+  '''backend/tests/.*\.test\.ts''',
+  '''docs/.*\.md''',  # docs may include example strings like ExponentPushToken[xxxxxxxx]
+]
+
+# Allow Expo push token placeholders in tests + docs.
+regexes = [
+  '''ExponentPushToken\[[a-zA-Z0-9-]+\]''',
+  '''test_(client_id|secret|webhook-secret)''',
+]
