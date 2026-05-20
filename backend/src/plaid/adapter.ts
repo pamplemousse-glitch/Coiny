@@ -1,4 +1,5 @@
 import type { Transaction } from '../types/transaction.js';
+import { getOverride } from '../store/overrides.js';
 import type { PlaidTransaction } from './types.js';
 
 // Plaid Personal Finance Category (detailed) → our internal category string.
@@ -38,15 +39,17 @@ function counterpartyName(tx: PlaidTransaction): string | undefined {
 // `accountBalance` is the current balance of the source account (from the
 // same /transactions/sync response). Used as an approximate running_balance —
 // see docs/plaid-integration.md §5.5 for why this is acceptable.
-export function plaidTxToInternal(
+export async function plaidTxToInternal(
   plaidTx: PlaidTransaction,
   accountBalance: number | null,
-): Transaction {
+): Promise<Transaction> {
   // Plaid: positive = outflow. Teller convention (which our rules use):
   // negative = outflow. Flip the sign.
   const signedAmount = -plaidTx.amount;
 
   const counterparty = counterpartyName(plaidTx);
+  const override = await getOverride(counterparty);
+  const category = override ?? mapCategory(plaidTx.personal_finance_category?.detailed);
 
   return {
     id: plaidTx.transaction_id,
@@ -58,7 +61,7 @@ export function plaidTxToInternal(
     type: plaidTx.payment_channel === 'other' ? 'transfer' : 'card_payment',
     running_balance: accountBalance == null ? null : accountBalance.toFixed(2),
     details: {
-      category: mapCategory(plaidTx.personal_finance_category?.detailed),
+      category,
       ...(counterparty ? { counterparty: { name: counterparty, type: 'organization' } } : {}),
     },
   };

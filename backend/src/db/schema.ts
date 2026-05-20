@@ -45,3 +45,12 @@ export const plaidItems = pgTable('plaid_items', {
   disabled: boolean('disabled').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// User-defined category overrides. Looked up by lowercased merchant name;
+// overrides Plaid's personal_finance_category mapping when present.
+// Phase 1 single-user — multi-user split adds user_id column in T2.2.
+export const categoryOverrides = pgTable('category_overrides', {
+  merchantName: text('merchant_name').primaryKey(), // already lowercased on insert
+  category: text('category').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
