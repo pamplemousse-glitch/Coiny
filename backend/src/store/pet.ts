@@ -2,6 +2,7 @@ import { desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/client.js';
 import { petState, reactionHistory } from '../db/schema.js';
+import { computeMoodWithDecay } from '../health/decay.js';
 import type { Reaction } from '../reactions/types.js';
 
 export const PetGoalsSchema = z.object({
@@ -52,7 +53,7 @@ export async function getState(): Promise<PetState> {
 
   return {
     healthScore: row.healthScore,
-    mood: row.mood,
+    mood: computeMoodWithDecay(row.mood, row.lastReactionAt),
     lastReactionAt: row.lastReactionAt?.toISOString() ?? null,
     reactionHistory: history.map((h) => ({
       at: h.at.toISOString(),
