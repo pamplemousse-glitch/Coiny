@@ -14,6 +14,7 @@ vibration, and sound.
 - `docs/stack-map.md` — complete visual map: every hardware component + software layer with purpose
 - `docs/launch-readiness.md` — actionable blocker checklist split by MVP-Prototype vs Full Launch
 - `docs/14-day-sprint.md` — hyper-aggressive prototype sprint plan with day-by-day checkboxes (realistic: 4-6 weeks)
+- `docs/3-day-sprint.md` — 72-hour software-only demo plan (iOS Simulator, no hardware, no Apple Dev needed) — $0 cost
 - `docs/architecture.md` — system design
 - `docs/plaid-integration.md` — Plaid API contract reference (auth, webhooks, sync semantics, taxonomy)
 - `docs/security.md` — security model + per-phase checklist
