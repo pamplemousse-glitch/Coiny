@@ -25,10 +25,7 @@ export async function setCursor(itemId: string, cursor: string): Promise<void> {
 }
 
 export async function markInitialSyncComplete(itemId: string): Promise<void> {
-  await db()
-    .update(plaidItems)
-    .set({ initialSyncComplete: true })
-    .where(eq(plaidItems.itemId, itemId));
+  await db().update(plaidItems).set({ initialSyncComplete: true }).where(eq(plaidItems.itemId, itemId));
 }
 
 export async function disableItem(itemId: string): Promise<void> {

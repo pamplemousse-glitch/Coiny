@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { resetDatabase } from './db-helper.js';
 
 describe('GET /api/pets', () => {
-  beforeEach(async () => { await resetDatabase(); });
+  beforeEach(async () => {
+    await resetDatabase();
+  });
 
   it('returns pet state shape', async () => {
     const { buildApp } = await import('../src/server.js');
@@ -22,7 +24,9 @@ describe('GET /api/pets', () => {
 });
 
 describe('PUT /api/pets/goals', () => {
-  beforeEach(async () => { await resetDatabase(); });
+  beforeEach(async () => {
+    await resetDatabase();
+  });
 
   it('updates goals and returns them', async () => {
     const { buildApp } = await import('../src/server.js');
@@ -81,7 +85,9 @@ describe('PUT /api/pets/goals', () => {
 });
 
 describe('GET /api/spending', () => {
-  beforeEach(async () => { await resetDatabase(); });
+  beforeEach(async () => {
+    await resetDatabase();
+  });
 
   it('returns an array', async () => {
     const { buildApp } = await import('../src/server.js');
@@ -96,7 +102,9 @@ describe('GET /api/spending', () => {
 });
 
 describe('GET /health', () => {
-  beforeEach(async () => { await resetDatabase(); });
+  beforeEach(async () => {
+    await resetDatabase();
+  });
 
   it('returns { ok: true }', async () => {
     const { buildApp } = await import('../src/server.js');

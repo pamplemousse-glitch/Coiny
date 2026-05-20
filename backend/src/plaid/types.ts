@@ -16,18 +16,18 @@ export type PlaidCounterparty = {
 export type PlaidTransaction = {
   transaction_id: string;
   account_id: string;
-  amount: number;                  // Plaid: positive = outflow
+  amount: number; // Plaid: positive = outflow
   iso_currency_code: string | null;
   unofficial_currency_code: string | null;
-  date: string;                    // YYYY-MM-DD
+  date: string; // YYYY-MM-DD
   authorized_date: string | null;
-  name: string;                    // raw description
+  name: string; // raw description
   merchant_name: string | null;
   pending: boolean;
   payment_channel: 'online' | 'in store' | 'other';
   personal_finance_category: PlaidPfc | null;
   counterparties?: PlaidCounterparty[];
-  category?: string[] | null;      // legacy taxonomy fallback
+  category?: string[] | null; // legacy taxonomy fallback
 };
 
 export type PlaidAccountBalance = {

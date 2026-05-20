@@ -1,20 +1,15 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { verifyPlaidSignature } from '../plaid/signature.js';
-import { transactionsSync } from '../plaid/client.js';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { deltaForEvent } from '../health/score.js';
 import { plaidTxToInternal } from '../plaid/adapter.js';
-import { PlaidApiError, type PlaidAccount, type PlaidWebhookEnvelope } from '../plaid/types.js';
-import { evaluate } from '../rules/engine.js';
+import { transactionsSync } from '../plaid/client.js';
+import { verifyPlaidSignature } from '../plaid/signature.js';
+import { type PlaidAccount, PlaidApiError, type PlaidWebhookEnvelope } from '../plaid/types.js';
 import { dispatchReaction } from '../reactions/dispatch.js';
+import { evaluate } from '../rules/engine.js';
 import { claimEvent } from '../store/events.js';
+import { disableItem, getItem, markInitialSyncComplete, setCursor } from '../store/items.js';
 import { applyHealthDelta, getGoals, recordReaction } from '../store/pet.js';
 import { persistTransactions } from '../store/transactions.js';
-import {
-  disableItem,
-  getItem,
-  markInitialSyncComplete,
-  setCursor,
-} from '../store/items.js';
-import { deltaForEvent } from '../health/score.js';
 
 // Webhook code dispatch — see docs/plaid-integration.md §6.
 const SYNC_TRIGGERS = new Set(['SYNC_UPDATES_AVAILABLE', 'DEFAULT_UPDATE']);
@@ -22,11 +17,11 @@ const SYNC_TRIGGERS = new Set(['SYNC_UPDATES_AVAILABLE', 'DEFAULT_UPDATE']);
 export function registerPlaidWebhook(app: FastifyInstance): void {
   app.register(async (scope) => {
     // We need the raw body bytes for the SHA-256 in the JWT payload.
-    scope.addContentTypeParser('application/json', { parseAs: 'buffer' }, function (_req, body, done) {
+    scope.addContentTypeParser('application/json', { parseAs: 'buffer' }, (_req, body, done) => {
       done(null, body);
     });
 
-    scope.post('/webhooks/plaid', async function (req: FastifyRequest, reply: FastifyReply) {
+    scope.post('/webhooks/plaid', async (req: FastifyRequest, reply: FastifyReply) => {
       const rawBody = req.body as Buffer;
       const signatureHeader = req.headers['plaid-verification'] as string | undefined;
 
@@ -44,11 +39,14 @@ export function registerPlaidWebhook(app: FastifyInstance): void {
         return reply.status(400).send({ error: 'Bad Request' });
       }
 
-      req.log.info({
-        webhook_type: envelope.webhook_type,
-        webhook_code: envelope.webhook_code,
-        item_id: envelope.item_id,
-      }, 'plaid webhook verified');
+      req.log.info(
+        {
+          webhook_type: envelope.webhook_type,
+          webhook_code: envelope.webhook_code,
+          item_id: envelope.item_id,
+        },
+        'plaid webhook verified',
+      );
 
       // Always ack fast; do the work async.
       reply.status(200).send({ ok: true });
@@ -116,7 +114,7 @@ async function syncItem(
   // Loop until has_more is false. On mutation-during-pagination error,
   // restart the entire loop from originalCursor.
   for (;;) {
-    let res;
+    let res: Awaited<ReturnType<typeof transactionsSync>>;
     try {
       res = await transactionsSync({
         access_token: item.accessToken,
@@ -138,11 +136,14 @@ async function syncItem(
     cursor = res.next_cursor;
 
     if (res.modified.length > 0 || res.removed.length > 0) {
-      app.log.info({
-        item_id: item.itemId,
-        modified: res.modified.length,
-        removed: res.removed.length,
-      }, 'plaid sync delta — ignoring modified/removed in phase 1');
+      app.log.info(
+        {
+          item_id: item.itemId,
+          modified: res.modified.length,
+          removed: res.removed.length,
+        },
+        'plaid sync delta — ignoring modified/removed in phase 1',
+      );
     }
 
     if (!res.has_more) break;
@@ -155,19 +156,20 @@ async function syncItem(
   // Adapt all txs once — needed both for persistence (subscription detection)
   // and (post-initial) for rule evaluation.
   const adapted = await Promise.all(
-    allAdded.map((plaidTx) =>
-      plaidTxToInternal(plaidTx, accountBalances.get(plaidTx.account_id) ?? null),
-    ),
+    allAdded.map((plaidTx) => plaidTxToInternal(plaidTx, accountBalances.get(plaidTx.account_id) ?? null)),
   );
 
   // Persist for subscription detection. Idempotent via onConflictDoNothing.
   await persistTransactions(adapted);
 
   if (!item.initialSyncComplete) {
-    app.log.info({
-      item_id: item.itemId,
-      transactions: allAdded.length,
-    }, 'plaid initial sync — ingesting without rule evaluation');
+    app.log.info(
+      {
+        item_id: item.itemId,
+        transactions: allAdded.length,
+      },
+      'plaid initial sync — ingesting without rule evaluation',
+    );
     await markInitialSyncComplete(item.itemId);
     return;
   }

@@ -12,16 +12,16 @@ import type { StoredTransaction } from '../store/transactions.js';
 
 export type Subscription = {
   merchantName: string;
-  cadenceDays: number;     // median gap (rounded)
-  amount: number;          // absolute, dollars
+  cadenceDays: number; // median gap (rounded)
+  amount: number; // absolute, dollars
   count: number;
-  lastDate: string;        // YYYY-MM-DD
+  lastDate: string; // YYYY-MM-DD
 };
 
 export const MIN_OCCURRENCES = 3;
 export const MIN_CADENCE_DAYS = 25;
 export const MAX_CADENCE_DAYS = 35;
-export const AMOUNT_TOLERANCE_PCT = 0.10;
+export const AMOUNT_TOLERANCE_PCT = 0.1;
 
 function median(nums: number[]): number {
   if (nums.length === 0) return 0;

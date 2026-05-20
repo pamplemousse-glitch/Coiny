@@ -16,16 +16,32 @@ const configSchema = z
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {
       if (!data.PLAID_CLIENT_ID) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['PLAID_CLIENT_ID'], message: 'PLAID_CLIENT_ID required in production' });
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['PLAID_CLIENT_ID'],
+          message: 'PLAID_CLIENT_ID required in production',
+        });
       }
       if (!data.PLAID_SECRET) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['PLAID_SECRET'], message: 'PLAID_SECRET required in production' });
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['PLAID_SECRET'],
+          message: 'PLAID_SECRET required in production',
+        });
       }
       if (!data.PLAID_WEBHOOK_URL) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['PLAID_WEBHOOK_URL'], message: 'PLAID_WEBHOOK_URL required in production' });
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['PLAID_WEBHOOK_URL'],
+          message: 'PLAID_WEBHOOK_URL required in production',
+        });
       }
       if (!data.DATABASE_URL) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['DATABASE_URL'], message: 'DATABASE_URL required in production' });
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['DATABASE_URL'],
+          message: 'DATABASE_URL required in production',
+        });
       }
     }
   });

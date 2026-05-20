@@ -13,11 +13,7 @@ export const FLOOR = 20;
 const MS_PER_HOUR = 60 * 60 * 1000;
 const MS_PER_DAY = 24 * MS_PER_HOUR;
 
-export function computeMoodWithDecay(
-  storedMood: number,
-  lastReactionAt: Date | null,
-  now: Date = new Date(),
-): number {
+export function computeMoodWithDecay(storedMood: number, lastReactionAt: Date | null, now: Date = new Date()): number {
   if (!lastReactionAt) return storedMood;
 
   const elapsedMs = now.getTime() - lastReactionAt.getTime();

@@ -1,5 +1,5 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { getState, updateGoals, PetGoalsSchema, getGoals } from '../store/pet.js';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { getGoals, getState, PetGoalsSchema, updateGoals } from '../store/pet.js';
 
 export function registerPetsApi(app: FastifyInstance): void {
   app.get('/api/pets', async () => {

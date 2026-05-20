@@ -1,18 +1,18 @@
-import Fastify from 'fastify';
-import rateLimit from '@fastify/rate-limit';
 import { fileURLToPath } from 'node:url';
-import { config } from './config.js';
-import { loggerOptions } from './plugins/logger.js';
-import { registerErrorHandler } from './plugins/error-handler.js';
-import { registerPlaidWebhook } from './webhook/plaid.js';
-import { registerPlaidLinkApi } from './api/plaid-link.js';
-import { registerPetsApi } from './api/pets.js';
-import { registerSpendingApi } from './api/spending.js';
-import { registerOverridesApi } from './api/overrides.js';
+import rateLimit from '@fastify/rate-limit';
+import Fastify from 'fastify';
 import { registerDevicesApi } from './api/devices.js';
+import { registerOverridesApi } from './api/overrides.js';
+import { registerPetsApi } from './api/pets.js';
+import { registerPlaidLinkApi } from './api/plaid-link.js';
+import { registerSpendingApi } from './api/spending.js';
 import { registerSubscriptionsApi } from './api/subscriptions.js';
+import { config } from './config.js';
 import { initDb } from './db/client.js';
 import { runMigrations, seedPetStateIfMissing } from './db/migrate.js';
+import { registerErrorHandler } from './plugins/error-handler.js';
+import { loggerOptions } from './plugins/logger.js';
+import { registerPlaidWebhook } from './webhook/plaid.js';
 
 async function buildApp() {
   await initDb();
@@ -53,7 +53,9 @@ async function start() {
     await app.listen({ port: config.PORT, host: '0.0.0.0' });
     app.log.info('Coiny backend ready');
     if (!config.PLAID_CLIENT_ID || !config.PLAID_SECRET) {
-      app.log.warn('⚠ PLAID_CLIENT_ID/PLAID_SECRET not set — Plaid endpoints will fail. Set in Fly secrets or Keychain.');
+      app.log.warn(
+        '⚠ PLAID_CLIENT_ID/PLAID_SECRET not set — Plaid endpoints will fail. Set in Fly secrets or Keychain.',
+      );
     }
   } catch (err) {
     app.log.error(err);

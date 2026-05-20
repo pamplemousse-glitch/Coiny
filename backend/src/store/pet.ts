@@ -44,11 +44,7 @@ async function readPetRow() {
 export async function getState(): Promise<PetState> {
   const [row, history] = await Promise.all([
     readPetRow(),
-    db()
-      .select()
-      .from(reactionHistory)
-      .orderBy(desc(reactionHistory.at))
-      .limit(MAX_HISTORY),
+    db().select().from(reactionHistory).orderBy(desc(reactionHistory.at)).limit(MAX_HISTORY),
   ]);
 
   return {
@@ -110,10 +106,7 @@ export async function applyHealthDelta(delta: number): Promise<void> {
 export async function recordReaction(eventType: string, reaction: Reaction): Promise<void> {
   const now = new Date();
   await db().insert(reactionHistory).values({ at: now, eventType, reaction });
-  await db()
-    .update(petState)
-    .set({ lastReactionAt: now })
-    .where(eq(petState.id, SINGLETON_ID));
+  await db().update(petState).set({ lastReactionAt: now }).where(eq(petState.id, SINGLETON_ID));
 
   // Prune history beyond MAX_HISTORY to keep the table bounded.
   await db().execute(sql`
