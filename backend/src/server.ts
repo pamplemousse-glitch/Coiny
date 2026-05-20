@@ -4,11 +4,18 @@ import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import { loggerOptions } from './plugins/logger.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
-import { registerTellerWebhook } from './webhook/teller.js';
+import { registerPlaidWebhook } from './webhook/plaid.js';
+import { registerPlaidLinkApi } from './api/plaid-link.js';
 import { registerPetsApi } from './api/pets.js';
 import { registerSpendingApi } from './api/spending.js';
+import { initDb } from './db/client.js';
+import { runMigrations, seedPetStateIfMissing } from './db/migrate.js';
 
 async function buildApp() {
+  await initDb();
+  await runMigrations();
+  await seedPetStateIfMissing();
+
   const app = Fastify({
     logger: {
       level: config.LOG_LEVEL,
@@ -23,7 +30,8 @@ async function buildApp() {
     timeWindow: '1 second',
   });
 
-  registerTellerWebhook(app);
+  registerPlaidWebhook(app);
+  registerPlaidLinkApi(app);
   registerPetsApi(app);
   registerSpendingApi(app);
 
@@ -38,8 +46,8 @@ async function start() {
   try {
     await app.listen({ port: config.PORT, host: '0.0.0.0' });
     app.log.info('Coiny backend ready');
-    if (!config.TELLER_SIGNING_SECRET) {
-      app.log.warn('⚠ TELLER_SIGNING_SECRET not set — webhook endpoint is unauthenticated (warn-mode). Register a webhook in the Teller dashboard to enable signature verification.');
+    if (!config.PLAID_CLIENT_ID || !config.PLAID_SECRET) {
+      app.log.warn('⚠ PLAID_CLIENT_ID/PLAID_SECRET not set — Plaid endpoints will fail. Set in Fly secrets or Keychain.');
     }
   } catch (err) {
     app.log.error(err);

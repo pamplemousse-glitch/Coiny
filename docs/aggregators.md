@@ -1,7 +1,13 @@
 # Coiny — Bank Data Aggregators
 
 How Coiny gets transaction data into the backend. Recommendation, pricing,
-and the rationale for choosing Teller first and adding Plaid in Phase 5.
+and the rationale.
+
+> **Decision updated 2026-05-19**: Coiny switched from **Teller-first → Plaid-in-Phase-5**
+> to **Plaid from the start**. Reasoning recorded in `docs/plaid-swap-plan.md` and
+> the implementation contract in `docs/plaid-integration.md`. The sections below
+> document the original landscape analysis that informed the decision — kept for
+> historical context, not as forward guidance.
 
 ---
 

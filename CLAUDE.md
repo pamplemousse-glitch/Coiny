@@ -1,13 +1,14 @@
 # Coiny — Claude Code Working Conventions
 
 Coiny is a BLE-connected carry device linked to a user's bank account via
-Teller. Reacts to financial behavior with face animations, LED color,
+Plaid. Reacts to financial behavior with face animations, LED color,
 vibration, and sound.
 
 **Read these docs first before any work:**
 - `docs/handoff.md` — current state, what's done, what's not
 - `docs/architecture.md` — system design
-- `docs/phase1-spec.md` — Phase 1 deliverables (if starting backend)
+- `docs/plaid-integration.md` — Plaid API contract reference (auth, webhooks, sync semantics, taxonomy)
+- `docs/plaid-swap-plan.md` — execution plan for the Teller→Plaid migration (in-progress)
 - `docs/security.md` — security model + per-phase checklist
 - `docs/sprint-plan.md` — 7-day sprint cadence
 - `docs/mqtt-topics.md` — BLE command schema
@@ -39,9 +40,9 @@ vibration, and sound.
 
 Examples:
 ```
-feat(backend): add Teller webhook signature verification
+feat(backend): add Plaid webhook signature verification
 fix(rules): correct paycheck threshold from $5000 to $500
-docs(handoff): reflect mTLS auth replacing API key
+docs(handoff): reflect Plaid integration replacing Teller
 chore: bump pino to 9.5.0
 ```
 
@@ -82,12 +83,11 @@ chore: bump pino to 9.5.0
 
 ## Security Rules (NEVER VIOLATE)
 
-1. **Never commit secrets.** `.env` files, `*.pem`, `*.key`, `*.zip` from Teller — all gitignored. If you find a tracked secret, halt and tell the user.
-2. **Never log PII or transaction details.** Log event types + pseudonymous IDs only. See `docs/security.md` § "Logging hygiene".
-3. **Teller webhook signature verification is required** on every webhook in code paths that touch real or sandbox webhooks. Use `crypto.timingSafeEqual`, not `===`. Reject timestamps >3 minutes old.
-4. **Local secrets come from macOS Keychain**, not `.env` files. The loader script is `bin/load-secrets.sh`.
-5. **mTLS cert + key files live OUTSIDE the repo** at `~/Documents/coiny-secrets/teller-sandbox/`. Never copy them into the repo for "convenience."
-6. **No new dependencies without a reason.** Each new package is a supply-chain surface. Prefer Node built-ins (`crypto`, `https`, `node:test`) when sufficient.
+1. **Never commit secrets.** `.env` files, any `*.pem` / `*.key`, vendor cert exports — all gitignored. If you find a tracked secret, halt and tell the user.
+2. **Never log PII or transaction details.** Log event types + pseudonymous IDs (transaction_id, item_id) only. See `docs/security.md` § "Logging hygiene".
+3. **Plaid webhook signature verification is required** on every webhook in code paths that touch sandbox or production webhooks. JWT (ES256) + key cached per `kid` + `request_body_sha256` must match raw body. See `docs/plaid-integration.md` §4.
+4. **Local secrets come from macOS Keychain**, not `.env` files. The loader script is `bin/load-secrets.sh`. Keys: `coiny-plaid-client-id`, `coiny-plaid-sandbox-secret`.
+5. **No new dependencies without a reason.** Each new package is a supply-chain surface. Prefer Node built-ins (`crypto`, `https`, `node:test`) when sufficient.
 
 ---
 
@@ -120,6 +120,6 @@ When adding cross-cutting types (BLE commands, financial events), put them in `s
 
 - **Solo project.** No team. Claude Code writes the code; Antoine handles physical setup (hardware, phone testing, signups).
 - **macOS environment.** Node 22, pnpm 11.1.3, gh CLI, OpenSCAD 2026.04.26, OpenSCAD MCP (already connected).
-- **Sandbox mode.** Teller is in sandbox until Phase 4. No real bank data, no real users. Don't add fake users to "make it feel real" — keep state minimal.
+- **Sandbox mode.** Plaid is in sandbox until Phase 5 (when we go through Plaid's production approval flow). No real bank data, no real users. Don't add fake users to "make it feel real" — keep state minimal. Sandbox credentials in Plaid Link: `user_good` / `pass_good`.
 
 When unsure about scope or whether to add something — **ask, don't assume**. Coiny lives or dies on small consistent decisions; one ambiguous choice today turns into three branches of code by next week.

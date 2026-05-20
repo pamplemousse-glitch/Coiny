@@ -6,19 +6,27 @@ const configSchema = z
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 
-    TELLER_APPLICATION_ID: z.string().min(1),
-    TELLER_CERT_PATH: z.string().min(1),
-    TELLER_KEY_PATH: z.string().min(1),
-    TELLER_SIGNING_SECRET: z.string().default(''),
-    TELLER_ENVIRONMENT: z.enum(['sandbox', 'development', 'production']).default('sandbox'),
+    PLAID_CLIENT_ID: z.string().default(''),
+    PLAID_SECRET: z.string().default(''),
+    PLAID_ENV: z.enum(['sandbox', 'development', 'production']).default('sandbox'),
+    PLAID_WEBHOOK_URL: z.string().default(''),
+
+    DATABASE_URL: z.string().default(''),
   })
   .superRefine((data, ctx) => {
-    if (data.NODE_ENV === 'production' && !data.TELLER_SIGNING_SECRET) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['TELLER_SIGNING_SECRET'],
-        message: 'TELLER_SIGNING_SECRET is required in production',
-      });
+    if (data.NODE_ENV === 'production') {
+      if (!data.PLAID_CLIENT_ID) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['PLAID_CLIENT_ID'], message: 'PLAID_CLIENT_ID required in production' });
+      }
+      if (!data.PLAID_SECRET) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['PLAID_SECRET'], message: 'PLAID_SECRET required in production' });
+      }
+      if (!data.PLAID_WEBHOOK_URL) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['PLAID_WEBHOOK_URL'], message: 'PLAID_WEBHOOK_URL required in production' });
+      }
+      if (!data.DATABASE_URL) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['DATABASE_URL'], message: 'DATABASE_URL required in production' });
+      }
     }
   });
 

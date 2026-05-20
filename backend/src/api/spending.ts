@@ -3,7 +3,8 @@ import { getState } from '../store/pet.js';
 
 export function registerSpendingApi(app: FastifyInstance): void {
   app.get('/api/spending', async () => {
-    return getState().reactionHistory.map(({ at, eventType, reaction }) => ({
+    const state = await getState();
+    return state.reactionHistory.map(({ at, eventType, reaction }) => ({
       at,
       eventType,
       reason: reaction.reason,

@@ -1,18 +1,28 @@
-// Idempotency store — deduplicates Teller webhook events by payload ID.
-// Teller retries unacknowledged webhooks; without this the same transaction
-// would fire multiple reactions.
+import { sql } from 'drizzle-orm';
+import { db } from '../db/client.js';
+import { processedEvents } from '../db/schema.js';
 
-const processedIds = new Set<string>();
 const MAX_IDS = 10_000;
 
-export function isAlreadyProcessed(id: string): boolean {
-  return processedIds.has(id);
-}
+// Atomically claim an event id. Returns true if this caller won (i.e., the row
+// was newly inserted); false if another caller already claimed it. Eliminates
+// the check-then-act race that two reads + two writes would have.
+export async function claimEvent(id: string): Promise<boolean> {
+  const inserted = await db()
+    .insert(processedEvents)
+    .values({ id })
+    .onConflictDoNothing()
+    .returning({ id: processedEvents.id });
 
-export function markProcessed(id: string): void {
-  if (processedIds.size >= MAX_IDS) {
-    const oldest = processedIds.values().next().value as string;
-    processedIds.delete(oldest);
-  }
-  processedIds.add(id);
+  if (inserted.length === 0) return false;
+
+  // Cap the table at MAX_IDS rows. FIFO eviction by processed_at.
+  await db().execute(sql`
+    DELETE FROM ${processedEvents}
+    WHERE id NOT IN (
+      SELECT id FROM ${processedEvents} ORDER BY processed_at DESC LIMIT ${MAX_IDS}
+    )
+  `);
+
+  return true;
 }

@@ -6,8 +6,7 @@
 
 set -e
 
-export TELLER_APPLICATION_ID=$(security find-generic-password -a "$USER" -s "coiny-teller-application-id" -w)
-export TELLER_SIGNING_SECRET=$(security find-generic-password -a "$USER" -s "coiny-teller-signing-secret" -w 2>/dev/null || echo "")
-export TELLER_CERT_PATH="$HOME/Documents/coiny-secrets/teller-sandbox/certificate.pem"
-export TELLER_KEY_PATH="$HOME/Documents/coiny-secrets/teller-sandbox/private_key.pem"
-export TELLER_ENVIRONMENT=sandbox
+export PLAID_CLIENT_ID=$(security find-generic-password -a "$USER" -s "coiny-plaid-client-id" -w)
+export PLAID_SECRET=$(security find-generic-password -a "$USER" -s "coiny-plaid-sandbox-secret" -w)
+export PLAID_ENV=sandbox
+export PLAID_WEBHOOK_URL="${PLAID_WEBHOOK_URL:-http://localhost:3000/webhooks/plaid}"
