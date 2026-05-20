@@ -15,7 +15,7 @@ export function verifyTellerSignature(
   if (!signatureHeader) return { ok: false, reason: 'missing_header' };
 
   const parts = Object.fromEntries(
-    signatureHeader.split(',').map((part) => part.split('=') as [string, string]),
+    signatureHeader.split(',').map((part) => part.split('=', 2) as [string, string]),
   );
 
   const timestamp = parts['t'];

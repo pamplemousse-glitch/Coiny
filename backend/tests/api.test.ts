@@ -73,3 +73,16 @@ describe('GET /api/spending', () => {
     await app.close();
   });
 });
+
+describe('GET /health', () => {
+  it('returns { ok: true }', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/health' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true });
+
+    await app.close();
+  });
+});
