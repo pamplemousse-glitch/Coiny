@@ -17,7 +17,7 @@ export async function resetDatabase(): Promise<void> {
     initialized = true;
   }
 
-  await db().execute(sql`TRUNCATE pet_state, reaction_history, processed_events, plaid_items, category_overrides, device_tokens RESTART IDENTITY`);
+  await db().execute(sql`TRUNCATE pet_state, reaction_history, processed_events, plaid_items, category_overrides, device_tokens, transactions RESTART IDENTITY`);
   await seedPetStateIfMissing();
   _resetOverrideCache();
 }

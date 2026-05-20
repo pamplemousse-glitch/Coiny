@@ -46,6 +46,19 @@ export const plaidItems = pgTable('plaid_items', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Persisted transaction history — primary source for subscription detection.
+// Phase 1 single-user; multi-user split adds user_id in T2.2.
+// `amount` is signed: negative = outflow (Teller convention preserved).
+export const transactions = pgTable('transactions', {
+  transactionId: text('transaction_id').primaryKey(),
+  accountId: text('account_id').notNull(),
+  merchantName: text('merchant_name'),
+  amount: text('amount').notNull(), // stored as signed decimal string
+  date: text('date').notNull(), // YYYY-MM-DD
+  category: text('category'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Expo push tokens. Phase 1 single-user — multi-user split adds user_id in T2.2.
 // `token` is the Expo push notification token; `platform` is 'ios' | 'android'.
 export const deviceTokens = pgTable('device_tokens', {

@@ -10,6 +10,7 @@ import { registerPetsApi } from './api/pets.js';
 import { registerSpendingApi } from './api/spending.js';
 import { registerOverridesApi } from './api/overrides.js';
 import { registerDevicesApi } from './api/devices.js';
+import { registerSubscriptionsApi } from './api/subscriptions.js';
 import { initDb } from './db/client.js';
 import { runMigrations, seedPetStateIfMissing } from './db/migrate.js';
 
@@ -38,6 +39,7 @@ async function buildApp() {
   registerSpendingApi(app);
   registerOverridesApi(app);
   registerDevicesApi(app);
+  registerSubscriptionsApi(app);
 
   app.get('/health', async () => ({ ok: true }));
 

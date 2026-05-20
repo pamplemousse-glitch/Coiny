@@ -7,6 +7,7 @@ import { evaluate } from '../rules/engine.js';
 import { dispatchReaction } from '../reactions/dispatch.js';
 import { claimEvent } from '../store/events.js';
 import { applyHealthDelta, getGoals, recordReaction } from '../store/pet.js';
+import { persistTransactions } from '../store/transactions.js';
 import {
   disableItem,
   getItem,
@@ -151,6 +152,17 @@ async function syncItem(
   // re-processes added transactions but transaction-level idempotency dedupes.
   if (cursor) await setCursor(item.itemId, cursor);
 
+  // Adapt all txs once — needed both for persistence (subscription detection)
+  // and (post-initial) for rule evaluation.
+  const adapted = await Promise.all(
+    allAdded.map((plaidTx) =>
+      plaidTxToInternal(plaidTx, accountBalances.get(plaidTx.account_id) ?? null),
+    ),
+  );
+
+  // Persist for subscription detection. Idempotent via onConflictDoNothing.
+  await persistTransactions(adapted);
+
   if (!item.initialSyncComplete) {
     app.log.info({
       item_id: item.itemId,
@@ -160,14 +172,11 @@ async function syncItem(
     return;
   }
 
-  if (allAdded.length === 0) return;
+  if (adapted.length === 0) return;
 
   const goals = await getGoals();
 
-  for (const plaidTx of allAdded) {
-    const balance = accountBalances.get(plaidTx.account_id) ?? null;
-    const tx = await plaidTxToInternal(plaidTx, balance);
-
+  for (const tx of adapted) {
     // Transaction-level idempotency: skip if we've already processed this
     // transaction_id (e.g., from a redelivered webhook).
     if (!(await claimEvent(tx.id))) {
