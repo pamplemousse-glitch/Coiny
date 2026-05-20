@@ -36,7 +36,8 @@ export function registerTellerWebhook(app: FastifyInstance): void {
       try {
         const parsed = JSON.parse(rawBody.toString('utf8')) as unknown;
         payload = TellerWebhookPayloadSchema.parse(parsed);
-      } catch {
+      } catch (err) {
+        req.log.warn({ err }, 'webhook body parse or validation failed');
         return reply.status(400).send({ error: 'Bad Request' });
       }
 
@@ -44,25 +45,29 @@ export function registerTellerWebhook(app: FastifyInstance): void {
 
       // Process async after responding — Teller expects a fast 200.
       setImmediate(() => {
-        if (payload.type === 'webhook.test') {
-          app.log.info('Teller webhook test received — pipeline is healthy');
-          return;
-        }
-
-        if (isAlreadyProcessed(payload.id)) {
-          req.log.warn({ id: payload.id }, 'duplicate webhook payload — skipping');
-          return;
-        }
-        markProcessed(payload.id);
-
-        const transactions = payload.payload?.transactions ?? [];
-        for (const tx of transactions) {
-          const match = evaluate(tx);
-          if (match) {
-            applyHealthDelta(deltaForEvent(match.name));
-            recordReaction(match.name, match.reaction);
-            dispatchReaction(match.reaction);
+        try {
+          if (payload.type === 'webhook.test') {
+            app.log.info('Teller webhook test received — pipeline is healthy');
+            return;
           }
+
+          if (isAlreadyProcessed(payload.id)) {
+            req.log.warn({ id: payload.id }, 'duplicate webhook payload — skipping');
+            return;
+          }
+          markProcessed(payload.id);
+
+          const transactions = payload.payload?.transactions ?? [];
+          for (const tx of transactions) {
+            const match = evaluate(tx);
+            if (match) {
+              applyHealthDelta(deltaForEvent(match.name));
+              recordReaction(match.name, match.reaction);
+              dispatchReaction(match.reaction);
+            }
+          }
+        } catch (err) {
+          app.log.error({ err }, 'unhandled error processing webhook payload');
         }
       });
     });

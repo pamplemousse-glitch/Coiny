@@ -1,6 +1,6 @@
 export const loggerOptions = {
   serializers: {
-    req(req: { method: string; url: string; headers: Record<string, string> }) {
+    req(req: { method: string; url: string }) {
       return {
         method: req.method,
         url: req.url,
