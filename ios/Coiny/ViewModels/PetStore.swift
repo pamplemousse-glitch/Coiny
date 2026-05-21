@@ -22,15 +22,18 @@ final class PetStore {
         return nil
     }
 
-    /// Fetches pet state from `/api/pets`. Idempotent — safe to call repeatedly.
+    /// Fetches pet state from `/api/pets`.
+    /// Shows a loading spinner only on the very first load; subsequent calls
+    /// refresh silently so the pet view doesn't flicker during polling.
     func refresh() async {
         if case .loading = state { return }
-        state = .loading
+        let isFirstLoad = pet == nil
+        if isFirstLoad { state = .loading }
         do {
-            let pet = try await API.shared.getPetState()
-            state = .loaded(pet)
+            let newPet = try await API.shared.getPetState()
+            state = .loaded(newPet)
         } catch {
-            state = .failed(error.localizedDescription)
+            if isFirstLoad { state = .failed(error.localizedDescription) }
         }
     }
 }
