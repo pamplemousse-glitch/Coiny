@@ -105,6 +105,7 @@ chore: bump pino to 9.5.0
 
 - `backend/` — Fastify TS server (Phase 1)
 - `firmware/` — nRF52840 + Zephyr (nRF Connect SDK) — Phase 2. See `docs/tech-stack.md` §1 for the rationale (ESP32-S3 was the original plan, swapped 2026-05-20 for battery life).
+- `ios/` — Native Swift + SwiftUI app (XcodeGen-managed). See `ios/README.md` for setup. Replaces the RN-based `mobile/` over time; both coexist during transition.
 - `mobile/` — Expo React Native (Phase 3)
 - `shared/` — cross-package TS types (BLE schema, pet state)
 - `hardware/case/` — OpenSCAD CAD files
