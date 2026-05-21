@@ -48,7 +48,7 @@ export function detectSubscriptions(txs: StoredTransaction[]): Subscription[] {
 
   const subs: Subscription[] = [];
 
-  for (const [merchantKey, group] of groups) {
+  for (const [_merchantKey, group] of groups) {
     if (group.length < MIN_OCCURRENCES) continue;
 
     const amounts = group.map((tx) => Math.abs(parseFloat(tx.amount)));

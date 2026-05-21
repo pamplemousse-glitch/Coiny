@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
+import { registerDebugApi } from './api/debug.js';
 import { registerDevicesApi } from './api/devices.js';
 import { registerOverridesApi } from './api/overrides.js';
 import { registerPetsApi } from './api/pets.js';
@@ -35,6 +36,7 @@ async function buildApp() {
 
   registerPlaidWebhook(app);
   registerPlaidLinkApi(app);
+  if (config.PLAID_ENV === 'sandbox') registerDebugApi(app);
   registerPetsApi(app);
   registerSpendingApi(app);
   registerOverridesApi(app);

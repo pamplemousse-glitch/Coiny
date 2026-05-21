@@ -80,12 +80,19 @@ export function transactionsSync(args: {
   count?: number;
 }): Promise<TransactionsSyncResponse> {
   const body: Record<string, unknown> = { access_token: args.access_token, count: args.count ?? 100 };
-  if (args.cursor) body['cursor'] = args.cursor;
+  if (args.cursor) body.cursor = args.cursor;
   return plaidPost('/transactions/sync', body);
 }
 
 export function webhookVerificationKeyGet(keyId: string): Promise<WebhookVerificationKeyGetResponse> {
   return plaidPost('/webhook_verification_key/get', { key_id: keyId });
+}
+
+export function itemWebhookUpdate(args: { access_token: string; webhook: string }): Promise<{ request_id: string }> {
+  return plaidPost('/item/webhook/update', {
+    access_token: args.access_token,
+    webhook: args.webhook,
+  });
 }
 
 export function sandboxItemFireWebhook(args: {
