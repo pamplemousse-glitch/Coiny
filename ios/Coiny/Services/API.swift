@@ -88,6 +88,13 @@ actor API {
         return try await post("/api/plaid/exchange-token", body: Body(public_token: publicToken))
     }
 
+    /// `POST /api/devices/push-token`
+    @discardableResult
+    func registerDeviceToken(_ hexToken: String) async throws -> EmptyResponse {
+        struct Body: Encodable { let token: String; let platform: String }
+        return try await post("/api/devices/push-token", body: Body(token: hexToken, platform: "ios"))
+    }
+
     /// `GET /health`
     func health() async throws -> HealthResponse {
         try await get("/health")

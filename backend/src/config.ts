@@ -12,6 +12,11 @@ const configSchema = z
     PLAID_WEBHOOK_URL: z.string().default(''),
 
     DATABASE_URL: z.string().default(''),
+
+    APNS_KEY_ID: z.string().default(''),
+    APNS_TEAM_ID: z.string().default(''),
+    APNS_KEY: z.string().default(''),
+    APNS_BUNDLE_ID: z.string().default('app.coiny.ios'),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {
