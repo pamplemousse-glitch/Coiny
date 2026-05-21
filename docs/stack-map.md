@@ -69,7 +69,7 @@ Every layer labeled with its tools.
    ║  │  • 1-2 tactile buttons      │ ║   ║  │ Bank:  Plaid Link iOS SDK       │ ║
    ║  │  • 200mAh LiPo + USB-C PD   │ ║   ║  │ BLE:   CoreBluetooth (native)   │ ║
    ║  │  • MAX77654 integrated PMIC │ ║   ║  │ Push:  Direct APNs              │ ║
-   ║  │  • Knowles I2S MEMS speaker │ ║   ║  │ Obs:   Datadog RUM iOS SDK      │ ║
+   ║  │  • MAX98357A + 8Ω speaker   │ ║   ║  │ Obs:   Datadog RUM iOS SDK      │ ║
    ║  │  • Chip antenna + RF shield │ ║   ║  ├─────────────────────────────────┤ ║
    ║  ├─────────────────────────────┤ ║   ║  │ Android — Kotlin + Jetpack      │ ║
    ║  │ FIRMWARE                    │ ║   ║  │   Compose + Coroutines + Hilt   │ ║
@@ -237,7 +237,7 @@ Every layer labeled with its tools.
 | **RGB LED** | APA102 single | Better color accuracy + faster refresh than WS2812 |
 | **Battery** | 200mAh single-cell LiPo | Right size for coin form, USB-C PD rechargeable |
 | **PMIC** | Maxim MAX77654 | Integrated charger + fuel gauge + 3 LDOs (one chip) |
-| **Speaker** | Knowles SPH0645LM4H-B I2S MEMS (or omit) | Best quality at lowest power if audio in scope |
+| **Speaker** | MAX98357A I2S amp + 8Ω dynamic speaker (or omit) | SPH0645LM4H-B is a mic; MAX98357A drives a passive speaker over I2S directly |
 | **Antenna** | Saluki chip antenna + matching network | Omnidirectional, well-matched 2.4GHz |
 | **RF shield** | Stamped sheet metal can over radio | Eases FCC certification, reduces interference |
 | **Case** | PC/ABS injection-molded | Premium feel, polished or soft-touch finish |
