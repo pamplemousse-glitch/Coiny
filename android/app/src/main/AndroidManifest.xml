@@ -22,10 +22,7 @@
         android:theme="@style/Theme.Coiny">
 
         <!-- nosemgrep: java.android.security.exported_activity.exported_activity -->
-        <!-- Launcher activity must be exported (Android 12+ requirement); false positive -->
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
+        <activity android:name=".MainActivity" android:exported="true"
             android:theme="@style/Theme.Coiny">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
