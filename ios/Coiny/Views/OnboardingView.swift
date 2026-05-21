@@ -235,10 +235,14 @@ private struct LinkPresenter: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ vc: UIViewController, context: Context) {
-        guard !context.coordinator.hasOpened, vc.presentedViewController == nil else { return }
+        guard !context.coordinator.hasOpened else { return }
         context.coordinator.hasOpened = true
-        handler.open(presentUsing: .custom { linkVC, completion in
-            vc.present(linkVC, animated: true, completion: completion)
+        handler.open(presentUsing: .custom { linkVC in
+            guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  let window = scene.keyWindow else { return }
+            var presenter: UIViewController = window.rootViewController!
+            while let next = presenter.presentedViewController { presenter = next }
+            presenter.present(linkVC, animated: true)
         })
     }
 
