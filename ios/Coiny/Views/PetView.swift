@@ -3,6 +3,7 @@ import SwiftUI
 struct PetView: View {
     @Environment(PetStore.self) private var store
     @State private var celebrating = false
+    @State private var sadTriggered = false
 
     var body: some View {
         NavigationStack {
@@ -21,10 +22,19 @@ struct PetView: View {
         }
         .onChange(of: store.pet?.lastReactionAt) { oldValue, newValue in
             guard let newValue, let oldValue, newValue != oldValue else { return }
-            celebrating = true
-            Task {
-                try? await Task.sleep(for: .seconds(3))
-                celebrating = false
+            let animation = store.pet?.reactionHistory.first?.reaction.animation ?? "neutral"
+            if animation == "celebrate" || animation == "happy" {
+                celebrating = true
+                Task {
+                    try? await Task.sleep(for: .seconds(3))
+                    celebrating = false
+                }
+            } else if animation == "sad" || animation == "concerned" || animation == "sleeping" {
+                sadTriggered = true
+                Task {
+                    try? await Task.sleep(for: .seconds(4))
+                    sadTriggered = false
+                }
             }
         }
     }
@@ -37,7 +47,7 @@ struct PetView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case let .loaded(pet):
-            PetLoadedView(pet: pet, celebrating: celebrating)
+            PetLoadedView(pet: pet, celebrating: celebrating, sadTriggered: sadTriggered)
 
         case let .failed(message):
             ContentUnavailableView {
@@ -57,6 +67,7 @@ struct PetView: View {
 private struct PetLoadedView: View {
     let pet: PetState
     let celebrating: Bool
+    let sadTriggered: Bool
 
     private var moodSymbol: String {
         if celebrating { return "face.smiling.inverse" }
@@ -93,6 +104,11 @@ private struct PetLoadedView: View {
                     // celebrate bounce — compounds with breathing scale
                     .scaleEffect(celebrating ? 1.1 : 1.0)
                     .animation(.spring(response: 0.35, dampingFraction: 0.45), value: celebrating)
+                    // sad droop — shift down + desaturate
+                    .offset(y: sadTriggered ? 14 : 0)
+                    .animation(.easeInOut(duration: 0.9), value: sadTriggered)
+                    .saturation(sadTriggered ? 0.25 : 1.0)
+                    .animation(.easeInOut(duration: 0.9), value: sadTriggered)
                     .onAppear { breathing = true }
                     .padding(.top, 32)
                     .accessibilityLabel("Pet mood: \(pet.mood) out of 100")
@@ -159,7 +175,6 @@ private struct PetLoadedView: View {
 }
 
 #Preview("Loaded - happy") {
-    let store = PetStore()
-    return PetView()
-        .environment(store)
+    PetView()
+        .environment(PetStore())
 }

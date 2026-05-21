@@ -3,10 +3,29 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(PetStore.self) private var store
     @AppStorage("onboardingComplete") private var onboardingComplete: Bool = false
+    @AppStorage("bankLinked") private var bankLinked: Bool = false
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("Bank account") {
+                    if bankLinked {
+                        LabeledContent("Status") {
+                            Label("Linked", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                        }
+                        Button("Unlink bank", role: .destructive) {
+                            bankLinked = false
+                            onboardingComplete = false
+                        }
+                    } else {
+                        LabeledContent("Status") {
+                            Text("Not linked")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
                 if let goals = store.pet?.goals {
                     Section("Current goals") {
                         LabeledContent("Savings target") {
