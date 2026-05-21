@@ -12,8 +12,8 @@ import { registerSubscriptionsApi } from './api/subscriptions.js';
 import { config } from './config.js';
 import { initDb } from './db/client.js';
 import { runMigrations } from './db/migrate.js';
-import { registerErrorHandler } from './plugins/error-handler.js';
 import { registerAuthPlugin } from './plugins/auth.js';
+import { registerErrorHandler } from './plugins/error-handler.js';
 import { loggerOptions } from './plugins/logger.js';
 import { registerPlaidWebhook } from './webhook/plaid.js';
 

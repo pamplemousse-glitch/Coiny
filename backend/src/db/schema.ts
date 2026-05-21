@@ -35,10 +35,7 @@ export const sessions = pgTable(
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   },
-  (t) => [
-    uniqueIndex('sessions_token_hash_idx').on(t.tokenHash),
-    index('sessions_user_id_idx').on(t.userId),
-  ],
+  (t) => [uniqueIndex('sessions_token_hash_idx').on(t.tokenHash), index('sessions_user_id_idx').on(t.userId)],
 );
 
 export const petState = pgTable('pet_state', {

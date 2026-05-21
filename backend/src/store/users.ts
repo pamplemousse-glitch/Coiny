@@ -5,10 +5,7 @@ import { petState, users } from '../db/schema.js';
 
 export type UserRow = typeof users.$inferSelect;
 
-export async function findOrCreateUser(args: {
-  appleSub: string;
-  email?: string | null;
-}): Promise<string> {
+export async function findOrCreateUser(args: { appleSub: string; email?: string | null }): Promise<string> {
   const existing = await db().select({ id: users.id }).from(users).where(eq(users.appleSub, args.appleSub));
   if (existing[0]) return existing[0].id;
 

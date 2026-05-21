@@ -23,7 +23,8 @@ function decryptToken(stored: string): string {
   if (parts.length !== 3) return stored;
   const [ivHex, tagHex, ctHex] = parts as [string, string, string];
   const key = Buffer.from(config.DATA_ENCRYPTION_KEY, 'hex');
-  const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
+  // nosemgrep: javascript.node-crypto.security.gcm-no-tag-length — authTagLength option is the Node.js equivalent
+  const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'), { authTagLength: 16 });
   decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
   return decipher.update(Buffer.from(ctHex, 'hex')).toString('utf8') + decipher.final('utf8');
 }

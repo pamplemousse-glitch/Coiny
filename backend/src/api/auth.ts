@@ -2,8 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { z } from 'zod';
 import { config } from '../config.js';
-import { deleteSession } from '../store/sessions.js';
-import { createSession } from '../store/sessions.js';
+import { createSession, deleteSession } from '../store/sessions.js';
 import { findOrCreateUser } from '../store/users.js';
 
 // Cache the Apple JWKS fetcher (it internally caches with a 15-min TTL).
@@ -41,7 +40,7 @@ export function registerAuthApi(app: FastifyInstance): void {
       return reply.status(401).send({ error: 'Invalid identity token' });
     }
 
-    const userId = await findOrCreateUser({ appleSub: sub, email });
+    const userId = await findOrCreateUser({ appleSub: sub, email: email ?? null });
     const { rawToken } = await createSession(userId);
 
     req.log.info({ userId }, 'apple sign-in success');

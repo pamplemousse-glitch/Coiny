@@ -152,7 +152,10 @@ async function syncItem(
   await persistTransactions(userId, adapted);
 
   if (!item.initialSyncComplete) {
-    app.log.info({ item_id: item.itemId, transactions: allAdded.length }, 'plaid initial sync — ingesting without rule evaluation');
+    app.log.info(
+      { item_id: item.itemId, transactions: allAdded.length },
+      'plaid initial sync — ingesting without rule evaluation',
+    );
     await markInitialSyncComplete(item.itemId);
     return;
   }

@@ -16,14 +16,16 @@ export async function createSession(userId: string): Promise<{ rawToken: string;
   const now = new Date();
   const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
 
-  await db().insert(sessions).values({
-    id: sessionId,
-    userId,
-    tokenHash: hashToken(rawToken),
-    createdAt: now,
-    lastUsedAt: now,
-    expiresAt,
-  });
+  await db()
+    .insert(sessions)
+    .values({
+      id: sessionId,
+      userId,
+      tokenHash: hashToken(rawToken),
+      createdAt: now,
+      lastUsedAt: now,
+      expiresAt,
+    });
 
   return { rawToken, sessionId };
 }
@@ -50,5 +52,7 @@ export async function validateSession(rawToken: string): Promise<string | null> 
 }
 
 export async function deleteSession(rawToken: string): Promise<void> {
-  await db().delete(sessions).where(eq(sessions.tokenHash, hashToken(rawToken)));
+  await db()
+    .delete(sessions)
+    .where(eq(sessions.tokenHash, hashToken(rawToken)));
 }
