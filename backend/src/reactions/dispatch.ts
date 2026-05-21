@@ -11,7 +11,7 @@ const PUSH_TITLES: Record<string, string> = {
   neutral: '🐣 Coiny reacted',
 };
 
-export function dispatchReaction(reaction: Reaction): void {
+export function dispatchReaction(userId: string, reaction: Reaction): void {
   const durationLabel = reaction.duration === 0 ? 'hold' : `${reaction.duration}ms`;
   console.log(`\n🐣 Coiny reacted:`);
   console.log(`   animation: ${reaction.animation}`);
@@ -20,12 +20,12 @@ export function dispatchReaction(reaction: Reaction): void {
   console.log(`   duration:  ${durationLabel}`);
   console.log(`   reason:    ${reaction.reason}\n`);
 
-  void fanOutPush(reaction);
+  void fanOutPush(userId, reaction);
 }
 
-async function fanOutPush(reaction: Reaction): Promise<void> {
+async function fanOutPush(userId: string, reaction: Reaction): Promise<void> {
   try {
-    const tokens = await listDeviceTokens();
+    const tokens = await listDeviceTokens(userId);
     const ios = tokens.filter((t) => t.platform === 'ios');
     if (ios.length === 0) return;
 

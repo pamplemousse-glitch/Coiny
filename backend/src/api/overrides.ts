@@ -12,19 +12,19 @@ const DeleteBodySchema = z.object({
 });
 
 export function registerOverridesApi(app: FastifyInstance): void {
-  app.get('/api/spending/overrides', async () => listOverrides());
+  app.get('/api/spending/overrides', async (req: FastifyRequest) => listOverrides(req.user.id));
 
   app.put('/api/spending/overrides', async (req: FastifyRequest, reply: FastifyReply) => {
     const parsed = PutBodySchema.safeParse(req.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
-    await setOverride(parsed.data.merchant_name, parsed.data.category);
+    await setOverride(req.user.id, parsed.data.merchant_name, parsed.data.category);
     return { ok: true };
   });
 
   app.delete('/api/spending/overrides', async (req: FastifyRequest, reply: FastifyReply) => {
     const parsed = DeleteBodySchema.safeParse(req.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
-    await deleteOverride(parsed.data.merchant_name);
+    await deleteOverride(req.user.id, parsed.data.merchant_name);
     return { ok: true };
   });
 }

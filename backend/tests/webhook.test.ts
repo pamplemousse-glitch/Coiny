@@ -2,7 +2,7 @@ import { createHash, webcrypto } from 'node:crypto';
 import { exportJWK, type JWK, SignJWT } from 'jose';
 import { type Dispatcher, getGlobalDispatcher, MockAgent, setGlobalDispatcher } from 'undici';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { resetDatabase } from './db-helper.js';
+import { resetDatabase, testUserId } from './db-helper.js';
 
 const flushImmediate = () => new Promise<void>((r) => setImmediate(r));
 async function flushAll() {
@@ -13,8 +13,6 @@ const TEST_KID = 'test-kid-1';
 const TEST_ITEM_ID = 'item_test_1';
 const TEST_ACCESS_TOKEN = 'access-sandbox-test';
 
-// webcrypto.subtle.generateKey returns CryptoKey | CryptoKeyPair depending on alg;
-// for ECDSA it's always a pair.
 type Key = Parameters<typeof SignJWT.prototype.sign>[0];
 let privateKey: Key;
 let publicJwk: JWK & Record<string, unknown>;
@@ -44,7 +42,7 @@ beforeEach(async () => {
   });
 
   const { upsertItem } = await import('../src/store/items.js');
-  await upsertItem({ itemId: TEST_ITEM_ID, accessToken: TEST_ACCESS_TOKEN });
+  await upsertItem({ itemId: TEST_ITEM_ID, accessToken: TEST_ACCESS_TOKEN, userId: testUserId });
 
   originalDispatcher = getGlobalDispatcher();
   mockAgent = new MockAgent();
@@ -219,7 +217,7 @@ describe('POST /webhooks/plaid', () => {
 
     await flushAll();
     expect(spy).toHaveBeenCalledOnce();
-    expect(spy.mock.calls[0]?.[0]?.animation).toBe('celebrate');
+    expect(spy.mock.calls[0]?.[1]?.animation).toBe('celebrate');
 
     await app.close();
   });

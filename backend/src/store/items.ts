@@ -1,22 +1,48 @@
+import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { eq } from 'drizzle-orm';
+import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { plaidItems } from '../db/schema.js';
 
 export type PlaidItemRow = typeof plaidItems.$inferSelect;
 
-export async function getItem(itemId: string): Promise<PlaidItemRow | null> {
-  const rows = await db().select().from(plaidItems).where(eq(plaidItems.itemId, itemId));
-  return rows[0] ?? null;
+// AES-256-GCM envelope: hex(iv):hex(authTag):hex(ciphertext)
+function encryptToken(plaintext: string): string {
+  if (!config.DATA_ENCRYPTION_KEY) return plaintext;
+  const key = Buffer.from(config.DATA_ENCRYPTION_KEY, 'hex');
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${iv.toString('hex')}:${tag.toString('hex')}:${encrypted.toString('hex')}`;
 }
 
-export async function upsertItem(args: { itemId: string; accessToken: string }): Promise<void> {
+function decryptToken(stored: string): string {
+  if (!config.DATA_ENCRYPTION_KEY || !stored.includes(':')) return stored;
+  const parts = stored.split(':');
+  if (parts.length !== 3) return stored;
+  const [ivHex, tagHex, ctHex] = parts as [string, string, string];
+  const key = Buffer.from(config.DATA_ENCRYPTION_KEY, 'hex');
+  const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
+  decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+  return decipher.update(Buffer.from(ctHex, 'hex')).toString('utf8') + decipher.final('utf8');
+}
+
+export async function getItem(itemId: string): Promise<(PlaidItemRow & { accessToken: string }) | null> {
+  const rows = await db().select().from(plaidItems).where(eq(plaidItems.itemId, itemId));
+  const row = rows[0];
+  if (!row) return null;
+  return { ...row, accessToken: decryptToken(row.accessToken) };
+}
+
+export async function upsertItem(args: { itemId: string; accessToken: string; userId: string }): Promise<void> {
+  const stored = encryptToken(args.accessToken);
   await db()
     .insert(plaidItems)
-    .values({ itemId: args.itemId, accessToken: args.accessToken })
+    .values({ itemId: args.itemId, accessToken: stored, userId: args.userId })
     .onConflictDoUpdate({
       target: plaidItems.itemId,
-      // On re-link the access_token may change; preserve cursor + sync state.
-      set: { accessToken: args.accessToken, disabled: false },
+      set: { accessToken: stored, disabled: false },
     });
 }
 

@@ -1,51 +1,45 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { categoryOverrides } from '../db/schema.js';
-
-// In-memory cache so the webhook hot path doesn't hit the DB once per tx.
-// Repopulated on demand; invalidated on every write.
-let cache: Map<string, string> | null = null;
 
 function key(merchant: string): string {
   return merchant.trim().toLowerCase();
 }
 
-async function loadCache(): Promise<Map<string, string>> {
-  const rows = await db().select().from(categoryOverrides);
-  const map = new Map<string, string>();
-  for (const r of rows) map.set(r.merchantName, r.category);
-  cache = map;
-  return map;
-}
-
-export async function getOverride(merchant: string | undefined): Promise<string | null> {
+export async function getOverride(userId: string, merchant: string | undefined): Promise<string | null> {
   if (!merchant) return null;
-  const map = cache ?? (await loadCache());
-  return map.get(key(merchant)) ?? null;
-}
-
-export async function setOverride(merchant: string, category: string): Promise<void> {
   const k = key(merchant);
-  await db().insert(categoryOverrides).values({ merchantName: k, category }).onConflictDoUpdate({
-    target: categoryOverrides.merchantName,
-    set: { category },
-  });
-  cache = null;
+  const rows = await db()
+    .select({ category: categoryOverrides.category })
+    .from(categoryOverrides)
+    .where(and(eq(categoryOverrides.userId, userId), eq(categoryOverrides.merchantName, k)));
+  return rows[0]?.category ?? null;
 }
 
-export async function deleteOverride(merchant: string): Promise<void> {
+export async function setOverride(userId: string, merchant: string, category: string): Promise<void> {
+  const k = key(merchant);
+  await db()
+    .insert(categoryOverrides)
+    .values({ userId, merchantName: k, category })
+    .onConflictDoUpdate({
+      target: [categoryOverrides.userId, categoryOverrides.merchantName],
+      set: { category },
+    });
+}
+
+export async function deleteOverride(userId: string, merchant: string): Promise<void> {
   await db()
     .delete(categoryOverrides)
-    .where(eq(categoryOverrides.merchantName, key(merchant)));
-  cache = null;
+    .where(and(eq(categoryOverrides.userId, userId), eq(categoryOverrides.merchantName, key(merchant))));
 }
 
-export async function listOverrides(): Promise<{ merchantName: string; category: string }[]> {
-  const rows = await db().select().from(categoryOverrides);
-  return rows.map((r) => ({ merchantName: r.merchantName, category: r.category }));
+export async function listOverrides(userId: string): Promise<{ merchantName: string; category: string }[]> {
+  const rows = await db()
+    .select({ merchantName: categoryOverrides.merchantName, category: categoryOverrides.category })
+    .from(categoryOverrides)
+    .where(eq(categoryOverrides.userId, userId));
+  return rows;
 }
 
-// Test-only.
-export function _resetOverrideCache(): void {
-  cache = null;
-}
+// Test-only: no-op kept for signature compatibility.
+export function _resetOverrideCache(): void {}

@@ -17,6 +17,13 @@ const configSchema = z
     APNS_TEAM_ID: z.string().default(''),
     APNS_KEY: z.string().default(''),
     APNS_BUNDLE_ID: z.string().default('app.coiny.ios'),
+
+    // 64-char hex string (32 raw bytes) for AES-256-GCM encryption of Plaid access_token.
+    // Required in production. If empty in dev/test, access tokens are stored plaintext.
+    DATA_ENCRYPTION_KEY: z.string().default(''),
+
+    // Apple bundle ID used to verify the `aud` claim in Apple identity tokens.
+    APPLE_BUNDLE_ID: z.string().default('app.coiny.ios'),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {
@@ -46,6 +53,13 @@ const configSchema = z
           code: z.ZodIssueCode.custom,
           path: ['DATABASE_URL'],
           message: 'DATABASE_URL required in production',
+        });
+      }
+      if (!data.DATA_ENCRYPTION_KEY) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['DATA_ENCRYPTION_KEY'],
+          message: 'DATA_ENCRYPTION_KEY required in production',
         });
       }
     }

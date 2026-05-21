@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { StoredTransaction } from '../src/store/transactions.js';
 import { detectSubscriptions } from '../src/subscriptions/detect.js';
-import { resetDatabase } from './db-helper.js';
+import { authHeader, resetDatabase, testUserId } from './db-helper.js';
 
 function tx(overrides: Partial<StoredTransaction>): StoredTransaction {
   return {
     transactionId: overrides.transactionId ?? 'tx_x',
+    userId: null,
     accountId: 'acc_1',
     merchantName: 'Spotify',
     amount: '-10.99',
@@ -42,7 +43,7 @@ describe('detectSubscriptions', () => {
     const txs = [
       tx({ transactionId: 't1', date: '2026-02-01', amount: '-10.00' }),
       tx({ transactionId: 't2', date: '2026-03-01', amount: '-10.00' }),
-      tx({ transactionId: 't3', date: '2026-04-01', amount: '-20.00' }), // 100% jump
+      tx({ transactionId: 't3', date: '2026-04-01', amount: '-20.00' }),
     ];
     expect(detectSubscriptions(txs)).toEqual([]);
   });
@@ -86,7 +87,7 @@ describe('GET /api/subscriptions', () => {
 
   it('returns persisted subscriptions detected from transactions', async () => {
     const { persistTransactions } = await import('../src/store/transactions.js');
-    await persistTransactions([
+    await persistTransactions(testUserId, [
       {
         id: 't1',
         account_id: 'a1',
@@ -125,7 +126,7 @@ describe('GET /api/subscriptions', () => {
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
-    const res = await app.inject({ method: 'GET', url: '/api/subscriptions' });
+    const res = await app.inject({ method: 'GET', url: '/api/subscriptions', headers: authHeader() });
     expect(res.statusCode).toBe(200);
     const body = res.json<{ merchantName: string; count: number }[]>();
     expect(body.length).toBe(1);
