@@ -63,6 +63,12 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("Account") {
+                    Button("Sign out", role: .destructive) {
+                        NotificationCenter.default.post(name: .coinySignedOut, object: nil)
+                    }
+                }
+
                 Section("Debug") {
                     Button("Reset onboarding", role: .destructive) {
                         onboardingComplete = false

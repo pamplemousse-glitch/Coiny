@@ -1,13 +1,13 @@
 # Coiny — Project Handoff
 
-Read this first. Then read `docs/phase1-spec.md` if starting Phase 1.
+Read this first. It is the single source of truth for current project state.
 
 ---
 
 ## What Is Coiny
 
 A portable Tamagotchi-like carry device linked to the user's bank account
-via Teller. The device reacts in real time to financial behavior —
+via Plaid. The device reacts in real time to financial behavior —
 animated face, color LED, vibration, and sound — when the user does things
 aligned or misaligned with their personal finance goals.
 
@@ -27,38 +27,46 @@ aligned or misaligned with their personal finance goals.
 
 ```
 Coiny/
-├── firmware/          # ESP32-S3 C++ (PlatformIO) — empty scaffolding
-├── backend/           # Node.js / TypeScript (Fastify) — empty scaffolding
-├── mobile/            # React Native / Expo — empty scaffolding
-├── shared/            # BLE schemas, pet model types — empty scaffolding
+├── backend/           # Fastify + TypeScript + Drizzle ORM — live on Fly.io
+├── ios/               # Native Swift + SwiftUI (XcodeGen-managed)
+├── android/           # Kotlin + Compose scaffold (early stage)
+├── firmware/          # nRF52840 + Zephyr (nRF Connect SDK) — scaffolded, not flashed yet
+├── shared/            # Cross-package TS types (BLE schema, pet state)
 ├── hardware/
 │   └── case/          # OpenSCAD designs (coin_v1.scad + renders)
 ├── bin/               # Helper scripts (load-secrets.sh, etc.)
 └── docs/
+    ├── handoff.md           This file
     ├── architecture.md      System design, BLE flow, hardware spec
-    ├── development-plan.md  Phased roadmap, decisions, hardware list
-    ├── sprint-plan.md       7-day MVP sprint plan
-    ├── phase1-spec.md       Phase 1 deliverables (read before starting)
-    ├── mqtt-topics.md       BLE command schema, event mappings
+    ├── tech-stack.md        Quality-first stack decisions
+    ├── proposed-changes.md  Summary table of 2026-05-20 quality audit changes
+    ├── implementation-plan.md Execution sequence + milestones
+    ├── feature-backlog.md   Forward-looking feature list
+    ├── product-brief.md     Product north star (target user, voice, principles)
+    ├── stack-map.md         Complete visual map: hardware + software layers
+    ├── launch-readiness.md  Blocker checklist (MVP-Prototype vs Full Launch)
+    ├── 14-day-sprint.md     14-day prototype sprint plan (realistic: 4–6 weeks)
+    ├── 3-day-sprint.md      72-hour software-only demo plan (iOS Simulator, $0)
+    ├── plaid-integration.md Plaid API contract reference
     ├── security.md          Threat model + per-phase security checklist
-    ├── ota-process.md       (empty)
-    └── handoff.md           This file
+    ├── sprint-plan.md       7-day sprint cadence
+    └── mqtt-topics.md       BLE command schema
 ```
 
 ---
 
-## Architecture in One Picture
+## Architecture
 
 ```
 Bank Transaction
       ↓
-Teller webhook  ─── mTLS ────► Backend (Fastify / TS)
+Plaid webhook (HMAC-SHA256 verified) ──► Backend (Fastify / TS, Fly.io)
       ↓
 Rule engine evaluates vs user goals
       ↓
-Push notification → Companion app (Expo)
+Direct APNs push notification ──► iOS app (SwiftUI)
       ↓
-App relays BLE command to Coiny in pocket
+[Phase 2+] App relays BLE command to Coiny in pocket
       ↓
 Device: animated face + LED + vibration + sound
 ```
@@ -67,376 +75,260 @@ Device is BLE-only. Phone is the internet bridge → 2–3 day battery target.
 
 ---
 
+## Stack (Current)
+
+| Layer | Technology | Notes |
+|---|---|---|
+| Backend | Fastify + TypeScript + Drizzle ORM | Fly.io (Sydney), Node 22 |
+| Database | Neon Postgres (prod) / PGlite (tests) | 6 migrations, 0005 adds multi-user |
+| Auth | Apple Sign In (AS JWT) + session tokens | ES256 JWT verified via Apple JWKS |
+| Bank data | Plaid (sandbox) | `PLAID_ENV=sandbox` — zero real bank risk |
+| Push | Direct APNs (HTTP/2, `@parse/node-apn`) | No intermediary (Expo/FCM bypass) |
+| iOS | Swift 5.10 + SwiftUI, iOS 17+ | XcodeGen-managed, `ios/` |
+| Android | Kotlin + Compose | Early scaffold, `android/` |
+| Firmware | nRF52840 + Zephyr / nRF Connect SDK | Phase 2; not flashed yet |
+| CI | GitHub Actions | Node 22, pnpm 11.1.3, Biome, Semgrep, Gitleaks, Trivy |
+| Observability | pino JSON logs on Fly | Sentry not yet wired |
+
+---
+
 ## Key Decisions (Made)
 
 | Decision | Choice | Reason |
 |---|---|---|
+| Bank API | **Plaid** (replaced Teller) | Broader coverage, sandbox safety, Plaid production path |
+| Mobile | **Native Swift/SwiftUI** (replaced React Native/Expo) | Direct APNs, better BLE, no bridge layer |
+| Auth | **Apple Sign In** | Privacy-preserving, no email/password infra |
+| Session storage | **SHA-256 hash in DB, raw in iOS Keychain** | Token compromise doesn't expose DB |
+| Access token encryption | **AES-256-GCM** (`DATA_ENCRYPTION_KEY`) | GLBA / Plaid production requirement |
 | Device connectivity | **BLE** | 2–3 day battery vs 12–16 hr for WiFi |
-| Bank API | **Teller** (mTLS) | Near real-time for major US banks; daily SLA worst case |
-| Investments (deferred) | **Plaid Investments** | Teller's investment coverage is narrow |
-| Prototype hardware | **M5StickS3** (~$22) | All-in-one ESP32-S3 dev board with speaker + mic + battery |
-| Haptics (prototype) | **Adafruit DRV2605L + 10mm coin motor** | 123 named haptic patterns, no breadboard |
-| Display (prototype) | M5StickS3's built-in 1.14" color LCD | Built into the board |
-| Backend | **Node 22 + Fastify + TypeScript + Zod** | Fast, type-safe, lean |
-| Mobile | **React Native + Expo** | Single codebase iOS + Android |
-| Monorepo | **pnpm workspaces + Turborepo** | Already configured |
+| Prototype hardware | **nRF52840** (replaced ESP32-S3) | 10× better battery life; nRF Connect SDK |
+| Monorepo | **pnpm workspaces + Turborepo** | Cross-package builds, single lockfile |
 | Local secrets | **macOS Keychain** via `security` CLI | Encrypted at rest, no plaintext `.env` |
-
----
-
-## Key Decisions (Open)
-
-| Decision | Status |
-|---|---|
-| iOS background BLE reliability | Must validate in Phase 3 |
-| Form factor (coin / chip / rectangle) | Deferred to v2 ID phase; driven by battery measurements |
-| v2 chip (ESP32-S3 vs Nordic nRF52840) | Decide post-MVP, after measuring power |
-| Pet personality & sound design | TBD |
-| Pricing model | Tentative: $79 hardware + $3.99/month |
 
 ---
 
 ## What Has Been Done
 
-- ✅ Repo created (private GitHub, pamplemousse-glitch/Coiny)
-- ✅ All docs written (architecture, development plan, sprint plan, security, BLE schema)
-- ✅ Teller sandbox account created
-- ✅ Teller mTLS cert + private key downloaded to `~/Documents/coiny-secrets/teller-sandbox/`, `chmod 600`
-- ✅ Sandbox API call verified end-to-end (cert auth works, returned fake Chase accounts)
-- ✅ Teller Application ID stored in macOS Keychain under `coiny-teller-application-id`
-- ✅ Sandbox Teller Connect enrollment created (fake Chase, 3 accounts)
-- ✅ Node 22, pnpm 11.1.3 installed
-- ✅ OpenSCAD 2026.04.26 installed; first coin-case sketch at `hardware/case/coin_v1.scad`
-- ✅ Form factor explicitly deferred to v2 design phase
+### Infrastructure (pre-May-20)
+- ✅ Repo, CI, hosting, monorepo scaffold
+- ✅ Fly.io backend deployed (`coiny-backend.fly.dev`)
+- ✅ Neon Postgres wired (Drizzle ORM, 6 migrations)
+- ✅ Plaid sandbox account + webhook registration
+- ✅ Biome 2.0 linting, Semgrep + Gitleaks + Trivy security CI
+- ✅ Branch-guard hook: commits on `main` are blocked
+- ✅ `CLAUDE.md` with project conventions
 
-## What Has Been Done (cont.)
+### Backend (PRs #2, #5, #42, #45, #46, open PRs #47)
+- ✅ Fastify server: pino logging, rate limiting, error handler
+- ✅ Plaid webhook handler: HMAC-SHA256 signature verification + replay protection
+- ✅ Rule engine: paycheck, overspend, savings milestone, bill paid, large purchase,
+  subscription detection
+- ✅ Health score (0–100), mood, reaction history ring buffer
+- ✅ REST API: `GET /api/pets`, `PUT /api/pets/goals`, `GET /api/spending`,
+  `GET /api/subscriptions`, `POST /api/devices/push-token`,
+  `POST /api/plaid/link-token`, `POST /api/plaid/exchange-token`,
+  `POST /api/plaid/sync`, `GET/PUT /api/overrides`
+- ✅ Direct APNs push (HTTP/2, p8 key) — no Expo/FCM
+- ✅ **Multi-user + Apple Sign In (PR #47 — open, not yet merged)**
+  - `users` + `sessions` tables (migration 0005)
+  - `POST /api/auth/apple`: verifies Apple JWT via JWKS, creates/finds user, issues session
+  - `POST /api/auth/logout`: deletes session
+  - Auth plugin: `Bearer` token → SHA-256 → DB lookup → `req.user.id`
+  - All store functions and routes scoped by `userId` (BOLA/IDOR protection)
+  - AES-256-GCM encryption of Plaid `access_token` in DB
+  - Three-scope server: unauthenticated (`/health`, `/webhooks/plaid`),
+    public (`/api/auth/*`), protected (all others)
+  - 56 Vitest tests, all passing
 
-- ✅ All MVP hardware ordered — see Hardware Plan section below for vendor + ETA
-- ✅ USB-C data cable already owned (Anker 240W / 40 Gbps — overkill but works)
-- ✅ Branch-guard hook installed: `git commit` on main is blocked. Use feature branches.
-- ✅ `CLAUDE.md` written with project conventions (auto-loaded each session)
-
-## What Has Been Done (Phase 1 — complete as of 2026-05-19)
-
-- ✅ Phase 1 backend fully shipped and merged to main (PR #2)
-  - Fastify server, pino logging, rate limiting
-  - Teller mTLS client (undici Agent, cert+key at startup)
-  - Webhook handler with HMAC-SHA256 signature verification + replay protection
-  - Rule engine: 5 rules (paycheck, overspend, savings milestone, bill paid, large purchase)
-  - Terminal reaction dispatcher (Phase 1 stub)
-  - `pnpm sim` CLI for all 5 events
-  - 20 Vitest tests, all passing
-- ✅ Teller signing secret generated and stored in Keychain (`coiny-teller-signing-secret`)
-- ✅ Webhook registered in Teller dashboard — real sandbox events now fire through pipeline
-- ✅ Hookdeck CLI tunnel set up (stable URL: `https://hkdk.events/3yv62dpjlcg6bo`)
-  - Forwards `transactions.processed` + `enrollment.disconnected` to local backend
-- ✅ Security review + simplify pass completed on Phase 1 code
-- ✅ Production guard: `TELLER_SIGNING_SECRET` required at startup when `NODE_ENV=production`
-
-## What Has Been Done (Pre-hardware backend — complete as of 2026-05-19, PR #5)
-
-- ✅ **Webhook idempotency** — `store/events.ts` deduplicates on `payload.id` with LRU eviction
-  at 10 000 entries; duplicate payloads log a warning and are skipped
-- ✅ **In-memory pet state store** — `store/pet.ts` holds healthScore (0–100), mood, goals,
-  and a 50-entry reaction history ring buffer; exposes typed mutations
-- ✅ **Health score** — `health/score.ts` applies per-event deltas (+10 paycheck, +5 bill paid,
-  +15 savings milestone, −10 overspent, −5 large purchase); clamped to [0, 100]
-- ✅ **Live goal binding** — `rules/definitions.ts` reads goals from the store at evaluation time;
-  `PUT /api/pets/goals` immediately changes thresholds for all 5 rules
-- ✅ **REST API** — two new route modules:
-  - `GET /api/pets` — returns full pet state (healthScore, mood, lastReactionAt, goals, reactionHistory)
-  - `PUT /api/pets/goals` — Zod-validated patch (weeklyBudgetByCategory, savingsGoal,
-    paycheckMinAmount, largePurchaseThreshold)
-  - `GET /api/spending` — reaction history with extracted dollar amounts
-- ✅ **Test suite** — 24 Vitest tests, all passing; server auto-start guarded by `import.meta.url`
-  so test imports no longer trigger `process.exit(1)`
-
-## What Has NOT Been Done
-
-- ❌ Apple Developer Program ($99/yr) — needed before TestFlight (Phase 3)
-- ❌ Firmware project not initialized (limited utility without hardware)
-- ❌ Teller production access — apply when sandbox is proven end-to-end
-- ❌ GLBA compliance — sandbox stage needs nothing; see `docs/security.md` cost ladder
-- ❌ LLC formation — recommended before TestFlight / Teller production (see `docs/security.md`)
-
-## Pre-Hardware Work Status
-
-### Done ✅
-
-**Backend** (PRs #2, #5)
-- Phase 1: Fastify server, Teller mTLS, signed webhooks, rule engine, terminal dispatcher, 24 Vitest tests
-- Webhook idempotency, health score, REST API (`GET /api/pets`, `PUT /api/pets/goals`, `GET /api/spending`)
-- Hookdeck tunnel + webhook registered in Teller dashboard
-
-**Mobile** (PR #7)
-- Expo SDK 54 + expo-router scaffold, TypeScript strict, monorepo Metro config
-- Pet tab (health, mood, recent reactions), Activity tab, Settings hub
-- Goal config screens (wired to `PUT /api/pets/goals`)
-- Teller Connect via `react-native-webview` (institution name only — enrollment not yet POSTed to backend)
-- Expo push token registration UI (token not yet POSTed to backend)
-
-### Not buildable pre-hardware
-- BLE scanning / pairing
-- BLE relay (push → BLE command to device)
-- iOS background BLE validation (#1 architectural risk)
-- Production firmware testing
-- Battery measurement
-- DRV2605L + motor soldering
-
-### Pre-Hardware Backlog — actionable tickets
-
-A fresh Claude Code session should execute these top-to-bottom. Each item is sized to fit in a single session. **C** = Claude can do it; **A** = needs Antoine; **C+A** = Claude scaffolds, Antoine provides account/asset.
-
-#### Tier 1 — Unblockers (do first)
-
-- [ ] **T1.1  Backend hosting on Fly.io or Railway** (C+A · 2–4 h)
-      Deploys backend so the mobile app can reach it from a physical device.
-      New: `backend/Dockerfile`, `backend/fly.toml`. Secrets via Fly secrets (Keychain → Fly). Antoine creates account + provides API token.
-      🛑 **Validate before T2.x**: in the Teller dashboard, point the webhook URL at the deployed backend → trigger a sandbox event → `fly logs` shows the webhook arrived **and signature verified**. If not, every later ticket sits on a broken pipeline.
-- [ ] **T1.2  GitHub Actions CI** (C · 1 h)
-      `.github/workflows/ci.yml` — Node 22, pnpm 11.1.3 — runs `pnpm --filter coiny-backend test`, `pnpm --filter coiny-mobile typecheck`, `pnpm --filter coiny-mobile lint` on every PR.
-      🛑 **Validate**: open any PR, confirm a green check appears under "Checks". If no checks → the workflow file isn't triggering.
-- [ ] **T1.3  Sentry error tracking** (C+A · 2 h)
-      Free tier. `backend/src/plugins/sentry.ts`, `mobile/services/sentry.ts`. Antoine creates Sentry org + provides DSN as env var.
-- [ ] **T1.4  LLC formation (Wyoming, ~$200)** (A · 90 min)
-      Northwest Registered Agent. Then EIN (IRS, free), Mercury account (free), BOI report to FinCEN. Unblocks Apple Developer Org account and Teller production.
-
-#### Tier 2 — Backend feature work (highest leverage)
-
-- [ ] **T2.1  Persistent storage (Postgres on Supabase or Neon)** (C+A · 1–2 d)
-      Replaces `store/pet.ts`, `store/events.ts` with Postgres. Migrations in `backend/migrations/`. Pick `pg` or `drizzle-orm`. Antoine creates Supabase/Neon project + provides connection string.
-      🛑 **Validate before T2.2**: edit goals via the mobile app → restart the backend (`fly apps restart` or local restart) → `GET /api/pets` returns the edited goals, not defaults. If state resets, the write path or migrations are broken — freeze before adding multi-user on top.
-- [ ] **T2.2  Multi-user accounts** (C · 2–3 d)
-      `users` table; all API routes derive `userId` from auth. Auth: magic-link email via Resend/Postmark, or Apple/Google sign-in via Expo. Depends on T2.1.
-      🛑 **Validate before T2.3–T2.5**: sign up two accounts, link a different sandbox bank to each, trigger an event for user A → confirm reaction appears only in user A's `GET /api/pets`, not user B's. Cross-leak → STOP. Every later ticket assumes user isolation works.
-- [ ] **T2.3  Push pipeline backend → APNs/FCM via Expo Push API** (C · 4–6 h)
-      New: `services/push.ts`. Wire into `reactions/dispatch.ts`. Depends on T2.1, T2.5.
-      🛑 **Validate before T3.x**: trigger a sandbox transaction → a push lands on the physical iPhone within ~5s. Without this the "Coiny reacts in real time" thesis is unverified — don't build BLE relay on top of a broken push layer.
-- [ ] **T2.4  `POST /api/banks/connect`** (C · 4–6 h)
-      Receives Teller enrollment from mobile, stores `(user_id, encrypted_access_token, enrollment_id, institution_name)`. Encrypt access token with env-supplied key. Depends on T2.1, T2.2.
-      🛑 **Validate before T3.3 onboarding**: link a sandbox bank from the iPhone → row appears in `bank_connections` table → trigger a sandbox transaction → reaction appears under the right user's history. If the wiring drops a step, onboarding will silently fail.
-- [ ] **T2.5  `POST /api/devices/push-token`** (C · 2–3 h)
-      Receives Expo push token, stores `(user_id, token, platform, last_seen)`. Depends on T2.1, T2.2.
-      🛑 **Validate before T2.3**: tap "Enable notifications" on the iPhone → row appears in `device_tokens` table with the right `user_id`. T2.3 reads from this table; if it's empty the push pipeline can't even start.
-- [ ] **T2.6  Subscription detection** (C · 1–2 d)
-      New: `subscriptions/detector.ts` (group by merchant + amount, infer cadence from gaps). New: `store/transactions.ts` (bounded ring buffer, 90-day window). New rule `new_subscription_detected` fires on 3rd matching charge. Update privacy-policy retention disclosure (see `docs/security.md`).
-      🛑 **Validate before privacy-policy disclosure goes live**: `pnpm sim` to send 3 identical sandbox transactions → `new_subscription_detected` appears in reaction history. If it doesn't fire, the algorithm needs tuning before you publish a retention claim you can't back up.
-- [ ] **T2.7  Mood / health decay over time** (C · 2–3 h)
-      Cron tick decrements `healthScore` by N per day if no recent reactions. Pet gets sad if ignored. Add to test suite.
-- [ ] **T2.8  Categorization override layer** (C · 3–4 h)
-      `rules/categorize.ts` — regex on `counterparty.name` → canonical category. Fixes Teller miscategorizations (Uber Eats → food_and_drink, not transportation).
-- [ ] **T2.9  More rules** (C · 4–6 h total)
-      Weekend spending, time-of-day rules, payday streak, subscription price bump. One PR per 1–2 rules to keep them reviewable.
-- [ ] **T2.10  Test suite expansion** (C · 4–6 h)
-      Target 50+ tests (currently 24). Cover the new rules, store, subscription detector.
-
-#### Tier 3 — Mobile integration (most depend on Tier 2)
-
-- [ ] **T3.1  Wire link-bank → `POST /api/banks/connect`** (C · 1–2 h) · depends T2.4
-- [ ] **T3.2  Wire push registration → `POST /api/devices/push-token`** (C · 1 h) · depends T2.5
-- [ ] **T3.3  Onboarding flow** (C · 4–6 h) · depends T3.1, T3.2
-      `app/onboarding/` multi-step: welcome → goals → bank link → push opt-in. First-run gate via AsyncStorage.
-- [ ] **T3.4  Account signup / login UI** (C · 4–6 h) · depends T2.2
-- [ ] **T3.5  Manual transaction entry** (C · 4–6 h)
-      For cash. Mobile form → `POST /api/transactions`. Flows into the same rule engine.
-- [ ] **T3.6  Dark-mode QA + state polish** (C · 2–4 h)
-      Loading shimmers, empty states, error toasts.
-- [ ] **T3.7  E2E tests with Maestro on iOS Simulator** (C · 4–6 h)
-      `mobile/.maestro/` flow files covering onboarding, goals edit, link-bank happy path.
-
-#### Tier 4 — Design / content (Antoine, parallelizable)
-
-- [ ] **T4.1  App icon + splash design** (A) — replace default Expo art in `mobile/assets/images/`
-- [ ] **T4.2  Pet animation frames** (A) — 6 mood faces × N frames each (PNG sequence or sprite sheet)
-- [ ] **T4.3  Sound design** (A) — `.wav` files for chime / fanfare / warning / coin
-- [ ] **T4.4  Brand** (A) — logo, name lockup, color palette
-- [ ] **T4.5  Pet personality bible** (A) — `docs/personality.md`, voice + tone for reactions
-
-#### Tier 5 — Business / launch prep (mostly Antoine)
-
-- [ ] **T5.1  LLC formation** (A) — see T1.4 (listed in both tiers because it unblocks downstream items)
-- [ ] **T5.2  Domain** (A) — `coiny.app` or `.io`
-- [ ] **T5.3  Landing page + email waitlist** (C+A) — Framer or static HTML on Vercel; Claude can scaffold
-- [ ] **T5.4  Termly privacy policy + ToS** (A) — free tier; needs domain + LLC name
-- [ ] **T5.5  Apple Developer Program** (A · $99/yr) — Organization account after LLC + DUNS
-- [ ] **T5.6  Public roadmap on Canny** (A) — free tier
-
-#### Tier 6 — DevOps polish
-
-- [ ] **T6.1  Renovate or Dependabot** (C · 1 h) — `renovate.json` or `.github/dependabot.yml`
-- [ ] **T6.2  Backup + restore plan** (C · 2 h doc) — document Supabase/Neon restore procedure · depends T2.1
-
-#### Tier 7 — Firmware scaffolding (no flashing yet — useful prep for hardware day)
-
-- [ ] **T7.1  PlatformIO project structure** (C · 2–3 h) — `firmware/platformio.ini`, `firmware/src/main.cpp` for ESP32-S3 / M5StickS3
-- [ ] **T7.2  BLE command serialization / schema code** (C · 3–4 h) — matches `docs/mqtt-topics.md`
-
-#### Tier 8 — Hardware case iteration
-
-- [ ] **T8.1  OpenSCAD case iteration** (C+A) — Claude can edit `hardware/case/coin_v1.scad` via OpenSCAD MCP; Antoine prints
-- [ ] **T8.2  3D print test shells** (A)
-
-### Execution order recommendation
-
-Fresh Claude session, optimizing for leverage:
-
-1. **T1.2 CI** (1 h) — fail-fast for everything below
-2. **T1.1 Hosting** (3 h) — backend reachable from real device
-3. **T2.1 Postgres** (1–2 d) — state survives restart
-4. **T2.6 Subscription detection** (1–2 d) — highest-value new feature
-5. **T2.7 Mood decay** (3 h) — gives the pet life
-6. **T2.8 Categorization** (4 h) — existing rules become accurate
-7. **T6.1 Dependabot** (1 h) — set and forget
-8. **T7.1 + T7.2 Firmware scaffolding** (6 h) — ready for hardware day
-
-Then the **"ready for friends" track** (~1–2 weeks): T2.2 → T2.3 → T2.4 → T2.5 → T3.1 → T3.2 → T3.3.
-
-Antoine attacks Tier 4 + Tier 5 in parallel.
-
-### Validation gates — quick reference
-
-Stops where Claude pauses to ask Antoine to confirm before moving on.
-A broken layer here silently corrupts every later ticket.
-
-| Gate | After | Antoine confirms | Stop if... |
-|---|---|---|---|
-| **G1** | T1.2 | A green CI check appears on any PR | No checks appear — workflow file isn't triggering |
-| **G2** | T1.1 | Sandbox webhook fired from Teller dashboard arrives in `fly logs` **with signature verified** | Logs silent or signature rejected — every T2.x depends on this path |
-| **G3** | T2.1 | Edit goals via app → restart backend → goals persist | Goals reset — write path or migrations broken; freeze before T2.2 |
-| **G4** | T2.2 | Two test users see only their own data | Cross-leak — STOP. Isolation is a load-bearing assumption for everything after |
-| **G5** | T2.5 | Tapping "Enable notifications" creates a `device_tokens` row with the right `user_id` | No row — T2.3 has no source of truth for who to push to |
-| **G6** | T2.3 | Sandbox transaction → push lands on the physical iPhone in ~5 s | No push — fix before BLE relay is ever attempted |
-| **G7** | T2.4 | Link sandbox bank from iPhone → transaction triggers a reaction under the right user | Reaction missing or wrong-user — onboarding will silently fail |
-| **G8** | T2.6 | `pnpm sim` of 3 identical sandbox txs fires `new_subscription_detected` | Doesn't fire — algorithm needs tuning before any retention claim is published |
-
-**Items Claude can self-validate (no Antoine action required):** T2.6 unit tests, T2.7, T2.8, T6.1, T7.1, T7.2.
-
-**Items that need Antoine because only a physical iPhone or external account can prove them:** G2, G3, G4, G5, G6, G7.
+### iOS (PRs #39, #42, #45, #46, open PR #48)
+- ✅ XcodeGen project, SwiftUI, strict Swift
+- ✅ `API.swift`: typed client for all backend endpoints
+- ✅ Plaid Link (web view), transaction polling, JSON parsing
+- ✅ Pet animation (breathing, celebrate, sad) + health bar
+- ✅ APNs push token registration + `POST /api/devices/push-token`
+- ✅ Onboarding flow (goals → bank link → push opt-in)
+- ✅ SettingsView: bank status, goal display, sign-out, reset
+- ✅ **Apple Sign In + Keychain session (PR #48 — open, not yet merged)**
+  - `SignInView.swift`: `SignInWithAppleButton`, extracts identity token + user ID
+  - `Keychain.swift`: generic password item, `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly`
+  - `CoinyApp.swift`: three-state flow — `SignInView → OnboardingView → RootView`
+  - Session token stored raw in Keychain, never in UserDefaults
+  - `API.swift`: injects `Authorization: Bearer` on all authenticated calls,
+    auto-signs-out on 401, `isSignedIn` property
+  - `coinySignedOut` notification triggers full sign-out across the app
 
 ---
 
-## Local Secrets Convention
+## What Needs Antoine Action (Blocking)
 
-**Cert + private key (files):**
-```
-~/Documents/coiny-secrets/teller-sandbox/certificate.pem   (chmod 600)
-~/Documents/coiny-secrets/teller-sandbox/private_key.pem   (chmod 600)
-```
-These are outside the repo so they can never be accidentally committed.
+Before PRs #47 and #48 can be tested on a real device:
 
-**Other secrets (macOS Keychain via `security` CLI):**
-```
-coiny-teller-application-id        ✅ stored
-coiny-teller-signing-secret        ✅ stored (webhook registered 2026-05-19)
-coiny-teller-sandbox-token         optional (regenerable from dashboard)
-```
+1. **Merge PR #47** (multi-user auth backend)
+   `gh pr merge 47 --squash` after CI green
 
-**Read with:**
+2. **Set `DATA_ENCRYPTION_KEY` in Fly**
+   ```bash
+   fly secrets set DATA_ENCRYPTION_KEY=$(openssl rand -hex 32) -a coiny-backend
+   ```
+   (Required in production; gracefully skipped in local dev/test when empty)
+
+3. **Set `DEVELOPMENT_TEAM` in `ios/project.yml`**
+   Find your 10-char Team ID at developer.apple.com/account → Membership.
+   Edit line 19: `DEVELOPMENT_TEAM: "XXXXXXXXXX"`
+
+4. **Enable "Sign In with Apple" capability in Developer Portal**
+   Identifiers → `app.coiny.ios` → Edit → Sign In with Apple → Save
+
+5. **Regenerate Xcode project after #3**
+   ```bash
+   cd /Users/antoinewiley/Tamogatchi/ios && xcodegen generate
+   ```
+
+6. **Merge PR #48** (iOS Apple Sign In)
+   `gh pr merge 48 --squash` after CI green
+
+---
+
+## What Needs Antoine Action (Non-Blocking, Next Sprint)
+
+- [ ] **`DELETE /api/account`** — calls Plaid `/item/remove` for all user items,
+  deletes user row (cascades), needed for GLBA right-to-delete
+- [ ] **Per-user rate limiting** — `keyGenerator: (req) => req.user?.id`
+  on `@fastify/rate-limit`
+- [ ] **Encrypt `reaction_history.reaction` field** — plaintext merchant names
+  + amounts currently stored; needs migration + new AES column
+- [ ] **Incident response plan** (one-page doc) — Plaid approval requires it
+- [ ] **Privacy policy** (technical sections) — Plaid approval requires it
+- [ ] **`POST /api/debug/react`** — bypass Plaid for TestFlight demo
+  (`?animation=celebrate` triggers a test reaction without a real transaction)
+- [ ] **Apple Developer Program** ($99/yr) — needed before TestFlight
+
+---
+
+## Open PRs Summary
+
+| PR | Title | Status |
+|---|---|---|
+| #44 | fix(docs): replace incorrect mic with MAX98357A I2S amp | Open — docs only |
+| #45 | feat(ios+backend): wire direct APNs push | Open — superseded by #46 |
+| #46 | feat(ios+backend): finish MVP-A (push + sad animation + bank status) | Open |
+| #47 | feat(auth): Apple Sign In + multi-user data model | Open — **merge first** |
+| #48 | feat(ios): Apple Sign In + Keychain session token | Open — **merge after #47** |
+
+PRs #45–#48 are all on `feat/native-ios`. #46 adds background push + sad
+animation; #47 + #48 are the auth layer on top.
+
+---
+
+## Sensitive Data Audit
+
+| Data | Where stored | Protection |
+|---|---|---|
+| Plaid `access_token` | Neon Postgres `plaid_items.access_token` | AES-256-GCM, key in Fly secrets |
+| Session token (raw) | iOS Keychain only | `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly` |
+| Session token (hash) | Neon Postgres `sessions.token_hash` | SHA-256, one-way |
+| Apple `sub` | Neon Postgres `users.apple_sub` | Pseudonymous opaque ID |
+| User email | Neon Postgres `users.email` | Optional; user can withhold |
+| APNs device token | Neon Postgres `device_tokens.token` | Rotating; revocable |
+| Transaction data | Neon Postgres `transactions` | Scoped by `user_id`; pseudonymous IDs in logs |
+| Plaid sandbox creds | Not stored | `user_good`/`pass_good` only in Link UI |
+
+Nothing sensitive is in `.env` files or logs. Local dev secrets use macOS Keychain.
+
+---
+
+## Plaid Sandbox Safety
+
+- `PLAID_ENV=sandbox` means the Plaid client can only reach sandbox endpoints.
+  No path exists to real bank data without a deliberate Fly secrets change to
+  `PLAID_ENV=development` AND Plaid approving the upgrade.
+- Sandbox tokens (`access-sandbox-…`) are structurally blocked from touching
+  real institutions.
+- Safe to test end-to-end with `user_good` / `pass_good` credentials.
+
+---
+
+## Plaid Production Approval Path
+
+Plaid reviews apps manually before granting `development` or `production` access.
+Requirements we already meet: HMAC signature verification, HTTPS, sandbox isolation.
+
+Remaining gaps before applying:
+- Privacy policy (URL required in application)
+- Incident response plan
+- `DELETE /api/account` (right-to-delete = GLBA/CCPA)
+- Encryption at rest for all PII fields (access_token done; `reaction.reason` not yet)
+
+---
+
+## Local Dev Startup
+
 ```bash
-security find-generic-password -a "$USER" -s "coiny-teller-application-id" -w
+# Two terminals
+
+# Terminal 1 — backend (loads secrets from Keychain)
+cd /Users/antoinewiley/Tamogatchi
+source bin/load-secrets.sh && pnpm --filter coiny-backend dev
+
+# Terminal 2 — tests
+pnpm --filter coiny-backend test
 ```
 
-**Production**: secrets move to Railway/AWS Secrets Manager. Same env var
-contract; only the loader changes.
+**Keychain secrets in use:**
+```
+coiny-plaid-client-id        ✅ stored
+coiny-plaid-sandbox-secret   ✅ stored
+```
 
 ---
 
-## Hardware (1 unit MVP — all ordered as of 2026-05-19)
+## Hardware
 
-| Source | Item | Cost | Status | ETA |
-|---|---|---|---|---|
-| MTools Tec | M5StickS3 (K150) | $36.59 (incl. ship + tax) | ✅ Ordered | 5–10 business days |
-| DigiKey | Adafruit DRV2605L (1528-1346-ND / PID 2305) | $7.95 + ship | ✅ Ordered | 2–3 business days |
-| Amazon | SparkFun Qwiic-to-Grove cable (100mm) | $7.95 + $5.97 ship | ✅ Ordered | by 2026-05-26 |
-| Amazon | uxcell 10× 10mm coin vibration motor 3V pack | $8.99 | ✅ Ordered | by 2026-05-24 |
-| (already owned) | Anker USB-C to USB-C cable (240W / 40 Gbps data) | $0 | ✅ Own | — |
-| **Total spend** | | **~$75** | | |
+### Prototype (1 unit — hardware acquired)
 
-**Procurement notes (for v2 reference):**
-- M5StickS3 supply is tight as of May 2026 (4 months post-launch). M5Stack
-  direct + DigiKey + Mouser + Amazon all out at order time. MTools Tec (US-based
-  M5Stack reseller, Texas) had 9 units in stock at $24.99 + shipping. Backup:
-  eBay's Official M5Stack listing.
-- DRV2605L: Adafruit direct + Amazon listing both out at order time. DigiKey
-  had 982 units in stock at $7.95 — best single source for the breakout.
-- Grove-to-STEMMA-QT cable: Adafruit (PID 4528) out; SparkFun PRT-15109 on
-  Amazon is the functional equivalent (Qwiic = STEMMA QT physically).
-- USB-C cable: any data-capable USB-C-to-USB-C cable works. Charge-only cables
-  silently fail to flash firmware. Cables rated for USB 2.0+ or any data
-  spec are safe. Avoid "charging only" listings.
+| Item | Status |
+|---|---|
+| nRF52840 dev kit | To order (replaced ESP32-S3) |
+| Adafruit DRV2605L haptic driver | ✅ Ordered (DigiKey) |
+| 10mm coin vibration motor | ✅ Ordered (Amazon) |
+| SparkFun Qwiic-to-Grove cable | ✅ Ordered (Amazon) |
+| M5StickS3 (original plan, replaced) | ✅ Ordered but superseded |
 
-Soldering required: 1 joint (motor leads → DRV2605L pads). Antoine has iron + solder.
+See `docs/tech-stack.md` § Hardware for the rationale for the ESP32-S3 →
+nRF52840 swap (battery life: hours vs weeks).
 
-WS2812B LED removed — M5StickS3's LCD covers mood color via background.
-Breadboard + jumper wires removed — Grove + STEMMA QT is solderless via cable.
+### Firmware
 
----
-
-## Development Phases (Sprint Plan = 7 Days)
-
-See `docs/sprint-plan.md` for day-by-day. Realistic with breakage tax: 9–10 days.
-
-| Phase | Goal | Days | Needs hardware? |
-|---|---|---|---|
-| 1 | Backend + Teller sandbox + terminal simulator | 1–2 | No |
-| 2 | Firmware on M5StickS3 | 3–4 | Yes |
-| 3 | Expo app (BLE pair, Teller Connect, push relay, iOS bg BLE) | 5–6 | Yes (phone) |
-| 4 | Full integration end-to-end | 7 | Yes |
-| 5 | Real Teller production, custom PCB, beta | Weeks 10–14 | Yes |
-
-**Phase 1 doesn't need hardware.** It can start immediately while hardware ships.
-
----
-
-## Economics (Reference)
-
-- MVP cost: ~$75 hardware (actual) + $99/year Apple Developer = ~$175
-- Production BOM at 1K units: ~$20
-- Retail target: $59–$79 hardware + $3.99/month
-- Per-user/month cost: $0.30 (Teller only) to $4 (Teller + Plaid Investments)
-- Bank-data APIs dominate opex; subscription is structurally required
-
----
-
-## Legal (Reference)
-
-- **GLBA**: applies because we read bank data. Realistic cost path is the
-  indie minimum (LLC + generated privacy policy + this-doc-as-WISP) for
-  sandbox/closed-beta, ~$2–8K for public launch (lawyer review + cyber
-  liability insurance). The $15–30K "fintech attorney" figure is the all-in
-  upfront program — only needed when raising or scaling past 5,000 users.
-  Full phase-by-phase cost ladder + indie precedents in `docs/security.md`
-  ("Compliance Posture & Realistic Cost Path").
-- **FCC**: pre-certified ESP32-S3 module covers prototype. Custom PCB needs DoC.
-- **Teller ToS**: cannot resell or share transaction data.
-- **App Store**: Apple guideline 3.2.1(viii) carves out apps using a public
-  API of the financial institution (Teller qualifies). Reviewers treat Coiny
-  closer to a quantified-self app than a banking app, provided privacy policy
-  URL + App Privacy nutrition label match reality.
-- **CCPA / GDPR**: applies if any users in CA / EU.
-- **Aggregator landscape + pricing** (Teller / Plaid / MX / Yodlee / Finicity):
-  see `docs/aggregators.md`. Coiny's plan is Teller-only through Phase 4,
-  add Plaid Investments in Phase 5.
+`firmware/` is scaffolded but not flashed. Phase 2 work. nRF Connect SDK
+(Zephyr RTOS). BLE command schema in `docs/mqtt-topics.md`.
 
 ---
 
 ## Resuming Work
 
-Start a fresh Claude Code session in `/Users/antoinewiley/Tamogatchi` and say:
+Open a fresh Claude Code session in `/Users/antoinewiley/Tamogatchi` and say:
 
-> Read `docs/handoff.md`, `docs/architecture.md`, `docs/security.md`,
-> `docs/aggregators.md`, `docs/sprint-plan.md`, and `docs/mqtt-topics.md`.
-> Phase 1 + the pre-hardware mobile work are complete (PRs #2, #5, #7).
-> Execute the "Pre-Hardware Backlog" in `docs/handoff.md` top-to-bottom,
-> starting with T1.2 (CI). Open one PR per ticket; squash-merge after the
-> simplify skill passes. Ask before touching items marked **A** (Antoine).
+> Read `docs/handoff.md`. PRs #47 (multi-user auth) and #48 (iOS Apple Sign In)
+> are open on `feat/native-ios`. Antoine needs to complete the blocking steps
+> in "What Needs Antoine Action" before these can be tested on device. Once
+> merged, the next priorities are: the security gap closure items (account
+> deletion, rate limiting, reaction encryption), `POST /api/debug/react` for
+> TestFlight demo, and the incident response + privacy policy docs for Plaid
+> production approval.
 
-### Local dev startup (two terminals)
+### Key commands
+
 ```bash
-# Terminal 1 — tunnel
-hookdeck listen 3000 teller-webhooks --path /webhooks/teller
+# Run all 56 backend tests
+pnpm --filter coiny-backend test
 
-# Terminal 2 — backend
-cd /Users/antoinewiley/Tamogatchi
-source bin/load-secrets.sh && pnpm --filter coiny-backend dev
+# Regenerate Xcode project after ios/project.yml changes
+cd ios && xcodegen generate
+
+# Deploy to Fly
+fly deploy -a coiny-backend --dockerfile backend/Dockerfile
+
+# Check Fly logs
+fly logs -a coiny-backend
 ```
