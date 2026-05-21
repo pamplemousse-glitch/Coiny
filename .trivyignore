@@ -1,0 +1,10 @@
+# Suppressions for vulnerabilities that require major version bumps on temporary prototype scaffolding.
+# The Node/Fastify backend is being replaced by Go (docs/tech-stack.md §2).
+# Remove this file (and fix properly) when the Go rewrite ships.
+
+# fast-uri 2.x → 3.x: internal dep of fastify 4.x; can't be upgraded independently
+CVE-2026-6321
+CVE-2026-6322
+
+# fastify 4.x → 5.x: major breaking change; all routes, plugins, and TS types change
+CVE-2026-25223
