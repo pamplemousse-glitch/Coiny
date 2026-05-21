@@ -119,7 +119,7 @@ Device is BLE-only. Phone is the internet bridge → 2–3 day battery target.
 - ✅ Branch-guard hook: commits on `main` are blocked
 - ✅ `CLAUDE.md` with project conventions
 
-### Backend (PRs #2, #5, #42, #45, #46, open PRs #47)
+### Backend (PRs #2, #5, #42, #45, #46, #47 — all merged to main)
 - ✅ Fastify server: pino logging, rate limiting, error handler
 - ✅ Plaid webhook handler: HMAC-SHA256 signature verification + replay protection
 - ✅ Rule engine: paycheck, overspend, savings milestone, bill paid, large purchase,
@@ -129,8 +129,8 @@ Device is BLE-only. Phone is the internet bridge → 2–3 day battery target.
   `GET /api/subscriptions`, `POST /api/devices/push-token`,
   `POST /api/plaid/link-token`, `POST /api/plaid/exchange-token`,
   `POST /api/plaid/sync`, `GET/PUT /api/overrides`
-- ✅ Direct APNs push (HTTP/2, p8 key) — no Expo/FCM
-- ✅ **Multi-user + Apple Sign In (PR #47 — open, not yet merged)**
+- ✅ Direct APNs push (HTTP/2, `@parse/node-apn`) — no Expo/FCM
+- ✅ Multi-user + Apple Sign In (PR #47, merged 2026-05-21)
   - `users` + `sessions` tables (migration 0005)
   - `POST /api/auth/apple`: verifies Apple JWT via JWKS, creates/finds user, issues session
   - `POST /api/auth/logout`: deletes session
@@ -141,7 +141,7 @@ Device is BLE-only. Phone is the internet bridge → 2–3 day battery target.
     public (`/api/auth/*`), protected (all others)
   - 56 Vitest tests, all passing
 
-### iOS (PRs #39, #42, #45, #46, open PR #48)
+### iOS (PRs #39, #42, #45, #46, #48 — all merged to main)
 - ✅ XcodeGen project, SwiftUI, strict Swift
 - ✅ `API.swift`: typed client for all backend endpoints
 - ✅ Plaid Link (web view), transaction polling, JSON parsing
@@ -149,7 +149,7 @@ Device is BLE-only. Phone is the internet bridge → 2–3 day battery target.
 - ✅ APNs push token registration + `POST /api/devices/push-token`
 - ✅ Onboarding flow (goals → bank link → push opt-in)
 - ✅ SettingsView: bank status, goal display, sign-out, reset
-- ✅ **Apple Sign In + Keychain session (PR #48 — open, not yet merged)**
+- ✅ Apple Sign In + Keychain session (PR #48, merged 2026-05-21)
   - `SignInView.swift`: `SignInWithAppleButton`, extracts identity token + user ID
   - `Keychain.swift`: generic password item, `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly`
   - `CoinyApp.swift`: three-state flow — `SignInView → OnboardingView → RootView`
@@ -160,33 +160,31 @@ Device is BLE-only. Phone is the internet bridge → 2–3 day battery target.
 
 ---
 
-## What Needs Antoine Action (Blocking)
+## What Needs Antoine Action (Blocking — before device testing)
 
-Before PRs #47 and #48 can be tested on a real device:
+All PRs are merged. The code is correct. Before the app can be built and run on
+a real iPhone, Antoine must do three things in the Developer Portal:
 
-1. **Merge PR #47** (multi-user auth backend)
-   `gh pr merge 47 --squash` after CI green
-
-2. **Set `DATA_ENCRYPTION_KEY` in Fly**
+1. **Set `DATA_ENCRYPTION_KEY` in Fly**
    ```bash
    fly secrets set DATA_ENCRYPTION_KEY=$(openssl rand -hex 32) -a coiny-backend
    ```
-   (Required in production; gracefully skipped in local dev/test when empty)
+   Required for AES-256-GCM encryption of Plaid tokens in production.
 
-3. **Set `DEVELOPMENT_TEAM` in `ios/project.yml`**
-   Find your 10-char Team ID at developer.apple.com/account → Membership.
-   Edit line 19: `DEVELOPMENT_TEAM: "XXXXXXXXXX"`
+2. **Set `DEVELOPMENT_TEAM` in `ios/project.yml` line 19**
+   10-char Team ID from developer.apple.com/account → Membership Details.
+   ```yaml
+   DEVELOPMENT_TEAM: "XXXXXXXXXX"
+   ```
 
-4. **Enable "Sign In with Apple" capability in Developer Portal**
+3. **Enable "Sign In with Apple" in Developer Portal**
    Identifiers → `app.coiny.ios` → Edit → Sign In with Apple → Save
 
-5. **Regenerate Xcode project after #3**
+4. **Regenerate Xcode project**
    ```bash
    cd /Users/antoinewiley/Tamogatchi/ios && xcodegen generate
    ```
-
-6. **Merge PR #48** (iOS Apple Sign In)
-   `gh pr merge 48 --squash` after CI green
+   Then open `ios/Coiny.xcodeproj`, select your iPhone, Build & Run.
 
 ---
 
@@ -206,18 +204,17 @@ Before PRs #47 and #48 can be tested on a real device:
 
 ---
 
-## Open PRs Summary
+## Merged PRs (this sprint, 2026-05-21)
 
-| PR | Title | Status |
+| PR | Title | What it added |
 |---|---|---|
-| #44 | fix(docs): replace incorrect mic with MAX98357A I2S amp | Open — docs only |
-| #45 | feat(ios+backend): wire direct APNs push | Open — superseded by #46 |
-| #46 | feat(ios+backend): finish MVP-A (push + sad animation + bank status) | Open |
-| #47 | feat(auth): Apple Sign In + multi-user data model | Open — **merge first** |
-| #48 | feat(ios): Apple Sign In + Keychain session token | Open — **merge after #47** |
+| #44 | fix(docs): speaker part correction | docs only |
+| #45 | feat(ios+backend): wire direct APNs push | APNs HTTP/2 push, device token registration |
+| #46 | feat(ios+backend): finish MVP-A | Background push, sad animation, bank status UI |
+| #47 | feat(auth): Apple Sign In + multi-user data model | users/sessions tables, auth API, AES-256-GCM, 56 tests |
+| #48 | feat(ios): Apple Sign In + Keychain session token | SignInView, Keychain.swift, three-state app flow |
 
-PRs #45–#48 are all on `feat/native-ios`. #46 adds background push + sad
-animation; #47 + #48 are the auth layer on top.
+No open PRs. `main` is clean.
 
 ---
 
@@ -309,13 +306,13 @@ nRF52840 swap (battery life: hours vs weeks).
 
 Open a fresh Claude Code session in `/Users/antoinewiley/Tamogatchi` and say:
 
-> Read `docs/handoff.md`. PRs #47 (multi-user auth) and #48 (iOS Apple Sign In)
-> are open on `feat/native-ios`. Antoine needs to complete the blocking steps
-> in "What Needs Antoine Action" before these can be tested on device. Once
-> merged, the next priorities are: the security gap closure items (account
-> deletion, rate limiting, reaction encryption), `POST /api/debug/react` for
-> TestFlight demo, and the incident response + privacy policy docs for Plaid
-> production approval.
+> Read `docs/handoff.md`. All PRs are merged to main as of 2026-05-21. Antoine
+> still needs to do the 4 blocking steps (Fly secret, DEVELOPMENT_TEAM, Sign In
+> with Apple capability, xcodegen generate) before the app runs on device. The
+> next code sprint is security gap closure: `DELETE /api/account`, per-user rate
+> limiting, encrypt `reaction_history.reaction` field, `POST /api/debug/react`
+> debug endpoint, and the incident response plan + privacy policy docs needed for
+> Plaid production approval. Start with the backend endpoints, one PR each.
 
 ### Key commands
 
