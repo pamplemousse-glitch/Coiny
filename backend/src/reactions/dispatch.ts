@@ -30,9 +30,7 @@ async function fanOutPush(reaction: Reaction): Promise<void> {
     if (ios.length === 0) return;
 
     const title = PUSH_TITLES[reaction.animation] ?? '🐣 Coiny reacted';
-    const results = await Promise.allSettled(
-      ios.map((t) => sendApnsPush(t.token, title, reaction.reason)),
-    );
+    const results = await Promise.allSettled(ios.map((t) => sendApnsPush(t.token, title, reaction.reason)));
 
     for (const r of results) {
       if (r.status === 'rejected') {

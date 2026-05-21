@@ -25,8 +25,7 @@ export async function sendApnsPush(deviceToken: string, title: string, body: str
   if (!config.APNS_KEY || !config.APNS_KEY_ID || !config.APNS_TEAM_ID) return;
 
   const jwt = await getJwt();
-  const host =
-    config.NODE_ENV === 'production' ? 'api.push.apple.com' : 'api.sandbox.push.apple.com';
+  const host = config.NODE_ENV === 'production' ? 'api.push.apple.com' : 'api.sandbox.push.apple.com';
 
   const payload = JSON.stringify({
     aps: { alert: { title, body }, sound: 'default' },
@@ -53,7 +52,9 @@ export async function sendApnsPush(deviceToken: string, title: string, body: str
       const status = headers[':status'];
       let responseBody = '';
       req.setEncoding('utf8');
-      req.on('data', (chunk) => { responseBody += chunk; });
+      req.on('data', (chunk) => {
+        responseBody += chunk;
+      });
       req.once('end', () => {
         session.close();
         if (status === 200) {
