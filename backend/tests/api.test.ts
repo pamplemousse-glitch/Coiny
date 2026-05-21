@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { resetDatabase } from './db-helper.js';
+import { authHeader, resetDatabase } from './db-helper.js';
 
 describe('GET /api/pets', () => {
   beforeEach(async () => {
@@ -10,7 +10,7 @@ describe('GET /api/pets', () => {
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
-    const res = await app.inject({ method: 'GET', url: '/api/pets' });
+    const res = await app.inject({ method: 'GET', url: '/api/pets', headers: authHeader() });
     expect(res.statusCode).toBe(200);
 
     const body = res.json<Record<string, unknown>>();
@@ -18,6 +18,16 @@ describe('GET /api/pets', () => {
     expect(typeof body.mood).toBe('number');
     expect(body).toHaveProperty('goals');
     expect(body).toHaveProperty('reactionHistory');
+
+    await app.close();
+  });
+
+  it('returns 401 without auth', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/pets' });
+    expect(res.statusCode).toBe(401);
 
     await app.close();
   });
@@ -35,7 +45,7 @@ describe('PUT /api/pets/goals', () => {
     const res = await app.inject({
       method: 'PUT',
       url: '/api/pets/goals',
-      headers: { 'content-type': 'application/json' },
+      headers: { ...authHeader(), 'content-type': 'application/json' },
       body: JSON.stringify({ savingsGoal: 2000, largePurchaseThreshold: 300 }),
     });
 
@@ -54,15 +64,14 @@ describe('PUT /api/pets/goals', () => {
     await app1.inject({
       method: 'PUT',
       url: '/api/pets/goals',
-      headers: { 'content-type': 'application/json' },
+      headers: { ...authHeader(), 'content-type': 'application/json' },
       body: JSON.stringify({ savingsGoal: 5000 }),
     });
     await app1.close();
 
-    // Simulate restart: build a fresh app against the same DB (no resetDatabase).
     const { buildApp: build2 } = await import('../src/server.js');
     const app2 = await build2();
-    const res = await app2.inject({ method: 'GET', url: '/api/pets' });
+    const res = await app2.inject({ method: 'GET', url: '/api/pets', headers: authHeader() });
     const body = res.json<Record<string, unknown>>();
     expect((body.goals as Record<string, unknown>).savingsGoal).toBe(5000);
     await app2.close();
@@ -75,7 +84,7 @@ describe('PUT /api/pets/goals', () => {
     const res = await app.inject({
       method: 'PUT',
       url: '/api/pets/goals',
-      headers: { 'content-type': 'application/json' },
+      headers: { ...authHeader(), 'content-type': 'application/json' },
       body: JSON.stringify({ savingsGoal: -500 }),
     });
 
@@ -93,7 +102,7 @@ describe('GET /api/spending', () => {
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
-    const res = await app.inject({ method: 'GET', url: '/api/spending' });
+    const res = await app.inject({ method: 'GET', url: '/api/spending', headers: authHeader() });
     expect(res.statusCode).toBe(200);
     expect(Array.isArray(res.json())).toBe(true);
 
@@ -102,11 +111,7 @@ describe('GET /api/spending', () => {
 });
 
 describe('GET /health', () => {
-  beforeEach(async () => {
-    await resetDatabase();
-  });
-
-  it('returns { ok: true }', async () => {
+  it('returns { ok: true } without auth', async () => {
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 

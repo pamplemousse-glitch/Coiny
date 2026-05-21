@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
+import { registerAuthApi } from './api/auth.js';
 import { registerDebugApi } from './api/debug.js';
 import { registerDevicesApi } from './api/devices.js';
 import { registerOverridesApi } from './api/overrides.js';
@@ -10,7 +11,8 @@ import { registerSpendingApi } from './api/spending.js';
 import { registerSubscriptionsApi } from './api/subscriptions.js';
 import { config } from './config.js';
 import { initDb } from './db/client.js';
-import { runMigrations, seedPetStateIfMissing } from './db/migrate.js';
+import { runMigrations } from './db/migrate.js';
+import { registerAuthPlugin } from './plugins/auth.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
 import { loggerOptions } from './plugins/logger.js';
 import { registerPlaidWebhook } from './webhook/plaid.js';
@@ -18,7 +20,6 @@ import { registerPlaidWebhook } from './webhook/plaid.js';
 async function buildApp() {
   await initDb();
   await runMigrations();
-  await seedPetStateIfMissing();
 
   const app = Fastify({
     logger: {
@@ -34,16 +35,27 @@ async function buildApp() {
     timeWindow: '1 second',
   });
 
-  registerPlaidWebhook(app);
-  registerPlaidLinkApi(app);
-  if (config.PLAID_ENV === 'sandbox') registerDebugApi(app);
-  registerPetsApi(app);
-  registerSpendingApi(app);
-  registerOverridesApi(app);
-  registerDevicesApi(app);
-  registerSubscriptionsApi(app);
-
+  // Unauthenticated routes
   app.get('/health', async () => ({ ok: true }));
+  registerPlaidWebhook(app);
+
+  // Public auth endpoint (no session required)
+  app.register(async (scope) => {
+    registerAuthApi(scope);
+  });
+
+  // All other routes require a valid session token
+  app.register(async (scope) => {
+    await registerAuthPlugin(scope);
+
+    registerPlaidLinkApi(scope);
+    if (config.PLAID_ENV === 'sandbox') registerDebugApi(scope);
+    registerPetsApi(scope);
+    registerSpendingApi(scope);
+    registerOverridesApi(scope);
+    registerDevicesApi(scope);
+    registerSubscriptionsApi(scope);
+  });
 
   return app;
 }
@@ -68,7 +80,6 @@ async function start() {
 export { buildApp };
 export default start;
 
-// Only auto-start when run directly, not when imported by tests or other modules.
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   start();
 }
