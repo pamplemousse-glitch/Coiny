@@ -8,6 +8,3 @@ CVE-2026-6322
 
 # fastify 4.x → 5.x: major breaking change; all routes, plugins, and TS types change
 CVE-2026-25223
-
-# picomatch ReDoS — transitive dep, fix available in 4.0.4/3.0.2/2.3.2 but locked by upstream
-CVE-2026-33671
