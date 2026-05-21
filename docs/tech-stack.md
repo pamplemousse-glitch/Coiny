@@ -41,7 +41,7 @@ decisions, see `docs/plaid-integration.md` and inline citations.
 | **Display** | Sharp Memory LCD LS013B7DH06 (color, always-on, µA draw) |
 | **Haptic** | LRA motor + DRV2605L driver |
 | **RGB indicator** | APA102 (better color accuracy + faster refresh than WS2812) |
-| **Audio** | Knowles I2S MEMS speaker (or omit) |
+| **Audio** | MAX98357A I2S amp + 8Ω dynamic speaker (or omit — use phone audio) |
 | **Battery / PMIC** | 200mAh LiPo + MAX77654 integrated PMIC + USB-C PD charging |
 | **Antenna** | Chip antenna with matched network + RF shield can |
 | **Firmware OS** | Zephyr RTOS via Nordic nRF Connect SDK |
@@ -358,9 +358,8 @@ from the user's first day.
 
 ### Audio
 
-- **Part:** Knowles SPH0645LM4H-B I2S MEMS speaker (if audio in scope)
-- **Why:** highest quality at lowest power for a wearable; alternative is
-  to skip audio and rely on phone-side playback (likely choice)
+- **Part:** MAX98357A I2S class-D amp + small 8Ω dynamic speaker (if audio in scope)
+- **Why:** SPH0645LM4H-B is a microphone, not a speaker; MAX98357A drives a passive speaker directly over I2S with no external components; alternative is phone-only audio (likely choice for v1)
 
 ### Battery + PMIC
 

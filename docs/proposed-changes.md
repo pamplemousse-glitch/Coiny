@@ -18,7 +18,7 @@ compromises. For execution sequence see `docs/implementation-plan.md`.
 | H4 | **Haptic** | ERM (already ordered) | **LRA + DRV2605L driver** | Apple-Watch-grade taps vs ERM buzz | 🟡 PCB design |
 | H5 | **PMIC** | None | **Maxim MAX77654** (integrated charger + 3 LDOs + fuel gauge) | One chip vs three; less PCB space; better firmware UX (used by Oura Ring Gen3) | 🟡 PCB design |
 | H6 | **RGB indicator** | None | **APA102** RGB LED | Better color accuracy + faster refresh than WS2812 | 🟡 PCB design |
-| H7 | **Audio** | M5StickS3 built-in speaker | **Knowles I2S MEMS speaker** OR omit entirely | Best quality at lowest power; alternative is phone-only audio | 🟡 PCB design |
+| H7 | **Audio** | M5StickS3 built-in speaker | **MAX98357A I2S amp + small 8Ω dynamic speaker** OR omit entirely (use phone audio) | SPH0645LM4H-B is a mic not a speaker; MAX98357A drives a passive speaker directly over I2S | 🟡 PCB design |
 | H8 | **Antenna + shielding** | None planned | **Chip antenna with matched network + RF shield can** over radio | RF performance is the #1 hardware-quality dimension; bad antenna = BLE disconnects | 🟡 PCB design |
 | H9 | **Industrial design** | DIY OpenSCAD prints | **Contracted ID firm + injection-molded PC/ABS shell + custom packaging** | Apple-unboxing-grade first impression | 🟡 Pre-manufacturing |
 | H10 | **Contract manufacturer** | TBD | **Premium-tier CM (Jabil, Flex, or similar)** | Not Seeed Studio / JLCPCB Assembly; QA, certifications, supply chain | 🟡 Manufacturing prep |
