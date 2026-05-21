@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Coiny</string>
+    <string name="tab_pet">Pet</string>
+    <string name="tab_spending">Spending</string>
+    <string name="tab_settings">Settings</string>
+    <string name="action_retry">Retry</string>
+    <string name="loading_pet">Loading your pet…</string>
+    <string name="error_load_pet">Couldn\'t load pet</string>
+    <string name="empty_reactions_title">No reactions yet</string>
+    <string name="empty_reactions_body">Reactions will appear once your bank starts sending transactions.</string>
+</resources>
