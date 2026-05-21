@@ -35,21 +35,25 @@ actor API {
         self.session = URLSession(configuration: config)
 
         self.decoder = JSONDecoder()
-        // Backend sends ISO-8601 with fractional seconds.
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        // Backend sends ISO-8601 with fractional seconds. We create formatters
+        // inside the closure to avoid Sendable capture issues (formatters are
+        // not Sendable). Cost is minimal — only fires per Date field decoded.
         decoder.dateDecodingStrategy = .custom { dec in
             let container = try dec.singleValueContainer()
             let raw = try container.decode(String.self)
-            if let date = formatter.date(from: raw) {
+
+            let withFractional = ISO8601DateFormatter()
+            withFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = withFractional.date(from: raw) {
                 return date
             }
-            // Fallback: plain ISO-8601 without fractional seconds
+
             let plain = ISO8601DateFormatter()
             plain.formatOptions = [.withInternetDateTime]
             if let date = plain.date(from: raw) {
                 return date
             }
+
             throw DecodingError.dataCorruptedError(
                 in: container,
                 debugDescription: "Date string not ISO-8601: \(raw)"
@@ -70,10 +74,32 @@ actor API {
         try await put("/api/pets/goals", body: patch)
     }
 
+    /// `POST /api/plaid/link-token`
+    func createLinkToken() async throws -> String {
+        struct Res: Decodable { let link_token: String }
+        let r: Res = try await post("/api/plaid/link-token")
+        return r.link_token
+    }
+
+    /// `POST /api/plaid/exchange-token`
+    @discardableResult
+    func exchangePublicToken(_ publicToken: String) async throws -> EmptyResponse {
+        struct Body: Encodable { let public_token: String }
+        return try await post("/api/plaid/exchange-token", body: Body(public_token: publicToken))
+    }
+
     /// `GET /health`
     func health() async throws -> HealthResponse {
         try await get("/health")
     }
+
+    #if DEBUG
+    /// `POST /api/debug/fire-transaction` — sandbox only, fires a DEFAULT_UPDATE webhook.
+    @discardableResult
+    func fireTestTransaction() async throws -> EmptyResponse {
+        try await post("/api/debug/fire-transaction")
+    }
+    #endif
 
     // MARK: - Internals
 
@@ -83,6 +109,14 @@ actor API {
 
     private func put<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T {
         try await request(method: "PUT", path: path, body: body)
+    }
+
+    private func post<T: Decodable>(_ path: String) async throws -> T {
+        try await request(method: "POST", path: path, body: Optional<Empty>.none)
+    }
+
+    private func post<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T {
+        try await request(method: "POST", path: path, body: body)
     }
 
     private func request<T: Decodable, B: Encodable>(
@@ -130,6 +164,7 @@ actor API {
 // MARK: - Request/response DTOs
 
 struct Empty: Encodable {}
+struct EmptyResponse: Decodable {}
 
 struct HealthResponse: Decodable {
     let ok: Bool
