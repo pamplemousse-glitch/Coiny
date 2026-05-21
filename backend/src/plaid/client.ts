@@ -88,10 +88,7 @@ export function webhookVerificationKeyGet(keyId: string): Promise<WebhookVerific
   return plaidPost('/webhook_verification_key/get', { key_id: keyId });
 }
 
-export function itemWebhookUpdate(args: {
-  access_token: string;
-  webhook: string;
-}): Promise<{ request_id: string }> {
+export function itemWebhookUpdate(args: { access_token: string; webhook: string }): Promise<{ request_id: string }> {
   return plaidPost('/item/webhook/update', {
     access_token: args.access_token,
     webhook: args.webhook,
