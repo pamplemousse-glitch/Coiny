@@ -80,7 +80,7 @@ export function transactionsSync(args: {
   count?: number;
 }): Promise<TransactionsSyncResponse> {
   const body: Record<string, unknown> = { access_token: args.access_token, count: args.count ?? 100 };
-  if (args.cursor) body['cursor'] = args.cursor;
+  if (args.cursor) body.cursor = args.cursor;
   return plaidPost('/transactions/sync', body);
 }
 

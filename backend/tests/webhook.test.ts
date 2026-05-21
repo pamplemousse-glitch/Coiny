@@ -27,11 +27,11 @@ beforeAll(async () => {
     'verify',
   ])) as { privateKey: unknown; publicKey: unknown };
   privateKey = keypair.privateKey as Key;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: exportJWK requires CryptoKey which isn't typed to accept unknown
   publicJwk = (await exportJWK(keypair.publicKey as any)) as JWK & Record<string, unknown>;
-  publicJwk['kid'] = TEST_KID;
-  publicJwk['alg'] = 'ES256';
-  publicJwk['use'] = 'sig';
+  publicJwk.kid = TEST_KID;
+  publicJwk.alg = 'ES256';
+  publicJwk.use = 'sig';
 });
 
 beforeEach(async () => {

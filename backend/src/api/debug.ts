@@ -1,8 +1,8 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
+import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { plaidItems } from '../db/schema.js';
 import { itemWebhookUpdate, sandboxItemFireWebhook } from '../plaid/client.js';
-import { config } from '../config.js';
 
 // Only registered when PLAID_ENV=sandbox — not callable in production.
 export function registerDebugApi(app: FastifyInstance): void {
