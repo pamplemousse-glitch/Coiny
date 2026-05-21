@@ -1,6 +1,10 @@
 import SwiftUI
 import UserNotifications
 
+extension Notification.Name {
+    static let coinyPushReceived = Notification.Name("CoinyPushReceived")
+}
+
 @main
 struct CoinyApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -17,6 +21,9 @@ struct CoinyApp: App {
                         .task {
                             await petStore.refresh()
                             await requestPushPermission()
+                        }
+                        .onReceive(NotificationCenter.default.publisher(for: .coinyPushReceived)) { _ in
+                            Task { await petStore.refresh() }
                         }
                 } else {
                     OnboardingView(onboardingComplete: $onboardingComplete)
@@ -66,6 +73,19 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
         print("APNs registration failed: \(error.localizedDescription)")
+    }
+
+    // Fires in background when push with content-available:1 arrives (no tap needed).
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        NotificationCenter.default.post(name: .coinyPushReceived, object: nil)
+        // Give the refresh task time to complete before iOS reclaims background time.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
+            completionHandler(.newData)
+        }
     }
 
     // Show notification banner even when app is in foreground.

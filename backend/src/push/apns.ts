@@ -28,7 +28,7 @@ export async function sendApnsPush(deviceToken: string, title: string, body: str
   const host = config.NODE_ENV === 'production' ? 'api.push.apple.com' : 'api.sandbox.push.apple.com';
 
   const payload = JSON.stringify({
-    aps: { alert: { title, body }, sound: 'default' },
+    aps: { alert: { title, body }, sound: 'default', 'content-available': 1 },
   });
 
   await new Promise<void>((resolve, reject) => {

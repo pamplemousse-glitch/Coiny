@@ -157,6 +157,7 @@ private struct LinkBankPage: View {
                     Task { @MainActor in
                         do {
                             try await API.shared.exchangePublicToken(success.publicToken)
+                            UserDefaults.standard.set(true, forKey: "bankLinked")
                             onNext()
                         } catch {
                             errorMessage = error.localizedDescription
