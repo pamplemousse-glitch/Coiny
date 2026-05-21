@@ -55,6 +55,10 @@ mobile/android/
 mobile/google-services.json
 mobile/GoogleService-Info.plist
 
+# ─── iOS ─────────────────────────────────────────────────────────
+ios/.spm-cache/
+ios/screenshots/
+
 # ─── OS / Editor ─────────────────────────────────────────────────
 .DS_Store
 Thumbs.db

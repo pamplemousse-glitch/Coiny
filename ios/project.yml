@@ -14,6 +14,8 @@ settings:
     SWIFT_VERSION: "5.10"
     IPHONEOS_DEPLOYMENT_TARGET: "17.0"
     ENABLE_USER_SCRIPT_SANDBOXING: NO
+    # Set your 10-character Apple Developer Team ID here (found at developer.apple.com/account).
+    # Also enable "Sign In with Apple" capability for bundle ID app.coiny.ios in the Developer Portal.
     DEVELOPMENT_TEAM: ""
 
 # Build configurations — Debug for local + Simulator, Release for TestFlight + App Store
@@ -56,6 +58,10 @@ targets:
           like animations, lights, and haptics when your pet has something to say.
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
+    entitlements:
+      path: Coiny/Coiny.entitlements
+      properties:
+        aps-environment: development
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.coiny.ios
@@ -64,7 +70,6 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
         GCC_TREAT_WARNINGS_AS_ERRORS: YES
-        # Free "Personal Team" signing works for Simulator + 7-day device builds
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "Apple Development"
     dependencies:
