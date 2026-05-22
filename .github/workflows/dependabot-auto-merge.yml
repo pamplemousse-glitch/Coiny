@@ -49,15 +49,4 @@ jobs:
           git commit -m "chore: regenerate pnpm-lock.yaml after Dependabot bump"
           git push
 
-  # Enable auto-merge for Dependabot minor/patch PRs once all checks pass.
-  # Major version bumps are ignored in dependabot.yml so they never reach here.
-  auto-merge:
-    name: Enable auto-merge
-    needs: lockfile
-    if: github.actor == 'dependabot[bot]'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Enable auto-merge (squash)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh pr merge --auto --squash "${{ github.event.pull_request.html_url }}"
+  # Auto-merge is handled by auto-merge.yml for all PRs.
