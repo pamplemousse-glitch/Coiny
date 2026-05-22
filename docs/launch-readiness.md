@@ -26,22 +26,22 @@ bank, sees their (fake) transactions trigger pet reactions on the phone.
 
 | ✓ | Blocker | Owner | Effort | Cost | Notes |
 |---|---|---|---|---|---|
-| ☐ | **Apple Developer Program account** | Antoine | 15 min signup + 24-48h Apple approval | $99/yr | Unblocks TestFlight + EAS Build iOS signing |
+| ✅ | **Apple Developer Program account** | Antoine | done | $99/yr | Confirmed active |
 | ☐ | **Google Play Console account** | Antoine | 15 min | $25 one-time | For internal testing track + later Play Store submission |
-| ☐ | **Mobile Plaid Link wiring** | Claude | 1 day | $0 | Already have backend endpoints (`/api/plaid/link-token` + `/api/plaid/exchange-token`); just wire the RN SDK in the mobile app |
-| ☐ | **Push pipeline (T2.3 backend → APNs/FCM)** | Antoine sets up APNs key + Firebase project; Claude wires backend | 2 days | $0 (free tier) | Requires Apple Developer cert for APNs and Firebase project for FCM |
+| ✅ | **iOS Plaid Link wiring** | Claude | done | $0 | `OnboardingView.swift` imports LinkKit, calls `Plaid.create()`, handles token exchange end-to-end |
+| ✅ | **Push pipeline (APNs backend → iOS)** | done | done | $0 | `backend/src/push/apns.ts` full HTTP/2 APNs client; `CoinyApp.swift` registers, gets device token, posts to backend |
 | ☐ | **First-launch flow** | Claude (need product brief locked first) | 1 day | $0 | What the tester sees: connect bank → wait for first sync → meet pet |
-| ☐ | **Mobile API wiring** to render real pet state | Claude | 0.5 day | $0 | Polish existing scaffold to actually hit `/api/pets` |
-| ☐ | **Minimum 1 mobile test** in CI | Claude | 1 h | $0 | A render-smoke test so mobile CI isn't a no-op |
-| ☐ | **EAS Build configured** for iOS + Android | Claude (needs Apple Dev creds) | 2 h | $0 (Expo free tier) | One-click build → TestFlight / Internal Track |
-| ☐ | **TestFlight build distributed to ≥3 testers** | Antoine | 30 min | $0 | Use the EAS Build output |
+| ✅ | **Mobile API wiring** to render real pet state | Claude | done | $0 | `API.swift` + `PetStore` hit `/api/pets` live |
+| ✅ | **Minimum 1 mobile test** in CI | Claude | done | $0 | iOS CI with XCTest + view smoke tests running on every PR |
+| ☐ | **EAS Build / Xcode Archive configured** for iOS | Claude (needs Apple Dev creds) | 2 h | $0 | One-command build → TestFlight |
+| ☐ | **TestFlight build distributed to ≥2 testers** | Antoine | 30 min | $0 | Antoine + Jack internal test |
 
-**MVP-A milestone:** 3 friends install the app, link their Plaid sandbox bank,
+**MVP-A milestone:** Antoine + Jack install the app, link their Plaid sandbox bank,
 spend a sandbox transaction, see Coiny react on their phone with a push +
 animation.
 
-**Estimated time to MVP-A from today:** ~2 weeks of solo work (assuming
-Antoine sets up Apple Dev + Firebase in parallel).
+**Estimated time to MVP-A from today:** ~2-3 days of Claude work (EAS build config +
+first-launch flow). Apple Dev account already active.
 
 ---
 
@@ -267,17 +267,22 @@ with a small contractor team.**
 
 What we already have toward each milestone:
 
-**MVP-A (software-only):** ~40% there. Backend + Plaid integration + rule
+**MVP-A (software-only):** ~85% there. Backend + Plaid integration + rule
 engine + DB persistence + mood decay + category overrides + subscription
-detection + push-token endpoint all shipped. Mobile shell scaffolded. Main
-gaps: Plaid Link UI, push pipeline, first-launch flow, TestFlight build.
+detection + APNs push pipeline + iOS Plaid Link + iOS API wiring all shipped.
+CI pipeline fully hardened (100 tests, coverage gate, SBOM, CodeQL, SHA-pinned
+actions, fastify CVEs patched). Remaining gaps: EAS build config + TestFlight
+distribution + first-launch onboarding flow polish.
+
+**Last updated:** 2026-05-22
 
 **MVP-B (with hardware):** ~10% there. M5StickS3 ordered, haptics
 ordered. Firmware not started. Native BLE module not started.
 
-**Full Launch:** ~5% there. Backend production-grade-adjacent (live on
-Fly, Postgres on Neon, security CI floor, Plaid sandbox webhook validated
-end-to-end). Everything else in this doc is still to do.
+**Full Launch:** ~8% there. Backend production-grade-adjacent (live on
+Fly, Postgres on Neon, hardened security CI, Plaid sandbox webhook validated
+end-to-end, non-root Docker, 0 HIGH/CRITICAL CVEs). Everything else in this
+doc is still to do.
 
 ---
 

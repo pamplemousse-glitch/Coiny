@@ -8,7 +8,7 @@ export function registerAccountApi(app: FastifyInstance): void {
   // access on their side) and deletes the user row. All child tables
   // cascade via FK constraints.
   app.delete('/api/account', async (req: FastifyRequest, reply: FastifyReply) => {
-    const userId = req.user.id;
+    const userId = req.user!.id;
     const items = await getItemsByUser(userId);
 
     for (const item of items) {
