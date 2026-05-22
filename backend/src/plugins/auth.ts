@@ -12,7 +12,7 @@ export async function registerAuthPlugin(app: FastifyInstance): Promise<void> {
 
   app.addHook('preHandler', async (req: FastifyRequest, reply: FastifyReply) => {
     const header = req.headers.authorization;
-    if (!header || !header.toLowerCase().startsWith('bearer ')) {
+    if (!header?.toLowerCase().startsWith('bearer ')) {
       return reply.status(401).send({ error: 'Unauthorized' });
     }
     const rawToken = header.slice(7).trim();

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
@@ -31,9 +32,29 @@ async function buildApp() {
 
   registerErrorHandler(app);
 
+  // Per-user rate limiting (with IP fallback for unauthenticated requests).
+  //
+  // We key on the SHA-256 of the bearer token rather than req.user.id because
+  // the rate-limit hook fires at onRequest, before the auth preValidation has
+  // populated req.user. SHA-256(bearer) maps 1:1 to user (it's the same hash
+  // stored in sessions.token_hash), so it's equivalent to per-user keying
+  // without requiring a DB lookup in the hot path.
+  //
+  // Invalid/missing-token requests fall through to req.ip, which gives DOS
+  // protection on /health and the public /api/auth/* endpoints.
   await app.register(rateLimit, {
-    max: 100,
-    timeWindow: '1 second',
+    max: config.RATE_LIMIT_MAX,
+    timeWindow: config.RATE_LIMIT_WINDOW,
+    keyGenerator: (req) => {
+      const header = req.headers.authorization;
+      if (header?.toLowerCase().startsWith('bearer ')) {
+        const rawToken = header.slice(7).trim();
+        if (rawToken) {
+          return `s:${createHash('sha256').update(rawToken).digest('hex')}`;
+        }
+      }
+      return req.ip;
+    },
   });
 
   // Unauthenticated routes
@@ -45,7 +66,9 @@ async function buildApp() {
     registerAuthApi(scope);
   });
 
-  // All other routes require a valid session token
+  // All other routes require a valid session token. The global rate-limiter
+  // above keys on the bearer-token hash, so each authenticated user gets a
+  // distinct bucket regardless of their network address.
   app.register(async (scope) => {
     await registerAuthPlugin(scope);
 
