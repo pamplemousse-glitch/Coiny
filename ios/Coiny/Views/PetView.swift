@@ -116,7 +116,9 @@ private struct PetLoadedView: View {
                 statRow(label: "Health", value: pet.healthScore, color: .pink, icon: "heart.fill")
                 statRow(label: "Mood", value: pet.mood, color: moodTint, icon: "sparkles")
 
-                if let last = pet.reactionHistory.first {
+                if pet.reactionHistory.isEmpty {
+                    WaitingForFirstReactionView()
+                } else if let last = pet.reactionHistory.first {
                     lastReactionCard(last)
                 }
 

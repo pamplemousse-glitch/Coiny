@@ -187,31 +187,39 @@ private struct MeetPetPage: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            Spacer()
+            Spacer(minLength: 24)
 
             Image(systemName: "face.smiling.inverse")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 180, height: 180)
+                .frame(width: 140, height: 140)
                 .foregroundStyle(.purple, .pink)
                 .scaleEffect(bounce ? 1.05 : 1.0)
                 .animation(.easeInOut(duration: 1.2).repeatForever(), value: bounce)
                 .onAppear { bounce = true }
 
-            VStack(spacing: 8) {
-                Text("Say hello to your Coiny")
-                    .font(.largeTitle.bold())
-                Text("Reactions will appear here when your bank starts sending updates.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(.horizontal)
+            Text("You're all set!")
+                .font(.largeTitle.bold())
 
-            Spacer()
+            TabView {
+                ForEach(coinyTips, id: \.title) { tip in
+                    TipCard(
+                        icon: tip.icon,
+                        iconColor: tip.color,
+                        title: tip.title,
+                        body: tip.body
+                    )
+                    .padding(.horizontal)
+                }
+            }
+            .tabViewStyle(.page)
+            .indexViewStyle(.page(backgroundDisplayMode: .always))
+            .frame(height: 220)
+
+            Spacer(minLength: 8)
 
             Button(action: onFinish) {
-                Text("Let's go")
+                Text("Let's go →")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
