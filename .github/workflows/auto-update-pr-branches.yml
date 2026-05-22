@@ -1,0 +1,33 @@
+name: Auto-update PR branches
+
+# When main advances (any merge), update every open PR that has auto-merge
+# enabled so it stays current with the base branch. This pairs with the
+# "require branches to be up to date" branch-protection rule — without it,
+# auto-merge would stall on the out-of-date check forever.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update out-of-date auto-merge PR branches
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr list \
+            --repo "${{ github.repository }}" \
+            --state open \
+            --json number,autoMergeRequest \
+            --jq '.[] | select(.autoMergeRequest != null) | .number' \
+          | while read -r pr; do
+              echo "Updating branch for PR #$pr"
+              gh api --method PUT \
+                "/repos/${{ github.repository }}/pulls/$pr/update-branch" \
+                || echo "PR #$pr: update skipped (conflict or already current)"
+            done
