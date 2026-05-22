@@ -60,6 +60,9 @@ describe('persistTransactions', () => {
       account_id: 'acc_1',
       amount: '-42.50',
       date: new Date().toISOString().slice(0, 10),
+      description: 'Whole Foods',
+      status: 'posted' as const,
+      type: 'debit',
       running_balance: null,
       details: { category: 'groceries', counterparty: { name: 'Whole Foods' } },
     };
@@ -75,6 +78,9 @@ describe('persistTransactions', () => {
       account_id: 'acc_1',
       amount: '-10.00',
       date: new Date().toISOString().slice(0, 10),
+      description: 'Test',
+      status: 'posted' as const,
+      type: 'debit',
       running_balance: null,
       details: null,
     };
@@ -93,8 +99,8 @@ describe('persistTransactions', () => {
     const { persistTransactions, getRecentOutflows } = await import('../src/store/transactions.js');
     const today = new Date().toISOString().slice(0, 10);
     await persistTransactions(testUserId, [
-      { id: 'txn_credit', account_id: 'acc_1', amount: '2400.00', date: today, running_balance: null, details: null },
-      { id: 'txn_debit', account_id: 'acc_1', amount: '-50.00', date: today, running_balance: null, details: null },
+      { id: 'txn_credit', account_id: 'acc_1', amount: '2400.00', date: today, description: 'Paycheck', status: 'posted' as const, type: 'credit', running_balance: null, details: null },
+      { id: 'txn_debit', account_id: 'acc_1', amount: '-50.00', date: today, description: 'Groceries', status: 'posted' as const, type: 'debit', running_balance: null, details: null },
     ]);
     const rows = await getRecentOutflows(testUserId, 7);
     expect(rows.some((r) => r.transactionId === 'txn_credit')).toBe(false);

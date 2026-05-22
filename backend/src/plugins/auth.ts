@@ -3,7 +3,8 @@ import { validateSession } from '../store/sessions.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
-    user: { id: string };
+    // null before the auth preHandler runs; always populated for protected routes.
+    user: { id: string } | null;
   }
 }
 
