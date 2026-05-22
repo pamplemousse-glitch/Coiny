@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
+import { registerAccountApi } from './api/account.js';
 import { registerAuthApi } from './api/auth.js';
 import { registerDebugApi } from './api/debug.js';
 import { registerDevicesApi } from './api/devices.js';
@@ -50,6 +51,7 @@ async function buildApp() {
 
     registerPlaidLinkApi(scope);
     if (config.PLAID_ENV === 'sandbox') registerDebugApi(scope);
+    registerAccountApi(scope);
     registerPetsApi(scope);
     registerSpendingApi(scope);
     registerOverridesApi(scope);

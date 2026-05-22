@@ -36,6 +36,11 @@ export async function getItem(itemId: string): Promise<(PlaidItemRow & { accessT
   return { ...row, accessToken: decryptToken(row.accessToken) };
 }
 
+export async function getItemsByUser(userId: string): Promise<(PlaidItemRow & { accessToken: string })[]> {
+  const rows = await db().select().from(plaidItems).where(eq(plaidItems.userId, userId));
+  return rows.map((row) => ({ ...row, accessToken: decryptToken(row.accessToken) }));
+}
+
 export async function upsertItem(args: { itemId: string; accessToken: string; userId: string }): Promise<void> {
   const stored = encryptToken(args.accessToken);
   await db()
