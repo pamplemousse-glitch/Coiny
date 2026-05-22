@@ -42,7 +42,7 @@ decisions, see `docs/plaid-integration.md` and inline citations.
 | **Haptic** | LRA motor + DRV2605L driver |
 | **RGB indicator** | APA102 (better color accuracy + faster refresh than WS2812) |
 | **Audio** | MAX98357A I2S amp + 8Ω dynamic speaker (or omit — use phone audio) |
-| **Battery / PMIC** | 200mAh LiPo + MAX77654 integrated PMIC + USB-C PD charging |
+| **Battery / power** | CR2450 coin cell + LDO regulator (no PMIC, no USB-C) — months of runtime |
 | **Antenna** | Chip antenna with matched network + RF shield can |
 | **Firmware OS** | Zephyr RTOS via Nordic nRF Connect SDK |
 | **BLE stack** | Nordic SoftDevice |
@@ -358,17 +358,23 @@ from the user's first day.
 
 ### Audio
 
-- **Part:** MAX98357A I2S class-D amp + small 8Ω dynamic speaker (if audio in scope)
-- **Why:** SPH0645LM4H-B is a microphone, not a speaker; MAX98357A drives a passive speaker directly over I2S with no external components; alternative is phone-only audio (likely choice for v1)
+- **Amp:** MAX98357A I2S class-D amp
+- **Speaker:** IP68-rated waterproof micro speaker (e.g. Knowles SXAM-2300 or TDK PS1240P02CT) + Gore PTFE acoustic membrane over port
+- **Why MAX98357A:** drives passive speaker directly over I2S, no external components
+- **IP68 note:** speaker port sealed with acoustic membrane; Parylene C coating on PCB provides secondary water barrier
 
-### Battery + PMIC
+### Battery + power
 
-- **Battery:** 200mAh single-cell LiPo (rechargeable)
-- **PMIC:** Maxim MAX77654 (integrated charger + 3 LDOs + fuel gauge in one
-  chip)
-- **Charging:** USB-C with PD-compliant negotiation
-- **Why MAX77654:** one chip instead of separate charging IC + fuel gauge +
-  regulators; saves PCB space, simpler firmware, used in Oura Ring Gen3
+- **Battery:** CR2450 coin cell (non-rechargeable, replaceable)
+- **Power supply:** LDO regulator only (e.g. TLV70030) — no PMIC needed
+- **Bulk capacitor:** ~100µF tantalum for LRA motor peak current buffering
+- **Runtime target:** months (vs 2–3 days for LiPo at same form factor)
+- **No USB-C:** removing the charging port is the key IP68 enabler; users
+  replace the coin cell via battery door sealed with dual EPDM 70A O-rings
+- **Why coin cell over LiPo:** eliminates MAX77654 PMIC, USB-C connector,
+  charge management firmware; enables continuous IP68 sealing; CR2450 at
+  3V nominal covers the nRF54L15 + DRV2605L + Sharp LCD operating range
+  directly via LDO
 
 ### Antenna
 
@@ -378,13 +384,27 @@ from the user's first day.
 - **Why:** RF performance is the most-overlooked hardware-quality dimension;
   bad antenna = constant BLE disconnects = product-killing
 
+### Rugged design target
+
+- **Ingress protection:** IP68 (1m / 30 min continuous submersion)
+- **Shock/vibe standard:** MIL-STD-810G Methods 514.8 + 516.8
+- **Sealing:**
+  - Display: Gorilla Glass Victus 2 (0.7–1.0mm) bonded with 3M 8146-2 OCA
+  - Battery door: dual Parker EPDM 70A O-rings with foam preload
+  - PCB: Parylene C conformal coat (25µm, vapor deposited)
+  - LRA motor: Sylgard 184 silicone potting
+- **PCB isolation:** 4× Shore 40A silicone standoff grommets (Würth 9774)
+- **Debug access:** 6-pin SWD pogo array (Mill-Max 0915) + silicone
+  plug; programming via magnetic jig — no USB-C opening in enclosure
+- **Drop protection:** TPU 90A overmold bumper rail; recessed display boss
+
 ### Industrial design
 
 - **Approach:** contracted ID firm (not DIY-OpenSCAD)
-- **Materials:** PC/ABS injection-molded shell, polished or soft-touch
-  finish; aluminum back option for premium SKU
-- **Packaging:** custom box with foam insert, printed insert card, charging
-  cable, sticker — like Apple unboxing
+- **Materials:** PC/ABS front shell + 316L stainless steel back +
+  TPU 90A overmold bumper; polished or soft-touch front finish
+- **Packaging:** custom box with foam insert, printed insert card,
+  spare coin cell, sticker — like Apple unboxing (no charging cable needed)
 
 ### Manufacturing
 
@@ -508,7 +528,10 @@ now explicitly removed:
 | M5StickS3 / ESP32-S3 prototyping path | nRF52840-DK or nRF54L15-DK from day 1 |
 | nRF52840 production target | nRF54L15 production target |
 | WS2812 RGB LED | APA102 |
-| MAX17048 fuel gauge + MCP73831 charger (two ICs) | MAX77654 integrated PMIC |
+| MAX17048 fuel gauge + MCP73831 charger (two ICs) | Coin cell + LDO — no PMIC needed |
+| MAX77654 PMIC | Removed — only relevant for LiPo charging; coin cell model doesn't need it |
+| USB-C connector + charging port | Removed — coin cell eliminates charging; enables continuous IP68 seal |
+| LiPo battery | CR2450 coin cell — months of runtime; replaceable |
 | AI-generated sprite assets | Commissioned indie pixel artist |
 | CC0 / scraped sound packs | Custom-commissioned sound design |
 | Seeed Studio / JLCPCB Assembly | Premium contract manufacturer (Jabil-tier) |

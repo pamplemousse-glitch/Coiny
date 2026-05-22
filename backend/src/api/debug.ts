@@ -25,7 +25,7 @@ const ReactQuerySchema = z.object({
 // Only registered when PLAID_ENV=sandbox — not callable in production.
 export function registerDebugApi(app: FastifyInstance): void {
   app.post('/api/debug/fire-transaction', async (req: FastifyRequest, reply: FastifyReply) => {
-    const [item] = await db().select().from(plaidItems).where(eq(plaidItems.userId, req.user.id)).limit(1);
+    const [item] = await db().select().from(plaidItems).where(eq(plaidItems.userId, req.user!.id)).limit(1);
     if (!item) {
       return reply.status(409).send({ error: 'No linked Plaid item — link a bank first.' });
     }
@@ -50,8 +50,8 @@ export function registerDebugApi(app: FastifyInstance): void {
     const preset = DEBUG_PRESETS[parsed.data.animation];
     const reaction: Reaction = { ...preset, reason: `(debug) ${parsed.data.animation}` };
 
-    await recordReaction(req.user.id, 'debug', reaction);
-    dispatchReaction(req.user.id, reaction);
+    await recordReaction(req.user!.id, 'debug', reaction);
+    dispatchReaction(req.user!.id, reaction);
     return { ok: true, reaction };
   });
 }

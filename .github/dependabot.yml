@@ -1,28 +1,32 @@
 version: 2
-updates:
-  - package-ecosystem: "npm"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    groups:
-      backend-deps:
-        patterns:
-          - "*"
-        exclude-patterns:
-          - "react*"
-          - "expo*"
-          - "@types/react*"
-    open-pull-requests-limit: 5
-    labels:
-      - "deps"
 
-  - package-ecosystem: "github-actions"
-    directory: "/"
+updates:
+  # GitHub Actions — keep action SHAs current
+  - package-ecosystem: github-actions
+    directory: /
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "chore(ci)"
     open-pull-requests-limit: 5
     labels:
-      - "deps"
-      - "ci"
+      - deps
+      - ci
+
+  # Backend npm packages (package.json lives in /backend)
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 5
+    labels:
+      - deps
+    groups:
+      backend-minor-patch:
+        update-types:
+          - minor
+          - patch
