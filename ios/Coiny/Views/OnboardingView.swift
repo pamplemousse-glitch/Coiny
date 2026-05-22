@@ -97,7 +97,8 @@ private struct LinkBankPage: View {
             VStack(spacing: 12) {
                 Text("Link your bank")
                     .font(.largeTitle.bold())
-                Text("Coiny reacts to your spending in real time. We use bank-grade encryption through Plaid — your credentials never touch our servers.")
+                Text("Coiny reacts to your spending in real time. We use bank-grade encryption through Plaid — " +
+                     "your credentials never touch our servers.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

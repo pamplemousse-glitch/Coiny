@@ -1,11 +1,11 @@
 import Foundation
 import Security
 
-/// Generic Keychain wrapper. Construct with a custom `service` for tests so
-/// tests don't read or pollute production-app Keychain items.
 // `@unchecked Sendable` because CFString (an immutable Foundation type) isn't
 // marked Sendable in the Security framework's imported headers. The properties
 // here are all immutable after init.
+/// Generic Keychain wrapper. Construct with a custom `service` for tests so
+/// tests don't read or pollute production-app Keychain items.
 struct Keychain: @unchecked Sendable {
     let service: String
     /// kSecAttrAccessible value applied on save. Defaults to the strict
