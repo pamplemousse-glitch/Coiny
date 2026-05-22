@@ -6,15 +6,15 @@ final class PetStateDecodingTests: XCTestCase {
     private let decoder: JSONDecoder = {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .custom { dec in
-            let s = try dec.singleValueContainer().decode(String.self)
+            let container = try dec.singleValueContainer()
+            let s = try container.decode(String.self)
             let fmtFrac = ISO8601DateFormatter()
             fmtFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             let fmtPlain = ISO8601DateFormatter()
             fmtPlain.formatOptions = [.withInternetDateTime]
             if let date = fmtFrac.date(from: s) { return date }
             if let date = fmtPlain.date(from: s) { return date }
-            throw DecodingError.dataCorruptedError(in: dec.singleValueContainer() as! SingleValueDecodingContainer,
-                                                   debugDescription: "Cannot decode date: \(s)")
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date: \(s)")
         }
         return d
     }()

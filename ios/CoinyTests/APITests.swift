@@ -259,7 +259,8 @@ final class APITests: XCTestCase {
             {"token": "tok-nil-email", "user_id": "user-456"}
             """)
         try await api.signInWithApple(identityToken: "id-tok", userId: "sub-456", email: nil)
-        XCTAssertTrue(await api.isSignedIn)
+        let isSignedIn = await api.isSignedIn
+        XCTAssertTrue(isSignedIn)
     }
 
     func testSignInFailureDoesNotPersistToken() async {
@@ -273,7 +274,8 @@ final class APITests: XCTestCase {
             // expected
         }
 
-        XCTAssertFalse(await api.isSignedIn)
+        let isSignedIn = await api.isSignedIn
+        XCTAssertFalse(isSignedIn)
         XCTAssertNil(store.load())
     }
 }
