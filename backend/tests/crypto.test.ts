@@ -22,13 +22,7 @@ describe('encryptString / decryptString', () => {
 
   it('round-trips arbitrary UTF-8 strings', async () => {
     const { encryptString, decryptString } = await import('../src/util/crypto.js');
-    const inputs = [
-      'simple ascii',
-      'emoji 🎉',
-      'json {"key":"val","n":42}',
-      'a'.repeat(10_000),
-      '',
-    ];
+    const inputs = ['simple ascii', 'emoji 🎉', 'json {"key":"val","n":42}', 'a'.repeat(10_000), ''];
     for (const input of inputs) {
       expect(decryptString(encryptString(input))).toBe(input);
     }
@@ -56,7 +50,7 @@ describe('encryptString / decryptString', () => {
     const ct = encryptString('secret');
     const [iv, tag, ciphertext] = ct.split(':') as [string, string, string];
     // Flip first byte of auth tag.
-    const badTag = ((parseInt(tag.slice(0, 2), 16) ^ 0xff).toString(16).padStart(2, '0')) + tag.slice(2);
+    const badTag = (parseInt(tag.slice(0, 2), 16) ^ 0xff).toString(16).padStart(2, '0') + tag.slice(2);
     const tampered = `${iv}:${badTag}:${ciphertext}`;
     expect(() => decryptString(tampered)).toThrow();
   });
