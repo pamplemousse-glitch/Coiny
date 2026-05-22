@@ -11,6 +11,7 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
+
 export const users = pgTable(
   'users',
   {
@@ -111,3 +112,40 @@ export const categoryOverrides = pgTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.merchantName] })],
 );
+
+// Coinbase connections — one per user; mode='dev_key' uses server-side API key,
+// mode='oauth' stores per-user OAuth tokens.
+export const coinbaseConnections = pgTable('coinbase_connections', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  accessToken: text('access_token'),
+  refreshToken: text('refresh_token'),
+  tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true }),
+  mode: text('mode').notNull().default('dev_key'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Zerion wallets — many per user, one row per wallet address.
+export const zerionWallets = pgTable(
+  'zerion_wallets',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    address: text('address').notNull(),
+    label: text('label'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('zerion_wallets_user_address_idx').on(t.userId, t.address)],
+);
+
+// Spinwheel connections — one per user; spinwheelUserId links to the Spinwheel platform.
+export const spinwheelConnections = pgTable('spinwheel_connections', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  spinwheelUserId: text('spinwheel_user_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
