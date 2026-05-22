@@ -30,10 +30,10 @@ bank, sees their (fake) transactions trigger pet reactions on the phone.
 | ☐ | **Google Play Console account** | Antoine | 15 min | $25 one-time | For internal testing track + later Play Store submission |
 | ✅ | **iOS Plaid Link wiring** | Claude | done | $0 | `OnboardingView.swift` imports LinkKit, calls `Plaid.create()`, handles token exchange end-to-end |
 | ✅ | **Push pipeline (APNs backend → iOS)** | done | done | $0 | `backend/src/push/apns.ts` full HTTP/2 APNs client; `CoinyApp.swift` registers, gets device token, posts to backend |
-| ☐ | **First-launch flow** | Claude (need product brief locked first) | 1 day | $0 | What the tester sees: connect bank → wait for first sync → meet pet |
+| ✅ | **First-launch flow** | Claude | done | $0 | Goals → bank link → push opt-in → pet view; education card carousel + "Coiny is watching…" empty state (PR #70) |
 | ✅ | **Mobile API wiring** to render real pet state | Claude | done | $0 | `API.swift` + `PetStore` hit `/api/pets` live |
-| ✅ | **Minimum 1 mobile test** in CI | Claude | done | $0 | iOS CI with XCTest + view smoke tests running on every PR |
-| ☐ | **EAS Build / Xcode Archive configured** for iOS | Claude (needs Apple Dev creds) | 2 h | $0 | One-command build → TestFlight |
+| ✅ | **Minimum 1 mobile test** in CI | Claude | done | $0 | 25+ XCTest unit tests + UITest launch; iOS CI on macOS-15 |
+| ☐ | **Xcode Archive configured for TestFlight** | Antoine (needs DEVELOPMENT_TEAM set) | 2 h | $0 | Fill `ios/project.yml:19` Team ID → `xcodegen generate` → Archive → Distribute |
 | ☐ | **TestFlight build distributed to ≥2 testers** | Antoine | 30 min | $0 | Antoine + Jack internal test |
 
 **MVP-A milestone:** Antoine + Jack install the app, link their Plaid sandbox bank,
@@ -263,26 +263,35 @@ with a small contractor team.**
 
 ---
 
-## Status snapshot (as of 2026-05-20)
+## Status snapshot (as of 2026-05-22)
 
 What we already have toward each milestone:
 
-**MVP-A (software-only):** ~85% there. Backend + Plaid integration + rule
-engine + DB persistence + mood decay + category overrides + subscription
-detection + APNs push pipeline + iOS Plaid Link + iOS API wiring all shipped.
-CI pipeline fully hardened (100 tests, coverage gate, SBOM, CodeQL, SHA-pinned
-actions, fastify CVEs patched). Remaining gaps: EAS build config + TestFlight
-distribution + first-launch onboarding flow polish.
+**MVP-A (software-only):** ~95% there. Backend complete: Plaid + rule engine +
+multi-user auth + Apple Sign In + APNs push + DELETE /api/account + per-user rate
+limiting + AES-256-GCM for both access_token and reaction column + debug react
+endpoint + 7 DB migrations + 56 Vitest tests passing. iOS complete: SwiftUI app,
+DI API client, 25+ XCTest tests, full onboarding flow, education card carousel,
+waiting-for-first-reaction empty state. CI hardened: SHA-pinned actions, SBOM,
+CodeQL, SwiftLint, 80% coverage gate, Semgrep, Gitleaks, Trivy, docs-only skip gate,
+always-reporting checks (no more required-check deadlocks).
 
-**Last updated:** 2026-05-22
+Remaining gap: Antoine must set `DEVELOPMENT_TEAM` in `ios/project.yml:19`, enable
+Sign In with Apple in Developer Portal, then archive and upload to TestFlight.
+That's a 30-minute manual step — no code work left for MVP-A.
 
-**MVP-B (with hardware):** ~10% there. M5StickS3 ordered, haptics
-ordered. Firmware not started. Native BLE module not started.
+External integrations (CoinGecko, Coinbase, Zerion, Spinwheel) are implemented on
+the backend (PR #71 pending merge). iOS display of crypto reactions is next after
+that merges.
 
-**Full Launch:** ~8% there. Backend production-grade-adjacent (live on
-Fly, Postgres on Neon, hardened security CI, Plaid sandbox webhook validated
-end-to-end, non-root Docker, 0 HIGH/CRITICAL CVEs). Everything else in this
-doc is still to do.
+**MVP-B (with hardware):** ~10% there. nRF52840 dev kit still to order,
+DRV2605L haptic driver + coin motor ordered. Firmware not started. Native BLE
+module not started.
+
+**Full Launch:** ~10% there. Backend production-grade-adjacent (live on
+Fly, Postgres on Neon, hardened CI, Plaid sandbox webhook validated end-to-end,
+non-root Docker, 0 HIGH/CRITICAL CVEs, GLBA right-to-delete implemented). Remaining:
+LLC + compliance docs + AWS migration + App Store submission + hardware certification.
 
 ---
 
