@@ -1,0 +1,80 @@
+name: iOS CI
+
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-ci.yml'
+  pull_request:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-ci.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# macOS runner minutes are 10× the cost of Linux. The path filter above keeps
+# this job from firing on backend-only PRs.
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      # Pin Xcode for reproducibility. Bump in lockstep with ios/project.yml's
+      # `xcodeVersion`. macos-15 ships Xcode 16.x; if the exact patch is missing
+      # on a future image, drop the `.1` to fall back to the latest 16.x.
+      DEVELOPER_DIR: /Applications/Xcode_16.app/Contents/Developer
+      SCHEME: Coiny
+      DESTINATION: 'platform=iOS Simulator,name=iPhone 16,OS=latest'
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Show Xcode + simulators
+        run: |
+          xcodebuild -version
+          xcrun simctl list devices available iOS | head -40
+
+      - name: Install build tools
+        run: |
+          brew install xcodegen xcbeautify
+
+      - name: Cache SwiftPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('ios/project.yml') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build + test
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Coiny.xcodeproj \
+            -scheme "$SCHEME" \
+            -sdk iphonesimulator \
+            -destination "$DESTINATION" \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            | xcbeautify --renderer github-actions
+
+      - name: Upload xcresult bundle on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-xcresult
+          path: ios/TestResults.xcresult
+          retention-days: 7
