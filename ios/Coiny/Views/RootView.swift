@@ -13,6 +13,16 @@ struct RootView: View {
                     Label("Spending", systemImage: "creditcard")
                 }
 
+            CryptoView()
+                .tabItem {
+                    Label("Crypto", systemImage: "bitcoinsign.circle")
+                }
+
+            SpinwheelView()
+                .tabItem {
+                    Label("Debt", systemImage: "banknote")
+                }
+
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gear")

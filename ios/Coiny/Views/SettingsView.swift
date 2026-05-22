@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(PetStore.self) private var store
     @AppStorage("onboardingComplete") private var onboardingComplete: Bool = false
+    @State private var showDeleteAlert = false
 
     var body: some View {
         NavigationStack {
@@ -41,6 +42,23 @@ struct SettingsView: View {
                     LabeledContent("Version") {
                         Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0")
                             .font(.caption.monospaced())
+                    }
+                }
+
+                Section("Account") {
+                    Button("Delete Account", role: .destructive) {
+                        showDeleteAlert = true
+                    }
+                    .alert("Delete Account?", isPresented: $showDeleteAlert) {
+                        Button("Delete", role: .destructive) {
+                            Task {
+                                _ = try? await API.shared.deleteAccount()
+                                onboardingComplete = false
+                            }
+                        }
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text("This will permanently delete your account and all data. This cannot be undone.")
                     }
                 }
 

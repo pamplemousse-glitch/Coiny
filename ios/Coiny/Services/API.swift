@@ -36,15 +36,14 @@ actor API {
 
         self.decoder = JSONDecoder()
         // Backend sends ISO-8601 with fractional seconds.
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         decoder.dateDecodingStrategy = .custom { dec in
             let container = try dec.singleValueContainer()
             let raw = try container.decode(String.self)
-            if let date = formatter.date(from: raw) {
+            let withFractional = ISO8601DateFormatter()
+            withFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = withFractional.date(from: raw) {
                 return date
             }
-            // Fallback: plain ISO-8601 without fractional seconds
             let plain = ISO8601DateFormatter()
             plain.formatOptions = [.withInternetDateTime]
             if let date = plain.date(from: raw) {
@@ -57,22 +56,94 @@ actor API {
         }
     }
 
-    // MARK: - Endpoints
+    // MARK: - Pet
 
-    /// `GET /api/pets`
     func getPetState() async throws -> PetState {
         try await get("/api/pets")
     }
 
-    /// `PUT /api/pets/goals`
     @discardableResult
     func updateGoals(_ patch: GoalsPatch) async throws -> PetGoals {
         try await put("/api/pets/goals", body: patch)
     }
 
-    /// `GET /health`
     func health() async throws -> HealthResponse {
         try await get("/health")
+    }
+
+    // MARK: - Account
+
+    @discardableResult
+    func deleteAccount() async throws -> EmptyResponse {
+        try await delete("/api/account")
+    }
+
+    // MARK: - Coinbase
+
+    func getCoinbaseStatus() async throws -> CoinbaseStatus {
+        try await get("/api/coinbase/status")
+    }
+
+    @discardableResult
+    func connectCoinbaseDevKey() async throws -> EmptyResponse {
+        try await post("/api/coinbase/connect/dev-key")
+    }
+
+    func disconnectCoinbase() async throws {
+        try await deleteVoid("/api/coinbase/connect")
+    }
+
+    func syncCoinbase() async throws -> SyncResult {
+        try await post("/api/coinbase/sync")
+    }
+
+    // MARK: - Zerion
+
+    func getZerionWallets() async throws -> [ZerionWallet] {
+        try await get("/api/zerion/wallets")
+    }
+
+    func addZerionWallet(address: String, label: String?) async throws -> ZerionWallet {
+        struct Body: Encodable { let address: String; let label: String? }
+        return try await post("/api/zerion/wallets", body: Body(address: address, label: label))
+    }
+
+    func removeZerionWallet(address: String) async throws {
+        try await deleteVoid("/api/zerion/wallets/\(address)")
+    }
+
+    func getZerionPortfolio() async throws -> ZerionPortfolio {
+        try await get("/api/zerion/portfolio")
+    }
+
+    func syncZerion() async throws -> SyncResult {
+        try await post("/api/zerion/sync")
+    }
+
+    // MARK: - Spinwheel
+
+    func getSpinwheelStatus() async throws -> SpinwheelStatus {
+        try await get("/api/spinwheel/status")
+    }
+
+    @discardableResult
+    func sendSpinwheelOtp(phone: String, dateOfBirth: String) async throws -> EmptyResponse {
+        struct Body: Encodable { let phone: String; let dateOfBirth: String }
+        return try await post("/api/spinwheel/connect/sms", body: Body(phone: phone, dateOfBirth: dateOfBirth))
+    }
+
+    @discardableResult
+    func verifySpinwheelOtp(phone: String, code: String) async throws -> EmptyResponse {
+        struct Body: Encodable { let phone: String; let code: String }
+        return try await post("/api/spinwheel/connect/sms/verify", body: Body(phone: phone, code: code))
+    }
+
+    func getSpinwheelDebts() async throws -> SpinwheelDebtsResponse {
+        try await get("/api/spinwheel/debts")
+    }
+
+    func disconnectSpinwheel() async throws {
+        try await deleteVoid("/api/spinwheel/connect")
     }
 
     // MARK: - Internals
@@ -81,8 +152,46 @@ actor API {
         try await request(method: "GET", path: path, body: Optional<Empty>.none)
     }
 
+    private func post<T: Decodable>(_ path: String) async throws -> T {
+        try await request(method: "POST", path: path, body: Optional<Empty>.none)
+    }
+
+    private func post<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T {
+        try await request(method: "POST", path: path, body: body)
+    }
+
     private func put<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T {
         try await request(method: "PUT", path: path, body: body)
+    }
+
+    private func delete<T: Decodable>(_ path: String) async throws -> T {
+        try await request(method: "DELETE", path: path, body: Optional<Empty>.none)
+    }
+
+    /// DELETE for endpoints that return 204 No Content (no body to decode).
+    private func deleteVoid(_ path: String) async throws {
+        guard let url = URL(string: path, relativeTo: Endpoint.baseURL) else {
+            throw APIError.invalidURL
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        req.addValue("application/json", forHTTPHeaderField: "Accept")
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: req)
+        } catch {
+            throw APIError.transport(underlying: error)
+        }
+        guard let http = response as? HTTPURLResponse else {
+            throw APIError.http(status: -1, body: "no response")
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw APIError.http(
+                status: http.statusCode,
+                body: String(data: data, encoding: .utf8) ?? ""
+            )
+        }
     }
 
     private func request<T: Decodable, B: Encodable>(
@@ -127,9 +236,10 @@ actor API {
     }
 }
 
-// MARK: - Request/response DTOs
+// MARK: - DTOs
 
 struct Empty: Encodable {}
+struct EmptyResponse: Decodable {}
 
 struct HealthResponse: Decodable {
     let ok: Bool
@@ -140,4 +250,59 @@ struct GoalsPatch: Encodable {
     var savingsGoal: Int?
     var paycheckMinAmount: Int?
     var largePurchaseThreshold: Int?
+}
+
+struct SyncResult: Decodable {
+    let reacted: Int
+}
+
+struct CoinbaseStatus: Decodable {
+    let connected: Bool
+    let mode: String?
+}
+
+struct ZerionWallet: Decodable, Identifiable {
+    let id: String
+    let userId: String
+    let address: String
+    let label: String?
+    let createdAt: Date
+}
+
+struct ZerionPortfolio: Decodable {
+    let data: ZerionPortfolioData
+
+    struct ZerionPortfolioData: Decodable {
+        let attributes: ZerionPortfolioAttributes
+    }
+
+    struct ZerionPortfolioAttributes: Decodable {
+        let total: ZerionPortfolioTotal
+    }
+
+    struct ZerionPortfolioTotal: Decodable {
+        let positions: Double
+    }
+}
+
+struct SpinwheelStatus: Decodable {
+    let connected: Bool
+}
+
+struct SpinwheelDebt: Decodable, Identifiable {
+    let id: String
+    let debtType: String?
+    let balance: Double?
+    let monthlyPayment: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case debtType = "type"
+        case balance
+        case monthlyPayment
+    }
+}
+
+struct SpinwheelDebtsResponse: Decodable {
+    let debts: [SpinwheelDebt]
 }
