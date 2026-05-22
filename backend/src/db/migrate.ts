@@ -17,9 +17,3 @@ export async function runMigrations(): Promise<void> {
     await migrate(database as never, { migrationsFolder });
   }
 }
-
-// Seed the singleton pet_state row if it doesn't exist yet. Idempotent.
-export async function seedPetStateIfMissing(): Promise<void> {
-  const { petState } = await import('./schema.js');
-  await db().insert(petState).values({ id: 1 }).onConflictDoNothing();
-}

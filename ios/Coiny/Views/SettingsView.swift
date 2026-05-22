@@ -3,11 +3,29 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(PetStore.self) private var store
     @AppStorage("onboardingComplete") private var onboardingComplete: Bool = false
-    @State private var showDeleteAlert = false
+    @AppStorage("bankLinked") private var bankLinked: Bool = false
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("Bank account") {
+                    if bankLinked {
+                        LabeledContent("Status") {
+                            Label("Linked", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                        }
+                        Button("Unlink bank", role: .destructive) {
+                            bankLinked = false
+                            onboardingComplete = false
+                        }
+                    } else {
+                        LabeledContent("Status") {
+                            Text("Not linked")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
                 if let goals = store.pet?.goals {
                     Section("Current goals") {
                         LabeledContent("Savings target") {
@@ -25,7 +43,8 @@ struct SettingsView: View {
                     }
 
                     Section("Weekly budgets") {
-                        ForEach(goals.weeklyBudgetByCategory.sorted(by: { $0.key < $1.key }), id: \.key) { category, amount in
+                        ForEach(goals.weeklyBudgetByCategory.sorted(by: { $0.key < $1.key }),
+                                id: \.key) { category, amount in
                             LabeledContent(category.capitalized) {
                                 Text("$\(Int(amount))")
                                     .monospacedDigit()
@@ -46,19 +65,8 @@ struct SettingsView: View {
                 }
 
                 Section("Account") {
-                    Button("Delete Account", role: .destructive) {
-                        showDeleteAlert = true
-                    }
-                    .alert("Delete Account?", isPresented: $showDeleteAlert) {
-                        Button("Delete", role: .destructive) {
-                            Task {
-                                _ = try? await API.shared.deleteAccount()
-                                onboardingComplete = false
-                            }
-                        }
-                        Button("Cancel", role: .cancel) {}
-                    } message: {
-                        Text("This will permanently delete your account and all data. This cannot be undone.")
+                    Button("Sign out", role: .destructive) {
+                        NotificationCenter.default.post(name: .coinySignedOut, object: nil)
                     }
                 }
 

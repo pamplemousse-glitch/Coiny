@@ -14,12 +14,19 @@ settings:
     SWIFT_VERSION: "5.10"
     IPHONEOS_DEPLOYMENT_TARGET: "17.0"
     ENABLE_USER_SCRIPT_SANDBOXING: NO
+    # Set your 10-character Apple Developer Team ID here (found at developer.apple.com/account).
+    # Also enable "Sign In with Apple" capability for bundle ID app.coiny.ios in the Developer Portal.
     DEVELOPMENT_TEAM: ""
 
 # Build configurations — Debug for local + Simulator, Release for TestFlight + App Store
 configs:
   Debug: debug
   Release: release
+
+packages:
+  LinkKit:
+    url: https://github.com/plaid/plaid-ios
+    from: "5.6.0"
 
 targets:
   Coiny:
@@ -36,7 +43,7 @@ targets:
       path: Coiny/Info.plist
       properties:
         CFBundleDisplayName: Coiny
-        CFBundleShortVersionString: "0.1.0"
+        CFBundleShortVersionString: "0.2.0"
         CFBundleVersion: "1"
         UILaunchScreen:
           UIColorName: ""
@@ -45,11 +52,16 @@ targets:
         UIRequiresFullScreen: false
         UIBackgroundModes:
           - bluetooth-central
+          - remote-notification
         NSBluetoothAlwaysUsageDescription: >-
           Coiny pairs with your Coiny device over Bluetooth to deliver reactions
           like animations, lights, and haptics when your pet has something to say.
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
+    entitlements:
+      path: Coiny/Coiny.entitlements
+      properties:
+        aps-environment: development
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.coiny.ios
@@ -58,10 +70,11 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
         GCC_TREAT_WARNINGS_AS_ERRORS: YES
-        # Free "Personal Team" signing works for Simulator + 7-day device builds
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "Apple Development"
-    dependencies: []
+    dependencies:
+      - package: LinkKit
+        product: LinkKit
 
   CoinyTests:
     type: bundle.unit-test
@@ -78,18 +91,34 @@ targets:
         BUNDLE_LOADER: "$(TEST_HOST)"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Coiny.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Coiny"
 
+  CoinyUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: CoinyUITests
+    dependencies:
+      - target: Coiny
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.coiny.ios.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Coiny
+
 schemes:
   Coiny:
     build:
       targets:
         Coiny: all
         CoinyTests: [test]
+        CoinyUITests: [test]
     run:
       config: Debug
     test:
       config: Debug
       targets:
         - CoinyTests
+        - CoinyUITests
     profile:
       config: Release
     analyze:

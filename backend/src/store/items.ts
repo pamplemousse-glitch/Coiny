@@ -1,22 +1,30 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { plaidItems } from '../db/schema.js';
+import { decryptString, encryptString } from '../util/crypto.js';
 
 export type PlaidItemRow = typeof plaidItems.$inferSelect;
 
-export async function getItem(itemId: string): Promise<PlaidItemRow | null> {
+export async function getItem(itemId: string): Promise<(PlaidItemRow & { accessToken: string }) | null> {
   const rows = await db().select().from(plaidItems).where(eq(plaidItems.itemId, itemId));
-  return rows[0] ?? null;
+  const row = rows[0];
+  if (!row) return null;
+  return { ...row, accessToken: decryptString(row.accessToken) };
 }
 
-export async function upsertItem(args: { itemId: string; accessToken: string }): Promise<void> {
+export async function getItemsByUser(userId: string): Promise<(PlaidItemRow & { accessToken: string })[]> {
+  const rows = await db().select().from(plaidItems).where(eq(plaidItems.userId, userId));
+  return rows.map((row) => ({ ...row, accessToken: decryptString(row.accessToken) }));
+}
+
+export async function upsertItem(args: { itemId: string; accessToken: string; userId: string }): Promise<void> {
+  const stored = encryptString(args.accessToken);
   await db()
     .insert(plaidItems)
-    .values({ itemId: args.itemId, accessToken: args.accessToken })
+    .values({ itemId: args.itemId, accessToken: stored, userId: args.userId })
     .onConflictDoUpdate({
       target: plaidItems.itemId,
-      // On re-link the access_token may change; preserve cursor + sync state.
-      set: { accessToken: args.accessToken, disabled: false },
+      set: { accessToken: stored, disabled: false },
     });
 }
 

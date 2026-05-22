@@ -2,7 +2,7 @@ import { createHash, webcrypto } from 'node:crypto';
 import { exportJWK, type JWK, SignJWT } from 'jose';
 import { type Dispatcher, getGlobalDispatcher, MockAgent, setGlobalDispatcher } from 'undici';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { resetDatabase } from './db-helper.js';
+import { resetDatabase, testUserId } from './db-helper.js';
 
 const flushImmediate = () => new Promise<void>((r) => setImmediate(r));
 async function flushAll() {
@@ -13,8 +13,6 @@ const TEST_KID = 'test-kid-1';
 const TEST_ITEM_ID = 'item_test_1';
 const TEST_ACCESS_TOKEN = 'access-sandbox-test';
 
-// webcrypto.subtle.generateKey returns CryptoKey | CryptoKeyPair depending on alg;
-// for ECDSA it's always a pair.
 type Key = Parameters<typeof SignJWT.prototype.sign>[0];
 let privateKey: Key;
 let publicJwk: JWK & Record<string, unknown>;
@@ -27,11 +25,11 @@ beforeAll(async () => {
     'verify',
   ])) as { privateKey: unknown; publicKey: unknown };
   privateKey = keypair.privateKey as Key;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: exportJWK requires CryptoKey which isn't typed to accept unknown
   publicJwk = (await exportJWK(keypair.publicKey as any)) as JWK & Record<string, unknown>;
-  publicJwk['kid'] = TEST_KID;
-  publicJwk['alg'] = 'ES256';
-  publicJwk['use'] = 'sig';
+  publicJwk.kid = TEST_KID;
+  publicJwk.alg = 'ES256';
+  publicJwk.use = 'sig';
 });
 
 beforeEach(async () => {
@@ -44,7 +42,7 @@ beforeEach(async () => {
   });
 
   const { upsertItem } = await import('../src/store/items.js');
-  await upsertItem({ itemId: TEST_ITEM_ID, accessToken: TEST_ACCESS_TOKEN });
+  await upsertItem({ itemId: TEST_ITEM_ID, accessToken: TEST_ACCESS_TOKEN, userId: testUserId });
 
   originalDispatcher = getGlobalDispatcher();
   mockAgent = new MockAgent();
@@ -219,7 +217,7 @@ describe('POST /webhooks/plaid', () => {
 
     await flushAll();
     expect(spy).toHaveBeenCalledOnce();
-    expect(spy.mock.calls[0]?.[0]?.animation).toBe('celebrate');
+    expect(spy.mock.calls[0]?.[1]?.animation).toBe('celebrate');
 
     await app.close();
   });
@@ -329,6 +327,249 @@ describe('POST /webhooks/plaid', () => {
     const item = await getItem(TEST_ITEM_ID);
     expect(item?.disabled).toBe(true);
 
+    await app.close();
+  });
+
+  it('returns 400 on malformed JSON body', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const malformedBody = Buffer.from('{not valid json');
+    const signed = await signWebhook(malformedBody.toString());
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/webhooks/plaid',
+      headers: { 'content-type': 'application/json', 'plaid-verification': signed },
+      body: malformedBody,
+    });
+    expect(res.statusCode).toBe(400);
+    await app.close();
+  });
+
+  it('no-ops gracefully for unknown item_id (link-flow race)', async () => {
+    const dispatchModule = await import('../src/reactions/dispatch.js');
+    const spy = vi.spyOn(dispatchModule, 'dispatchReaction');
+    spy.mockClear();
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const body = JSON.stringify({
+      webhook_type: 'TRANSACTIONS',
+      webhook_code: 'SYNC_UPDATES_AVAILABLE',
+      item_id: 'item_does_not_exist',
+      environment: 'sandbox',
+    });
+    const signed = await signWebhook(body);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/webhooks/plaid',
+      headers: { 'content-type': 'application/json', 'plaid-verification': signed },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+    await flushAll();
+    expect(spy).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('skips sync for disabled item', async () => {
+    const { disableItem } = await import('../src/store/items.js');
+    await disableItem(TEST_ITEM_ID);
+
+    const dispatchModule = await import('../src/reactions/dispatch.js');
+    const spy = vi.spyOn(dispatchModule, 'dispatchReaction');
+    spy.mockClear();
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const body = buildSyncEnvelope();
+    const signed = await signWebhook(body);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/webhooks/plaid',
+      headers: { 'content-type': 'application/json', 'plaid-verification': signed },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+    await flushAll();
+    expect(spy).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it('handles has_more pagination — fetches all pages before reacting', async () => {
+    const { markInitialSyncComplete } = await import('../src/store/items.js');
+    await markInitialSyncComplete(TEST_ITEM_ID);
+
+    const accounts = [
+      {
+        account_id: 'acc_test_1',
+        balances: { current: 5000, available: 5000, iso_currency_code: 'USD', limit: null },
+        name: 'Checking',
+        official_name: null,
+        type: 'depository',
+        subtype: 'checking',
+      },
+    ];
+
+    // Page 1 — has_more: true
+    mockAgent
+      .get('https://sandbox.plaid.com')
+      .intercept({ path: '/transactions/sync', method: 'POST' })
+      .reply(200, {
+        accounts,
+        added: [buildAddedTx({ transaction_id: 'txn_page1', amount: -10 })],
+        modified: [],
+        removed: [],
+        next_cursor: 'cursor-page2',
+        has_more: true,
+        transactions_update_status: 'HISTORICAL_UPDATE_COMPLETE',
+        request_id: 'req_p1',
+      });
+
+    // Page 2 — has_more: false (paycheck triggers reaction)
+    mockAgent
+      .get('https://sandbox.plaid.com')
+      .intercept({ path: '/transactions/sync', method: 'POST' })
+      .reply(200, {
+        accounts,
+        added: [buildAddedTx({ transaction_id: 'txn_page2_paycheck', amount: -2400 })],
+        modified: [],
+        removed: [],
+        next_cursor: 'cursor-done',
+        has_more: false,
+        transactions_update_status: 'HISTORICAL_UPDATE_COMPLETE',
+        request_id: 'req_p2',
+      });
+
+    const dispatchModule = await import('../src/reactions/dispatch.js');
+    const spy = vi.spyOn(dispatchModule, 'dispatchReaction');
+    spy.mockClear();
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const body = buildSyncEnvelope();
+    const signed = await signWebhook(body);
+
+    await app.inject({
+      method: 'POST',
+      url: '/webhooks/plaid',
+      headers: { 'content-type': 'application/json', 'plaid-verification': signed },
+      body,
+    });
+    await flushAll();
+
+    // Cursor should be updated to last page's cursor.
+    const { getItem } = await import('../src/store/items.js');
+    const item = await getItem(TEST_ITEM_ID);
+    expect(item?.cursor).toBe('cursor-done');
+
+    await app.close();
+  });
+
+  it('logs modified and removed counts without crashing', async () => {
+    const { markInitialSyncComplete } = await import('../src/store/items.js');
+    await markInitialSyncComplete(TEST_ITEM_ID);
+
+    mockSync({
+      accounts: [
+        {
+          account_id: 'acc_test_1',
+          balances: { current: 5000, available: 5000, iso_currency_code: 'USD', limit: null },
+          name: 'Checking',
+          official_name: null,
+          type: 'depository',
+          subtype: 'checking',
+        },
+      ],
+      added: [],
+      modified: [buildAddedTx({ transaction_id: 'txn_mod_1', amount: -50 })],
+      removed: [{ transaction_id: 'txn_removed_1' }],
+      next_cursor: 'cursor-mod',
+      has_more: false,
+      transactions_update_status: 'HISTORICAL_UPDATE_COMPLETE',
+      request_id: 'req_mod',
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const body = buildSyncEnvelope();
+    const signed = await signWebhook(body);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/webhooks/plaid',
+      headers: { 'content-type': 'application/json', 'plaid-verification': signed },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+    await flushAll();
+    // No crash — cursor still advances.
+    const { getItem } = await import('../src/store/items.js');
+    const item = await getItem(TEST_ITEM_ID);
+    expect(item?.cursor).toBe('cursor-mod');
+    await app.close();
+  });
+
+  it('concurrent webhooks for same item — both return 200 and only dispatch once per unique tx', async () => {
+    const { markInitialSyncComplete } = await import('../src/store/items.js');
+    await markInitialSyncComplete(TEST_ITEM_ID);
+
+    const syncResponse = {
+      accounts: [
+        {
+          account_id: 'acc_test_1',
+          balances: { current: 5000, available: 5000, iso_currency_code: 'USD', limit: null },
+          name: 'Checking',
+          official_name: null,
+          type: 'depository',
+          subtype: 'checking',
+        },
+      ],
+      added: [buildAddedTx({ transaction_id: 'txn_concurrent' })],
+      modified: [],
+      removed: [],
+      next_cursor: 'cursor-concurrent',
+      has_more: false,
+      transactions_update_status: 'HISTORICAL_UPDATE_COMPLETE',
+      request_id: 'req_concurrent',
+    };
+    // Queue two responses for two concurrent Plaid sync calls.
+    mockSync(syncResponse);
+    mockSync(syncResponse);
+
+    const dispatchModule = await import('../src/reactions/dispatch.js');
+    const spy = vi.spyOn(dispatchModule, 'dispatchReaction');
+    spy.mockClear();
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const body = buildSyncEnvelope();
+    const signed = await signWebhook(body);
+
+    // Fire two webhooks simultaneously.
+    const [res1, res2] = await Promise.all([
+      app.inject({
+        method: 'POST',
+        url: '/webhooks/plaid',
+        headers: { 'content-type': 'application/json', 'plaid-verification': signed },
+        body,
+      }),
+      app.inject({
+        method: 'POST',
+        url: '/webhooks/plaid',
+        headers: { 'content-type': 'application/json', 'plaid-verification': signed },
+        body,
+      }),
+    ]);
+
+    expect(res1.statusCode).toBe(200);
+    expect(res2.statusCode).toBe(200);
+    await flushAll();
+
+    // claimEvent idempotency gate must prevent double-dispatch.
+    expect(spy.mock.calls.length).toBeLessThanOrEqual(1);
     await app.close();
   });
 });

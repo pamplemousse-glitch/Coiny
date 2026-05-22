@@ -11,12 +11,10 @@ import { disableItem, getItem, markInitialSyncComplete, setCursor } from '../sto
 import { applyHealthDelta, getGoals, recordReaction } from '../store/pet.js';
 import { persistTransactions } from '../store/transactions.js';
 
-// Webhook code dispatch — see docs/plaid-integration.md §6.
 const SYNC_TRIGGERS = new Set(['SYNC_UPDATES_AVAILABLE', 'DEFAULT_UPDATE']);
 
 export function registerPlaidWebhook(app: FastifyInstance): void {
   app.register(async (scope) => {
-    // We need the raw body bytes for the SHA-256 in the JWT payload.
     scope.addContentTypeParser('application/json', { parseAs: 'buffer' }, (_req, body, done) => {
       done(null, body);
     });
@@ -48,7 +46,6 @@ export function registerPlaidWebhook(app: FastifyInstance): void {
         'plaid webhook verified',
       );
 
-      // Always ack fast; do the work async.
       reply.status(200).send({ ok: true });
 
       setImmediate(async () => {
@@ -65,7 +62,6 @@ export function registerPlaidWebhook(app: FastifyInstance): void {
 async function dispatch(app: FastifyInstance, envelope: PlaidWebhookEnvelope): Promise<void> {
   const { webhook_type, webhook_code, item_id } = envelope;
 
-  // ITEM-scoped webhooks
   if (webhook_type === 'ITEM') {
     if (webhook_code === 'USER_PERMISSION_REVOKED' && item_id) {
       app.log.warn({ item_id }, 'plaid item permission revoked — disabling');
@@ -88,9 +84,12 @@ async function dispatch(app: FastifyInstance, envelope: PlaidWebhookEnvelope): P
 
   const item = await getItem(item_id);
   if (!item) {
-    // Race: webhook arrived before exchange-token persisted the item. Plaid
-    // will redeliver after exchange completes (next SYNC_UPDATES_AVAILABLE).
     app.log.warn({ item_id }, 'plaid webhook for unknown item — likely link-flow race');
+    return;
+  }
+
+  if (!item.userId) {
+    app.log.error({ item_id }, 'plaid item has no user_id — skipping');
     return;
   }
 
@@ -99,20 +98,19 @@ async function dispatch(app: FastifyInstance, envelope: PlaidWebhookEnvelope): P
     return;
   }
 
-  await syncItem(app, item);
+  await syncItem(app, item as typeof item & { userId: string });
 }
 
 async function syncItem(
   app: FastifyInstance,
-  item: { itemId: string; accessToken: string; cursor: string | null; initialSyncComplete: boolean },
+  item: { itemId: string; accessToken: string; cursor: string | null; initialSyncComplete: boolean; userId: string },
 ): Promise<void> {
+  const { userId } = item;
   const originalCursor = item.cursor ?? undefined;
   let cursor = originalCursor;
   let accountBalances = new Map<string, number | null>();
   const allAdded: import('../plaid/types.js').PlaidTransaction[] = [];
 
-  // Loop until has_more is false. On mutation-during-pagination error,
-  // restart the entire loop from originalCursor.
   for (;;) {
     let res: Awaited<ReturnType<typeof transactionsSync>>;
     try {
@@ -137,11 +135,7 @@ async function syncItem(
 
     if (res.modified.length > 0 || res.removed.length > 0) {
       app.log.info(
-        {
-          item_id: item.itemId,
-          modified: res.modified.length,
-          removed: res.removed.length,
-        },
+        { item_id: item.itemId, modified: res.modified.length, removed: res.removed.length },
         'plaid sync delta — ignoring modified/removed in phase 1',
       );
     }
@@ -149,25 +143,17 @@ async function syncItem(
     if (!res.has_more) break;
   }
 
-  // Persist the new cursor before any rule eval; if we crash here, redelivery
-  // re-processes added transactions but transaction-level idempotency dedupes.
   if (cursor) await setCursor(item.itemId, cursor);
 
-  // Adapt all txs once — needed both for persistence (subscription detection)
-  // and (post-initial) for rule evaluation.
   const adapted = await Promise.all(
-    allAdded.map((plaidTx) => plaidTxToInternal(plaidTx, accountBalances.get(plaidTx.account_id) ?? null)),
+    allAdded.map((plaidTx) => plaidTxToInternal(plaidTx, accountBalances.get(plaidTx.account_id) ?? null, userId)),
   );
 
-  // Persist for subscription detection. Idempotent via onConflictDoNothing.
-  await persistTransactions(adapted);
+  await persistTransactions(userId, adapted);
 
   if (!item.initialSyncComplete) {
     app.log.info(
-      {
-        item_id: item.itemId,
-        transactions: allAdded.length,
-      },
+      { item_id: item.itemId, transactions: allAdded.length },
       'plaid initial sync — ingesting without rule evaluation',
     );
     await markInitialSyncComplete(item.itemId);
@@ -176,11 +162,9 @@ async function syncItem(
 
   if (adapted.length === 0) return;
 
-  const goals = await getGoals();
+  const goals = await getGoals(userId);
 
   for (const tx of adapted) {
-    // Transaction-level idempotency: skip if we've already processed this
-    // transaction_id (e.g., from a redelivered webhook).
     if (!(await claimEvent(tx.id))) {
       app.log.debug({ transaction_id: tx.id }, 'plaid tx already processed');
       continue;
@@ -188,9 +172,9 @@ async function syncItem(
 
     const match = evaluate(tx, goals);
     if (match) {
-      await applyHealthDelta(deltaForEvent(match.name));
-      await recordReaction(match.name, match.reaction);
-      dispatchReaction(match.reaction);
+      await applyHealthDelta(userId, deltaForEvent(match.name));
+      await recordReaction(userId, match.name, match.reaction);
+      dispatchReaction(userId, match.reaction);
     }
   }
 }

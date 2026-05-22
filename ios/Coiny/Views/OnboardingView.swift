@@ -1,8 +1,9 @@
+import LinkKit
 import SwiftUI
 
 /// Three-screen onboarding flow:
 /// 1. Welcome — introduce Coiny
-/// 2. Link Bank — explain the Plaid connection
+/// 2. Link Bank — Plaid Link flow
 /// 3. Meet Pet — celebrate completion + segue to RootView
 struct OnboardingView: View {
     @Binding var onboardingComplete: Bool
@@ -78,6 +79,11 @@ private struct LinkBankPage: View {
     let onNext: () -> Void
     let onSkip: () -> Void
 
+    @State private var isLoading = false
+    @State private var showLink = false
+    @State private var linkHandler: Handler?
+    @State private var errorMessage: String?
+
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
@@ -91,23 +97,39 @@ private struct LinkBankPage: View {
             VStack(spacing: 12) {
                 Text("Link your bank")
                     .font(.largeTitle.bold())
-                Text("Coiny reacts to your spending in real time. We use bank-grade encryption through Plaid — your credentials never touch our servers.")
+                Text("Coiny reacts to your spending in real time. We use bank-grade encryption through Plaid — " +
+                     "your credentials never touch our servers.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
             .padding(.horizontal)
 
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+
             Spacer()
 
             VStack(spacing: 12) {
-                // TODO: launch Plaid Link iOS SDK — wired in a follow-up PR.
-                Button(action: onNext) {
-                    Label("Link with Plaid", systemImage: "link")
-                        .frame(maxWidth: .infinity)
+                Button(action: startLinking) {
+                    Group {
+                        if isLoading {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Label("Link with Plaid", systemImage: "link")
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
+                .disabled(isLoading)
 
                 Button("Skip for now", action: onSkip)
                     .font(.footnote)
@@ -115,6 +137,45 @@ private struct LinkBankPage: View {
             }
             .padding(.horizontal)
             .padding(.bottom, 60)
+        }
+        .sheet(isPresented: $showLink) {
+            if let handler = linkHandler {
+                LinkPresenter(handler: handler)
+                    .ignoresSafeArea()
+            }
+        }
+    }
+
+    private func startLinking() {
+        isLoading = true
+        errorMessage = nil
+        Task { @MainActor in
+            defer { isLoading = false }
+            do {
+                let token = try await API.shared.createLinkToken()
+                var cfg = LinkTokenConfiguration(token: token) { success in
+                    showLink = false
+                    Task { @MainActor in
+                        do {
+                            try await API.shared.exchangePublicToken(success.publicToken)
+                            UserDefaults.standard.set(true, forKey: "bankLinked")
+                            onNext()
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
+                    }
+                }
+                cfg.onExit = { _ in showLink = false }
+                switch Plaid.create(cfg) {
+                case .success(let handler):
+                    linkHandler = handler
+                    showLink = true
+                case .failure(let error):
+                    errorMessage = error.localizedDescription
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 }
@@ -126,31 +187,39 @@ private struct MeetPetPage: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            Spacer()
+            Spacer(minLength: 24)
 
             Image(systemName: "face.smiling.inverse")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 180, height: 180)
+                .frame(width: 140, height: 140)
                 .foregroundStyle(.purple, .pink)
                 .scaleEffect(bounce ? 1.05 : 1.0)
                 .animation(.easeInOut(duration: 1.2).repeatForever(), value: bounce)
                 .onAppear { bounce = true }
 
-            VStack(spacing: 8) {
-                Text("Say hello to your Coiny")
-                    .font(.largeTitle.bold())
-                Text("Reactions will appear here when your bank starts sending updates.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(.horizontal)
+            Text("You're all set!")
+                .font(.largeTitle.bold())
 
-            Spacer()
+            TabView {
+                ForEach(coinyTips, id: \.title) { tip in
+                    TipCard(
+                        icon: tip.icon,
+                        iconColor: tip.color,
+                        title: tip.title,
+                        description: tip.description
+                    )
+                    .padding(.horizontal)
+                }
+            }
+            .tabViewStyle(.page)
+            .indexViewStyle(.page(backgroundDisplayMode: .always))
+            .frame(height: 220)
+
+            Spacer(minLength: 8)
 
             Button(action: onFinish) {
-                Text("Let's go")
+                Text("Let's go →")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
@@ -158,6 +227,37 @@ private struct MeetPetPage: View {
             .padding(.horizontal)
             .padding(.bottom, 60)
         }
+    }
+}
+
+// MARK: - Plaid Link presenter
+
+/// Thin UIViewControllerRepresentable that opens the Plaid Link flow.
+/// Placed inside a .sheet so dismissal is handled by setting showLink=false
+/// in the LinkTokenConfiguration callbacks.
+private struct LinkPresenter: UIViewControllerRepresentable {
+    let handler: Handler
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIViewController(context: Context) -> UIViewController {
+        UIViewController()
+    }
+
+    func updateUIViewController(_ vc: UIViewController, context: Context) {
+        guard !context.coordinator.hasOpened else { return }
+        context.coordinator.hasOpened = true
+        handler.open(presentUsing: .custom { linkVC in
+            guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  let window = scene.keyWindow else { return }
+            var presenter: UIViewController = window.rootViewController!
+            while let next = presenter.presentedViewController { presenter = next }
+            presenter.present(linkVC, animated: true)
+        })
+    }
+
+    final class Coordinator {
+        var hasOpened = false
     }
 }
 

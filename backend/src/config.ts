@@ -12,6 +12,36 @@ const configSchema = z
     PLAID_WEBHOOK_URL: z.string().default(''),
 
     DATABASE_URL: z.string().default(''),
+
+    APNS_KEY_ID: z.string().default(''),
+    APNS_TEAM_ID: z.string().default(''),
+    APNS_KEY: z.string().default(''),
+    APNS_BUNDLE_ID: z.string().default('app.coiny.ios'),
+
+    // 64-char hex string (32 raw bytes) for AES-256-GCM encryption of Plaid access_token.
+    // Required in production. If empty in dev/test, access tokens are stored plaintext.
+    DATA_ENCRYPTION_KEY: z.string().default(''),
+
+    // Apple bundle ID used to verify the `aud` claim in Apple identity tokens.
+    APPLE_BUNDLE_ID: z.string().default('app.coiny.ios'),
+
+    // Rate-limit knobs. Per-key budget for the global limiter (keyed on
+    // bearer-token hash, falling back to req.ip for unauthenticated traffic).
+    RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+    RATE_LIMIT_WINDOW: z.string().default('1 second'),
+
+    // CoinGecko price API (Pro tier). Empty = free tier (no header sent).
+    COINGECKO_API_KEY: z.string().default(''),
+
+    // Coinbase Advanced Trade API (ECDSA key pair).
+    COINBASE_API_KEY_ID: z.string().default(''),
+    COINBASE_API_KEY_SECRET: z.string().default(''), // PEM-encoded EC private key
+
+    // Zerion DeFi portfolio API.
+    ZERION_API_KEY: z.string().default(''),
+
+    // Spinwheel student/consumer debt API.
+    SPINWHEEL_SECRET_KEY: z.string().default(''),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {
@@ -41,6 +71,13 @@ const configSchema = z
           code: z.ZodIssueCode.custom,
           path: ['DATABASE_URL'],
           message: 'DATABASE_URL required in production',
+        });
+      }
+      if (!data.DATA_ENCRYPTION_KEY) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['DATA_ENCRYPTION_KEY'],
+          message: 'DATA_ENCRYPTION_KEY required in production',
         });
       }
     }
