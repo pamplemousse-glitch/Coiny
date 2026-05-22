@@ -32,7 +32,7 @@
     "@biomejs/biome": "^2.4.15",
     "@electric-sql/pglite": "^0.4.5",
     "@types/node": "^22.10.0",
-    "@vitest/coverage-v8": "^2.1.9",
+    "@vitest/coverage-v8": "^4.1.7",
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
