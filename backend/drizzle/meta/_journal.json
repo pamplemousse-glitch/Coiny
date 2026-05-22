@@ -43,6 +43,13 @@
       "when": 1748836800000,
       "tag": "0005_multi_user",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779580800000,
+      "tag": "0006_encrypt_reaction",
+      "breakpoints": true
     }
   ]
 }

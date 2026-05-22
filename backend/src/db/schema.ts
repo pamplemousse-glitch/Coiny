@@ -10,7 +10,6 @@ import {
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
-import type { Reaction } from '../reactions/types.js';
 
 export const users = pgTable(
   'users',
@@ -54,12 +53,16 @@ export const petState = pgTable('pet_state', {
   largePurchaseThreshold: integer('large_purchase_threshold').notNull().default(200),
 });
 
+// `reaction` holds an AES-256-GCM-encrypted JSON blob (envelope format from
+// util/crypto.ts). Stores a free-text `reason` field plus the animation/sound/
+// led/duration payload — none of which should land in DB backups in plaintext.
+// Migration 0006 dropped the old jsonb column and re-added it as text.
 export const reactionHistory = pgTable('reaction_history', {
   id: serial('id').primaryKey(),
   userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
   at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
   eventType: text('event_type').notNull(),
-  reaction: jsonb('reaction').$type<Reaction>().notNull(),
+  reaction: text('reaction').notNull(),
 });
 
 export const processedEvents = pgTable('processed_events', {
