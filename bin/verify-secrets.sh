@@ -8,7 +8,6 @@ for s in \
   coiny-zerion-sandbox-api-key \
   coiny-paypal-sandbox-client-id \
   coiny-paypal-sandbox-secret \
-  coiny-spinwheel-secret-key \
   coiny-spinwheel-sandbox-secret-key; do
   security find-generic-password -a "$USER" -s "$s" -w &>/dev/null \
     && echo "✓ $s" \
