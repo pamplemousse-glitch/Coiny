@@ -11,8 +11,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Detects whether the PR touches any code (not just docs/markdown).
+  # Downstream jobs use `needs.has-code.outputs.result` to skip themselves
+  # on docs-only PRs. Skipped jobs via `if:` count as passing for required
+  # status checks — so merge gates are never blocked by a skipped scan.
+  has-code:
+    name: Detect code changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      result: ${{ steps.check.outputs.result }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0
+      - id: check
+        run: |
+          BASE=${{ github.event.pull_request.base.sha || 'HEAD~1' }}
+          if git diff --name-only "$BASE"...HEAD | grep -qvE '^(docs/|\.github/workflows/|.*\.md$)'; then
+            echo "result=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=false" >> "$GITHUB_OUTPUT"
+          fi
+
   semgrep:
     name: Semgrep SAST
+    needs: has-code
+    if: needs.has-code.outputs.result == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -44,6 +70,8 @@ jobs:
 
   trivy:
     name: Trivy container scan
+    needs: has-code
+    if: needs.has-code.outputs.result == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -75,6 +103,8 @@ jobs:
 
   sbom:
     name: SBOM (CycloneDX)
+    needs: has-code
+    if: needs.has-code.outputs.result == 'true'
     runs-on: ubuntu-latest
     # PCI DSS 4.0 §6.3.2 — generate and retain a SBOM for every build.
     permissions:
