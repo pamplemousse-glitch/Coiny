@@ -30,3 +30,15 @@ updates:
         update-types:
           - minor
           - patch
+    # Major version bumps for these packages require intentional migration
+    # (breaking API changes, lockfile regeneration, test updates). Ignore
+    # them in Dependabot — handle manually when ready.
+    ignore:
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitest/coverage-v8"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
