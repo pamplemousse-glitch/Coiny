@@ -1,26 +1,30 @@
--- Coinbase connections (one per user, stores OAuth tokens or dev-key marker)
-CREATE TABLE coinbase_connections (
-  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  access_token TEXT,
-  refresh_token TEXT,
-  token_expires_at TIMESTAMPTZ,
-  mode TEXT NOT NULL DEFAULT 'dev_key',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE "coinbase_connections" (
+	"user_id" text PRIMARY KEY NOT NULL,
+	"access_token" text,
+	"refresh_token" text,
+	"token_expires_at" timestamp with time zone,
+	"mode" text DEFAULT 'dev_key' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
-
--- Zerion wallets (many per user — one per wallet address)
-CREATE TABLE zerion_wallets (
-  id SERIAL PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  address TEXT NOT NULL,
-  label TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE(user_id, address)
+--> statement-breakpoint
+CREATE TABLE "zerion_wallets" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" text NOT NULL,
+	"address" text NOT NULL,
+	"label" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
-
--- Spinwheel connections (one per user)
-CREATE TABLE spinwheel_connections (
-  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-  spinwheel_user_id TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+--> statement-breakpoint
+CREATE TABLE "spinwheel_connections" (
+	"user_id" text PRIMARY KEY NOT NULL,
+	"spinwheel_user_id" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
+--> statement-breakpoint
+ALTER TABLE "coinbase_connections" ADD CONSTRAINT "coinbase_connections_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+--> statement-breakpoint
+ALTER TABLE "zerion_wallets" ADD CONSTRAINT "zerion_wallets_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+--> statement-breakpoint
+ALTER TABLE "spinwheel_connections" ADD CONSTRAINT "spinwheel_connections_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+--> statement-breakpoint
+CREATE UNIQUE INDEX "zerion_wallets_user_address_idx" ON "zerion_wallets" USING btree ("user_id","address");
