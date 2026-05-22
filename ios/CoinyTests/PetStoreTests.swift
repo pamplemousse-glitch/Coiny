@@ -127,8 +127,52 @@ final class PetStoreTests: XCTestCase {
         let api = FakeAPI()
         let store = PetStore(api: api)
         XCTAssertNil(store.pet, "idle → nil")
+    }
 
-        // Can't easily get into .loading state without racing; .idle → .loaded
-        // and .failed → nil are the load-bearing branches.
+    func testMultipleConsecutiveFailuresKeepLastLoaded() async {
+        let api = FakeAPI()
+        api.enqueue(.success(Self.samplePet))
+        let store = PetStore(api: api)
+        await store.refresh()
+        XCTAssertEqual(store.pet?.healthScore, 73)
+
+        struct Boom: Error {}
+        for _ in 0..<3 {
+            api.enqueue(.failure(Boom()))
+            await store.refresh()
+        }
+        // Three consecutive failures — still showing last good state.
+        XCTAssertEqual(store.state, .loaded(Self.samplePet))
+        XCTAssertEqual(store.pet?.healthScore, 73)
+    }
+
+    func testConcurrentRefreshCallsBothComplete() async {
+        let api = FakeAPI()
+        // Enqueue two responses for two concurrent refreshes.
+        api.enqueue(.success(Self.samplePet))
+        api.enqueue(.success(Self.secondPet))
+        let store = PetStore(api: api)
+
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await store.refresh() }
+            group.addTask { await store.refresh() }
+        }
+
+        // After both complete the store should be in a loaded state — not crashed or nil.
+        XCTAssertNotNil(store.pet)
+        if case .loaded = store.state { } else {
+            XCTFail("Expected .loaded after concurrent refreshes, got \(store.state)")
+        }
+    }
+
+    func testFailedStateStringMatchesErrorDescription() async {
+        let api = FakeAPI()
+        struct KnownError: LocalizedError {
+            var errorDescription: String? { "known error message" }
+        }
+        api.enqueue(.failure(KnownError()))
+        let store = PetStore(api: api)
+        await store.refresh()
+        XCTAssertEqual(store.state, .failed("known error message"))
     }
 }
