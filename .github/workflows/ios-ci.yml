@@ -2,21 +2,39 @@ name: iOS CI
 
 on:
   pull_request:
-    paths:
-      - 'ios/**'
-      - '.github/workflows/ios-ci.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# macOS runner minutes are 10× the cost of Linux. The path filter above keeps
-# this job from firing on backend-only PRs.
+# macOS runner minutes are 10× the cost of Linux. The `changes` gate below
+# keeps the expensive `test` job from running on backend-only or docs-only PRs,
+# while the `result` job always reports so required-check branch protection
+# never deadlocks.
 permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      has_ios: ${{ steps.check.outputs.result }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0
+      - id: check
+        run: |
+          BASE=${{ github.event.pull_request.base.sha || 'HEAD~1' }}
+          if git diff --name-only "$BASE"...HEAD | grep -qE '^(ios/|\.github/workflows/ios-ci\.yml)'; then
+            echo "result=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=false" >> "$GITHUB_OUTPUT"
+          fi
+
   test:
+    needs: changes
+    if: needs.changes.outputs.has_ios == 'true'
     runs-on: macos-15
     timeout-minutes: 30
     env:
@@ -101,3 +119,20 @@ jobs:
           name: ios-xcresult
           path: ios/TestResults.xcresult
           retention-days: 7
+
+  result:
+    needs: [changes, test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate
+        run: |
+          if [[ "${{ needs.changes.outputs.has_ios }}" != "true" ]]; then
+            echo "No iOS changes – skipping."
+            exit 0
+          fi
+          if [[ "${{ needs.test.result }}" == "success" ]]; then
+            exit 0
+          fi
+          echo "iOS tests ${{ needs.test.result }}."
+          exit 1
