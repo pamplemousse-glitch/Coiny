@@ -24,6 +24,11 @@ const configSchema = z
 
     // Apple bundle ID used to verify the `aud` claim in Apple identity tokens.
     APPLE_BUNDLE_ID: z.string().default('app.coiny.ios'),
+
+    // Rate-limit knobs. Per-key budget for the global limiter (keyed on
+    // bearer-token hash, falling back to req.ip for unauthenticated traffic).
+    RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
+    RATE_LIMIT_WINDOW: z.string().default('1 second'),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {
