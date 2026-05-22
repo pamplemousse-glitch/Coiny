@@ -31,30 +31,37 @@ struct TipCard: View {
     }
 }
 
+struct Tip {
+    let icon: String
+    let color: Color
+    let title: String
+    let description: String
+}
+
 /// The four education tips shown consistently across onboarding and the empty state.
-let coinyTips: [(icon: String, color: Color, title: String, description: String)] = [
-    (
+let coinyTips: [Tip] = [
+    Tip(
         icon: "dollarsign.circle.fill",
         color: .green,
         title: "Paychecks make Coiny celebrate",
         description: "Big deposits trigger a full celebration with lights and sound."
     ),
-    (
+    Tip(
         icon: "cart.fill",
         color: .orange,
         title: "Overspending triggers concern",
         description: "Go over your weekly budget in groceries or dining and Coiny will notice."
     ),
-    (
+    Tip(
         icon: "target",
         color: .blue,
         title: "Hit your savings goal",
         description: "Reach 25%, 50%, or 100% of your savings target for a milestone reaction."
     ),
-    (
+    Tip(
         icon: "creditcard.fill",
         color: .red,
         title: "Large purchases get attention",
         description: "Transactions over your threshold make Coiny look twice."
-    )
+    ),
 ]
