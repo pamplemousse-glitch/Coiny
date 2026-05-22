@@ -54,11 +54,7 @@ async function spinwheelGet<T>(path: string, schema: z.ZodType<T>): Promise<T> {
 /**
  * Initiates an SMS OTP challenge for the given phone number.
  */
-export async function sendSmsOtp(params: {
-  phone: string;
-  dateOfBirth: string;
-  extUserId: string;
-}): Promise<void> {
+export async function sendSmsOtp(params: { phone: string; dateOfBirth: string; extUserId: string }): Promise<void> {
   const OkSchema = z.object({}).passthrough();
   await spinwheelPost(
     '/v1/users/otp/send',
@@ -113,9 +109,6 @@ export type SpinwheelDebt = z.infer<typeof SpinwheelDebtSchema>;
  * Returns all debts for a Spinwheel user.
  */
 export async function getDebts(spinwheelUserId: string): Promise<SpinwheelDebt[]> {
-  const result = await spinwheelGet(
-    `/v1/users/${encodeURIComponent(spinwheelUserId)}/debts`,
-    DebtsResponseSchema,
-  );
+  const result = await spinwheelGet(`/v1/users/${encodeURIComponent(spinwheelUserId)}/debts`, DebtsResponseSchema);
   return result.debts;
 }

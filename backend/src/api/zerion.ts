@@ -3,8 +3,8 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/client.js';
 import { zerionWallets } from '../db/schema.js';
-import { evaluateExternalEvent } from '../reactions/external.js';
 import { dispatchReaction } from '../reactions/dispatch.js';
+import { evaluateExternalEvent } from '../reactions/external.js';
 import { claimEvent } from '../store/events.js';
 import { recordReaction } from '../store/pet.js';
 import { getPortfolio, getTransactions } from '../zerion/client.js';
@@ -17,10 +17,7 @@ const AddWalletBodySchema = z.object({
 export function registerZerionApi(app: FastifyInstance): void {
   // GET /api/zerion/wallets
   app.get('/api/zerion/wallets', async (req: FastifyRequest) => {
-    const rows = await db()
-      .select()
-      .from(zerionWallets)
-      .where(eq(zerionWallets.userId, req.user!.id));
+    const rows = await db().select().from(zerionWallets).where(eq(zerionWallets.userId, req.user!.id));
 
     return rows.map((r) => ({
       id: r.id,
@@ -48,17 +45,20 @@ export function registerZerionApi(app: FastifyInstance): void {
   });
 
   // DELETE /api/zerion/wallets/:address
-  app.delete('/api/zerion/wallets/:address', async (req: FastifyRequest<{ Params: { address: string } }>, reply: FastifyReply) => {
-    const { address } = req.params;
-    const userId = req.user!.id;
+  app.delete(
+    '/api/zerion/wallets/:address',
+    async (req: FastifyRequest<{ Params: { address: string } }>, reply: FastifyReply) => {
+      const { address } = req.params;
+      const userId = req.user!.id;
 
-    await db()
-      .delete(zerionWallets)
-      .where(and(eq(zerionWallets.userId, userId), eq(zerionWallets.address, address)));
+      await db()
+        .delete(zerionWallets)
+        .where(and(eq(zerionWallets.userId, userId), eq(zerionWallets.address, address)));
 
-    req.log.info({ userId }, 'zerion wallet removed');
-    return reply.status(204).send();
-  });
+      req.log.info({ userId }, 'zerion wallet removed');
+      return reply.status(204).send();
+    },
+  );
 
   // GET /api/zerion/portfolio
   app.get('/api/zerion/portfolio', async (req: FastifyRequest) => {
@@ -108,11 +108,10 @@ export function registerZerionApi(app: FastifyInstance): void {
         const opType = tx.type.toLowerCase();
         const isInbound = tx.direction === 'in';
 
-        if (isInbound || opType === 'receive' || opType === 'deposit') {
-          eventType = 'wallet_receive';
-        } else if (opType === 'trade' && isInbound) {
-          // DeFi trade where assets flow in = yield-like
+        if (opType === 'trade' && isInbound) {
           eventType = 'defi_yield';
+        } else if (isInbound || opType === 'receive' || opType === 'deposit') {
+          eventType = 'wallet_receive';
         }
 
         if (!eventType) continue;
