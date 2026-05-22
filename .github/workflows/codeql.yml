@@ -18,19 +18,25 @@ concurrency:
 permissions:
   contents: read
   security-events: write  # Required to upload SARIF results to GitHub code scanning.
+  actions: read           # Required by analyze step to read workflow-run info for telemetry — without this the run fails post-analysis with "Resource not accessible by integration".
 
 jobs:
   analyze:
     name: CodeQL — ${{ matrix.language }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 45
 
     strategy:
       fail-fast: false
       matrix:
-        # javascript-typescript covers both the backend (Node/TS) and any JS in the repo.
-        # swift covers the iOS app.
-        language: [javascript-typescript, swift]
+        # javascript-typescript covers backend (Node/TS) + any JS. Runs on Linux.
+        # Swift's CodeQL extractor is macOS-only — Linux fails Initialize with
+        # "Swift analysis is only supported on macOS runner images."
+        include:
+          - language: javascript-typescript
+            os: ubuntu-latest
+          - language: swift
+            os: macos-latest
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
