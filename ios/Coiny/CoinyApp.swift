@@ -12,7 +12,7 @@ struct CoinyApp: App {
     @State private var petStore = PetStore()
 
     // Auth state — seeded synchronously from Keychain on launch.
-    @State private var isSignedIn: Bool = Keychain.load(account: Keychain.sessionTokenAccount) != nil
+    @State private var isSignedIn: Bool = KeychainSessionStore().load() != nil
     @AppStorage("onboardingComplete") private var onboardingComplete: Bool = false
 
     var body: some Scene {

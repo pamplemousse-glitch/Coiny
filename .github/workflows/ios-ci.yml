@@ -22,14 +22,22 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 30
     env:
-      # Pin Xcode for reproducibility. Bump in lockstep with ios/project.yml's
-      # `xcodeVersion`. macos-15 ships Xcode 16.x; if the exact patch is missing
-      # on a future image, drop the `.1` to fall back to the latest 16.x.
-      DEVELOPER_DIR: /Applications/Xcode_16.app/Contents/Developer
       SCHEME: Coiny
 
     steps:
       - uses: actions/checkout@v6
+
+      # Pin to the newest Xcode 16.x available on the runner image. Each Xcode
+      # 16 minor bundles a different iOS SDK (16.0→18.0, 16.1→18.1, …) and the
+      # runner image only preinstalls simulator runtimes for the *newer* SDKs.
+      # Pinning 16.0 explicitly broke CI: it wanted an iOS 18.0 runtime that
+      # nobody preinstalls anymore. Take the highest 16.x instead.
+      - name: Select latest Xcode 16.x
+        run: |
+          XCODE_PATH=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE_PATH" ]; then XCODE_PATH=$(ls -d /Applications/Xcode*.app | sort -V | tail -1); fi
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+          echo "Using $XCODE_PATH"
 
       - name: Show Xcode + simulators
         run: |
