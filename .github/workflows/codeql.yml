@@ -1,0 +1,52 @@
+name: CodeQL (nightly deep SAST)
+
+# Semgrep runs on every PR (fast, shallow). CodeQL runs nightly (slow, deep
+# semantic/dataflow analysis). Together they cover different vulnerability
+# classes — CodeQL catches multi-step tainted data flows that Semgrep misses.
+on:
+  schedule:
+    # 02:00 UTC nightly — off-peak, won't compete with PR runs.
+    - cron: '0 2 * * *'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  security-events: write  # Required to upload SARIF results to GitHub code scanning.
+
+jobs:
+  analyze:
+    name: CodeQL — ${{ matrix.language }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # javascript-typescript covers both the backend (Node/TS) and any JS in the repo.
+        # swift covers the iOS app.
+        language: [javascript-typescript, swift]
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@9e0d7b8d25671d64c341c19c0152d693099fb5ba  # v4.35.5
+        with:
+          languages: ${{ matrix.language }}
+          # security-and-quality covers OWASP Top 10 + code quality issues.
+          # More thorough than the default "security-extended" suite.
+          queries: security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@9e0d7b8d25671d64c341c19c0152d693099fb5ba  # v4.35.5
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@9e0d7b8d25671d64c341c19c0152d693099fb5ba  # v4.35.5
+        with:
+          category: /language:${{ matrix.language }}
