@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { SignJWT, importPKCS8 } from 'jose';
+import { importPKCS8, SignJWT } from 'jose';
 import { z } from 'zod';
 import { config } from '../config.js';
 

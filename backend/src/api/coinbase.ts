@@ -1,14 +1,14 @@
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { getAccounts, getTransactions } from '../coinbase/client.js';
+import { getPrices } from '../coingecko/client.js';
 import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { coinbaseConnections } from '../db/schema.js';
+import { dispatchReaction } from '../reactions/dispatch.js';
 import { evaluateExternalEvent } from '../reactions/external.js';
-import { dispatchReaction, } from '../reactions/dispatch.js';
 import { claimEvent } from '../store/events.js';
 import { recordReaction } from '../store/pet.js';
-import { getPrices } from '../coingecko/client.js';
-import { getAccounts, getTransactions } from '../coinbase/client.js';
 
 // Mapping from Coinbase currency symbol to CoinGecko coin ID.
 // Incomplete by design — we only need the major coins for price enrichment.
@@ -30,10 +30,7 @@ const SYMBOL_TO_COINGECKO_ID: Record<string, string> = {
 export function registerCoinbaseApi(app: FastifyInstance): void {
   // GET /api/coinbase/status
   app.get('/api/coinbase/status', async (req: FastifyRequest) => {
-    const rows = await db()
-      .select()
-      .from(coinbaseConnections)
-      .where(eq(coinbaseConnections.userId, req.user!.id));
+    const rows = await db().select().from(coinbaseConnections).where(eq(coinbaseConnections.userId, req.user!.id));
     const row = rows[0];
     if (!row) return { connected: false, mode: null };
     return { connected: true, mode: row.mode as 'dev_key' | 'oauth' };
@@ -68,10 +65,7 @@ export function registerCoinbaseApi(app: FastifyInstance): void {
   app.post('/api/coinbase/sync', async (req: FastifyRequest, reply: FastifyReply) => {
     const userId = req.user!.id;
 
-    const rows = await db()
-      .select()
-      .from(coinbaseConnections)
-      .where(eq(coinbaseConnections.userId, userId));
+    const rows = await db().select().from(coinbaseConnections).where(eq(coinbaseConnections.userId, userId));
     if (!rows[0]) {
       return reply.status(409).send({ error: 'No Coinbase connection found. Connect first.' });
     }

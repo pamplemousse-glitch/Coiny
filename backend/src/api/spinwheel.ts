@@ -18,10 +18,7 @@ const VerifyOtpBodySchema = z.object({
 export function registerSpinwheelApi(app: FastifyInstance): void {
   // GET /api/spinwheel/status
   app.get('/api/spinwheel/status', async (req: FastifyRequest) => {
-    const rows = await db()
-      .select()
-      .from(spinwheelConnections)
-      .where(eq(spinwheelConnections.userId, req.user!.id));
+    const rows = await db().select().from(spinwheelConnections).where(eq(spinwheelConnections.userId, req.user!.id));
     return { connected: rows.length > 0 };
   });
 
@@ -49,13 +46,10 @@ export function registerSpinwheelApi(app: FastifyInstance): void {
 
     const { spinwheelUserId } = await verifySmsOtp({ phone, code, extUserId: userId });
 
-    await db()
-      .insert(spinwheelConnections)
-      .values({ userId, spinwheelUserId })
-      .onConflictDoUpdate({
-        target: spinwheelConnections.userId,
-        set: { spinwheelUserId },
-      });
+    await db().insert(spinwheelConnections).values({ userId, spinwheelUserId }).onConflictDoUpdate({
+      target: spinwheelConnections.userId,
+      set: { spinwheelUserId },
+    });
 
     req.log.info({ userId }, 'spinwheel connection established');
     return { ok: true };
@@ -64,10 +58,7 @@ export function registerSpinwheelApi(app: FastifyInstance): void {
   // GET /api/spinwheel/debts
   app.get('/api/spinwheel/debts', async (req: FastifyRequest, reply: FastifyReply) => {
     const userId = req.user!.id;
-    const rows = await db()
-      .select()
-      .from(spinwheelConnections)
-      .where(eq(spinwheelConnections.userId, userId));
+    const rows = await db().select().from(spinwheelConnections).where(eq(spinwheelConnections.userId, userId));
 
     const connection = rows[0];
     if (!connection) {

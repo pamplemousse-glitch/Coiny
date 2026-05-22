@@ -63,9 +63,12 @@ export async function getPrices(coinIds: string[]): Promise<Map<string, { usd: n
  * Returns the small image URL for a coin, or null if not found.
  */
 export async function getCoinImageUrl(coinId: string): Promise<string | null> {
-  const res = await fetch(`${BASE_URL}/coins/${encodeURIComponent(coinId)}?localization=false&tickers=false&market_data=false&community_data=false&developer_data=false`, {
-    headers: { ...authHeaders() },
-  });
+  const res = await fetch(
+    `${BASE_URL}/coins/${encodeURIComponent(coinId)}?localization=false&tickers=false&market_data=false&community_data=false&developer_data=false`,
+    {
+      headers: { ...authHeaders() },
+    },
+  );
 
   if (res.status === 404) return null;
   if (res.status === 429) throw new CoinGeckoRateLimitError();
