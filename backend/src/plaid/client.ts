@@ -74,6 +74,10 @@ export function itemPublicTokenExchange(publicToken: string): Promise<PublicToke
   return plaidPost('/item/public_token/exchange', { public_token: publicToken });
 }
 
+export function itemRemove(accessToken: string): Promise<{ request_id: string }> {
+  return plaidPost('/item/remove', { access_token: accessToken });
+}
+
 export function transactionsSync(args: {
   access_token: string;
   cursor?: string;

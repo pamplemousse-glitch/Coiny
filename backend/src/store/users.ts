@@ -23,3 +23,9 @@ export async function getUserById(id: string): Promise<UserRow | null> {
   const rows = await db().select().from(users).where(eq(users.id, id));
   return rows[0] ?? null;
 }
+
+// Deletes the user row. All child tables (sessions, pet_state, plaid_items,
+// transactions, reaction_history, device_tokens, category_overrides) cascade.
+export async function deleteUser(id: string): Promise<void> {
+  await db().delete(users).where(eq(users.id, id));
+}
