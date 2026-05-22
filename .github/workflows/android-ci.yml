@@ -3,36 +3,52 @@ name: Android CI
 on:
   push:
     branches-ignore: [main]
-    paths:
-      - 'android/**'
-      - '.github/workflows/android-ci.yml'
   pull_request:
-    paths:
-      - 'android/**'
-      - '.github/workflows/android-ci.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# The `changes` gate keeps the expensive `unit-test` job from running on
+# non-Android PRs, while `result` always reports so required-check branch
+# protection never deadlocks.
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      has_android: ${{ steps.check.outputs.result }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0
+      - id: check
+        run: |
+          BASE=${{ github.event.pull_request.base.sha || 'HEAD~1' }}
+          if git diff --name-only "$BASE"...HEAD | grep -qE '^(android/|\.github/workflows/android-ci\.yml)'; then
+            echo "result=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=false" >> "$GITHUB_OUTPUT"
+          fi
+
   unit-test:
+    needs: changes
+    if: needs.changes.outputs.has_android == 'true'
     name: JVM unit tests + lint
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654  # v5.0.0
         with:
           distribution: temurin
           java-version: '17'
 
       # Handles wrapper validation + dependency / build caching.
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e  # v4.4.1
 
       - name: Lint (Android Lint, debug variant)
         working-directory: android
@@ -44,13 +60,30 @@ jobs:
 
       - name: Upload lint + test reports on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: android-reports
           path: |
             android/app/build/reports/lint-results-debug.html
             android/app/build/reports/tests/testDebugUnitTest/
           retention-days: 7
+
+  result:
+    needs: [changes, unit-test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate
+        run: |
+          if [[ "${{ needs.changes.outputs.has_android }}" != "true" ]]; then
+            echo "No Android changes – skipping."
+            exit 0
+          fi
+          if [[ "${{ needs.unit-test.result }}" == "success" ]]; then
+            exit 0
+          fi
+          echo "Android tests ${{ needs.unit-test.result }}."
+          exit 1
 
   # Instrumented Compose UI tests would go in a separate job that uses
   # reactivecircus/android-emulator-runner. Deliberately not enabled yet:
