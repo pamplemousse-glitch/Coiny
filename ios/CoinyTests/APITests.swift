@@ -227,4 +227,55 @@ final class APITests: XCTestCase {
         XCTAssertEqual(body?["token"] as? String, "deadbeef")
         XCTAssertEqual(body?["platform"] as? String, "ios")
     }
+
+    // MARK: - Concurrent 401 handling
+
+    func testConcurrent401OnlySignsOutOnce() async {
+        let api = makeAPI(seedToken: "shared-token")
+        // Both requests will get 401.
+        http.enqueue(.ok(status: 401, body: Data()))
+        http.enqueue(.ok(status: 401, body: Data()))
+
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask {
+                _ = try? await api.getPetState()
+            }
+            group.addTask {
+                _ = try? await api.getPetState()
+            }
+        }
+
+        // Must be signed out after concurrent 401s — not in a weird intermediate state.
+        let signedIn = await api.isSignedIn
+        XCTAssertFalse(signedIn)
+        XCTAssertNil(store.load())
+    }
+
+    // MARK: - Sign-in edge cases
+
+    func testSignInWithNilEmailSucceeds() async throws {
+        let api = makeAPI()
+        http.enqueue(status: 200, json: """
+            {"token": "tok-nil-email", "user_id": "user-456"}
+            """)
+        try await api.signInWithApple(identityToken: "id-tok", userId: "sub-456", email: nil)
+        let isSignedIn = await api.isSignedIn
+        XCTAssertTrue(isSignedIn)
+    }
+
+    func testSignInFailureDoesNotPersistToken() async {
+        let api = makeAPI()
+        http.enqueue(.ok(status: 401, body: Data("{\"error\":\"invalid token\"}".utf8)))
+
+        do {
+            try await api.signInWithApple(identityToken: "bad-tok", userId: "sub", email: nil)
+            XCTFail("Expected sign-in to throw on 401")
+        } catch {
+            // expected
+        }
+
+        let isSignedIn = await api.isSignedIn
+        XCTAssertFalse(isSignedIn)
+        XCTAssertNil(store.load())
+    }
 }

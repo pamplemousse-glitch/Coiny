@@ -9,7 +9,7 @@ const ExchangeBodySchema = z.object({
 
 export function registerPlaidLinkApi(app: FastifyInstance): void {
   app.post('/api/plaid/link-token', async (req: FastifyRequest) => {
-    const res = await linkTokenCreate({ client_user_id: req.user.id });
+    const res = await linkTokenCreate({ client_user_id: req.user!.id });
     return { link_token: res.link_token, expiration: res.expiration };
   });
 
@@ -18,7 +18,7 @@ export function registerPlaidLinkApi(app: FastifyInstance): void {
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
     const { access_token, item_id } = await itemPublicTokenExchange(parsed.data.public_token);
-    await upsertItem({ itemId: item_id, accessToken: access_token, userId: req.user.id });
+    await upsertItem({ itemId: item_id, accessToken: access_token, userId: req.user!.id });
 
     req.log.info({ item_id }, 'plaid item linked');
     return { ok: true, item_id };

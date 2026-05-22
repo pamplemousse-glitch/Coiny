@@ -36,4 +36,8 @@ RUN chmod +x ./entrypoint.sh
 ENV NODE_ENV=production
 EXPOSE 3000
 
+# Drop root — node:alpine ships a non-root 'node' user (uid 1000).
+# If an attacker achieves RCE, they get uid 1000, not root.
+USER node
+
 ENTRYPOINT ["./entrypoint.sh"]

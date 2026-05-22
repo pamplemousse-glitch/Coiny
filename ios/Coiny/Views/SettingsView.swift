@@ -43,7 +43,8 @@ struct SettingsView: View {
                     }
 
                     Section("Weekly budgets") {
-                        ForEach(goals.weeklyBudgetByCategory.sorted(by: { $0.key < $1.key }), id: \.key) { category, amount in
+                        ForEach(goals.weeklyBudgetByCategory.sorted(by: { $0.key < $1.key }),
+                                id: \.key) { category, amount in
                             LabeledContent(category.capitalized) {
                                 Text("$\(Int(amount))")
                                     .monospacedDigit()
