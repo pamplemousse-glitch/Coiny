@@ -36,9 +36,9 @@ describe('spinwheel sendSmsOtp', () => {
     vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ message: 'Bad request' }, 400));
 
     const { sendSmsOtp, SpinwheelError } = await import('../src/spinwheel/client.js');
-    await expect(
-      sendSmsOtp({ phone: '+1', dateOfBirth: '1990-01-01', extUserId: 'user-1' }),
-    ).rejects.toBeInstanceOf(SpinwheelError);
+    await expect(sendSmsOtp({ phone: '+1', dateOfBirth: '1990-01-01', extUserId: 'user-1' })).rejects.toBeInstanceOf(
+      SpinwheelError,
+    );
   });
 });
 
@@ -63,9 +63,7 @@ describe('spinwheel verifySmsOtp', () => {
     vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ error: 'Invalid OTP' }, 401));
 
     const { verifySmsOtp, SpinwheelError } = await import('../src/spinwheel/client.js');
-    await expect(
-      verifySmsOtp({ phone: '+1', code: 'bad', extUserId: 'u1' }),
-    ).rejects.toBeInstanceOf(SpinwheelError);
+    await expect(verifySmsOtp({ phone: '+1', code: 'bad', extUserId: 'u1' })).rejects.toBeInstanceOf(SpinwheelError);
   });
 });
 
@@ -81,9 +79,7 @@ describe('spinwheel getDebts', () => {
   it('returns parsed debt list', async () => {
     vi.mocked(fetch).mockResolvedValue(
       makeFetchResponse({
-        debts: [
-          { id: 'd-1', type: 'student_loan', balance: 10000, interestRate: 4.5, minimumPayment: 150 },
-        ],
+        debts: [{ id: 'd-1', type: 'student_loan', balance: 10000, interestRate: 4.5, minimumPayment: 150 }],
       }),
     );
 

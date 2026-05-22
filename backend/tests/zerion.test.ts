@@ -108,7 +108,12 @@ describe('DELETE /api/zerion/wallets/:address', () => {
     const app = await buildApp();
     const headers = { ...authHeader(), 'content-type': 'application/json' };
 
-    await app.inject({ method: 'POST', url: '/api/zerion/wallets', headers, body: JSON.stringify({ address: '0xdel' }) });
+    await app.inject({
+      method: 'POST',
+      url: '/api/zerion/wallets',
+      headers,
+      body: JSON.stringify({ address: '0xdel' }),
+    });
 
     const res = await app.inject({ method: 'DELETE', url: '/api/zerion/wallets/0xdel', headers: authHeader() });
     expect(res.statusCode).toBe(204);
@@ -149,7 +154,10 @@ describe('GET /api/zerion/portfolio', () => {
 
     const res = await app.inject({ method: 'GET', url: '/api/zerion/portfolio', headers: authHeader() });
     expect(res.statusCode).toBe(200);
-    const body = res.json<{ total_usd: number; wallets: { address: string; label: string | null; total_usd: number }[] }>();
+    const body = res.json<{
+      total_usd: number;
+      wallets: { address: string; label: string | null; total_usd: number }[];
+    }>();
     expect(body.total_usd).toBe(12500);
     expect(body.wallets[0]?.address).toBe('0xwlt1');
     expect(body.wallets[0]?.label).toBe('Main');
@@ -199,7 +207,15 @@ describe('POST /api/zerion/sync', () => {
 
     mockedGetTransactions.mockResolvedValue({
       transactions: [
-        { id: 'ztx-001', type: 'receive', status: 'confirmed', quantity_usd: 500, asset_symbol: 'ETH', created_at: '2026-01-01T00:00:00Z', direction: 'in' },
+        {
+          id: 'ztx-001',
+          type: 'receive',
+          status: 'confirmed',
+          quantity_usd: 500,
+          asset_symbol: 'ETH',
+          created_at: '2026-01-01T00:00:00Z',
+          direction: 'in',
+        },
       ],
     });
 
@@ -220,7 +236,15 @@ describe('POST /api/zerion/sync', () => {
 
     mockedGetTransactions.mockResolvedValue({
       transactions: [
-        { id: 'ztx-yield-001', type: 'trade', status: 'confirmed', quantity_usd: 50, asset_symbol: 'USDC', created_at: '2026-01-01T00:00:00Z', direction: 'in' },
+        {
+          id: 'ztx-yield-001',
+          type: 'trade',
+          status: 'confirmed',
+          quantity_usd: 50,
+          asset_symbol: 'USDC',
+          created_at: '2026-01-01T00:00:00Z',
+          direction: 'in',
+        },
       ],
     });
 
@@ -241,7 +265,15 @@ describe('POST /api/zerion/sync', () => {
 
     mockedGetTransactions.mockResolvedValue({
       transactions: [
-        { id: 'ztx-out-001', type: 'send', status: 'confirmed', quantity_usd: 100, asset_symbol: 'ETH', created_at: '2026-01-01T00:00:00Z', direction: 'out' },
+        {
+          id: 'ztx-out-001',
+          type: 'send',
+          status: 'confirmed',
+          quantity_usd: 100,
+          asset_symbol: 'ETH',
+          created_at: '2026-01-01T00:00:00Z',
+          direction: 'out',
+        },
       ],
     });
 
@@ -262,7 +294,15 @@ describe('POST /api/zerion/sync', () => {
 
     mockedGetTransactions.mockResolvedValue({
       transactions: [
-        { id: 'ztx-idem', type: 'receive', status: 'confirmed', quantity_usd: 10, asset_symbol: 'BTC', created_at: '2026-01-01T00:00:00Z', direction: 'in' },
+        {
+          id: 'ztx-idem',
+          type: 'receive',
+          status: 'confirmed',
+          quantity_usd: 10,
+          asset_symbol: 'BTC',
+          created_at: '2026-01-01T00:00:00Z',
+          direction: 'in',
+        },
       ],
     });
 

@@ -29,7 +29,13 @@ describe('evaluateExternalEvent', () => {
   });
 
   it('wallet_receive includes symbol and amount when provided', () => {
-    const result = evaluateExternalEvent({ ...base, type: 'wallet_receive', symbol: 'ETH', amountUsd: 200, source: 'zerion' });
+    const result = evaluateExternalEvent({
+      ...base,
+      type: 'wallet_receive',
+      symbol: 'ETH',
+      amountUsd: 200,
+      source: 'zerion',
+    });
     expect(result?.reason).toContain('ETH');
     expect(result?.reason).toContain('200.00');
   });

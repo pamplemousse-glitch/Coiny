@@ -27,7 +27,10 @@ describe('coingecko getPrices', () => {
 
   it('parses USD prices from response', async () => {
     vi.mocked(fetch).mockResolvedValue(
-      makeFetchResponse({ bitcoin: { usd: 50000, usd_24h_change: 5.2 }, ethereum: { usd: 3000, usd_24h_change: -2.1 } }),
+      makeFetchResponse({
+        bitcoin: { usd: 50000, usd_24h_change: 5.2 },
+        ethereum: { usd: 3000, usd_24h_change: -2.1 },
+      }),
     );
 
     const { getPrices } = await import('../src/coingecko/client.js');
@@ -38,9 +41,7 @@ describe('coingecko getPrices', () => {
   });
 
   it('defaults change24h to 0 when usd_24h_change is absent', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      makeFetchResponse({ solana: { usd: 200 } }),
-    );
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ solana: { usd: 200 } }));
 
     const { getPrices } = await import('../src/coingecko/client.js');
     const result = await getPrices(['solana']);
@@ -72,9 +73,7 @@ describe('coingecko getCoinImageUrl', () => {
   });
 
   it('returns the small image URL on success', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      makeFetchResponse({ image: { small: 'https://cdn.coingecko.com/btc.png' } }),
-    );
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ image: { small: 'https://cdn.coingecko.com/btc.png' } }));
 
     const { getCoinImageUrl } = await import('../src/coingecko/client.js');
     const url = await getCoinImageUrl('bitcoin');

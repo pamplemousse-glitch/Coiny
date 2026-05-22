@@ -91,7 +91,11 @@ describe('POST /api/spinwheel/connect/sms', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ ok: true });
-    expect(mockedSendSmsOtp).toHaveBeenCalledWith({ phone: '+15551234567', dateOfBirth: '1990-01-01', extUserId: testUserId });
+    expect(mockedSendSmsOtp).toHaveBeenCalledWith({
+      phone: '+15551234567',
+      dateOfBirth: '1990-01-01',
+      extUserId: testUserId,
+    });
 
     await app.close();
   });

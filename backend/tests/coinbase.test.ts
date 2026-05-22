@@ -143,7 +143,13 @@ describe('POST /api/coinbase/sync', () => {
     ]);
     mockedGetTransactions.mockResolvedValue({
       transactions: [
-        { id: 'tx-001', type: 'receive', status: 'completed', amount: { amount: '0.5', currency: 'BTC' }, created_at: '2026-01-01T00:00:00Z' },
+        {
+          id: 'tx-001',
+          type: 'receive',
+          status: 'completed',
+          amount: { amount: '0.5', currency: 'BTC' },
+          created_at: '2026-01-01T00:00:00Z',
+        },
       ],
     });
     mockedGetPrices.mockResolvedValue(new Map([['bitcoin', { usd: 50000, change24h: 2 }]]));
@@ -168,7 +174,13 @@ describe('POST /api/coinbase/sync', () => {
     ]);
     mockedGetTransactions.mockResolvedValue({
       transactions: [
-        { id: 'tx-idem', type: 'receive', status: 'completed', amount: { amount: '0.1', currency: 'BTC' }, created_at: '2026-01-01T00:00:00Z' },
+        {
+          id: 'tx-idem',
+          type: 'receive',
+          status: 'completed',
+          amount: { amount: '0.1', currency: 'BTC' },
+          created_at: '2026-01-01T00:00:00Z',
+        },
       ],
     });
     mockedGetPrices.mockResolvedValue(new Map());
@@ -193,7 +205,13 @@ describe('POST /api/coinbase/sync', () => {
     ]);
     mockedGetTransactions.mockResolvedValue({
       transactions: [
-        { id: 'tx-sol-001', type: 'buy', status: 'completed', amount: { amount: '10', currency: 'SOL' }, created_at: '2026-01-01T00:00:00Z' },
+        {
+          id: 'tx-sol-001',
+          type: 'buy',
+          status: 'completed',
+          amount: { amount: '10', currency: 'SOL' },
+          created_at: '2026-01-01T00:00:00Z',
+        },
       ],
     });
     mockedGetPrices.mockResolvedValue(new Map([['solana', { usd: 200, change24h: 15 }]]));
@@ -218,7 +236,13 @@ describe('POST /api/coinbase/sync', () => {
     ]);
     mockedGetTransactions.mockResolvedValue({
       transactions: [
-        { id: 'tx-send-001', type: 'send', status: 'completed', amount: { amount: '-1', currency: 'ETH' }, created_at: '2026-01-01T00:00:00Z' },
+        {
+          id: 'tx-send-001',
+          type: 'send',
+          status: 'completed',
+          amount: { amount: '-1', currency: 'ETH' },
+          created_at: '2026-01-01T00:00:00Z',
+        },
       ],
     });
     mockedGetPrices.mockResolvedValue(new Map());
@@ -243,7 +267,13 @@ describe('POST /api/coinbase/sync', () => {
     ]);
     mockedGetTransactions.mockResolvedValue({
       transactions: [
-        { id: 'tx-noprice', type: 'receive', status: 'completed', amount: { amount: '0.1', currency: 'BTC' }, created_at: '2026-01-01T00:00:00Z' },
+        {
+          id: 'tx-noprice',
+          type: 'receive',
+          status: 'completed',
+          amount: { amount: '0.1', currency: 'BTC' },
+          created_at: '2026-01-01T00:00:00Z',
+        },
       ],
     });
     mockedGetPrices.mockRejectedValue(new Error('rate limit'));
