@@ -4,6 +4,7 @@ import { db } from '../db/client.js';
 import { petState, reactionHistory } from '../db/schema.js';
 import { computeMoodWithDecay } from '../health/decay.js';
 import type { Reaction } from '../reactions/types.js';
+import { decryptString, encryptString } from '../util/crypto.js';
 
 export const PetGoalsSchema = z.object({
   weeklyBudgetByCategory: z.record(z.string(), z.number().positive()).optional(),
@@ -58,7 +59,7 @@ export async function getState(userId: string): Promise<PetState> {
     reactionHistory: history.map((h) => ({
       at: h.at.toISOString(),
       eventType: h.eventType,
-      reaction: h.reaction,
+      reaction: JSON.parse(decryptString(h.reaction)) as Reaction,
     })),
     goals: {
       weeklyBudgetByCategory: row.weeklyBudgetByCategory,
@@ -106,7 +107,8 @@ export async function applyHealthDelta(userId: string, delta: number): Promise<v
 
 export async function recordReaction(userId: string, eventType: string, reaction: Reaction): Promise<void> {
   const now = new Date();
-  await db().insert(reactionHistory).values({ userId, at: now, eventType, reaction });
+  const encrypted = encryptString(JSON.stringify(reaction));
+  await db().insert(reactionHistory).values({ userId, at: now, eventType, reaction: encrypted });
   await db().update(petState).set({ lastReactionAt: now }).where(eq(petState.userId, userId));
 
   await db().execute(sql`
