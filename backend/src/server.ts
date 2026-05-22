@@ -4,13 +4,16 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
 import { registerAccountApi } from './api/account.js';
 import { registerAuthApi } from './api/auth.js';
+import { registerCoinbaseApi } from './api/coinbase.js';
 import { registerDebugApi } from './api/debug.js';
 import { registerDevicesApi } from './api/devices.js';
 import { registerOverridesApi } from './api/overrides.js';
 import { registerPetsApi } from './api/pets.js';
 import { registerPlaidLinkApi } from './api/plaid-link.js';
 import { registerSpendingApi } from './api/spending.js';
+import { registerSpinwheelApi } from './api/spinwheel.js';
 import { registerSubscriptionsApi } from './api/subscriptions.js';
+import { registerZerionApi } from './api/zerion.js';
 import { config } from './config.js';
 import { initDb } from './db/client.js';
 import { runMigrations } from './db/migrate.js';
@@ -80,6 +83,9 @@ async function buildApp() {
     registerOverridesApi(scope);
     registerDevicesApi(scope);
     registerSubscriptionsApi(scope);
+    registerCoinbaseApi(scope);
+    registerZerionApi(scope);
+    registerSpinwheelApi(scope);
   });
 
   return app;
