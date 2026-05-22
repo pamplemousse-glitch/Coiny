@@ -30,12 +30,9 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # gradle/actions/setup-gradle handles wrapper validation + dependency
-      # and build caching. Both go a long way on Android CI runs.
+      # Handles wrapper validation + dependency / build caching.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-read-only: ${{ github.ref != 'refs/heads/main' && github.event_name != 'pull_request' }}
 
       - name: Lint (Android Lint, debug variant)
         working-directory: android
@@ -55,56 +52,7 @@ jobs:
             android/app/build/reports/tests/testDebugUnitTest/
           retention-days: 7
 
-  # Instrumented Compose UI tests on an emulator. KVM acceleration is available
-  # on ubuntu-latest runners, but the job is still slow (~10 min cold start) so
-  # it's separated from the unit-test job and runs in parallel.
-  instrumented-test:
-    name: Compose UI tests (emulator)
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-
-    strategy:
-      fail-fast: true
-      matrix:
-        api-level: [34]
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Enable KVM
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Run instrumented tests
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: ${{ matrix.api-level }}
-          arch: x86_64
-          profile: pixel_6
-          target: google_apis
-          force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          disable-animations: true
-          working-directory: android
-          script: ./gradlew :app:connectedDebugAndroidTest --no-daemon
-
-      - name: Upload instrumented test reports on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-instrumented-reports-api${{ matrix.api-level }}
-          path: |
-            android/app/build/reports/androidTests/
-            android/app/build/outputs/androidTest-results/
-          retention-days: 7
+  # Instrumented Compose UI tests would go in a separate job that uses
+  # reactivecircus/android-emulator-runner. Deliberately not enabled yet:
+  # we have no androidTest sources, and the emulator cold-start is slow.
+  # Add this job back when the first Compose UI test lands.

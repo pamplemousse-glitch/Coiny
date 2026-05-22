@@ -27,7 +27,6 @@ jobs:
       # on a future image, drop the `.1` to fall back to the latest 16.x.
       DEVELOPER_DIR: /Applications/Xcode_16.app/Contents/Developer
       SCHEME: Coiny
-      DESTINATION: 'platform=iOS Simulator,name=iPhone 16,OS=latest'
 
     steps:
       - uses: actions/checkout@v6
@@ -35,7 +34,7 @@ jobs:
       - name: Show Xcode + simulators
         run: |
           xcodebuild -version
-          xcrun simctl list devices available iOS | head -40
+          xcrun simctl list devices available iOS
 
       - name: Install build tools
         run: |
@@ -55,6 +54,20 @@ jobs:
         working-directory: ios
         run: xcodegen generate
 
+      # Hardcoded device names (e.g. "iPhone 16") fail when the runner image
+      # ships a different default simulator. Instead, pick the first available
+      # iOS Simulator's UDID dynamically and target that exact device.
+      - name: Pick a simulator destination
+        id: simulator
+        run: |
+          UDID=$(xcrun simctl list devices available --json \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; \
+                          runtimes=sorted([k for k in d if "iOS" in k]); \
+                          devs=[x for r in runtimes for x in d[r] if x.get("isAvailable") and "iPhone" in x["name"]]; \
+                          print(devs[0]["udid"]) if devs else sys.exit("no iPhone simulator available")')
+          echo "destination=platform=iOS Simulator,id=$UDID" >> "$GITHUB_OUTPUT"
+          echo "Selected simulator UDID: $UDID"
+
       - name: Build + test
         working-directory: ios
         run: |
@@ -63,7 +76,7 @@ jobs:
             -project Coiny.xcodeproj \
             -scheme "$SCHEME" \
             -sdk iphonesimulator \
-            -destination "$DESTINATION" \
+            -destination "${{ steps.simulator.outputs.destination }}" \
             -resultBundlePath TestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \

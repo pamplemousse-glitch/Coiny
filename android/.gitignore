@@ -16,8 +16,5 @@ output.json
 *.dex
 proguard/
 
-# Generated wrapper jar — created on first build
-gradle/wrapper/gradle-wrapper.jar
-
 # macOS
 .DS_Store
