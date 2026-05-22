@@ -1,19 +1,40 @@
 import Foundation
 import Security
 
-enum Keychain {
-    private static let service = "app.coiny.ios"
+/// Generic Keychain wrapper. Construct with a custom `service` for tests so
+/// tests don't read or pollute production-app Keychain items.
+// `@unchecked Sendable` because CFString (an immutable Foundation type) isn't
+// marked Sendable in the Security framework's imported headers. The properties
+// here are all immutable after init.
+struct Keychain: @unchecked Sendable {
+    let service: String
+    /// kSecAttrAccessible value applied on save. Defaults to the strict
+    /// "device-only + requires user-set passcode" policy used in production;
+    /// tests pass `kSecAttrAccessibleWhenUnlocked` because the iOS Simulator
+    /// has no passcode, which rejects the strict policy with errSecMissingEntitlement.
+    let accessibility: CFString
 
-    static func save(_ value: String, account: String) throws {
+    init(
+        service: String = "app.coiny.ios",
+        accessibility: CFString = kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly
+    ) {
+        self.service = service
+        self.accessibility = accessibility
+    }
+
+    static let shared = Keychain()
+    static let sessionTokenAccount = "session_token"
+
+    func save(_ value: String, account: String) throws {
         guard let data = value.data(using: .utf8) else { return }
         // Delete any existing item first so the add doesn't conflict.
-        delete(account: account)
+        _ = delete(account: account)
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
             kSecAttrAccount: account,
             kSecValueData: data,
-            kSecAttrAccessible: kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
+            kSecAttrAccessible: accessibility,
         ]
         let status = SecItemAdd(query as CFDictionary, nil)
         if status != errSecSuccess {
@@ -21,7 +42,7 @@ enum Keychain {
         }
     }
 
-    static func load(account: String) -> String? {
+    func load(account: String) -> String? {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
@@ -36,7 +57,7 @@ enum Keychain {
     }
 
     @discardableResult
-    static func delete(account: String) -> Bool {
+    func delete(account: String) -> Bool {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
@@ -55,8 +76,4 @@ enum Keychain {
             }
         }
     }
-}
-
-extension Keychain {
-    static let sessionTokenAccount = "session_token"
 }

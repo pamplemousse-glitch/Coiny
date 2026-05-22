@@ -1,9 +1,22 @@
 import Foundation
 
 /// Network layer for talking to coiny-backend.fly.dev.
-/// Single instance per session; injected via SwiftUI Environment.
+///
+/// Construction takes injected dependencies (HTTPClient, SessionStore, base URL)
+/// so tests can drive the entire request/response surface without touching the
+/// real network or Keychain. Production code uses `API.shared`.
 actor API {
-    static let shared = API()
+    static let shared: API = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 30
+        config.waitsForConnectivity = true
+        let session = URLSession(configuration: config)
+        return API(
+            baseURL: Endpoint.baseURL,
+            http: session,
+            sessionStore: KeychainSessionStore()
+        )
+    }()
 
     enum Endpoint {
         static let baseURL = URL(string: "https://coiny-backend.fly.dev")!
@@ -27,18 +40,23 @@ actor API {
         }
     }
 
-    private let session: URLSession
+    private let baseURL: URL
+    private let http: HTTPClient
+    private let sessionStore: SessionStore
     private let decoder: JSONDecoder
-    // Cached in-memory after first Keychain read; kept in sync with Keychain on writes.
+    // Cached in-memory after first store read; kept in sync with the store on writes.
     private var sessionToken: String?
 
-    private init() {
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30
-        config.waitsForConnectivity = true
-        self.session = URLSession(configuration: config)
+    init(baseURL: URL, http: HTTPClient, sessionStore: SessionStore) {
+        self.baseURL = baseURL
+        self.http = http
+        self.sessionStore = sessionStore
+        self.decoder = Self.makeDecoder()
+        self.sessionToken = sessionStore.load()
+    }
 
-        self.decoder = JSONDecoder()
+    private static func makeDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .custom { dec in
             let container = try dec.singleValueContainer()
             let raw = try container.decode(String.self)
@@ -56,16 +74,14 @@ actor API {
                 debugDescription: "Date string not ISO-8601: \(raw)"
             )
         }
-
-        // Load cached session token from Keychain on startup.
-        self.sessionToken = Keychain.load(account: Keychain.sessionTokenAccount)
+        return decoder
     }
 
     // MARK: - Auth
 
     var isSignedIn: Bool { sessionToken != nil }
 
-    /// Called after a successful Apple Sign In — saves token to Keychain.
+    /// Called after a successful Apple Sign In — saves token to the session store.
     func signInWithApple(identityToken: String, userId: String, email: String?) async throws {
         struct Body: Encodable {
             let identity_token: String
@@ -82,13 +98,13 @@ actor API {
             body: Body(identity_token: identityToken, user_id: userId, email: email),
             requiresAuth: false
         )
-        try Keychain.save(res.token, account: Keychain.sessionTokenAccount)
+        try sessionStore.save(res.token)
         sessionToken = res.token
     }
 
     /// Clears the session — call on logout or 401.
     func signOut() {
-        Keychain.delete(account: Keychain.sessionTokenAccount)
+        sessionStore.clear()
         sessionToken = nil
     }
 
@@ -156,7 +172,7 @@ actor API {
         body: B?,
         requiresAuth: Bool
     ) async throws -> T {
-        guard let url = URL(string: path, relativeTo: Endpoint.baseURL) else {
+        guard let url = URL(string: path, relativeTo: baseURL) else {
             throw APIError.invalidURL
         }
 
@@ -180,7 +196,7 @@ actor API {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await session.data(for: req)
+            (data, response) = try await http.data(for: req)
         } catch {
             throw APIError.transport(underlying: error)
         }
