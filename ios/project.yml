@@ -91,18 +91,34 @@ targets:
         BUNDLE_LOADER: "$(TEST_HOST)"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Coiny.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Coiny"
 
+  CoinyUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: CoinyUITests
+    dependencies:
+      - target: Coiny
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.coiny.ios.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Coiny
+
 schemes:
   Coiny:
     build:
       targets:
         Coiny: all
         CoinyTests: [test]
+        CoinyUITests: [test]
     run:
       config: Debug
     test:
       config: Debug
       targets:
         - CoinyTests
+        - CoinyUITests
     profile:
       config: Release
     analyze:
