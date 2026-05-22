@@ -6,7 +6,7 @@ struct TipCard: View {
     let icon: String
     let iconColor: Color
     let title: String
-    let body: String
+    let description: String
 
     var body: some View {
         VStack(spacing: 12) {
@@ -20,7 +20,7 @@ struct TipCard: View {
                 .font(.headline)
                 .multilineTextAlignment(.center)
 
-            Text(body)
+            Text(description)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -32,29 +32,29 @@ struct TipCard: View {
 }
 
 /// The four education tips shown consistently across onboarding and the empty state.
-let coinyTips: [(icon: String, color: Color, title: String, body: String)] = [
+let coinyTips: [(icon: String, color: Color, title: String, description: String)] = [
     (
         icon: "dollarsign.circle.fill",
         color: .green,
         title: "Paychecks make Coiny celebrate",
-        body: "Big deposits trigger a full celebration with lights and sound."
+        description: "Big deposits trigger a full celebration with lights and sound."
     ),
     (
         icon: "cart.fill",
         color: .orange,
         title: "Overspending triggers concern",
-        body: "Go over your weekly budget in groceries or dining and Coiny will notice."
+        description: "Go over your weekly budget in groceries or dining and Coiny will notice."
     ),
     (
         icon: "target",
         color: .blue,
         title: "Hit your savings goal",
-        body: "Reach 25%, 50%, or 100% of your savings target for a milestone reaction."
+        description: "Reach 25%, 50%, or 100% of your savings target for a milestone reaction."
     ),
     (
         icon: "creditcard.fill",
         color: .red,
         title: "Large purchases get attention",
-        body: "Transactions over your threshold make Coiny look twice."
+        description: "Transactions over your threshold make Coiny look twice."
     )
 ]

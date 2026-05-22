@@ -36,7 +36,7 @@ struct WaitingForFirstReactionView: View {
                         icon: tip.icon,
                         iconColor: tip.color,
                         title: tip.title,
-                        body: tip.body
+                        description: tip.description
                     )
                     .padding(.horizontal)
                 }
