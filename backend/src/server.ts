@@ -13,6 +13,7 @@ import { registerPlaidLinkApi } from './api/plaid-link.js';
 import { registerSpendingApi } from './api/spending.js';
 import { registerSpinwheelApi } from './api/spinwheel.js';
 import { registerSubscriptionsApi } from './api/subscriptions.js';
+import { registerNetWorthApi } from './api/net-worth.js';
 import { registerZerionApi } from './api/zerion.js';
 import { config } from './config.js';
 import { initDb } from './db/client.js';
@@ -86,6 +87,7 @@ async function buildApp() {
     registerCoinbaseApi(scope);
     registerZerionApi(scope);
     registerSpinwheelApi(scope);
+    registerNetWorthApi(scope);
   });
 
   return app;

@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct RootView: View {
+    @State private var netWorthVM = NetWorthViewModel()
+
     var body: some View {
         TabView {
             PetView()
@@ -11,6 +13,12 @@ struct RootView: View {
             SpendingView()
                 .tabItem {
                     Label("Spending", systemImage: "creditcard")
+                }
+
+            NetWorthView()
+                .environment(netWorthVM)
+                .tabItem {
+                    Label("Wealth", systemImage: "chart.pie.fill")
                 }
 
             CryptoView()
