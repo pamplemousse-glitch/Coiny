@@ -1,9 +1,6 @@
 import { z } from 'zod';
 import { config } from '../config.js';
 
-// Spinwheel sandbox base URL. Switch to production URL when going live.
-const BASE_URL = 'https://sandbox-api.spinwheel.io';
-
 export class SpinwheelError extends Error {
   constructor(
     public readonly status: number,
@@ -14,15 +11,32 @@ export class SpinwheelError extends Error {
   }
 }
 
+function requireKey(): string {
+  if (!config.SPINWHEEL_SECRET_KEY) throw new SpinwheelError(0, 'SPINWHEEL_SECRET_KEY is not configured');
+  return config.SPINWHEEL_SECRET_KEY;
+}
+
 function authHeaders(): Record<string, string> {
   return {
-    Authorization: `Bearer ${config.SPINWHEEL_SECRET_KEY}`,
+    Authorization: `Bearer ${requireKey()}`,
     'Content-Type': 'application/json',
   };
 }
 
+// All Spinwheel responses are wrapped: { status: { code, desc, messages }, data: {...} }
+function envelopeSchema<T extends z.ZodTypeAny>(dataSchema: T) {
+  return z.object({
+    status: z.object({
+      code: z.number(),
+      desc: z.string().optional(),
+      messages: z.array(z.object({ desc: z.string() })).optional(),
+    }),
+    data: dataSchema,
+  });
+}
+
 async function spinwheelPost<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${config.SPINWHEEL_BASE_URL}${path}`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(body),
@@ -38,8 +52,8 @@ async function spinwheelPost<T>(path: string, body: unknown, schema: z.ZodType<T
 }
 
 async function spinwheelGet<T>(path: string, schema: z.ZodType<T>): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: authHeaders(),
+  const res = await fetch(`${config.SPINWHEEL_BASE_URL}${path}`, {
+    headers: { Authorization: `Bearer ${requireKey()}` },
   });
 
   if (!res.ok) {
@@ -51,64 +65,98 @@ async function spinwheelGet<T>(path: string, schema: z.ZodType<T>): Promise<T> {
   return schema.parse(raw);
 }
 
-/**
- * Initiates an SMS OTP challenge for the given phone number.
- */
-export async function sendSmsOtp(params: { phone: string; dateOfBirth: string; extUserId: string }): Promise<void> {
-  const OkSchema = z.object({}).passthrough();
-  await spinwheelPost(
-    '/v1/users/otp/send',
-    {
-      phone: params.phone,
-      dateOfBirth: params.dateOfBirth,
-      extUserId: params.extUserId,
-    },
-    OkSchema,
-  );
+async function spinwheelDelete(path: string): Promise<void> {
+  const res = await fetch(`${config.SPINWHEEL_BASE_URL}${path}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${requireKey()}` },
+  });
+
+  if (!res.ok && res.status !== 404) {
+    const text = await res.text().catch(() => '');
+    throw new SpinwheelError(res.status, `Spinwheel DELETE ${path} failed (${res.status}): ${text}`);
+  }
 }
 
-const VerifyOtpResponseSchema = z.object({
-  userId: z.string(),
-});
-
-/**
- * Verifies the OTP code and returns the Spinwheel user ID.
- */
-export async function verifySmsOtp(params: {
-  phone: string;
-  code: string;
+// POST /v1/users/connect/sms
+// Body: { phoneNumber (E.164), dateOfBirth (YYYY-MM-DD), extUserId }
+// Returns the Spinwheel userId needed for the subsequent verify call.
+export async function sendSmsOtp(params: {
+  phoneNumber: string;
+  dateOfBirth: string;
   extUserId: string;
 }): Promise<{ spinwheelUserId: string }> {
-  const result = await spinwheelPost(
-    '/v1/users/otp/verify',
-    {
-      phone: params.phone,
-      code: params.code,
-      extUserId: params.extUserId,
-    },
-    VerifyOtpResponseSchema,
-  );
-  return { spinwheelUserId: result.userId };
+  const schema = envelopeSchema(z.object({ userId: z.string() }).passthrough());
+  const result = await spinwheelPost('/v1/users/connect/sms', params, schema);
+  return { spinwheelUserId: result.data.userId };
 }
 
-const SpinwheelDebtSchema = z.object({
-  id: z.string(),
-  type: z.string(),
-  balance: z.number(),
-  interestRate: z.number(),
-  minimumPayment: z.number(),
-});
+// POST /v1/users/{spinwheelUserId}/connect/sms/verify
+// Body: { code } only — no phone or extUserId.
+export async function verifySmsOtp(params: { spinwheelUserId: string; code: string }): Promise<void> {
+  const schema = envelopeSchema(z.object({}).passthrough());
+  await spinwheelPost(
+    `/v1/users/${encodeURIComponent(params.spinwheelUserId)}/connect/sms/verify`,
+    { code: params.code },
+    schema,
+  );
+}
 
-const DebtsResponseSchema = z.object({
-  debts: z.array(SpinwheelDebtSchema),
+// Debt type taxonomy from Spinwheel docs.
+const LiabilityTypeSchema = z.enum([
+  'STUDENT_LOAN',
+  'CREDIT_CARD',
+  'HOME_LOAN',
+  'AUTO_LOAN',
+  'PERSONAL_LOAN',
+  'MISCELLANEOUS_LIABILITY',
+]);
+
+export const SpinwheelDebtSchema = z.object({
+  id: z.string(),
+  type: LiabilityTypeSchema.catch('MISCELLANEOUS_LIABILITY'),
+  balance: z.number().nullable().optional(),
+  interestRate: z.number().nullable().optional(),
+  minimumPayment: z.number().nullable().optional(),
 });
 
 export type SpinwheelDebt = z.infer<typeof SpinwheelDebtSchema>;
 
-/**
- * Returns all debts for a Spinwheel user.
- */
-export async function getDebts(spinwheelUserId: string): Promise<SpinwheelDebt[]> {
-  const result = await spinwheelGet(`/v1/users/${encodeURIComponent(spinwheelUserId)}/debts`, DebtsResponseSchema);
-  return result.debts;
+// POST /v1/users/{spinwheelUserId}/debtProfile
+// Returns normalized debt array across all liability types.
+export async function getDebtProfile(spinwheelUserId: string): Promise<SpinwheelDebt[]> {
+  const DataSchema = z.object({}).passthrough();
+  const schema = envelopeSchema(DataSchema);
+  const result = await spinwheelPost(`/v1/users/${encodeURIComponent(spinwheelUserId)}/debtProfile`, {}, schema);
+
+  // Spinwheel may return per-type arrays or a flat debts array depending on API version.
+  // Normalize both shapes into our SpinwheelDebt[].
+  const data = result.data as Record<string, unknown>;
+  const liabilityKeys = [
+    'debts',
+    'creditCards',
+    'autoLoans',
+    'studentLoans',
+    'homeLoans',
+    'personalLoans',
+    'miscellaneousLiabilities',
+  ];
+  const raw: unknown[] = [];
+  for (const key of liabilityKeys) {
+    const arr = data[key];
+    if (Array.isArray(arr)) raw.push(...arr);
+  }
+
+  return raw.map((item) => SpinwheelDebtSchema.parse(item));
+}
+
+// GET /v1/users/{spinwheelUserId} — full user profile
+export async function getUser(spinwheelUserId: string): Promise<Record<string, unknown>> {
+  const schema = envelopeSchema(z.object({}).passthrough());
+  const result = await spinwheelGet(`/v1/users/${encodeURIComponent(spinwheelUserId)}`, schema);
+  return result.data as Record<string, unknown>;
+}
+
+// DELETE /v1/users/{spinwheelUserId} — called on disconnect to remove user data from Spinwheel.
+export async function deleteUser(spinwheelUserId: string): Promise<void> {
+  await spinwheelDelete(`/v1/users/${encodeURIComponent(spinwheelUserId)}`);
 }
