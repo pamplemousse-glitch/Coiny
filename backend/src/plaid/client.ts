@@ -24,7 +24,7 @@ function baseUrl(): string {
 async function plaidPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
   const res = await request(`${baseUrl()}${path}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'plaid-version': '2020-09-14' },
     body: JSON.stringify({
       client_id: config.PLAID_CLIENT_ID,
       secret: config.PLAID_SECRET,

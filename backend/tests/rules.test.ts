@@ -26,15 +26,20 @@ function tx(overrides: Partial<Transaction> = {}): Transaction {
 
 describe('rule engine', () => {
   describe('paycheck_received', () => {
-    it('fires for a credit >= $500', () => {
-      const match = evaluate(tx({ amount: '2400.00', type: 'paycheck' }), DEFAULT_GOALS);
+    it('fires for a credit >= $500 with paycheck category', () => {
+      const match = evaluate(tx({ amount: '2400.00', details: { category: 'paycheck' } }), DEFAULT_GOALS);
       expect(match?.name).toBe('paycheck_received');
       expect(match?.reaction.animation).toBe('celebrate');
       expect(match?.reaction.reason).toMatch(/paycheck_received/);
     });
 
-    it('does not fire for a small credit', () => {
-      const match = evaluate(tx({ amount: '50.00', type: 'paycheck' }), DEFAULT_GOALS);
+    it('does not fire for a small credit even with paycheck category', () => {
+      const match = evaluate(tx({ amount: '50.00', details: { category: 'paycheck' } }), DEFAULT_GOALS);
+      expect(match).toBeNull();
+    });
+
+    it('does not fire for a large credit without paycheck category (prevents false positives on refunds)', () => {
+      const match = evaluate(tx({ amount: '2400.00' }), DEFAULT_GOALS);
       expect(match).toBeNull();
     });
   });

@@ -32,7 +32,7 @@ export const rules: Rule[] = [
   {
     name: 'paycheck_received',
     match(tx, goals) {
-      return isCredit(tx) && parseDollar(tx.amount) >= goals.paycheckMinAmount;
+      return isCredit(tx) && tx.details?.category === 'paycheck' && parseDollar(tx.amount) >= goals.paycheckMinAmount;
     },
     react(tx) {
       return {
