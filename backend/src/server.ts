@@ -7,6 +7,7 @@ import { registerAuthApi } from './api/auth.js';
 import { registerCoinbaseApi } from './api/coinbase.js';
 import { registerDebugApi } from './api/debug.js';
 import { registerDevicesApi } from './api/devices.js';
+import { registerNetWorthApi } from './api/net-worth.js';
 import { registerOverridesApi } from './api/overrides.js';
 import { registerPetsApi } from './api/pets.js';
 import { registerPlaidLinkApi } from './api/plaid-link.js';
@@ -86,6 +87,7 @@ async function buildApp() {
     registerCoinbaseApi(scope);
     registerZerionApi(scope);
     registerSpinwheelApi(scope);
+    registerNetWorthApi(scope);
   });
 
   return app;

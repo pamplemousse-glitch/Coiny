@@ -48,6 +48,18 @@ struct SignInView: View {
                     }
                     .signInWithAppleButtonStyle(.black)
                     .frame(height: 50)
+
+                    #if DEBUG
+                    Button("Debug: Skip Sign In") {
+                        Task { @MainActor in
+                            await API.shared.injectDebugSession()
+                            onSignedIn()
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .padding(.top, 4)
+                    #endif
                 }
             }
             .padding(.horizontal)

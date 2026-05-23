@@ -4,6 +4,7 @@ struct SettingsView: View {
     @Environment(PetStore.self) private var store
     @AppStorage("onboardingComplete") private var onboardingComplete: Bool = false
     @AppStorage("bankLinked") private var bankLinked: Bool = false
+    @State private var showDeleteAlert = false
 
     var body: some View {
         NavigationStack {
@@ -68,6 +69,20 @@ struct SettingsView: View {
                     Button("Sign out", role: .destructive) {
                         NotificationCenter.default.post(name: .coinySignedOut, object: nil)
                     }
+                    Button("Delete account", role: .destructive) {
+                        showDeleteAlert = true
+                    }
+                }
+                .alert("Delete Account?", isPresented: $showDeleteAlert) {
+                    Button("Delete", role: .destructive) {
+                        Task {
+                            _ = try? await API.shared.deleteAccount()
+                            NotificationCenter.default.post(name: .coinySignedOut, object: nil)
+                        }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("This permanently deletes your Coiny account and all data. This cannot be undone.")
                 }
 
                 Section("Debug") {

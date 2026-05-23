@@ -1,6 +1,7 @@
 import { request } from 'undici';
 import { config } from '../config.js';
 import {
+  type AccountsBalanceGetResponse,
   type LinkTokenCreateResponse,
   PlaidApiError,
   type PlaidErrorResponse,
@@ -86,6 +87,10 @@ export function transactionsSync(args: {
   const body: Record<string, unknown> = { access_token: args.access_token, count: args.count ?? 100 };
   if (args.cursor) body.cursor = args.cursor;
   return plaidPost('/transactions/sync', body);
+}
+
+export function accountsBalanceGet(accessToken: string): Promise<AccountsBalanceGetResponse> {
+  return plaidPost('/accounts/balance/get', { access_token: accessToken });
 }
 
 export function webhookVerificationKeyGet(keyId: string): Promise<WebhookVerificationKeyGetResponse> {

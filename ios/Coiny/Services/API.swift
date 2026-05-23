@@ -44,7 +44,6 @@ actor API {
     private let http: HTTPClient
     private let sessionStore: SessionStore
     private let decoder: JSONDecoder
-    // Cached in-memory after first store read; kept in sync with the store on writes.
     private var sessionToken: String?
 
     init(baseURL: URL, http: HTTPClient, sessionStore: SessionStore) {
@@ -81,7 +80,6 @@ actor API {
 
     var isSignedIn: Bool { sessionToken != nil }
 
-    /// Called after a successful Apple Sign In — saves token to the session store.
     func signInWithApple(identityToken: String, userId: String, email: String?) async throws {
         struct Body: Encodable {
             let identity_token: String
@@ -102,13 +100,12 @@ actor API {
         sessionToken = res.token
     }
 
-    /// Clears the session — call on logout or 401.
     func signOut() {
         sessionStore.clear()
         sessionToken = nil
     }
 
-    // MARK: - Endpoints
+    // MARK: - Pet
 
     func getPetState() async throws -> PetState {
         try await get("/api/pets")
@@ -118,6 +115,8 @@ actor API {
     func updateGoals(_ patch: GoalsPatch) async throws -> PetGoals {
         try await put("/api/pets/goals", body: patch)
     }
+
+    // MARK: - Plaid
 
     func createLinkToken() async throws -> String {
         struct Res: Decodable { let link_token: String }
@@ -131,11 +130,96 @@ actor API {
         return try await post("/api/plaid/exchange-token", body: Body(public_token: publicToken))
     }
 
+    // MARK: - Devices
+
     @discardableResult
     func registerDeviceToken(_ hexToken: String) async throws -> EmptyResponse {
         struct Body: Encodable { let token: String; let platform: String }
         return try await post("/api/devices/push-token", body: Body(token: hexToken, platform: "ios"))
     }
+
+    // MARK: - Account
+
+    @discardableResult
+    func deleteAccount() async throws -> EmptyResponse {
+        try await delete("/api/account")
+    }
+
+    // MARK: - Coinbase
+
+    func getCoinbaseStatus() async throws -> CoinbaseStatus {
+        try await get("/api/coinbase/status")
+    }
+
+    @discardableResult
+    func connectCoinbaseDevKey() async throws -> EmptyResponse {
+        try await post("/api/coinbase/connect/dev-key")
+    }
+
+    func disconnectCoinbase() async throws {
+        try await deleteVoid("/api/coinbase/connect")
+    }
+
+    func syncCoinbase() async throws -> SyncResult {
+        try await post("/api/coinbase/sync")
+    }
+
+    // MARK: - Zerion
+
+    func getZerionWallets() async throws -> [ZerionWallet] {
+        try await get("/api/zerion/wallets")
+    }
+
+    func addZerionWallet(address: String, label: String?) async throws -> ZerionWallet {
+        struct Body: Encodable { let address: String; let label: String? }
+        return try await post("/api/zerion/wallets", body: Body(address: address, label: label))
+    }
+
+    func removeZerionWallet(address: String) async throws {
+        try await deleteVoid("/api/zerion/wallets/\(address)")
+    }
+
+    func getZerionPortfolio() async throws -> ZerionPortfolio {
+        try await get("/api/zerion/portfolio")
+    }
+
+    func syncZerion() async throws -> SyncResult {
+        try await post("/api/zerion/sync")
+    }
+
+    // MARK: - Spinwheel
+
+    func getSpinwheelStatus() async throws -> SpinwheelStatus {
+        try await get("/api/spinwheel/status")
+    }
+
+    @discardableResult
+    func sendSpinwheelOtp(phone: String, dateOfBirth: String) async throws -> EmptyResponse {
+        struct Body: Encodable { let phone: String; let dateOfBirth: String }
+        return try await post("/api/spinwheel/connect/sms", body: Body(phone: phone, dateOfBirth: dateOfBirth))
+    }
+
+    @discardableResult
+    func verifySpinwheelOtp(phone: String, code: String) async throws -> EmptyResponse {
+        struct Body: Encodable { let phone: String; let code: String }
+        return try await post("/api/spinwheel/connect/sms/verify", body: Body(phone: phone, code: code))
+    }
+
+    func getSpinwheelDebts() async throws -> SpinwheelDebtsResponse {
+        try await get("/api/spinwheel/debts")
+    }
+
+    func disconnectSpinwheel() async throws {
+        try await deleteVoid("/api/spinwheel/connect")
+    }
+
+    // MARK: - Net Worth
+
+    func getNetWorth() async throws -> NetWorthResponse {
+        try await get("/api/net-worth")
+    }
+
+    // MARK: - Misc
 
     func health() async throws -> HealthResponse {
         try await request(method: "GET", path: "/health", body: Optional<Empty>.none, requiresAuth: false)
@@ -145,6 +229,14 @@ actor API {
     @discardableResult
     func fireTestTransaction() async throws -> EmptyResponse {
         try await post("/api/debug/fire-transaction")
+    }
+
+    /// Injects an in-memory session token so the simulator can bypass Sign In
+    /// with Apple, which doesn't work in the Simulator. Does not touch the
+    /// Keychain — the strict accessibility policy requires a passcode that the
+    /// Simulator doesn't have. The token is lost on app restart.
+    func injectDebugSession() {
+        sessionToken = "debug-simulator-token"
     }
     #endif
 
@@ -166,6 +258,43 @@ actor API {
         try await request(method: "POST", path: path, body: body, requiresAuth: true)
     }
 
+    private func delete<T: Decodable>(_ path: String) async throws -> T {
+        try await request(method: "DELETE", path: path, body: Optional<Empty>.none, requiresAuth: true)
+    }
+
+    /// DELETE for endpoints that return 204 No Content.
+    private func deleteVoid(_ path: String) async throws {
+        guard let url = URL(string: path, relativeTo: baseURL) else {
+            throw APIError.invalidURL
+        }
+        if sessionToken == nil { throw APIError.unauthenticated }
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        req.addValue("application/json", forHTTPHeaderField: "Accept")
+        if let token = sessionToken {
+            req.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await http.data(for: req)
+        } catch {
+            throw APIError.transport(underlying: error)
+        }
+        guard let httpResp = response as? HTTPURLResponse else {
+            throw APIError.http(status: -1, body: "no response")
+        }
+        if httpResp.statusCode == 401 { signOut() }
+        guard (200..<300).contains(httpResp.statusCode) else {
+            throw APIError.http(
+                status: httpResp.statusCode,
+                body: String(data: data, encoding: .utf8) ?? ""
+            )
+        }
+    }
+
     private func request<T: Decodable, B: Encodable>(
         method: String,
         path: String,
@@ -175,10 +304,7 @@ actor API {
         guard let url = URL(string: path, relativeTo: baseURL) else {
             throw APIError.invalidURL
         }
-
-        if requiresAuth, sessionToken == nil {
-            throw APIError.unauthenticated
-        }
+        if requiresAuth, sessionToken == nil { throw APIError.unauthenticated }
 
         var req = URLRequest(url: url)
         req.httpMethod = method
@@ -187,7 +313,6 @@ actor API {
         if let token = sessionToken, requiresAuth {
             req.addValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
-
         if let body {
             req.addValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONEncoder().encode(body)
@@ -204,12 +329,7 @@ actor API {
         guard let http = response as? HTTPURLResponse else {
             throw APIError.http(status: -1, body: "no response")
         }
-
-        // On 401, clear the cached session so the app shows the sign-in screen.
-        if http.statusCode == 401, requiresAuth {
-            signOut()
-        }
-
+        if http.statusCode == 401, requiresAuth { signOut() }
         guard (200..<300).contains(http.statusCode) else {
             throw APIError.http(
                 status: http.statusCode,
@@ -239,4 +359,117 @@ struct GoalsPatch: Encodable {
     var savingsGoal: Int?
     var paycheckMinAmount: Int?
     var largePurchaseThreshold: Int?
+}
+
+struct SyncResult: Decodable {
+    let reacted: Int
+}
+
+struct CoinbaseStatus: Decodable {
+    let connected: Bool
+    let mode: String?
+}
+
+struct ZerionWallet: Decodable, Identifiable {
+    let id: String
+    let userId: String
+    let address: String
+    let label: String?
+    let createdAt: Date
+}
+
+struct ZerionPortfolio: Decodable {
+    let data: ZerionPortfolioData
+
+    struct ZerionPortfolioData: Decodable {
+        let attributes: ZerionPortfolioAttributes
+    }
+
+    struct ZerionPortfolioAttributes: Decodable {
+        let total: ZerionPortfolioTotal
+    }
+
+    struct ZerionPortfolioTotal: Decodable {
+        let positions: Double
+    }
+}
+
+struct SpinwheelStatus: Decodable {
+    let connected: Bool
+}
+
+struct SpinwheelDebt: Decodable, Identifiable {
+    let id: String
+    let debtType: String?
+    let balance: Double?
+    let monthlyPayment: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case debtType = "type"
+        case balance
+        case monthlyPayment
+    }
+}
+
+struct SpinwheelDebtsResponse: Decodable {
+    let debts: [SpinwheelDebt]
+}
+
+// MARK: - Net Worth DTOs
+
+struct NetWorthResponse: Decodable {
+    let total: Double
+    let bank: Double
+    let crypto: Double
+    let defi: Double
+    let debts: Double
+    let accounts: NetWorthAccounts
+    let connections: NetWorthConnections
+}
+
+struct NetWorthAccounts: Decodable {
+    let bank: [BankAccount]
+    let crypto: [CryptoPosition]
+    let defi: DefiTotal
+    let debts: [DebtItem]
+}
+
+struct NetWorthConnections: Decodable {
+    let coinbase: Bool
+    let zerion: Bool
+    let spinwheel: Bool
+}
+
+struct BankAccount: Decodable, Identifiable {
+    let id: String
+    let name: String
+    let type: String
+    let balance: Double
+
+    enum CodingKeys: String, CodingKey {
+        case id = "accountId"
+        case name
+        case type
+        case balance
+    }
+}
+
+struct CryptoPosition: Decodable, Identifiable {
+    let id: String
+    let name: String
+    let symbol: String
+    let amount: Double
+    let valueUSD: Double
+}
+
+struct DefiTotal: Decodable {
+    let totalUSD: Double
+}
+
+struct DebtItem: Decodable, Identifiable {
+    let id: String
+    let type: String?
+    let balance: Double
+    let monthlyPayment: Double?
 }

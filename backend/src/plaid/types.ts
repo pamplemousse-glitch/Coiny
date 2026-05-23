@@ -105,6 +105,11 @@ export type PlaidErrorResponse = {
   suggested_action?: string;
 };
 
+export type AccountsBalanceGetResponse = {
+  accounts: PlaidAccount[];
+  request_id: string;
+};
+
 export class PlaidApiError extends Error {
   public override readonly name = 'PlaidApiError';
   constructor(
