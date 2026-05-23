@@ -70,9 +70,24 @@ final class ViewSmokeTests: XCTestCase {
         )
     }
 
+    func testNetWorthViewRenders() {
+        smoke(
+            NetWorthView()
+                .environment(NetWorthViewModel())
+        )
+    }
+
+    func testCryptoViewRenders() {
+        smoke(CryptoView())
+    }
+
+    func testSpinwheelViewRenders() {
+        smoke(SpinwheelView())
+    }
+
     func testRootViewRenders() {
-        // RootView is a TabView wrapping Pet, Spending, Settings — constructing
-        // it exercises all three children's init in one shot.
+        // RootView is a TabView wrapping all 6 tabs — constructing it exercises
+        // all children's init in one shot.
         smoke(
             RootView()
                 .environment(makeStore())

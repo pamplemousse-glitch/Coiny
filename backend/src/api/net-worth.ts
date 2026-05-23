@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { getAccounts } from '../coinbase/client.js';
 import { getPrices } from '../coingecko/client.js';
 import { db } from '../db/client.js';
-import { coinbaseConnections, zerionWallets, spinwheelConnections } from '../db/schema.js';
+import { coinbaseConnections, spinwheelConnections, zerionWallets } from '../db/schema.js';
 import { accountsBalanceGet } from '../plaid/client.js';
 import { getDebts } from '../spinwheel/client.js';
 import { getItemsByUser } from '../store/items.js';
@@ -27,7 +27,7 @@ const SYMBOL_TO_COINGECKO_ID: Record<string, string> = {
 
 export function registerNetWorthApi(app: FastifyInstance): void {
   app.get('/api/net-worth', async (req, _reply) => {
-    const userId = req.user.id;
+    const userId = req.user!.id;
 
     // --- Bank (Plaid) ---
     let bankTotal = 0;
@@ -60,16 +60,16 @@ export function registerNetWorthApi(app: FastifyInstance): void {
     const cryptoPositions: Array<{ id: string; name: string; symbol: string; amount: number; valueUSD: number }> = [];
     let coinbaseConnected = false;
     try {
-      const [connection] = await db()
-        .select()
-        .from(coinbaseConnections)
-        .where(eq(coinbaseConnections.userId, userId));
+      const [connection] = await db().select().from(coinbaseConnections).where(eq(coinbaseConnections.userId, userId));
       if (connection) {
         coinbaseConnected = true;
         const accounts = await getAccounts();
-        const symbols = accounts.map((a) => a.currency).filter((s) => s in SYMBOL_TO_COINGECKO_ID);
-        const coinIds = [...new Set(symbols.map((s) => SYMBOL_TO_COINGECKO_ID[s]))];
-        const prices = coinIds.length > 0 ? await getPrices(coinIds) : new Map<string, { usd: number; change24h: number }>();
+        const symbols = accounts
+          .map((a) => a.currency)
+          .filter((s): s is string => typeof s === 'string' && s in SYMBOL_TO_COINGECKO_ID);
+        const coinIds = [...new Set(symbols.map((s) => SYMBOL_TO_COINGECKO_ID[s]!))];
+        const prices =
+          coinIds.length > 0 ? await getPrices(coinIds) : new Map<string, { usd: number; change24h: number }>();
 
         for (const acct of accounts) {
           const amount = parseFloat(acct.balance.value);
@@ -95,10 +95,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
     let defiTotal = 0;
     let zerionConnected = false;
     try {
-      const wallets = await db()
-        .select()
-        .from(zerionWallets)
-        .where(eq(zerionWallets.userId, userId));
+      const wallets = await db().select().from(zerionWallets).where(eq(zerionWallets.userId, userId));
       if (wallets.length > 0) {
         zerionConnected = true;
         for (const wallet of wallets) {

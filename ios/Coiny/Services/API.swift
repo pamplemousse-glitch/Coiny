@@ -230,6 +230,14 @@ actor API {
     func fireTestTransaction() async throws -> EmptyResponse {
         try await post("/api/debug/fire-transaction")
     }
+
+    /// Injects an in-memory session token so the simulator can bypass Sign In
+    /// with Apple, which doesn't work in the Simulator. Does not touch the
+    /// Keychain — the strict accessibility policy requires a passcode that the
+    /// Simulator doesn't have. The token is lost on app restart.
+    func injectDebugSession() {
+        sessionToken = "debug-simulator-token"
+    }
     #endif
 
     // MARK: - Internals

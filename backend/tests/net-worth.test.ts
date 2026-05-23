@@ -22,16 +22,16 @@ vi.mock('../src/spinwheel/client.js', () => ({
   getDebts: vi.fn(),
 }));
 
-import { accountsBalanceGet } from '../src/plaid/client.js';
 import { getAccounts } from '../src/coinbase/client.js';
 import { getPrices } from '../src/coingecko/client.js';
-import { getPortfolio } from '../src/zerion/client.js';
+import { accountsBalanceGet } from '../src/plaid/client.js';
 import { getDebts } from '../src/spinwheel/client.js';
+import { getPortfolio } from '../src/zerion/client.js';
 
 const mockedAccountsBalanceGet = vi.mocked(accountsBalanceGet);
-const mockedGetAccounts = vi.mocked(getAccounts);
-const mockedGetPrices = vi.mocked(getPrices);
-const mockedGetPortfolio = vi.mocked(getPortfolio);
+const _mockedGetAccounts = vi.mocked(getAccounts);
+const _mockedGetPrices = vi.mocked(getPrices);
+const _mockedGetPortfolio = vi.mocked(getPortfolio);
 const mockedGetDebts = vi.mocked(getDebts);
 
 describe('GET /api/net-worth', () => {
@@ -83,8 +83,22 @@ describe('GET /api/net-worth', () => {
 
     mockedAccountsBalanceGet.mockResolvedValue({
       accounts: [
-        { account_id: 'acct-1', name: 'Checking', type: 'depository', subtype: 'checking', official_name: null, balances: { current: 1500, available: 1400, iso_currency_code: 'USD', limit: null } },
-        { account_id: 'acct-2', name: 'Savings', type: 'depository', subtype: 'savings', official_name: null, balances: { current: 5000, available: 5000, iso_currency_code: 'USD', limit: null } },
+        {
+          account_id: 'acct-1',
+          name: 'Checking',
+          type: 'depository',
+          subtype: 'checking',
+          official_name: null,
+          balances: { current: 1500, available: 1400, iso_currency_code: 'USD', limit: null },
+        },
+        {
+          account_id: 'acct-2',
+          name: 'Savings',
+          type: 'depository',
+          subtype: 'savings',
+          official_name: null,
+          balances: { current: 5000, available: 5000, iso_currency_code: 'USD', limit: null },
+        },
       ],
       request_id: 'req-1',
     });
