@@ -141,14 +141,14 @@ export function registerNetWorthApi(app: FastifyInstance): void {
           coinIds.length > 0 ? await getPrices(coinIds) : new Map<string, { usd: number; change24h: number }>();
 
         for (const acct of accounts) {
-          const amount = parseFloat(acct.balance.value);
+          const amount = parseFloat(acct.available_balance.value);
           if (amount <= 0) continue;
           const coinId = SYMBOL_TO_COINGECKO_ID[acct.currency];
           const priceData = coinId ? prices.get(coinId) : undefined;
           const valueUSD = priceData ? amount * priceData.usd : 0;
           cryptoTotal += valueUSD;
           cryptoPositions.push({
-            id: acct.account_id,
+            id: acct.uuid,
             name: acct.currency,
             symbol: acct.currency,
             amount,
