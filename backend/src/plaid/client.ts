@@ -2,6 +2,8 @@ import { request } from 'undici';
 import { config } from '../config.js';
 import {
   type AccountsBalanceGetResponse,
+  type InvestmentsHoldingsGetResponse,
+  type LiabilitiesGetResponse,
   type LinkTokenCreateResponse,
   PlaidApiError,
   type PlaidErrorResponse,
@@ -65,7 +67,7 @@ export function linkTokenCreate(args: {
     client_name: args.client_name ?? 'Coiny',
     language: args.language ?? 'en',
     country_codes: args.country_codes ?? ['US'],
-    products: args.products ?? ['transactions'],
+    products: args.products ?? ['transactions', 'investments', 'liabilities'],
     user: { client_user_id: args.client_user_id },
     webhook: args.webhook ?? config.PLAID_WEBHOOK_URL,
   });
@@ -91,6 +93,14 @@ export function transactionsSync(args: {
 
 export function accountsBalanceGet(accessToken: string): Promise<AccountsBalanceGetResponse> {
   return plaidPost('/accounts/balance/get', { access_token: accessToken });
+}
+
+export function investmentsHoldingsGet(accessToken: string): Promise<InvestmentsHoldingsGetResponse> {
+  return plaidPost('/investments/holdings/get', { access_token: accessToken });
+}
+
+export function liabilitiesGet(accessToken: string): Promise<LiabilitiesGetResponse> {
+  return plaidPost('/liabilities/get', { access_token: accessToken });
 }
 
 export function webhookVerificationKeyGet(keyId: string): Promise<WebhookVerificationKeyGetResponse> {
