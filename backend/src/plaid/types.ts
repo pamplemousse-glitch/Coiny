@@ -111,6 +111,59 @@ export type AccountsBalanceGetResponse = {
   request_id: string;
 };
 
+export type PlaidHolding = {
+  account_id: string;
+  security_id: string;
+  institution_price: number | null;
+  institution_value: number | null; // market value = quantity × price
+  quantity: number;
+  cost_basis: number | null;
+};
+
+export type PlaidSecurity = {
+  security_id: string;
+  name: string | null;
+  ticker_symbol: string | null;
+  type: string | null; // 'equity' | 'mutual_fund' | 'etf' | 'fixed_income' | etc.
+};
+
+export type InvestmentsHoldingsGetResponse = {
+  accounts: PlaidAccount[];
+  holdings: PlaidHolding[];
+  securities: PlaidSecurity[];
+  request_id: string;
+};
+
+export type PlaidCreditLiability = {
+  account_id: string;
+  minimum_payment_amount: number | null;
+  next_payment_due_date: string | null;
+  last_statement_balance: number | null;
+};
+
+export type PlaidMortgageLiability = {
+  account_id: string;
+  outstanding_principal_balance: number | null;
+  next_monthly_payment: number | null;
+  next_payment_due_date: string | null;
+};
+
+export type PlaidStudentLoan = {
+  account_id: string;
+  minimum_payment_amount: number | null;
+  next_payment_due_date: string | null;
+};
+
+export type LiabilitiesGetResponse = {
+  accounts: PlaidAccount[];
+  liabilities: {
+    credit: PlaidCreditLiability[] | null;
+    mortgage: PlaidMortgageLiability[] | null;
+    student: PlaidStudentLoan[] | null;
+  };
+  request_id: string;
+};
+
 export class PlaidApiError extends Error {
   public override readonly name = 'PlaidApiError';
   constructor(
