@@ -67,7 +67,7 @@ final class NetWorthViewModelTests: XCTestCase {
             defi: 0,
             debts: 0,
             accounts: NetWorthAccounts(
-                bank: [BankAccount(id: "a1", name: "Checking", type: "depository", balance: 3000)],
+                bank: [BankAccount(id: "a1", name: "Checking", type: "depository", balance: 3000, minPayment: nil, nextDueDate: nil)],
                 investments: [],
                 crypto: [],
                 defi: DefiTotal(totalUSD: 0),
