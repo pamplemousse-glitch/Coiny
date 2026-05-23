@@ -19,20 +19,20 @@ vi.mock('../src/zerion/client.js', () => ({
 vi.mock('../src/spinwheel/client.js', () => ({
   sendSmsOtp: vi.fn(),
   verifySmsOtp: vi.fn(),
-  getDebts: vi.fn(),
+  getDebtProfile: vi.fn(),
 }));
 
 import { getAccounts } from '../src/coinbase/client.js';
 import { getPrices } from '../src/coingecko/client.js';
 import { accountsBalanceGet } from '../src/plaid/client.js';
-import { getDebts } from '../src/spinwheel/client.js';
+import { getDebtProfile } from '../src/spinwheel/client.js';
 import { getPortfolio } from '../src/zerion/client.js';
 
 const mockedAccountsBalanceGet = vi.mocked(accountsBalanceGet);
 const _mockedGetAccounts = vi.mocked(getAccounts);
 const _mockedGetPrices = vi.mocked(getPrices);
 const _mockedGetPortfolio = vi.mocked(getPortfolio);
-const mockedGetDebts = vi.mocked(getDebts);
+const mockedGetDebtProfile = vi.mocked(getDebtProfile);
 
 describe('GET /api/net-worth', () => {
   beforeEach(async () => {
@@ -122,9 +122,9 @@ describe('GET /api/net-worth', () => {
     const { spinwheelConnections } = await import('../src/db/schema.js');
     await db().insert(spinwheelConnections).values({ userId: testUserId, spinwheelUserId: 'sw-nw-1' });
 
-    mockedGetDebts.mockResolvedValue([
-      { id: 'debt-1', type: 'student_loan', balance: 10000, interestRate: 5, minimumPayment: 150 },
-      { id: 'debt-2', type: 'credit_card', balance: 2500, interestRate: 18, minimumPayment: 75 },
+    mockedGetDebtProfile.mockResolvedValue([
+      { id: 'debt-1', type: 'STUDENT_LOAN', balance: 10000, interestRate: 5, minimumPayment: 150 },
+      { id: 'debt-2', type: 'CREDIT_CARD', balance: 2500, interestRate: 18, minimumPayment: 75 },
     ]);
 
     const { buildApp } = await import('../src/server.js');

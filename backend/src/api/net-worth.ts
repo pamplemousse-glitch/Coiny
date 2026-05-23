@@ -5,7 +5,7 @@ import { getPrices } from '../coingecko/client.js';
 import { db } from '../db/client.js';
 import { coinbaseConnections, spinwheelConnections, zerionWallets } from '../db/schema.js';
 import { accountsBalanceGet, investmentsHoldingsGet, liabilitiesGet } from '../plaid/client.js';
-import { getDebts } from '../spinwheel/client.js';
+import { getDebtProfile } from '../spinwheel/client.js';
 import { getItemsByUser } from '../store/items.js';
 import { getPortfolio } from '../zerion/client.js';
 
@@ -191,7 +191,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
         .where(eq(spinwheelConnections.userId, userId));
       if (connection) {
         spinwheelConnected = true;
-        const debts = await getDebts(connection.spinwheelUserId);
+        const debts = await getDebtProfile(connection.spinwheelUserId);
         for (const debt of debts) {
           debtsTotal += debt.balance;
           debtItems.push({
