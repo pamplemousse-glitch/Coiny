@@ -14,6 +14,8 @@ const AppleSignInSchema = z.object({
   user_id: z.string().min(1),
   // Optional: only provided on first sign-in; null on subsequent logins.
   email: z.string().email().nullish(),
+  // Optional: Apple provides fullName only on first sign-in.
+  display_name: z.string().max(100).nullish(),
 });
 
 export function registerAuthApi(app: FastifyInstance): void {
@@ -21,7 +23,7 @@ export function registerAuthApi(app: FastifyInstance): void {
     const parsed = AppleSignInSchema.safeParse(req.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
-    const { identity_token, user_id, email } = parsed.data;
+    const { identity_token, user_id, email, display_name } = parsed.data;
 
     let sub: string;
     try {
@@ -40,7 +42,7 @@ export function registerAuthApi(app: FastifyInstance): void {
       return reply.status(401).send({ error: 'Invalid identity token' });
     }
 
-    const userId = await findOrCreateUser({ appleSub: sub, email: email ?? null });
+    const userId = await findOrCreateUser({ appleSub: sub, email: email ?? null, displayName: display_name ?? null });
     const { rawToken } = await createSession(userId);
 
     req.log.info({ userId }, 'apple sign-in success');

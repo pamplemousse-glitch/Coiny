@@ -1,9 +1,22 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { z } from 'zod';
 import { itemRemove } from '../plaid/client.js';
 import { getItemsByUser } from '../store/items.js';
-import { deleteUser } from '../store/users.js';
+import { deleteUser, updateDisplayName } from '../store/users.js';
+
+const PatchAccountSchema = z.object({
+  display_name: z.string().min(1).max(100),
+});
 
 export function registerAccountApi(app: FastifyInstance): void {
+  app.patch('/api/account', async (req: FastifyRequest, reply: FastifyReply) => {
+    const parsed = PatchAccountSchema.safeParse(req.body);
+    if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
+
+    await updateDisplayName(req.user!.id, parsed.data.display_name);
+    return reply.status(200).send({ ok: true });
+  });
+
   // GLBA/CCPA right-to-delete. Removes all Plaid items (revokes Plaid's
   // access on their side) and deletes the user row. All child tables
   // cascade via FK constraints.

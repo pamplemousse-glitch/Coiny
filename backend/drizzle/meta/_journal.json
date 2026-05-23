@@ -64,6 +64,13 @@
       "when": 1779700000000,
       "tag": "0008_apply_missing_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1779720000000,
+      "tag": "0009_add_display_name",
+      "breakpoints": true
     }
   ]
 }

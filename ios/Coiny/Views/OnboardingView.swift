@@ -1,19 +1,28 @@
 import LinkKit
 import SwiftUI
 
-/// Three-screen onboarding flow:
+/// Four-screen onboarding flow:
 /// 1. Welcome — introduce Coiny
-/// 2. Link Bank — Plaid Link flow
-/// 3. Meet Pet — celebrate completion + segue to RootView
+/// 2. Enter Name — pre-filled from Apple if available, otherwise required input
+/// 3. Link Bank — Plaid Link flow
+/// 4. Meet Pet — celebrate completion + segue to RootView
 struct OnboardingView: View {
     @Binding var onboardingComplete: Bool
+    /// Pre-filled from Apple Sign In on first login; empty string on repeat logins.
+    var appleDisplayName: String = ""
 
     @State private var step: OnboardingStep = .welcome
 
     var body: some View {
         TabView(selection: $step) {
-            WelcomePage(onNext: { step = .linkBank })
+            WelcomePage(onNext: { step = .enterName })
                 .tag(OnboardingStep.welcome)
+
+            EnterNamePage(
+                initialName: appleDisplayName,
+                onNext: { step = .linkBank }
+            )
+            .tag(OnboardingStep.enterName)
 
             LinkBankPage(
                 onNext: { step = .meetPet },
@@ -32,6 +41,7 @@ struct OnboardingView: View {
 
 private enum OnboardingStep: Hashable {
     case welcome
+    case enterName
     case linkBank
     case meetPet
 }
@@ -72,6 +82,90 @@ private struct WelcomePage: View {
             .padding(.bottom, 60)
         }
         .padding(.horizontal)
+    }
+}
+
+private struct EnterNamePage: View {
+    let initialName: String
+    let onNext: () -> Void
+
+    @State private var name: String = ""
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            Image(systemName: "person.crop.circle.fill")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 100, height: 100)
+                .foregroundStyle(.purple)
+
+            VStack(spacing: 8) {
+                Text("What's your name?")
+                    .font(.largeTitle.bold())
+                Text("Coiny likes to know who it's living with.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            TextField("Your name", text: $name)
+                .textContentType(.name)
+                .autocorrectionDisabled()
+                .padding()
+                .background(Color(.secondarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal)
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+
+            Spacer()
+
+            Button(action: save) {
+                Group {
+                    if isSaving {
+                        ProgressView().tint(.white)
+                    } else {
+                        Text("Continue")
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
+            .padding(.horizontal)
+            .padding(.bottom, 60)
+        }
+        .padding(.horizontal)
+        .onAppear {
+            if name.isEmpty { name = initialName }
+        }
+    }
+
+    private func save() {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        isSaving = true
+        errorMessage = nil
+        Task { @MainActor in
+            defer { isSaving = false }
+            do {
+                try await API.shared.updateDisplayName(trimmed)
+                onNext()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
     }
 }
 

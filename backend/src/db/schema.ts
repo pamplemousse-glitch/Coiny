@@ -17,6 +17,7 @@ export const users = pgTable(
     id: text('id').primaryKey(),
     appleSub: text('apple_sub').notNull(),
     email: text('email'),
+    displayName: text('display_name'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('users_apple_sub_idx').on(t.appleSub)],
