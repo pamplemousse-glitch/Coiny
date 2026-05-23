@@ -14,17 +14,24 @@ compromises. For execution sequence see `docs/implementation-plan.md`.
 |---|--------|---------|--------|-----|------|
 | H1 | **MCU** | M5StickS3 (ESP32-S3) prototype | **Nordic nRF54L15** (BLE 5.4, 30% better power than nRF52840) | Battery life + RF performance + production-grade chip | 🟡 At PCB tape-out |
 | H2 | **Display** | TBD | **Sharp Memory LCD LS013B7DH06** (3-bit color, always-on, µA draw) | "Pet is always visible" feel; color > monochrome | 🟡 PCB design |
-| H3 | **Battery** | Coin cell (if any) | **200mAh LiPo + USB-C PD charging** | User expects plug-in charging | 🟡 PCB design |
+| H3 | **Battery** | Coin cell (if any) | **CR2450 coin cell + bulk capacitor (~100µF for LRA peak)** | Months of runtime (no USB-C hole = easier IP68); no charging circuit needed | 🟡 PCB design |
 | H4 | **Haptic** | ERM (already ordered) | **LRA + DRV2605L driver** | Apple-Watch-grade taps vs ERM buzz | 🟡 PCB design |
-| H5 | **PMIC** | None | **Maxim MAX77654** (integrated charger + 3 LDOs + fuel gauge) | One chip vs three; less PCB space; better firmware UX (used by Oura Ring Gen3) | 🟡 PCB design |
+| H5 | **PMIC** | None | ~~Maxim MAX77654~~ **Not needed for coin cell model** — LDO regulator only (e.g. TLV70030) | MAX77654 is a LiPo charger + fuel gauge; redundant with non-rechargeable coin cell | 🟡 PCB design |
 | H6 | **RGB indicator** | None | **APA102** RGB LED | Better color accuracy + faster refresh than WS2812 | 🟡 PCB design |
-| H7 | **Audio** | M5StickS3 built-in speaker | **Knowles I2S MEMS speaker** OR omit entirely | Best quality at lowest power; alternative is phone-only audio | 🟡 PCB design |
+| H7 | **Audio** | M5StickS3 built-in speaker | **MAX98357A I2S amp + IP68-rated waterproof micro speaker + Gore PTFE acoustic membrane** | On-device audio locked for v1; sealed speaker port maintains IP68 | 🟡 PCB design |
 | H8 | **Antenna + shielding** | None planned | **Chip antenna with matched network + RF shield can** over radio | RF performance is the #1 hardware-quality dimension; bad antenna = BLE disconnects | 🟡 PCB design |
 | H9 | **Industrial design** | DIY OpenSCAD prints | **Contracted ID firm + injection-molded PC/ABS shell + custom packaging** | Apple-unboxing-grade first impression | 🟡 Pre-manufacturing |
 | H10 | **Contract manufacturer** | TBD | **Premium-tier CM (Jabil, Flex, or similar)** | Not Seeed Studio / JLCPCB Assembly; QA, certifications, supply chain | 🟡 Manufacturing prep |
 | H11 | **Firmware OS** | PlatformIO/Arduino | **Zephyr RTOS via Nordic nRF Connect SDK** | Production-grade BLE stack, OTA, secure boot | 🟡 Firmware development |
 | H12 | **Secure boot + signed firmware** | None | **NSIB secure boot + signed OTA via MCUmgr** | Required for any consumer hardware; tamper resistance | 🟡 Firmware development |
 | H13 | **Certifications** | None | **FCC Part 15 + CE + UL + RoHS + REACH** | Required for any US/EU consumer sale | 🟡 Pre-launch |
+| H14 | **Weatherproofing** | None | **IP68 + MIL-STD-810G** (EPDM 70A O-rings, Parylene C conformal coating, Sylgard 184 potted LRA motor) | Pocket device used anywhere; rain, sweat, drops | 🟡 PCB + mechanical design |
+| H15 | **Display protection** | Bare LCD | **Gorilla Glass Victus 2 (0.7–1.0mm) + 3M 8146-2 OCA bonding** | Scratch/impact resistance; keeps IP68 seal | 🟡 Mechanical design |
+| H16 | **Debug port** | USB-C | **6-pin SWD pogo array (Mill-Max 0915) + silicone plug + magnetic jig** | No opening in enclosure; full SWD/JTAG via external jig; IP68-compatible | 🟡 PCB design |
+| H17 | **Enclosure materials** | PC/ABS DIY print | **PC/ABS front + 316L stainless steel back + TPU 90A overmold bumper rail** | Stainless back survives drops + key scratch; TPU absorbs shock; MIL-STD-810G drop test | 🟡 Industrial design |
+| H18 | **PCB shock isolation** | Hard-mounted | **4× Shore 40A silicone PCB standoff grommets (Würth 9774)** | Decouples PCB from enclosure shock transfer; MIL-STD-810G vibration | 🟡 Mechanical design |
+| H19 | **LRA motor (rugged spec)** | TBD | **Precision Microdrives 304-113 or 325-103** (potted in Sylgard 184) | Wearable-grade LRA; potting prevents ingress + adds damping | 🟡 PCB design |
+| H20 | **USB-C** | Planned | **Removed** — coin cell eliminates need for charging port; simplifies IP68 sealing | No port = no ingress point; critical enabler for true IP68 | 🟡 PCB design |
 
 ## Software changes
 

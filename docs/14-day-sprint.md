@@ -1,15 +1,20 @@
-# 🔥 Coiny — 14-Day Hyper-Aggressive Delusional Prototype Sprint
+# 🔥 Coiny — 14-Day Prototype Sprint (Native Swift + Kotlin)
 
 **Goal:** in 14 days, carry an M5StickS3 in your pocket, spend money via
 Plaid sandbox from your phone, watch the device animate + buzz within 2
 seconds. 3 friends installed via TestFlight.
 
-**Honest disclaimer:** this is the **delusional ideal** with zero
-setbacks. Realistic translation: **4-6 weeks**. Phone-only MVP-A (Day 5
-deliverable) is reachable in ~10 real days. Full prototype with hardware
-(Day 14) is ~5 weeks of real work. The day-by-day ordering + deliverables
-are correct; the calendar pacing is fantasy. **Use this as a checklist,
-not a schedule.**
+**Stack (locked):**
+- iOS: native Swift + SwiftUI + LinkKit (no React Native, no Expo)
+- Android: native Kotlin + Jetpack Compose (post-iOS, not in this sprint)
+- Backend: Fastify + Neon (existing, already deployed on Fly.io)
+- Push: direct APNs for iOS (no Expo Push, no Firebase needed for iOS)
+- BLE: CoreBluetooth in Swift (no Expo modules)
+
+**Honest disclaimer:** this is the delusional ideal with zero setbacks.
+Realistic translation: **4-6 weeks**. Phone-only MVP-A (Day 5 deliverable)
+is reachable in ~10 real days. Full prototype with hardware (Day 14) is
+~5 weeks. Use this as a checklist, not a schedule.
 
 ---
 
@@ -17,316 +22,315 @@ not a schedule.**
 
 - ☐ M5StickS3 in pocket animates + buzzes within 2 seconds of a Plaid sandbox transaction
 - ☐ Pet has at least 3 distinct animations (idle / celebrate / sad)
-- ☐ Pet has at least 5 sound effects (CC0 placeholders fine)
 - ☐ Mobile app installed on 3 friends' phones via TestFlight
+- ☐ Push notifications working (direct APNs)
 - ☐ End-to-end demo video recorded (30 seconds)
-- ☐ Push notifications working (Expo Push)
-- ☐ Sentry + Grafana receiving real production telemetry
 - ☐ Backend deployed on Fly.io is the same code testers use
 
-When all 7 boxes are checked, you have a real prototype.
+---
+
+## What's already done (no work needed)
+
+### Backend
+- ✅ Plaid sandbox integration (`/api/plaid/link-token`, `/api/plaid/exchange-token`, webhook verified)
+- ✅ Rule engine (paycheck, overspend, savings, bills, large purchase, subscription)
+- ✅ Postgres persistence on Neon (pet state, transactions, idempotency)
+- ✅ Mood decay over time
+- ✅ All API endpoints: `/api/pets`, `/api/spending`, `/api/plaid/*`, `/api/devices/push-token`
+- ✅ Debug endpoint: `POST /api/debug/fire-transaction`
+- ✅ Deployed at `https://coiny-backend.fly.dev`
+
+### iOS app (`ios/`)
+- ✅ XcodeGen project (`project.yml`) — LinkKit 5.6+ dependency declared
+- ✅ 3-screen onboarding: Welcome → Link Bank → Meet Pet
+- ✅ Plaid Link fully wired via LinkKit (creates token, opens sheet, exchanges public token)
+- ✅ `API.swift` actor — all endpoints implemented (`getPetState`, `createLinkToken`, `exchangePublicToken`, `fireTestTransaction`)
+- ✅ Pet view with breathing animation
+- ✅ Apple Developer account enrolled
 
 ---
 
-## Day 0 — Tonight (90 min, all signups)
+## Day 0 — Signups (45 min, Antoine only)
 
-These don't need Claude. Do them serially in the next hour and a half.
+- [x] **Apple Developer Program** ($99/yr) ✅ done
+- [ ] **Google Play Console** ($25 one-time) — skip for now; iOS-first
+- [ ] **Firebase** (free) — only needed for Android push later; skip for now
 
-- [ ] **Buy domain** at Cloudflare Registrar (5 min, ~$12-50). Try `coiny.app`, `coiny.io`, `getcoiny.com`.
-- [ ] **File LLC via Stripe Atlas** (30 min, ~$500). Delaware. Use placeholder name like `AW Holdings LLC` — operate Coiny as DBA later.
-- [ ] **Apple Developer Program signup as individual** ($99, ~24-48h approval). Switch to organization when LLC arrives.
-- [ ] **Google Play Console signup** ($25 one-time).
-- [ ] **Free signups (5 min each, batch them):**
-  - [ ] Sentry (https://sentry.io/signup) — create org + one project (TypeScript / Node.js)
-  - [ ] Grafana Cloud (https://grafana.com/products/cloud) — Connections → Add OpenTelemetry
-  - [ ] Clerk (https://clerk.com) — create application "Coiny"
-  - [ ] PostHog (https://posthog.com/signup) — US Cloud, project name "coiny"
-  - [ ] Resend (https://resend.com) — create API key
-  - [ ] Better Uptime (https://betterstack.com/better-uptime) — add monitor for `coiny-backend.fly.dev/health`
-  - [ ] Firebase (https://console.firebase.google.com) — project "coiny" with Cloud Messaging enabled
-- [ ] **Paste each key/DSN/credential** to me in chat as it arrives. I queue them.
-- [ ] **Confirm M5StickS3 + DRV2605L + motors** have arrived and you have a data-capable USB-C cable
-- [ ] **Read `docs/product-brief.md`** (just skim — fill it in Day 1)
+That's it. iOS APNs does not require Firebase.
 
 ---
 
-## Day 1 — Observability + product brief
+## Day 1 — Push notifications (APNs)
 
-**Claude:**
-- [ ] Wire Sentry into backend (Fastify SDK), capture exceptions
-- [ ] Wire Sentry into mobile (Expo SDK), capture crashes
-- [ ] Wire OpenTelemetry SDK into Fastify, OTLP exporter → Grafana Cloud
+### Antoine (~30 min, required first)
+
+1. Go to `developer.apple.com` → Certificates, Identifiers & Profiles → **Keys** → `+`
+2. Name: "Coiny APNs", check **Apple Push Notifications service (APNs)**
+3. Download the `.p8` file. Note the **Key ID** and **Team ID** (visible on the Keys page).
+4. Send me: the `.p8` file contents, Key ID, and Team ID.
+
+### Claude
+
+- [ ] Backend: add APNs push dispatch to `dispatchReaction`
+  - Library: `apns2` npm package (lightweight, no Firebase dependency)
+  - On reaction: query `device_tokens` table, fan out push to each token
+- [ ] iOS: register for push in `CoinyApp.swift` via `UNUserNotificationCenter`
+  - Request permission on first launch (after onboarding completes)
+  - On success: call `UIApplication.shared.registerForRemoteNotifications()`
+  - In `AppDelegate.application(_:didRegisterForRemoteNotificationsWithDeviceToken:)`: POST token to `POST /api/devices/push-token`
 - [ ] Open PR, merge
 
-**Antoine:**
-- [ ] Fill in every `<TBD>` in `docs/product-brief.md` (~1-2 h). Lock target user, pet personality, magic moment.
-- [ ] Apply for D-U-N-S number (~1 week processing; free) for future Apple Dev org
-- [ ] Apple Dev approves overnight 🤞
-
-**End-of-day artifact:** Sentry dashboard shows zero errors (good); Grafana shows `/health` latency p50/p95/p99 trending.
+**End-of-day artifact:** trigger `POST /api/debug/fire-transaction` in simulator → push notification appears.
 
 ---
 
-## Day 2 — Mobile Plaid Link
+## Day 2 — Pet reactions in the UI
 
-**Claude:**
-- [ ] Install `react-native-plaid-link-sdk` in mobile
-- [ ] Wire link-bank screen: tap → calls `/api/plaid/link-token` → opens Plaid Link sheet → on success, posts `public_token` to `/api/plaid/exchange-token`
-- [ ] Show "linking…" state, "success" state, error state
+### Claude
+
+- [ ] `PetStore` already polls `/api/pets` — extend it to surface `currentReaction` from the response
+- [ ] `PetView`: when `currentReaction == "celebrate"`, play a bounce animation for 3 seconds, then return to idle
+- [ ] `PetView`: when `currentReaction == "sad"`, play a droop animation
+- [ ] `PetView`: when `currentReaction == "alert"`, pulse the pet red briefly
+- [ ] Background fetch: on push notification received, wake app, re-poll `/api/pets`, update pet state
 - [ ] Open PR, merge
 
-**Antoine:**
-- [ ] Test on iOS simulator with `user_good` / `pass_good`
-- [ ] Verify `plaid_items` row appears in production Neon DB (`fly logs` or query directly)
-
-**End-of-day artifact:** simulator → tap "Link Bank" → complete Plaid sandbox flow → see Item created in backend.
+**End-of-day artifact:** fire sandbox transaction → push arrives → app opens → pet bounces for 3 seconds.
 
 ---
 
-## Day 3 — Push pipeline (T2.3)
+## Day 3 — Polish + empty/error states
 
-**Antoine (~30 min — required first):**
-- [ ] Apple Dev: generate **APNs Authentication Key** (`.p8` file). Send me the file + Key ID + Team ID.
-- [ ] Firebase: create a Cloud Messaging API key. Download `google-services.json` (Android) + `GoogleService-Info.plist` (iOS). Send both.
+### Claude
 
-**Claude:**
-- [ ] Backend: install `expo-server-sdk`, wire it into `dispatchReaction`. When a reaction fires, query `device_tokens` table, send push to each.
-- [ ] Mobile: wire `expo-notifications`. On app open, register for push → POST token to `/api/devices/push-token`.
-- [ ] Open PR, merge.
-
-**End-of-day artifact:** trigger sandbox transaction via Plaid sandbox dashboard → push notification appears on iOS simulator.
-
----
-
-## Day 4 — First-launch flow
-
-**Antoine (~1-2 h):**
-- [ ] Generate placeholder pet sprite via Midjourney / SDXL. Subject: cute Tamagotchi-style chick (or slime, or whatever your product brief picks). 4 emotions × 4 animation frames each = 16 sprites. PNG, ~64×64 each, transparent background.
-- [ ] Save as `mobile/assets/sprites/<emotion>-<frame>.png`
-
-**Claude:**
-- [ ] 3-screen onboarding: Welcome → Link Bank → Meet Pet
-- [ ] Pet view: cycles through idle frames on a 500ms timer
-- [ ] Open PR, merge.
-
-**End-of-day artifact:** fresh install on simulator → 3-screen onboard → see your pet breathing on screen.
-
----
-
-## Day 5 — 🎉 Phone-only MVP-A complete
-
-**Claude:**
-- [ ] Polish: empty states (no transactions yet), error states (Plaid down, no internet), settings screen stub (just sign out for now)
-- [ ] EAS Build → TestFlight first build
+- [ ] Empty state: no transactions yet → pet sits idle with "Waiting for your first transaction…" subtitle
+- [ ] Error state: backend unreachable → pet looks sad + "Having trouble connecting" message + retry button
+- [ ] Settings screen: show linked bank status; "Unlink bank" action; app version
+- [ ] `SpendingView`: wire it to `GET /api/spending` so it shows real recent transactions
 - [ ] Open PR, merge
 
-**Antoine:**
-- [ ] Install on real iPhone via TestFlight link
-- [ ] Invite 2 friends to TestFlight
-- [ ] Each tester: link sandbox bank, fire sandbox transactions, watch pet react via push + on-screen animation
-- [ ] Sanity check: do real-iPhone notifications work? Does Sentry capture any crashes?
+---
 
-**End-of-day artifact:** **3 humans have Coiny installed on their phones.** Phone-only experience is demoable. You could legitimately stop here and have a respectable software demo. We don't stop.
+## Day 4 — Pet sprites (Antoine)
+
+### Antoine (~1-2 h)
+
+Generate placeholder pet sprites. Final art will be commissioned later; these just need to exist for the demo.
+
+- [ ] Generate 16 PNGs via Midjourney / DALL-E / SDXL:
+  - 4 emotions: `idle`, `celebrate`, `sad`, `alert`
+  - 4 frames each = 16 total
+  - 64×64px, transparent background, PNG
+- [ ] Save to `ios/Coiny/Resources/Sprites/` as `idle-0.png` … `alert-3.png`
+- [ ] Confirm with me so I can wire them in
+
+### Claude (after sprites arrive)
+
+- [ ] Replace SF Symbol placeholder in `PetView` with `Image` cycling through sprite frames
+- [ ] `idle`: 500ms frame timer, breathing cycle
+- [ ] `celebrate`: 250ms timer, jumping cycle, stops after 3 sec
+- [ ] `sad`: 800ms timer, slow droop cycle
+- [ ] Open PR, merge
+
+**End-of-day artifact:** pet is a real animated character, not a system icon.
 
 ---
 
-## Day 6 — Firmware day 1 (M5StickS3 BLE)
+## Day 5 — 🎉 MVP-A: TestFlight
 
-**Antoine (~30 min):**
-- [ ] Solder DRV2605L + coin motor to M5StickS3 Grove port (or use the Qwiic-to-Grove cable you bought)
-- [ ] Define BLE command schema in `shared/` package: `{ animation: 0-4, haptic: 0-3, led_r/g/b: 0-255, duration_ms: u16 }` packed into 8 bytes
+### Claude
 
-**Claude:**
+- [ ] Bump `CFBundleShortVersionString` to `0.2.0` in `project.yml`
+- [ ] Verify CI is green (run xcodebuild on simulator)
+- [ ] Open PR, merge
+
+### Antoine
+
+- [ ] Xcode → Product → **Archive** (select the Coiny scheme, any iOS device target)
+- [ ] Organizer → Distribute App → **TestFlight & App Store** → Upload
+- [ ] App Store Connect → TestFlight → add 3 testers by email
+- [ ] Each tester installs via TestFlight link, links sandbox bank (`user_good` / `pass_good`), fires a sandbox transaction, watches pet react
+
+**End-of-day artifact:** 3 humans have Coiny on their phones. MVP-A complete. You could stop here. We don't stop.
+
+---
+
+## Day 6 — Firmware day 1 (M5StickS3 BLE GATT server)
+
+### Antoine (~30 min)
+
+- [ ] Confirm M5StickS3 + DRV2605L + coin motor have arrived; you have a data-capable USB-C cable
+- [ ] Define BLE command schema in `shared/`: `{ animation: u8, haptic: u8, led_r/g/b: u8, duration_ms: u16 }` — 8 bytes packed
+
+### Claude
+
 - [ ] PlatformIO project in `firmware/`: `platformio.ini` targeting M5StickS3, NimBLE library
-- [ ] BLE GATT server with one Coiny service + one writable characteristic
-- [ ] On write: parse 8-byte payload, log it via serial
-- [ ] Flash to M5StickS3 via USB-C
-- [ ] Open PR, merge.
+- [ ] BLE GATT server with one Coiny service UUID + one writable characteristic UUID
+- [ ] On write: parse 8-byte payload, log via serial
+- [ ] Open PR, merge
 
-**End-of-day artifact:** open LightBlue or nRF Connect on phone → scan → connect to M5StickS3 → write 8 bytes to the characteristic → see them in PlatformIO serial monitor.
+**End-of-day artifact:** open nRF Connect on your phone → scan → connect to M5StickS3 → write 8 bytes → see them in PlatformIO serial monitor.
 
 ---
 
 ## Day 7 — Firmware animations + haptics
 
-**Claude:**
+### Claude
+
 - [ ] On BLE write, dispatch to actuator handlers:
-  - LCD: draw sprite frames (3 hardcoded animations: `idle` breathing, `celebrate` jumping, `sad` slumping)
-  - DRV2605L: trigger haptic pattern from waveform library (123 named patterns)
-  - LED on M5StickS3 (built-in): R/G/B mood color
-  - Buzzer: optional placeholder beep
-- [ ] Idle state: cycle the breathing animation when no command for >5s
+  - M5StickS3 LCD: draw hardcoded sprite frames (`idle` breathing, `celebrate` jumping, `sad` slumping)
+  - DRV2605L: trigger haptic waveform (pattern 14 = double-click for celebrate, 52 = soft bump for bill)
+  - Built-in LED: R/G/B mood color
+- [ ] Idle state: cycle breathing animation when no BLE command for >5s
+- [ ] Open PR, merge
 
-**End-of-day artifact:** write `celebrate` over BLE → M5StickS3 plays 3-sec celebrate animation + double-tap haptic + green LED, then returns to idle.
-
----
-
-## Day 8 — Native BLE module (iOS Swift)
-
-**Claude:**
-- [ ] New Expo module via `expo-modules-core`: `expo-coiny-ble`
-- [ ] Swift implementation wraps CoreBluetooth:
-  - `scanForCoiny()` → returns first device matching our advertised service UUID
-  - `connect(deviceId)` → opens connection, discovers our characteristic
-  - `sendReaction({animation, haptic, led, duration_ms})` → packs into 8 bytes, writes to characteristic
-  - Auto-reconnect on disconnect (within 30s)
-- [ ] Background mode: declare `bluetooth-central` in `Info.plist` so the connection persists when app is backgrounded
-
-**End-of-day artifact:** in mobile app, tap a debug button → calls `expo-coiny-ble.sendReaction()` → M5StickS3 reacts. Backgrounding the app doesn't disconnect.
+**End-of-day artifact:** write `celebrate` bytes over BLE → M5StickS3 plays 3-sec animation + double-tap haptic + green LED, returns to idle.
 
 ---
 
-## Day 9 — Native BLE module (Android Kotlin)
+## Day 8 — Native BLE in iOS Swift (CoreBluetooth)
 
-**Claude:**
-- [ ] Same module surface as iOS, Kotlin implementation wrapping `BluetoothLeScanner` + `BluetoothGatt`
-- [ ] Foreground service for background BLE (Android requirement)
-- [ ] Permission request flow (Bluetooth + Location for older Android)
+### Claude
 
-**End-of-day artifact:** Android emulator (or Android phone) does the same dance — scan, connect, send, react.
+- [ ] New Swift file `ios/Coiny/Services/BLEManager.swift` — `@Observable` class wrapping `CBCentralManager` + `CBPeripheral`
+  - `scan()` → discovers Coiny device by service UUID
+  - `connect(_ peripheral: CBPeripheral)`
+  - `sendReaction(_ r: BLEReaction)` → packs 8 bytes, writes to characteristic
+  - Auto-reconnect on disconnect (exponential backoff, max 30s)
+- [ ] `Info.plist` already has `bluetooth-central` background mode (it's in `project.yml`) — verify characteristic write works when app is backgrounded
+- [ ] Add a "Device" tab to `RootView` showing: connection status, last reaction, "Scan" button
+- [ ] Open PR, merge
+
+**End-of-day artifact:** tap "Scan" in iOS app → connects to M5StickS3 → tap debug button → device reacts. Backgrounding the app doesn't disconnect.
 
 ---
 
-## Day 10 — 🔥 End-to-end integration
+## Day 9 — End-to-end integration
 
-**Claude:**
-- [ ] Mobile: when push notification arrives (or pet state polls a new reaction), call `expo-coiny-ble.sendReaction()` with the matching payload
-- [ ] Add a "device" tab in mobile: shows connected status, battery (read from device GATT characteristic), last reaction
-- [ ] Backend: extend `dispatchReaction` to include a `device_payload` field that mobile passes through to BLE
+### Claude
 
-**Antoine (carry test):**
+- [ ] `PetStore`: when reaction fires, if BLE is connected, call `BLEManager.shared.sendReaction()`
+- [ ] Mapping: `celebrate → animation:1 haptic:14 led:0,255,0`, `sad → animation:2 haptic:52 led:255,0,0`, `alert → animation:3 haptic:1 led:255,165,0`
+- [ ] Backend: extend `dispatchReaction` payload to include `animation` + `haptic` + `led` fields so iOS can pass them straight to BLE without translation logic on device
+- [ ] Open PR, merge
+
+### Antoine (carry test)
+
 - [ ] Carry M5StickS3 in pocket all day
-- [ ] Fire sandbox transactions from phone (`/sandbox/transactions/create` via shortcut button in app)
+- [ ] Fire sandbox transactions from the app's debug button
 - [ ] Verify each fires a reaction on the device within 2 sec
 - [ ] Note any latency / disconnect / failure modes
 
-**End-of-day artifact:** **full prototype loop working in the wild.** Tap → backend → push → BLE → pocket buzz. ✨
+**End-of-day artifact:** full prototype loop in the wild. Tap → backend → push → BLE → pocket buzz. ✨
 
 ---
 
-## Day 11 — Polish + reliability
+## Day 10 — Reliability
 
-**Claude:**
-- [ ] BLE reconnect handling — device goes to sleep / leaves Bluetooth range → mobile reconnects when in range again
-- [ ] Animation queueing on device — if 3 reactions fire in 5 seconds, queue them, don't drop
-- [ ] Mobile UI: device connection status with reconnect button
-- [ ] Battery indicator from device (BLE GATT characteristic the firmware updates every minute)
-- [ ] Sentry crash test — force a crash, confirm it lands in Sentry
+### Claude
 
-**Antoine:**
-- [ ] Test on a real workday — log every reaction observed, every miss, every disconnect
+- [ ] BLE: animation queue on device — if 3 reactions fire within 5s, queue them, don't drop
+- [ ] BLE: reconnect UI — show "Coiny disconnected" banner + auto-reconnect progress
+- [ ] Battery GATT characteristic on firmware: device updates a BLE characteristic every 60s with battery %; iOS reads and displays it in Device tab
+- [ ] Open PR, merge
 
 ---
 
-## Day 12 — Audio (placeholder pack)
+## Day 11 — Audio (placeholder)
 
-**Antoine (~30 min):**
-- [ ] Download ~10 CC0 sound effects from Pixabay (cheer, sad whistle, ding, magical ascending, error buzz). Save to `mobile/assets/sounds/`.
+### Antoine (~20 min)
 
-**Claude:**
-- [ ] Wire Expo Audio: when reaction dispatches on mobile, play matching sound
-- [ ] Mapping: `paycheck → fanfare`, `bill_paid → ding`, `overspent → sad`, etc.
-- [ ] Settings screen: master volume, quiet hours toggle
-- [ ] Open PR, merge.
+- [ ] Download ~6 CC0 sound effects from Pixabay: fanfare, ding, sad-whistle, alert-beep, coin-drop, level-up
+- [ ] Save to `ios/Coiny/Resources/Sounds/` as `celebrate.mp3`, `sad.mp3`, `alert.mp3`, etc.
+
+### Claude
+
+- [ ] Wire `AVAudioPlayer` (or `AVAudioEngine`) in `PetStore`: when reaction fires, play matching sound
+- [ ] Mapping: `paycheck → fanfare`, `bill_paid → ding`, `overspent → sad`, `large_purchase → alert`
+- [ ] Settings screen: mute toggle (`@AppStorage("soundEnabled")`)
+- [ ] Open PR, merge
 
 **End-of-day artifact:** phone plays a satisfying sound alongside every device reaction.
 
 ---
 
-## Day 13 — Tester onboarding kit
+## Day 12 — Tester onboarding kit + fresh TestFlight build
 
-**Antoine:**
-- [ ] EAS Build → fresh TestFlight build with everything
-- [ ] Write a 1-page "What is Coiny" doc for testers (use the product-brief content) + how-to-install instructions
-- [ ] Email to 3 friends
+### Claude
 
-**Claude:**
-- [ ] Monitor Sentry + Grafana for any tester-induced crashes; hot-fix immediately
-- [ ] Add a "Send feedback" link in mobile settings → opens email to you with device info pre-filled
+- [ ] Bump version to `0.3.0`
+- [ ] "Send feedback" button in Settings → opens `mailto:` with device info + iOS version pre-filled
+- [ ] Open PR, merge
 
-**End-of-day artifact:** 3 testers have Coiny on their phones. If they're remote, mail them an M5StickS3 each. If local, hand-deliver.
+### Antoine
+
+- [ ] Xcode → Archive → Upload to TestFlight
+- [ ] Write a 1-page "What is Coiny" note for testers (product brief content + sandbox instructions)
+- [ ] Invite 3 testers; if remote, mail each an M5StickS3
+
+**End-of-day artifact:** 3 testers have the full hardware+software experience.
+
+---
+
+## Day 13 — Bug fixes from tester feedback
+
+- [ ] Claude monitors for crashes / API errors in Fly logs; hot-fixes immediately
+- [ ] Antoine collects tester notes; prioritize any show-stoppers
 
 ---
 
 ## Day 14 — 🎬 Demo day
 
-- [ ] Record a 30-second demo video on a real phone. Frame: spend money in the app → see push → device buzzes + animates in your pocket.
-- [ ] Post the video somewhere (private link is fine — Loom, Vimeo unlisted, or just save the MP4 for the investor deck later).
-- [ ] Capture a tester's first reaction on video (their face when their pocket buzzes for the first time = the only marketing asset you ever need).
-- [ ] Update `docs/handoff.md`: mark Phase 2 prototype as ✅ delivered.
+- [ ] Record a 30-second demo on a real iPhone: spend money → see push → device buzzes + animates in pocket
+- [ ] Capture a tester's first reaction on video (their face = the only marketing asset you ever need)
+- [ ] Post the video somewhere (Loom unlisted, Vimeo, or MP4 for the investor deck)
+- [ ] Update `docs/handoff.md`: mark prototype as ✅ delivered
 
 🎉 **You now have a real prototype.**
 
-This is the artifact that:
-- Goes on a Kickstarter landing page
+This artifact:
+- Goes on a landing page / Kickstarter
 - Demos to angel investors
-- Justifies the YC application
+- Justifies a YC application
 - Validates whether to invest the next $30k+ in production hardware
 
 ---
 
-## What will actually happen (the real timeline)
+## Realistic timeline
 
-Honest realistic mapping of the days above to calendar time:
-
-| Sprint day | Realistic calendar time | Why it slips |
+| Sprint day | Realistic calendar | Why it slips |
 |---|---|---|
-| Day 0-1 | Day 1-3 | Apple Dev approval takes 3 days not 1; signups have onboarding flows |
-| Day 2-5 (phone MVP) | Day 4-10 | Plaid Link first-time integration has corner cases; push notifications on real iOS have certificate gotchas |
-| Day 6-7 (firmware) | Day 11-16 | First-time PlatformIO + NimBLE setup; BLE characteristic schema debugging |
-| Day 8-9 (native modules) | Day 17-26 | iOS BLE background mode is the slowest single step in the entire sprint. Plan a week of bugs. |
+| Day 0-1 | Day 1-3 | APNs certificate first-time setup has gotchas |
+| Day 2-5 (phone MVP) | Day 4-10 | Push on real iOS has provisioning profile edge cases |
+| Day 6-7 (firmware) | Day 11-16 | First-time NimBLE + DRV2605L debugging |
+| Day 8-9 (CoreBluetooth) | Day 17-26 | iOS BLE background mode is the slowest step in the sprint — plan a week |
 | Day 10-14 (integration + polish) | Day 27-35 | Always more polish than expected |
 
 **Realistic total: 5-6 weeks of focused solo work.**
-
-If you want the actually-realistic version, multiply each day above by ~2.5x and assume one full week of pure debugging somewhere. But the order is right and the deliverables are right.
 
 ---
 
 ## What this prototype is NOT
 
-Be honest with yourself + testers:
-
-- ❌ Not the production form factor (M5StickS3 is bulkier than the final coin shape)
-- ❌ Not the production battery life (3-5 days, not 9-12 months — that needs nRF52840)
-- ❌ Not the final pet design (AI sprites are placeholders)
+- ❌ Not the production form factor (M5StickS3 is big; final Coiny is coin-sized)
+- ❌ Not the production battery life (3-5 days vs 6-9 months on nRF54L15)
+- ❌ Not the final pet art (AI placeholders)
 - ❌ Not the final sound design (CC0 placeholders)
-- ❌ Not the final UX (onboarding is rough)
-- ❌ No real bank (Plaid sandbox only)
-- ❌ No multi-user (everything is `user_1`)
+- ❌ No real bank data (Plaid sandbox only)
+- ❌ No auth / multi-user (singleton `user_1`)
+- ❌ No Android (iOS-first; Android comes 3-6 months post-iOS-launch)
 
-**It IS:** a complete end-to-end loop that proves the concept works. Enough to validate engagement, demo to investors, build a waitlist around, prep for Kickstarter.
-
----
-
-## What I (Claude) can do alone vs. what needs Antoine
-
-| Day | Antoine actions | Time |
-|---|---|---|
-| 0 | All signups, hardware unboxing | 90 min |
-| 1 | Fill product brief | 2 h |
-| 3 | APNs key + Firebase config | 30 min |
-| 4 | AI sprite generation | 1-2 h |
-| 5 | TestFlight install on real iPhone + invite friends | 30 min |
-| 6 | Solder DRV2605L + define BLE schema | 1 h |
-| 10 | Carry test | passive (whole day) |
-| 12 | CC0 sounds | 30 min |
-| 13 | Tester onboarding email | 30 min |
-| 14 | Record demo | 30 min |
-
-**Total Antoine effort across 14 days:** ~8-12 hours of focused work (most of it Day 0 + product brief).
-
-**Everything else is Claude doing software work.** The hardware bottleneck is M5StickS3 being on your desk + DRV2605L being soldered.
+**It IS:** a complete end-to-end loop proving the concept works. Enough to validate, demo, build a waitlist, and prep for fundraising.
 
 ---
 
-## Start now
+## Android (post-prototype)
 
-The 90-minute Day 0 list is the bottleneck. Until those signups happen, nothing else moves. **Open the first 4 links and go:**
+Android development begins after iOS TestFlight is live and validated. Stack:
+- Kotlin + Jetpack Compose
+- Plaid Link Android SDK
+- BluetoothLeScanner + `BluetoothGatt` (no Expo)
+- FCM for push (requires Firebase project)
+- Foreground service for background BLE
 
-1. https://dash.cloudflare.com/?to=/:account/domains/register/
-2. https://stripe.com/atlas
-3. https://developer.apple.com/programs/enroll/
-4. https://sentry.io/signup
-
-Paste me the credentials as they arrive. I'll start staging Day 1 code immediately.
+See `docs/implementation-plan.md` M5 for the full Android milestone.

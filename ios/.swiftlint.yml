@@ -1,0 +1,34 @@
+# SwiftLint configuration for Coiny iOS
+# Calibrated for a Swift/SwiftUI codebase with Codable JSON models.
+
+disabled_rules:
+  # Codable structs use snake_case property names to match JSON API field names
+  # (e.g. identity_token, user_id, link_token). CodingKeys would be verbose noise.
+  - identifier_name
+  # Trailing commas in multi-line collection literals are valid Swift and improve
+  # diff readability (adding an item doesn't touch the previous line).
+  - trailing_comma
+
+opt_in_rules:
+  - empty_count
+  - empty_string
+  - closure_spacing
+  - overridden_super_call
+
+line_length:
+  warning: 140
+  error: 160
+  ignores_comments: true
+  ignores_urls: true
+
+type_body_length:
+  warning: 300
+  error: 400
+
+file_length:
+  warning: 500
+  error: 700
+
+excluded:
+  - .spm-cache
+  - DerivedData

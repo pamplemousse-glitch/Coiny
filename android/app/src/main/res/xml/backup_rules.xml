@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- No data should be backed up automatically. App holds nothing sensitive
+         in shared prefs; auth tokens (when added) will be in EncryptedSharedPreferences. -->
+</full-backup-content>

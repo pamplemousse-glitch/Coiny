@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+backend/coverage/
+ios/DerivedData/
+ios/Pods/
+ios/.build/
+ios/Coiny.xcodeproj/project.xcworkspace/xcuserdata/
+ios/Coiny.xcodeproj/xcuserdata/
+*.xcuserstate
+firmware/build/
+firmware/.west/
+.pnpm-store/
+.turbo/

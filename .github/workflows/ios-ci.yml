@@ -1,0 +1,138 @@
+name: iOS CI
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# macOS runner minutes are 10× the cost of Linux. The `changes` gate below
+# keeps the expensive `test` job from running on backend-only or docs-only PRs,
+# while the `result` job always reports so required-check branch protection
+# never deadlocks.
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      has_ios: ${{ steps.check.outputs.result }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0
+      - id: check
+        run: |
+          BASE=${{ github.event.pull_request.base.sha || 'HEAD~1' }}
+          if git diff --name-only "$BASE"...HEAD | grep -qE '^(ios/|\.github/workflows/ios-ci\.yml)'; then
+            echo "result=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  test:
+    needs: changes
+    if: needs.changes.outputs.has_ios == 'true'
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      SCHEME: Coiny
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      # Pin to the newest Xcode 16.x available on the runner image. Each Xcode
+      # 16 minor bundles a different iOS SDK (16.0→18.0, 16.1→18.1, …) and the
+      # runner image only preinstalls simulator runtimes for the *newer* SDKs.
+      # Pinning 16.0 explicitly broke CI: it wanted an iOS 18.0 runtime that
+      # nobody preinstalls anymore. Take the highest 16.x instead.
+      - name: Select latest Xcode 16.x
+        run: |
+          XCODE_PATH=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE_PATH" ]; then XCODE_PATH=$(ls -d /Applications/Xcode*.app | sort -V | tail -1); fi
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+          echo "Using $XCODE_PATH"
+
+      - name: Show Xcode + simulators
+        run: |
+          xcodebuild -version
+          xcrun simctl list devices available iOS
+
+      - name: Install build tools
+        run: |
+          brew install xcodegen xcbeautify swiftlint
+
+      - name: Cache SwiftPM dependencies
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('ios/project.yml') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Lint (SwiftLint)
+        working-directory: ios
+        run: swiftlint lint --strict Coiny
+
+      # Hardcoded device names (e.g. "iPhone 16") fail when the runner image
+      # ships a different default simulator. Instead, pick the first available
+      # iOS Simulator's UDID dynamically and target that exact device.
+      - name: Pick a simulator destination
+        id: simulator
+        run: |
+          UDID=$(xcrun simctl list devices available --json \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; \
+                          runtimes=sorted([k for k in d if "iOS" in k]); \
+                          devs=[x for r in runtimes for x in d[r] if x.get("isAvailable") and "iPhone" in x["name"]]; \
+                          print(devs[0]["udid"]) if devs else sys.exit("no iPhone simulator available")')
+          echo "destination=platform=iOS Simulator,id=$UDID" >> "$GITHUB_OUTPUT"
+          echo "Selected simulator UDID: $UDID"
+
+      - name: Build + test
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Coiny.xcodeproj \
+            -scheme "$SCHEME" \
+            -sdk iphonesimulator \
+            -destination "${{ steps.simulator.outputs.destination }}" \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            | xcbeautify --renderer github-actions
+
+      - name: Upload xcresult bundle on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: ios-xcresult
+          path: ios/TestResults.xcresult
+          retention-days: 7
+
+  result:
+    needs: [changes, test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate
+        run: |
+          if [[ "${{ needs.changes.outputs.has_ios }}" != "true" ]]; then
+            echo "No iOS changes – skipping."
+            exit 0
+          fi
+          if [[ "${{ needs.test.result }}" == "success" ]]; then
+            exit 0
+          fi
+          echo "iOS tests ${{ needs.test.result }}."
+          exit 1

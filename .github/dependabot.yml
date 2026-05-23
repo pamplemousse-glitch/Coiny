@@ -1,28 +1,44 @@
 version: 2
-updates:
-  - package-ecosystem: "npm"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    groups:
-      backend-deps:
-        patterns:
-          - "*"
-        exclude-patterns:
-          - "react*"
-          - "expo*"
-          - "@types/react*"
-    open-pull-requests-limit: 5
-    labels:
-      - "deps"
 
-  - package-ecosystem: "github-actions"
-    directory: "/"
+updates:
+  # GitHub Actions — keep action SHAs current
+  - package-ecosystem: github-actions
+    directory: /
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "chore(ci)"
     open-pull-requests-limit: 5
     labels:
-      - "deps"
-      - "ci"
+      - deps
+      - ci
+
+  # Backend npm packages (package.json lives in /backend)
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 5
+    labels:
+      - deps
+    groups:
+      backend-minor-patch:
+        update-types:
+          - minor
+          - patch
+    # Major version bumps for these packages require intentional migration
+    # (breaking API changes, lockfile regeneration, test updates). Ignore
+    # them in Dependabot — handle manually when ready.
+    ignore:
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitest/coverage-v8"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]

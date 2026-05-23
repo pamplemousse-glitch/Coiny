@@ -53,7 +53,7 @@ final class APITests: XCTestCase {
         do {
             _ = try await api.getPetState()
             XCTFail("Expected APIError.unauthenticated")
-        } catch let API.APIError.unauthenticated {
+        } catch API.APIError.unauthenticated {
             // Critical: never reached the network.
             XCTAssertEqual(http.requests.count, 0)
         } catch {

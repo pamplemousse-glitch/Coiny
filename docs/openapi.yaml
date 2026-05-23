@@ -1,0 +1,987 @@
+openapi: 3.0.3
+
+info:
+  title: Coiny API
+  version: 0.2.0
+  description: |
+    Backend API for the Coiny financial companion app.
+
+    **Authentication:** Every endpoint except `/health` and `/webhooks/plaid`
+    requires `Authorization: Bearer <session-token>`. Session tokens are issued
+    by `POST /api/auth/apple` and stored in the iOS Keychain
+    (`kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly`). Tokens expire after
+    30 days of inactivity or 90 days absolute.
+
+    **Object IDs:** All IDs are UUID v4 strings — never sequential integers.
+
+    **Errors:** All error responses follow `{ "error": "<short message>" }`.
+    No stack traces, no internal codes, no field-level details in production.
+
+    **Status markers:**
+    - ✅ Implemented
+    - 🔜 Planned — not yet built
+
+servers:
+  - url: https://coiny-backend.fly.dev
+    description: Production (Fly.io)
+  - url: https://coiny-backend-staging.fly.dev
+    description: Staging (Fly.io) — Plaid sandbox only
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Session token issued by POST /api/auth/apple.
+        Stored in iOS Keychain. 30-day rolling expiry, 90-day absolute max.
+
+  schemas:
+
+    # ── Primitives ──────────────────────────────────────────────────────────
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: Unauthorized
+
+    Ok:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+          example: true
+
+    # ── Auth ────────────────────────────────────────────────────────────────
+
+    AppleSignInRequest:
+      type: object
+      required: [identity_token, authorization_code]
+      properties:
+        identity_token:
+          type: string
+          description: |
+            ES256 JWT issued by Apple. Verified server-side using Apple's JWKS
+            at https://appleid.apple.com/auth/keys. `sub` claim is the stable
+            Apple user ID used as user_id in all tables.
+        authorization_code:
+          type: string
+          description: Single-use code from ASAuthorizationAppleIDCredential.
+        full_name:
+          type: string
+          nullable: true
+          description: |
+            Only present on first sign-in. Apple does not re-send on subsequent
+            sign-ins — store on first receipt or it is lost.
+
+    AuthResponse:
+      type: object
+      required: [session_token, expires_at, user_id, is_new_user]
+      properties:
+        session_token:
+          type: string
+          description: |
+            32-byte hex random string. Store in iOS Keychain only —
+            never UserDefaults, never logs. SHA-256 hash stored server-side.
+        expires_at:
+          type: string
+          format: date-time
+          description: Absolute expiry (90 days from issuance).
+        user_id:
+          type: string
+          format: uuid
+          description: Stable internal user ID (derived from Apple sub).
+        is_new_user:
+          type: boolean
+          description: True on first sign-in — client should trigger onboarding flow.
+
+    # ── Pet ─────────────────────────────────────────────────────────────────
+
+    PetGoals:
+      type: object
+      required:
+        - weeklyBudgetByCategory
+        - savingsGoal
+        - paycheckMinAmount
+        - largePurchaseThreshold
+      properties:
+        weeklyBudgetByCategory:
+          type: object
+          additionalProperties:
+            type: number
+          description: Map of Plaid category slug → weekly spend limit in USD.
+          example:
+            groceries: 150
+            food_and_drink: 100
+        savingsGoal:
+          type: integer
+          description: Target savings balance in USD.
+          example: 1000
+        paycheckMinAmount:
+          type: integer
+          description: |
+            Minimum inflow amount (USD) to be classified as a paycheck.
+            Smaller deposits are ignored by the paycheck rule.
+          example: 500
+        largePurchaseThreshold:
+          type: integer
+          description: Single-transaction amount (USD) that triggers the large-purchase reaction.
+          example: 200
+
+    PetGoalsPatch:
+      type: object
+      description: Partial update — omit any field to leave it unchanged.
+      properties:
+        weeklyBudgetByCategory:
+          type: object
+          additionalProperties:
+            type: number
+          description: |
+            Merged (not replaced) with existing categories. To remove a
+            category, set its value to 0.
+        savingsGoal:
+          type: integer
+          minimum: 1
+        paycheckMinAmount:
+          type: integer
+          minimum: 1
+        largePurchaseThreshold:
+          type: integer
+          minimum: 1
+
+    Animation:
+      type: string
+      enum: [happy, sad, celebrate, concerned, neutral, sleeping]
+
+    Sound:
+      type: string
+      enum: [chime, fanfare, warning, coin, off]
+
+    LedColor:
+      type: string
+      enum: [green, amber, red, rainbow, off]
+
+    Reaction:
+      type: object
+      required: [animation, sound, led, duration, reason]
+      properties:
+        animation:
+          $ref: '#/components/schemas/Animation'
+        sound:
+          $ref: '#/components/schemas/Sound'
+        led:
+          $ref: '#/components/schemas/LedColor'
+        duration:
+          type: integer
+          description: |
+            Milliseconds the animation plays. 0 = hold indefinitely until
+            the next reaction.
+          example: 3000
+        reason:
+          type: string
+          description: |
+            Human-readable explanation. Never contains raw dollar amounts —
+            uses ranges or relative language to avoid leaking exact balances
+            in push payloads.
+          example: Looks like you have a recurring charge from Netflix
+
+    ReactionRecord:
+      type: object
+      required: [at, eventType, reaction]
+      properties:
+        at:
+          type: string
+          format: date-time
+        eventType:
+          type: string
+          description: Rule name that fired.
+          example: overspent_in_category
+        reaction:
+          $ref: '#/components/schemas/Reaction'
+
+    PetState:
+      type: object
+      required: [healthScore, mood, lastReactionAt, reactionHistory, goals]
+      properties:
+        healthScore:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Cumulative financial health score. Decays over time without positive events.
+          example: 72
+        mood:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: |
+            Derived from healthScore with time-decay applied. More reactive
+            to recent events than healthScore.
+          example: 68
+        lastReactionAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO-8601 timestamp of the most recent reaction. Null if no reactions yet.
+          x-nullable: true
+        reactionHistory:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/ReactionRecord'
+          description: Most recent 50 reactions, newest first.
+        goals:
+          $ref: '#/components/schemas/PetGoals'
+
+    # ── Plaid ───────────────────────────────────────────────────────────────
+
+    LinkTokenResponse:
+      type: object
+      required: [link_token, expiration]
+      properties:
+        link_token:
+          type: string
+          description: Short-lived Plaid Link token. Pass directly to LinkKit — never store.
+        expiration:
+          type: string
+          format: date-time
+          description: Token expires at this time (typically 30 minutes).
+
+    ExchangeTokenRequest:
+      type: object
+      required: [public_token]
+      properties:
+        public_token:
+          type: string
+          description: |
+            Public token received from Plaid Link `onSuccess` callback.
+            Single-use — exchange immediately, then discard.
+          minLength: 1
+
+    ExchangeTokenResponse:
+      type: object
+      required: [ok, item_id]
+      properties:
+        ok:
+          type: boolean
+        item_id:
+          type: string
+          description: Plaid item ID. Opaque — used for logging and webhook correlation only.
+
+    # ── Spending ────────────────────────────────────────────────────────────
+
+    SpendingRecord:
+      type: object
+      required: [at, eventType, reason]
+      properties:
+        at:
+          type: string
+          format: date-time
+        eventType:
+          type: string
+          example: overspent_in_category
+        reason:
+          type: string
+          example: Looks like you spent a lot on food this week
+        amount:
+          type: string
+          nullable: true
+          description: |
+            Dollar amount extracted from reason text (e.g. "$47.23").
+            Null if no amount is present in the reason string.
+          example: "$47.23"
+
+    CategoryOverride:
+      type: object
+      required: [merchant_name, category]
+      properties:
+        merchant_name:
+          type: string
+          description: Lowercased merchant name as it appears in Plaid transactions.
+          example: uber eats
+        category:
+          type: string
+          description: Canonical category slug to override Plaid's classification.
+          example: food_and_drink
+
+    # ── Devices ─────────────────────────────────────────────────────────────
+
+    PushTokenRequest:
+      type: object
+      required: [token, platform]
+      properties:
+        token:
+          type: string
+          minLength: 10
+          maxLength: 200
+          description: APNs device token as lowercase hex string (iOS). FCM registration token (Android, future).
+        platform:
+          type: string
+          enum: [ios, android]
+
+    # ── Subscriptions ───────────────────────────────────────────────────────
+
+    Subscription:
+      type: object
+      required: [merchantName, cadenceDays, amount, count, lastDate]
+      properties:
+        merchantName:
+          type: string
+          example: Netflix
+        cadenceDays:
+          type: integer
+          description: Median number of days between charges (25–35 = monthly).
+          example: 30
+        amount:
+          type: number
+          description: Average charge amount in USD (absolute value).
+          example: 15.99
+        count:
+          type: integer
+          description: Number of matching transactions in the detection window (120 days).
+          example: 4
+        lastDate:
+          type: string
+          format: date
+          description: YYYY-MM-DD of the most recent charge.
+          example: "2026-05-01"
+
+    # ── Account ─────────────────────────────────────────────────────────────
+
+    AccountDeleteResponse:
+      type: object
+      required: [ok, deleted_at]
+      properties:
+        ok:
+          type: boolean
+        deleted_at:
+          type: string
+          format: date-time
+          description: |
+            Timestamp when deletion completed. All user data purged:
+            users, plaid_items (+ Plaid /item/remove called), transactions,
+            reaction_history, processed_events, device_tokens, sessions,
+            category_overrides.
+
+  responses:
+    Unauthorized:
+      description: Missing, expired, or revoked session token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Unauthorized
+
+    BadRequest:
+      description: Request body failed schema validation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Resource not found (or belongs to a different user).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Not found
+
+    TooManyRequests:
+      description: Rate limit exceeded.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds until the rate limit resets.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Too many requests
+
+    InternalError:
+      description: Unexpected server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Something went wrong
+
+security:
+  - BearerAuth: []
+
+paths:
+
+  # ── Health ────────────────────────────────────────────────────────────────
+
+  /health:
+    get:
+      summary: Liveness check ✅
+      description: |
+        Unauthenticated. Returns 200 if the server is up and the DB connection
+        is healthy. Used by UptimeRobot and Fly.io health checks.
+      security: []
+      tags: [System]
+      responses:
+        '200':
+          description: Server is healthy.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+
+  # ── Auth ─────────────────────────────────────────────────────────────────
+
+  /api/auth/apple:
+    post:
+      summary: Sign in with Apple 🔜
+      description: |
+        Verifies the Apple identity token server-side using Apple's JWKS endpoint.
+        Issues a session token on success.
+
+        **Rate limit:** 5 requests/minute per IP.
+
+        **First sign-in:** `is_new_user: true` — client must complete onboarding
+        (Plaid Link + push permission) before the pet is active.
+      security: []
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppleSignInRequest'
+      responses:
+        '200':
+          description: Sign-in successful. Store `session_token` in Keychain immediately.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Apple identity token invalid or expired.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Invalid identity token
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/auth/logout:
+    post:
+      summary: Revoke session token 🔜
+      description: |
+        Immediately marks the current session as revoked server-side.
+        The client must delete the token from Keychain after calling this endpoint.
+
+        Pass `revoke_all: true` to revoke all sessions for this user across
+        all devices ("log out everywhere").
+      tags: [Auth]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                revoke_all:
+                  type: boolean
+                  default: false
+                  description: If true, revoke all sessions for this user.
+      responses:
+        '200':
+          description: Session revoked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ── Pet ───────────────────────────────────────────────────────────────────
+
+  /api/pets:
+    get:
+      summary: Get pet state ✅
+      description: |
+        Returns the authenticated user's pet state including health score,
+        mood (with time-decay applied), last reaction timestamp, reaction
+        history (most recent 50), and current goals.
+
+        Poll this endpoint every 3 seconds while the app is foregrounded.
+        Also called immediately on push notification receipt (background fetch).
+      tags: [Pet]
+      responses:
+        '200':
+          description: Current pet state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PetState'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/pets/goals:
+    put:
+      summary: Update pet goals ✅
+      description: |
+        Partial update — omit any field to leave it unchanged.
+        `weeklyBudgetByCategory` is merged with existing categories, not replaced.
+        Changes take effect on the next rule evaluation (next webhook).
+      tags: [Pet]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PetGoalsPatch'
+            example:
+              weeklyBudgetByCategory:
+                food_and_drink: 120
+              savingsGoal: 2000
+      responses:
+        '200':
+          description: Updated goals.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PetGoals'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ── Plaid ─────────────────────────────────────────────────────────────────
+
+  /api/plaid/link-token:
+    post:
+      summary: Create Plaid Link token ✅
+      description: |
+        Creates a short-lived Plaid Link token for the authenticated user.
+        Pass this token directly to the Plaid Link SDK (LinkKit on iOS,
+        Plaid Android SDK on Android). Do not store the token.
+
+        Token expires in ~30 minutes. If the user abandons Link, request
+        a fresh token on retry.
+
+        **Rate limit:** 20 requests/minute per user.
+      tags: [Plaid]
+      responses:
+        '200':
+          description: Link token ready to pass to Plaid Link SDK.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkTokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/plaid/exchange-token:
+    post:
+      summary: Exchange Plaid public token ✅
+      description: |
+        Exchanges the public token from Plaid Link's `onSuccess` callback for
+        a long-lived access token, which is stored encrypted (AES-256-GCM)
+        server-side. The public token is single-use — exchange immediately.
+
+        On success, the bank is linked and the Plaid webhook pipeline is active.
+        The first `INITIAL_UPDATE` webhook will arrive within seconds and trigger
+        an initial transaction sync (no reactions fired on first sync).
+
+        **Rate limit:** 20 requests/minute per user.
+      tags: [Plaid]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExchangeTokenRequest'
+      responses:
+        '200':
+          description: Bank linked successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExchangeTokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/plaid/unlink:
+    post:
+      summary: Unlink bank account 🔜
+      description: |
+        Calls Plaid `/item/remove` to revoke the access token at Plaid's end,
+        then deletes all associated data for this user: plaid_items, transactions,
+        processed_events. The pet resets to default state.
+
+        This endpoint exists separately from `DELETE /api/account` — unlink
+        removes the bank connection while keeping the user account and pet alive.
+      tags: [Plaid]
+      responses:
+        '200':
+          description: Bank unlinked. All transaction data deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ok'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No linked bank found for this user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: No linked bank found
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ── Spending ──────────────────────────────────────────────────────────────
+
+  /api/spending:
+    get:
+      summary: Get spending reaction history ✅
+      description: |
+        Returns the reaction history with dollar amounts extracted from reason
+        text. Same data as `GET /api/pets` `reactionHistory`, formatted for
+        the Spending tab UI.
+      tags: [Spending]
+      responses:
+        '200':
+          description: List of spending reactions, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SpendingRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/spending/overrides:
+    get:
+      summary: List category overrides ✅
+      description: |
+        Returns all user-defined merchant → category overrides.
+        These override Plaid's `personal_finance_category` for rule evaluation.
+      tags: [Spending]
+      responses:
+        '200':
+          description: All overrides for this user.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategoryOverride'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    put:
+      summary: Set category override ✅
+      description: |
+        Creates or updates the category for a merchant name. Merchant name is
+        stored lowercased. Match is case-insensitive against incoming transaction
+        `merchant_name` fields.
+      tags: [Spending]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CategoryOverride'
+      responses:
+        '200':
+          description: Override saved.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      summary: Remove category override ✅
+      description: Removes the override for a merchant, restoring Plaid's classification.
+      tags: [Spending]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [merchant_name]
+              properties:
+                merchant_name:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+      responses:
+        '200':
+          description: Override removed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ── Subscriptions ─────────────────────────────────────────────────────────
+
+  /api/subscriptions:
+    get:
+      summary: Detect recurring charges ✅
+      description: |
+        Analyzes the last 120 days of outflow transactions and returns detected
+        recurring charges (subscriptions). Detection criteria:
+        - ≥3 occurrences
+        - Amounts within 10% of each other
+        - Median gap between charges: 25–35 days
+
+        Results are sorted by amount descending.
+      tags: [Spending]
+      responses:
+        '200':
+          description: Detected subscriptions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Subscription'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ── Devices ───────────────────────────────────────────────────────────────
+
+  /api/devices/push-token:
+    post:
+      summary: Register push notification token ✅
+      description: |
+        Upserts the APNs device token for this user+device combination.
+        Call this on every app launch after Apple calls
+        `didRegisterForRemoteNotificationsWithDeviceToken` — APNs tokens
+        can rotate between launches.
+
+        Stale tokens (APNs returns HTTP 410 Gone) are automatically removed
+        from the DB when a push fails.
+
+        **Rate limit:** 20 requests/minute per user.
+      tags: [Devices]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushTokenRequest'
+            example:
+              token: a1b2c3d4e5f6...
+              platform: ios
+      responses:
+        '200':
+          description: Token registered.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ok'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ── Account ───────────────────────────────────────────────────────────────
+
+  /api/account:
+    delete:
+      summary: Delete account (right to erasure) 🔜
+      description: |
+        Permanently deletes the authenticated user's account and ALL associated
+        data. This action is irreversible.
+
+        Deletion order:
+        1. Call Plaid `/item/remove` to revoke access token at Plaid's end
+        2. Delete: transactions, processed_events, reaction_history,
+           category_overrides, device_tokens, plaid_items, sessions, users
+        3. Return confirmation
+
+        Satisfies CCPA right to erasure and GDPR right to be forgotten.
+        Deleted data will be purged from Neon backups within 7 days.
+      tags: [Account]
+      responses:
+        '200':
+          description: Account and all data permanently deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountDeleteResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ── Webhooks (internal — not called by clients) ────────────────────────────
+
+  /webhooks/plaid:
+    post:
+      summary: Plaid webhook receiver ✅
+      description: |
+        **Internal endpoint — called by Plaid only, not by mobile clients.**
+
+        Authenticated via Plaid's JWT (ES256) in the `Plaid-Verification` header.
+        Rejects any request where the JWT signature is invalid or
+        `request_body_sha256` does not match the raw request body.
+
+        Supported webhook codes that trigger transaction sync:
+        - `TRANSACTIONS/SYNC_UPDATES_AVAILABLE`
+        - `TRANSACTIONS/DEFAULT_UPDATE`
+
+        All other types are logged and acknowledged with no action.
+
+        Replay protection: Plaid JWT `iat` must be within 300 seconds of
+        server time. Duplicate `jti` values rejected within a 5-minute window.
+      security: []
+      tags: [Internal]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Plaid webhook envelope. Schema defined by Plaid — see Plaid docs.
+      responses:
+        '200':
+          description: Acknowledged. Processing happens asynchronously.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ok'
+        '400':
+          description: Body parse failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Signature verification failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ── Debug (sandbox only — not registered in production) ───────────────────
+
+  /api/debug/fire-transaction:
+    post:
+      summary: Fire test webhook (sandbox only) ✅
+      description: |
+        **Only registered when `PLAID_ENV=sandbox`. Not available in production.**
+
+        Calls Plaid `sandbox/item/fire_webhook` with `DEFAULT_UPDATE` for the
+        first linked item. Triggers a transaction sync which will process any
+        new Plaid sandbox transactions and fire pet reactions if rules match.
+
+        Used by the in-app "Fire test reaction" button in TestFlight builds.
+      tags: [Debug]
+      responses:
+        '200':
+          description: Webhook fired.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No linked Plaid item found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: No linked Plaid item — link a bank first.
+        '409':
+          description: Conflict — no item linked yet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+tags:
+  - name: System
+    description: Health and liveness
+  - name: Auth
+    description: Apple Sign In and session management
+  - name: Pet
+    description: Pet state and goal configuration
+  - name: Plaid
+    description: Bank linking via Plaid
+  - name: Spending
+    description: Spending history, subscriptions, and category overrides
+  - name: Devices
+    description: Push notification token management
+  - name: Account
+    description: Account management and data deletion
+  - name: Internal
+    description: Webhook receivers — called by Plaid, not by mobile clients
+  - name: Debug
+    description: Sandbox-only debug endpoints — not available in production

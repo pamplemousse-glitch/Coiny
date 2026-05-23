@@ -1,0 +1,58 @@
+name: CodeQL (nightly deep SAST)
+
+# Semgrep runs on every PR (fast, shallow). CodeQL runs nightly (slow, deep
+# semantic/dataflow analysis). Together they cover different vulnerability
+# classes — CodeQL catches multi-step tainted data flows that Semgrep misses.
+on:
+  schedule:
+    # 02:00 UTC nightly — off-peak, won't compete with PR runs.
+    - cron: '0 2 * * *'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  security-events: write  # Required to upload SARIF results to GitHub code scanning.
+  actions: read           # Required by analyze step to read workflow-run info for telemetry — without this the run fails post-analysis with "Resource not accessible by integration".
+
+jobs:
+  analyze:
+    name: CodeQL — ${{ matrix.language }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # javascript-typescript covers backend (Node/TS) + any JS. Runs on Linux.
+        # Swift's CodeQL extractor is macOS-only — Linux fails Initialize with
+        # "Swift analysis is only supported on macOS runner images."
+        include:
+          - language: javascript-typescript
+            os: ubuntu-latest
+          - language: swift
+            os: macos-latest
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@7211b7c8077ea37d8641b6271f6a365a22a5fbfa  # v4.36.0
+        with:
+          languages: ${{ matrix.language }}
+          # security-and-quality covers OWASP Top 10 + code quality issues.
+          # More thorough than the default "security-extended" suite.
+          queries: security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@7211b7c8077ea37d8641b6271f6a365a22a5fbfa  # v4.36.0
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@7211b7c8077ea37d8641b6271f6a365a22a5fbfa  # v4.36.0
+        with:
+          category: /language:${{ matrix.language }}

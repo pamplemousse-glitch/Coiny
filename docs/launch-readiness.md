@@ -26,22 +26,22 @@ bank, sees their (fake) transactions trigger pet reactions on the phone.
 
 | ✓ | Blocker | Owner | Effort | Cost | Notes |
 |---|---|---|---|---|---|
-| ☐ | **Apple Developer Program account** | Antoine | 15 min signup + 24-48h Apple approval | $99/yr | Unblocks TestFlight + EAS Build iOS signing |
+| ✅ | **Apple Developer Program account** | Antoine | done | $99/yr | Confirmed active |
 | ☐ | **Google Play Console account** | Antoine | 15 min | $25 one-time | For internal testing track + later Play Store submission |
-| ☐ | **Mobile Plaid Link wiring** | Claude | 1 day | $0 | Already have backend endpoints (`/api/plaid/link-token` + `/api/plaid/exchange-token`); just wire the RN SDK in the mobile app |
-| ☐ | **Push pipeline (T2.3 backend → APNs/FCM)** | Antoine sets up APNs key + Firebase project; Claude wires backend | 2 days | $0 (free tier) | Requires Apple Developer cert for APNs and Firebase project for FCM |
-| ☐ | **First-launch flow** | Claude (need product brief locked first) | 1 day | $0 | What the tester sees: connect bank → wait for first sync → meet pet |
-| ☐ | **Mobile API wiring** to render real pet state | Claude | 0.5 day | $0 | Polish existing scaffold to actually hit `/api/pets` |
-| ☐ | **Minimum 1 mobile test** in CI | Claude | 1 h | $0 | A render-smoke test so mobile CI isn't a no-op |
-| ☐ | **EAS Build configured** for iOS + Android | Claude (needs Apple Dev creds) | 2 h | $0 (Expo free tier) | One-click build → TestFlight / Internal Track |
-| ☐ | **TestFlight build distributed to ≥3 testers** | Antoine | 30 min | $0 | Use the EAS Build output |
+| ✅ | **iOS Plaid Link wiring** | Claude | done | $0 | `OnboardingView.swift` imports LinkKit, calls `Plaid.create()`, handles token exchange end-to-end |
+| ✅ | **Push pipeline (APNs backend → iOS)** | done | done | $0 | `backend/src/push/apns.ts` full HTTP/2 APNs client; `CoinyApp.swift` registers, gets device token, posts to backend |
+| ✅ | **First-launch flow** | Claude | done | $0 | Goals → bank link → push opt-in → pet view; education card carousel + "Coiny is watching…" empty state (PR #70) |
+| ✅ | **Mobile API wiring** to render real pet state | Claude | done | $0 | `API.swift` + `PetStore` hit `/api/pets` live |
+| ✅ | **Minimum 1 mobile test** in CI | Claude | done | $0 | 25+ XCTest unit tests + UITest launch; iOS CI on macOS-15 |
+| ☐ | **Xcode Archive configured for TestFlight** | Antoine (needs DEVELOPMENT_TEAM set) | 2 h | $0 | Fill `ios/project.yml:19` Team ID → `xcodegen generate` → Archive → Distribute |
+| ☐ | **TestFlight build distributed to ≥2 testers** | Antoine | 30 min | $0 | Antoine + Jack internal test |
 
-**MVP-A milestone:** 3 friends install the app, link their Plaid sandbox bank,
+**MVP-A milestone:** Antoine + Jack install the app, link their Plaid sandbox bank,
 spend a sandbox transaction, see Coiny react on their phone with a push +
 animation.
 
-**Estimated time to MVP-A from today:** ~2 weeks of solo work (assuming
-Antoine sets up Apple Dev + Firebase in parallel).
+**Estimated time to MVP-A from today:** ~2-3 days of Claude work (EAS build config +
+first-launch flow). Apple Dev account already active.
 
 ---
 
@@ -263,21 +263,35 @@ with a small contractor team.**
 
 ---
 
-## Status snapshot (as of 2026-05-20)
+## Status snapshot (as of 2026-05-22)
 
 What we already have toward each milestone:
 
-**MVP-A (software-only):** ~40% there. Backend + Plaid integration + rule
-engine + DB persistence + mood decay + category overrides + subscription
-detection + push-token endpoint all shipped. Mobile shell scaffolded. Main
-gaps: Plaid Link UI, push pipeline, first-launch flow, TestFlight build.
+**MVP-A (software-only):** ~95% there. Backend complete: Plaid + rule engine +
+multi-user auth + Apple Sign In + APNs push + DELETE /api/account + per-user rate
+limiting + AES-256-GCM for both access_token and reaction column + debug react
+endpoint + 7 DB migrations + 56 Vitest tests passing. iOS complete: SwiftUI app,
+DI API client, 25+ XCTest tests, full onboarding flow, education card carousel,
+waiting-for-first-reaction empty state. CI hardened: SHA-pinned actions, SBOM,
+CodeQL, SwiftLint, 80% coverage gate, Semgrep, Gitleaks, Trivy, docs-only skip gate,
+always-reporting checks (no more required-check deadlocks).
 
-**MVP-B (with hardware):** ~10% there. M5StickS3 ordered, haptics
-ordered. Firmware not started. Native BLE module not started.
+Remaining gap: Antoine must set `DEVELOPMENT_TEAM` in `ios/project.yml:19`, enable
+Sign In with Apple in Developer Portal, then archive and upload to TestFlight.
+That's a 30-minute manual step — no code work left for MVP-A.
 
-**Full Launch:** ~5% there. Backend production-grade-adjacent (live on
-Fly, Postgres on Neon, security CI floor, Plaid sandbox webhook validated
-end-to-end). Everything else in this doc is still to do.
+External integrations (CoinGecko, Coinbase, Zerion, Spinwheel) are implemented on
+the backend (PR #71 pending merge). iOS display of crypto reactions is next after
+that merges.
+
+**MVP-B (with hardware):** ~10% there. nRF52840 dev kit still to order,
+DRV2605L haptic driver + coin motor ordered. Firmware not started. Native BLE
+module not started.
+
+**Full Launch:** ~10% there. Backend production-grade-adjacent (live on
+Fly, Postgres on Neon, hardened CI, Plaid sandbox webhook validated end-to-end,
+non-root Docker, 0 HIGH/CRITICAL CVEs, GLBA right-to-delete implemented). Remaining:
+LLC + compliance docs + AWS migration + App Store submission + hardware certification.
 
 ---
 

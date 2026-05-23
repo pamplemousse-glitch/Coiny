@@ -15,7 +15,8 @@ description = "Allowlist for known-safe test fixtures"
 # appear so the regex scanner doesn't false-positive on PEM/JWK fragments.
 paths = [
   '''backend/tests/.*\.test\.ts''',
-  '''docs/.*\.md''',  # docs may include example strings like ExponentPushToken[xxxxxxxx]
+  '''docs/.*\.md''',        # docs may include example strings like ExponentPushToken[xxxxxxxx]
+  '''docs/openapi\.yaml''', # OpenAPI spec has example request/response values, not real secrets
 ]
 
 # Allow Expo push token placeholders in tests + docs.
