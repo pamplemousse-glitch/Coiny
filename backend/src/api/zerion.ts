@@ -70,7 +70,8 @@ export function registerZerionApi(app: FastifyInstance): void {
     const portfolios = await Promise.allSettled(rows.map((r) => getPortfolio(r.address)));
 
     let total_usd = 0;
-    const wallets: Array<{ address: string; label: string | null; total_usd: number }> = [];
+    const wallets: Array<{ address: string; label: string | null; total_usd: number; change_1d_pct: number | null }> =
+      [];
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -78,9 +79,14 @@ export function registerZerionApi(app: FastifyInstance): void {
       if (!row) continue;
       if (result?.status === 'fulfilled') {
         total_usd += result.value.total_usd;
-        wallets.push({ address: row.address, label: row.label ?? null, total_usd: result.value.total_usd });
+        wallets.push({
+          address: row.address,
+          label: row.label ?? null,
+          total_usd: result.value.total_usd,
+          change_1d_pct: result.value.change_1d_pct ?? null,
+        });
       } else {
-        wallets.push({ address: row.address, label: row.label ?? null, total_usd: 0 });
+        wallets.push({ address: row.address, label: row.label ?? null, total_usd: 0, change_1d_pct: null });
       }
     }
 
@@ -97,43 +103,50 @@ export function registerZerionApi(app: FastifyInstance): void {
     let reacted = 0;
 
     for (const row of rows) {
-      const { transactions } = await getTransactions(row.address);
+      // Paginate up to 5 pages (500 txns) per wallet; pass sync=true on first fetch for fresh data.
+      let cursor: string | undefined;
+      let pagesLeft = 5;
+      do {
+        const page = await getTransactions(row.address, cursor, { sync: !cursor });
+        cursor = page.nextCursor;
+        pagesLeft--;
 
-      for (const tx of transactions) {
-        const eventId = `zerion:${tx.id}`;
-        const claimed = await claimEvent(eventId);
-        if (!claimed) continue;
+        for (const tx of page.transactions) {
+          const eventId = `zerion:${tx.id}`;
+          const claimed = await claimEvent(eventId);
+          if (!claimed) continue;
 
-        let eventType: import('../reactions/external.js').ExternalEventType | null = null;
-        const opType = tx.type.toLowerCase();
-        const isInbound = tx.direction === 'in';
+          let eventType: import('../reactions/external.js').ExternalEventType | null = null;
+          const opType = tx.type.toLowerCase();
+          const isInbound = tx.direction === 'in';
 
-        if (opType === 'trade' && isInbound) {
-          eventType = 'defi_yield';
-        } else if (isInbound || opType === 'receive' || opType === 'deposit') {
-          eventType = 'wallet_receive';
+          if (opType === 'trade' && isInbound) {
+            eventType = 'defi_yield';
+          } else if (isInbound || opType === 'receive' || opType === 'deposit') {
+            eventType = 'wallet_receive';
+          }
+
+          if (!eventType) continue;
+
+          const amountUsd = tx.quantity_usd > 0 ? tx.quantity_usd : null;
+          const symbol = tx.asset_symbol || null;
+
+          const reaction = evaluateExternalEvent({
+            id: eventId,
+            userId,
+            type: eventType,
+            ...(amountUsd !== null ? { amountUsd } : {}),
+            ...(symbol !== null ? { symbol } : {}),
+            source: 'zerion',
+          });
+
+          if (reaction) {
+            dispatchReaction(userId, reaction);
+            await recordReaction(userId, eventType, reaction);
+            reacted++;
+          }
         }
-
-        if (!eventType) continue;
-
-        const amountUsd = tx.quantity_usd > 0 ? tx.quantity_usd : null;
-        const symbol = tx.asset_symbol || null;
-
-        const reaction = evaluateExternalEvent({
-          id: eventId,
-          userId,
-          type: eventType,
-          ...(amountUsd !== null ? { amountUsd } : {}),
-          ...(symbol !== null ? { symbol } : {}),
-          source: 'zerion',
-        });
-
-        if (reaction) {
-          dispatchReaction(userId, reaction);
-          await recordReaction(userId, eventType, reaction);
-          reacted++;
-        }
-      }
+      } while (cursor && pagesLeft > 0);
     }
 
     req.log.info({ userId, reacted }, 'zerion sync complete');
