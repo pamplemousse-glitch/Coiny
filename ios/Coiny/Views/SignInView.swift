@@ -52,7 +52,7 @@ struct SignInView: View {
                     #if DEBUG
                     Button("Debug: Skip Sign In") {
                         Task { @MainActor in
-                            await API.shared.injectDebugSession()
+                            try? await API.shared.injectDebugSession()
                             onSignedIn()
                         }
                     }

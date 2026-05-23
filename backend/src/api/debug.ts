@@ -8,6 +8,8 @@ import { itemWebhookUpdate, sandboxItemFireWebhook } from '../plaid/client.js';
 import { dispatchReaction } from '../reactions/dispatch.js';
 import type { Animation, Reaction } from '../reactions/types.js';
 import { recordReaction } from '../store/pet.js';
+import { createSession } from '../store/sessions.js';
+import { findOrCreateUser } from '../store/users.js';
 
 const DEBUG_PRESETS: Record<Animation, Omit<Reaction, 'reason'>> = {
   celebrate: { animation: 'celebrate', sound: 'fanfare', led: 'rainbow', duration: 3000 },
@@ -53,5 +55,15 @@ export function registerDebugApi(app: FastifyInstance): void {
     await recordReaction(req.user!.id, 'debug', reaction);
     dispatchReaction(req.user!.id, reaction);
     return { ok: true, reaction };
+  });
+}
+
+// Unauthenticated — creates a real session for a fixed simulator test user.
+// Only registered when PLAID_ENV=sandbox. Never callable in production.
+export function registerDebugSessionApi(app: FastifyInstance): void {
+  app.post('/api/debug/session', async (_req: FastifyRequest, _reply: FastifyReply) => {
+    const userId = await findOrCreateUser({ appleSub: 'debug-simulator-user', email: 'simulator@coiny.dev' });
+    const { rawToken } = await createSession(userId);
+    return { token: rawToken };
   });
 }

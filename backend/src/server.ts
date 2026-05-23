@@ -5,7 +5,7 @@ import Fastify from 'fastify';
 import { registerAccountApi } from './api/account.js';
 import { registerAuthApi } from './api/auth.js';
 import { registerCoinbaseApi } from './api/coinbase.js';
-import { registerDebugApi } from './api/debug.js';
+import { registerDebugApi, registerDebugSessionApi } from './api/debug.js';
 import { registerDevicesApi } from './api/devices.js';
 import { registerNetWorthApi } from './api/net-worth.js';
 import { registerOverridesApi } from './api/overrides.js';
@@ -65,9 +65,10 @@ async function buildApp() {
   app.get('/health', async () => ({ ok: true }));
   registerPlaidWebhook(app);
 
-  // Public auth endpoint (no session required)
+  // Public auth endpoints (no session required)
   app.register(async (scope) => {
     registerAuthApi(scope);
+    if (config.PLAID_ENV === 'sandbox') registerDebugSessionApi(scope);
   });
 
   // All other routes require a valid session token. The global rate-limiter
