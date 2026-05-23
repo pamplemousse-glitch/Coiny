@@ -193,12 +193,12 @@ export function registerNetWorthApi(app: FastifyInstance): void {
         spinwheelConnected = true;
         const debts = await getDebtProfile(connection.spinwheelUserId);
         for (const debt of debts) {
-          debtsTotal += debt.balance;
+          debtsTotal += debt.balance ?? 0;
           debtItems.push({
             id: debt.id,
             type: debt.type,
-            balance: debt.balance,
-            monthlyPayment: debt.minimumPayment,
+            balance: debt.balance ?? 0,
+            monthlyPayment: debt.minimumPayment ?? 0,
           });
         }
       }
