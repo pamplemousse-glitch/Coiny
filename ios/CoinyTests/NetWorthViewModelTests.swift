@@ -12,7 +12,7 @@ final class NetWorthViewModelTests: XCTestCase {
         init() {
             result = .success(NetWorthResponse(
                 total: 0, bank: 0, crypto: 0, defi: 0, debts: 0,
-                accounts: NetWorthAccounts(bank: [], crypto: [], defi: DefiTotal(totalUSD: 0), debts: []),
+                accounts: NetWorthAccounts(bank: [], crypto: [], defi: DefiTotal(totalUSD: 0), debts: [], investments: []),
                 connections: NetWorthConnections(coinbase: false, zerion: false, spinwheel: false)
             ))
         }
@@ -37,7 +37,8 @@ final class NetWorthViewModelTests: XCTestCase {
                 bank: [],
                 crypto: [],
                 defi: DefiTotal(totalUSD: 0),
-                debts: []
+                debts: [],
+                investments: []
             ),
             connections: NetWorthConnections(coinbase: false, zerion: false, spinwheel: false)
         )
@@ -67,7 +68,8 @@ final class NetWorthViewModelTests: XCTestCase {
                 bank: [BankAccount(id: "a1", name: "Checking", type: "depository", balance: 3000)],
                 crypto: [],
                 defi: DefiTotal(totalUSD: 0),
-                debts: []
+                debts: [],
+                investments: []
             ),
             connections: NetWorthConnections(coinbase: true, zerion: false, spinwheel: false)
         )
@@ -112,7 +114,8 @@ final class NetWorthViewModelTests: XCTestCase {
                 bank: [],
                 crypto: [],
                 defi: DefiTotal(totalUSD: 0),
-                debts: [DebtItem(id: "d1", type: "credit_card", balance: 2000, monthlyPayment: 100)]
+                debts: [DebtItem(id: "d1", type: "credit_card", balance: 2000, monthlyPayment: 100)],
+                investments: []
             ),
             connections: NetWorthConnections(coinbase: false, zerion: false, spinwheel: true)
         )
