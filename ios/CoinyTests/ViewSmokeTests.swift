@@ -42,7 +42,7 @@ final class ViewSmokeTests: XCTestCase {
     // MARK: - Tests
 
     func testSignInViewRenders() {
-        smoke(SignInView(onSignedIn: {}))
+        smoke(SignInView(onSignedIn: { _ in }))
     }
 
     func testOnboardingViewRenders() {

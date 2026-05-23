@@ -2,7 +2,9 @@ import AuthenticationServices
 import SwiftUI
 
 struct SignInView: View {
-    let onSignedIn: () -> Void
+    /// Called after a successful sign-in. Receives the display name if Apple
+    /// provided one (first sign-in only); empty string on repeat logins.
+    let onSignedIn: (String) -> Void
 
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -53,7 +55,7 @@ struct SignInView: View {
                     Button("Debug: Skip Sign In") {
                         Task { @MainActor in
                             try? await API.shared.injectDebugSession()
-                            onSignedIn()
+                            onSignedIn("")
                         }
                     }
                     .font(.caption)
@@ -85,13 +87,21 @@ struct SignInView: View {
             errorMessage = nil
             defer { isLoading = false }
 
+            // fullName is only populated on first sign-in; nil on repeat logins.
+            let displayName: String? = {
+                guard let name = credential.fullName else { return nil }
+                let components = [name.givenName, name.familyName].compactMap { $0 }
+                return components.isEmpty ? nil : components.joined(separator: " ")
+            }()
+
             do {
                 try await API.shared.signInWithApple(
                     identityToken: identityToken,
                     userId: credential.user,
-                    email: credential.email
+                    email: credential.email,
+                    displayName: displayName
                 )
-                onSignedIn()
+                onSignedIn(displayName ?? "")
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -106,5 +116,5 @@ struct SignInView: View {
 }
 
 #Preview {
-    SignInView(onSignedIn: {})
+    SignInView(onSignedIn: { _ in })
 }
