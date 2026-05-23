@@ -236,7 +236,10 @@ actor API {
     /// work in the Simulator. Token is lost on app restart (no Keychain write).
     func injectDebugSession() async throws {
         struct DebugSessionResponse: Decodable { let token: String }
-        let response: DebugSessionResponse = try await request(method: "POST", path: "/api/debug/session", body: Optional<String>.none, requiresAuth: false)
+        let response: DebugSessionResponse = try await request(
+            method: "POST", path: "/api/debug/session",
+            body: Optional<String>.none, requiresAuth: false
+        )
         sessionToken = response.token
     }
     #endif
