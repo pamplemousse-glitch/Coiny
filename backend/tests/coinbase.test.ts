@@ -139,7 +139,7 @@ describe('POST /api/coinbase/sync', () => {
     await db().insert(coinbaseConnections).values({ userId: testUserId, mode: 'dev_key' });
 
     mockedGetAccounts.mockResolvedValue([
-      { account_id: 'acc-btc', currency: 'BTC', balance: { value: '1.0', currency: 'BTC' } },
+      { uuid: 'acc-btc', currency: 'BTC', available_balance: { value: '1.0', currency: 'BTC' } },
     ]);
     mockedGetTransactions.mockResolvedValue({
       transactions: [
@@ -170,7 +170,7 @@ describe('POST /api/coinbase/sync', () => {
     await db().insert(coinbaseConnections).values({ userId: testUserId, mode: 'dev_key' });
 
     mockedGetAccounts.mockResolvedValue([
-      { account_id: 'acc-btc', currency: 'BTC', balance: { value: '1.0', currency: 'BTC' } },
+      { uuid: 'acc-btc', currency: 'BTC', available_balance: { value: '1.0', currency: 'BTC' } },
     ]);
     mockedGetTransactions.mockResolvedValue({
       transactions: [
@@ -201,7 +201,7 @@ describe('POST /api/coinbase/sync', () => {
     await db().insert(coinbaseConnections).values({ userId: testUserId, mode: 'dev_key' });
 
     mockedGetAccounts.mockResolvedValue([
-      { account_id: 'acc-sol', currency: 'SOL', balance: { value: '10', currency: 'SOL' } },
+      { uuid: 'acc-sol', currency: 'SOL', available_balance: { value: '10', currency: 'SOL' } },
     ]);
     mockedGetTransactions.mockResolvedValue({
       transactions: [
@@ -232,7 +232,7 @@ describe('POST /api/coinbase/sync', () => {
     await db().insert(coinbaseConnections).values({ userId: testUserId, mode: 'dev_key' });
 
     mockedGetAccounts.mockResolvedValue([
-      { account_id: 'acc-eth', currency: 'ETH', balance: { value: '2', currency: 'ETH' } },
+      { uuid: 'acc-eth', currency: 'ETH', available_balance: { value: '2', currency: 'ETH' } },
     ]);
     mockedGetTransactions.mockResolvedValue({
       transactions: [
@@ -263,7 +263,7 @@ describe('POST /api/coinbase/sync', () => {
     await db().insert(coinbaseConnections).values({ userId: testUserId, mode: 'dev_key' });
 
     mockedGetAccounts.mockResolvedValue([
-      { account_id: 'acc-btc2', currency: 'BTC', balance: { value: '0.1', currency: 'BTC' } },
+      { uuid: 'acc-btc2', currency: 'BTC', available_balance: { value: '0.1', currency: 'BTC' } },
     ]);
     mockedGetTransactions.mockResolvedValue({
       transactions: [

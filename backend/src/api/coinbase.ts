@@ -10,8 +10,6 @@ import { evaluateExternalEvent } from '../reactions/external.js';
 import { claimEvent } from '../store/events.js';
 import { recordReaction } from '../store/pet.js';
 
-// Mapping from Coinbase currency symbol to CoinGecko coin ID.
-// Incomplete by design — we only need the major coins for price enrichment.
 const SYMBOL_TO_COINGECKO_ID: Record<string, string> = {
   BTC: 'bitcoin',
   ETH: 'ethereum',
@@ -19,12 +17,48 @@ const SYMBOL_TO_COINGECKO_ID: Record<string, string> = {
   USDC: 'usd-coin',
   USDT: 'tether',
   MATIC: 'matic-network',
+  POL: 'matic-network',
   AVAX: 'avalanche-2',
   DOGE: 'dogecoin',
   LTC: 'litecoin',
   DOT: 'polkadot',
   ADA: 'cardano',
   LINK: 'chainlink',
+  XRP: 'ripple',
+  UNI: 'uniswap',
+  SHIB: 'shiba-inu',
+  TON: 'the-open-network',
+  TRX: 'tron',
+  XLM: 'stellar',
+  ATOM: 'cosmos',
+  NEAR: 'near',
+  APT: 'aptos',
+  ARB: 'arbitrum',
+  OP: 'optimism',
+  SUI: 'sui',
+  INJ: 'injective-protocol',
+  IMX: 'immutable-x',
+  FIL: 'filecoin',
+  ICP: 'internet-computer',
+  HBAR: 'hedera-hashgraph',
+  VET: 'vechain',
+  ALGO: 'algorand',
+  MANA: 'decentraland',
+  SAND: 'the-sandbox',
+  AXS: 'axie-infinity',
+  CRV: 'curve-dao-token',
+  AAVE: 'aave',
+  MKR: 'maker',
+  SNX: 'havven',
+  COMP: 'compound-governance-token',
+  GRT: 'the-graph',
+  LDO: 'lido-dao',
+  RPL: 'rocket-pool',
+  CBETH: 'coinbase-wrapped-staked-eth',
+  WBTC: 'wrapped-bitcoin',
+  DAI: 'dai',
+  TUSD: 'true-usd',
+  PYUSD: 'paypal-usd',
 };
 
 export function registerCoinbaseApi(app: FastifyInstance): void {
@@ -75,14 +109,20 @@ export function registerCoinbaseApi(app: FastifyInstance): void {
       return { reacted: 0 };
     }
 
-    // Collect all transactions across accounts (first page only per account).
+    // Collect transactions across accounts; paginate up to 5 pages per account.
     type TxWithCurrency = { tx: Awaited<ReturnType<typeof getTransactions>>['transactions'][number]; currency: string };
     const allTxs: TxWithCurrency[] = [];
     for (const account of accounts) {
-      const { transactions } = await getTransactions(account.account_id);
-      for (const tx of transactions) {
-        allTxs.push({ tx, currency: account.currency });
-      }
+      let cursor: string | undefined;
+      let pagesLeft = 5;
+      do {
+        const page = await getTransactions(account.uuid, cursor);
+        cursor = page.nextCursor;
+        pagesLeft--;
+        for (const tx of page.transactions) {
+          allTxs.push({ tx, currency: account.currency });
+        }
+      } while (cursor && pagesLeft > 0);
     }
 
     // Fetch price data for unique currencies.
