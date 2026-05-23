@@ -11,7 +11,7 @@ final class NetWorthViewModelTests: XCTestCase {
 
         init() {
             result = .success(NetWorthResponse(
-                total: 0, bank: 0, crypto: 0, defi: 0, debts: 0,
+                total: 0, bank: 0, investments: 0, crypto: 0, defi: 0, debts: 0,
                 accounts: NetWorthAccounts(bank: [], investments: [], crypto: [], defi: DefiTotal(totalUSD: 0), debts: []),
                 connections: NetWorthConnections(coinbase: false, zerion: false, spinwheel: false)
             ))
@@ -30,6 +30,7 @@ final class NetWorthViewModelTests: XCTestCase {
         static let empty = NetWorthResponse(
             total: 0,
             bank: 0,
+            investments: 0,
             crypto: 0,
             defi: 0,
             debts: 0,
@@ -61,6 +62,7 @@ final class NetWorthViewModelTests: XCTestCase {
         let response = NetWorthResponse(
             total: 5000,
             bank: 3000,
+            investments: 0,
             crypto: 2000,
             defi: 0,
             debts: 0,
@@ -107,6 +109,7 @@ final class NetWorthViewModelTests: XCTestCase {
         let response = NetWorthResponse(
             total: -1500,
             bank: 500,
+            investments: 0,
             crypto: 0,
             defi: 0,
             debts: -2000,
