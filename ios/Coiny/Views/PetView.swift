@@ -16,7 +16,7 @@ struct PetView: View {
         .task {
             // CoinyApp triggers the first load; this loop keeps PetView fresh.
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(3))
+                try? await Task.sleep(for: .seconds(30))
                 await store.refresh()
             }
         }
