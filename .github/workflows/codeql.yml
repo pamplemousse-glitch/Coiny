@@ -49,6 +49,14 @@ jobs:
           # More thorough than the default "security-extended" suite.
           queries: security-and-quality
 
+      - name: Install XcodeGen (Swift only)
+        if: matrix.language == 'swift'
+        run: brew install xcodegen
+
+      - name: Generate Xcode project (Swift only)
+        if: matrix.language == 'swift'
+        run: xcodegen generate --spec ios/project.yml --project ios
+
       - name: Autobuild
         uses: github/codeql-action/autobuild@7211b7c8077ea37d8641b6271f6a365a22a5fbfa  # v4.36.0
 
