@@ -72,6 +72,8 @@ targets:
         GCC_TREAT_WARNINGS_AS_ERRORS: YES
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "Apple Development"
+        ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
+        SWIFT_EMIT_LOC_STRINGS: YES
     dependencies:
       - package: LinkKit
         product: LinkKit
