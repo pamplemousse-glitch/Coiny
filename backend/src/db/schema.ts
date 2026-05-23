@@ -149,3 +149,14 @@ export const spinwheelConnections = pgTable('spinwheel_connections', {
   spinwheelUserId: text('spinwheel_user_id').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Temporary storage for the Spinwheel userId returned by the SMS OTP send step.
+// Needed because the verify call requires the spinwheelUserId in the URL path.
+// Cleared on successful verify or replaced on new OTP request.
+export const spinwheelPending = pgTable('spinwheel_pending', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  spinwheelUserId: text('spinwheel_user_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});

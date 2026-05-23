@@ -4,14 +4,16 @@ import { authHeader, resetDatabase, testUserId } from './db-helper.js';
 vi.mock('../src/spinwheel/client.js', () => ({
   sendSmsOtp: vi.fn(),
   verifySmsOtp: vi.fn(),
-  getDebts: vi.fn(),
+  getDebtProfile: vi.fn(),
+  deleteUser: vi.fn(),
 }));
 
-import { getDebts, sendSmsOtp, verifySmsOtp } from '../src/spinwheel/client.js';
+import { deleteUser, getDebtProfile, sendSmsOtp, verifySmsOtp } from '../src/spinwheel/client.js';
 
 const mockedSendSmsOtp = vi.mocked(sendSmsOtp);
 const mockedVerifySmsOtp = vi.mocked(verifySmsOtp);
-const mockedGetDebts = vi.mocked(getDebts);
+const mockedGetDebtProfile = vi.mocked(getDebtProfile);
+const mockedDeleteUser = vi.mocked(deleteUser);
 
 describe('GET /api/spinwheel/status', () => {
   beforeEach(async () => {
@@ -47,7 +49,7 @@ describe('POST /api/spinwheel/connect/sms', () => {
     await resetDatabase();
   });
 
-  it('returns 400 for missing phone', async () => {
+  it('returns 400 for missing phoneNumber', async () => {
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
@@ -70,15 +72,15 @@ describe('POST /api/spinwheel/connect/sms', () => {
       method: 'POST',
       url: '/api/spinwheel/connect/sms',
       headers: { ...authHeader(), 'content-type': 'application/json' },
-      body: JSON.stringify({ phone: '+15551234567' }),
+      body: JSON.stringify({ phoneNumber: '+15551234567' }),
     });
     expect(res.statusCode).toBe(400);
 
     await app.close();
   });
 
-  it('calls sendSmsOtp and returns ok: true', async () => {
-    mockedSendSmsOtp.mockResolvedValue(undefined);
+  it('calls sendSmsOtp, stores pending, and returns ok: true', async () => {
+    mockedSendSmsOtp.mockResolvedValue({ spinwheelUserId: 'sw-pending-001' });
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
@@ -87,12 +89,12 @@ describe('POST /api/spinwheel/connect/sms', () => {
       method: 'POST',
       url: '/api/spinwheel/connect/sms',
       headers: { ...authHeader(), 'content-type': 'application/json' },
-      body: JSON.stringify({ phone: '+15551234567', dateOfBirth: '1990-01-01' }),
+      body: JSON.stringify({ phoneNumber: '+15551234567', dateOfBirth: '1990-01-01' }),
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ ok: true });
     expect(mockedSendSmsOtp).toHaveBeenCalledWith({
-      phone: '+15551234567',
+      phoneNumber: '+15551234567',
       dateOfBirth: '1990-01-01',
       extUserId: testUserId,
     });
@@ -107,7 +109,22 @@ describe('POST /api/spinwheel/connect/sms/verify', () => {
     await resetDatabase();
   });
 
-  it('returns 400 for missing phone', async () => {
+  it('returns 400 for missing code', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/spinwheel/connect/sms/verify',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    expect(res.statusCode).toBe(400);
+
+    await app.close();
+  });
+
+  it('returns 409 when no pending OTP', async () => {
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
@@ -117,13 +134,17 @@ describe('POST /api/spinwheel/connect/sms/verify', () => {
       headers: { ...authHeader(), 'content-type': 'application/json' },
       body: JSON.stringify({ code: '123456' }),
     });
-    expect(res.statusCode).toBe(400);
+    expect(res.statusCode).toBe(409);
 
     await app.close();
   });
 
   it('persists connection and returns ok: true', async () => {
-    mockedVerifySmsOtp.mockResolvedValue({ spinwheelUserId: 'sw-user-001' });
+    const { db } = await import('../src/db/client.js');
+    const { spinwheelPending } = await import('../src/db/schema.js');
+    await db().insert(spinwheelPending).values({ userId: testUserId, spinwheelUserId: 'sw-user-001' });
+
+    mockedVerifySmsOtp.mockResolvedValue(undefined);
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
@@ -132,10 +153,11 @@ describe('POST /api/spinwheel/connect/sms/verify', () => {
       method: 'POST',
       url: '/api/spinwheel/connect/sms/verify',
       headers: { ...authHeader(), 'content-type': 'application/json' },
-      body: JSON.stringify({ phone: '+15551234567', code: '654321' }),
+      body: JSON.stringify({ code: '654321' }),
     });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ ok: true });
+    expect(mockedVerifySmsOtp).toHaveBeenCalledWith({ spinwheelUserId: 'sw-user-001', code: '654321' });
 
     const status = await app.inject({ method: 'GET', url: '/api/spinwheel/status', headers: authHeader() });
     expect(status.json<{ connected: boolean }>().connected).toBe(true);
@@ -144,18 +166,35 @@ describe('POST /api/spinwheel/connect/sms/verify', () => {
   });
 
   it('upserts connection on re-verify', async () => {
-    mockedVerifySmsOtp
-      .mockResolvedValueOnce({ spinwheelUserId: 'sw-user-old' })
-      .mockResolvedValueOnce({ spinwheelUserId: 'sw-user-new' });
+    const { db } = await import('../src/db/client.js');
+    const { spinwheelPending } = await import('../src/db/schema.js');
+    mockedVerifySmsOtp.mockResolvedValue(undefined);
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
-    const body = JSON.stringify({ phone: '+15551234567', code: '000000' });
     const headers = { ...authHeader(), 'content-type': 'application/json' };
 
-    await app.inject({ method: 'POST', url: '/api/spinwheel/connect/sms/verify', headers, body });
-    const second = await app.inject({ method: 'POST', url: '/api/spinwheel/connect/sms/verify', headers, body });
+    await db().insert(spinwheelPending).values({ userId: testUserId, spinwheelUserId: 'sw-user-old' });
+    await app.inject({
+      method: 'POST',
+      url: '/api/spinwheel/connect/sms/verify',
+      headers,
+      body: JSON.stringify({ code: '000000' }),
+    });
+
+    // simulate a second OTP send storing new spinwheelUserId
+    await db()
+      .insert(spinwheelPending)
+      .values({ userId: testUserId, spinwheelUserId: 'sw-user-new' })
+      .onConflictDoUpdate({ target: spinwheelPending.userId, set: { spinwheelUserId: 'sw-user-new' } });
+
+    const second = await app.inject({
+      method: 'POST',
+      url: '/api/spinwheel/connect/sms/verify',
+      headers,
+      body: JSON.stringify({ code: '000000' }),
+    });
     expect(second.statusCode).toBe(200);
 
     await app.close();
@@ -183,8 +222,8 @@ describe('GET /api/spinwheel/debts', () => {
     const { spinwheelConnections } = await import('../src/db/schema.js');
     await db().insert(spinwheelConnections).values({ userId: testUserId, spinwheelUserId: 'sw-abc' });
 
-    mockedGetDebts.mockResolvedValue([
-      { id: 'debt-1', type: 'student_loan', balance: 15000, interestRate: 5.5, minimumPayment: 200 },
+    mockedGetDebtProfile.mockResolvedValue([
+      { id: 'debt-1', type: 'STUDENT_LOAN', balance: 15000, interestRate: 5.5, minimumPayment: 200 },
     ]);
 
     const { buildApp } = await import('../src/server.js');
@@ -194,8 +233,8 @@ describe('GET /api/spinwheel/debts', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json<{ debts: { id: string; type: string }[] }>();
     expect(body.debts).toHaveLength(1);
-    expect(body.debts[0]?.type).toBe('student_loan');
-    expect(mockedGetDebts).toHaveBeenCalledWith('sw-abc');
+    expect(body.debts[0]?.type).toBe('STUDENT_LOAN');
+    expect(mockedGetDebtProfile).toHaveBeenCalledWith('sw-abc');
 
     await app.close();
   });
@@ -217,16 +256,19 @@ describe('DELETE /api/spinwheel/connect', () => {
     await app.close();
   });
 
-  it('removes existing connection', async () => {
+  it('removes existing connection and calls deleteUser', async () => {
     const { db } = await import('../src/db/client.js');
     const { spinwheelConnections } = await import('../src/db/schema.js');
     await db().insert(spinwheelConnections).values({ userId: testUserId, spinwheelUserId: 'sw-del' });
+
+    mockedDeleteUser.mockResolvedValue(undefined);
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
     const res = await app.inject({ method: 'DELETE', url: '/api/spinwheel/connect', headers: authHeader() });
     expect(res.statusCode).toBe(204);
+    expect(mockedDeleteUser).toHaveBeenCalledWith('sw-del');
 
     const status = await app.inject({ method: 'GET', url: '/api/spinwheel/status', headers: authHeader() });
     expect(status.json<{ connected: boolean }>().connected).toBe(false);
