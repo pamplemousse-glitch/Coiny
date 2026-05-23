@@ -437,6 +437,7 @@ struct SpinwheelDebtsResponse: Decodable {
 struct NetWorthResponse: Decodable {
     let total: Double
     let bank: Double
+    let investments: Double
     let crypto: Double
     let defi: Double
     let debts: Double
@@ -446,6 +447,7 @@ struct NetWorthResponse: Decodable {
 
 struct NetWorthAccounts: Decodable {
     let bank: [BankAccount]
+    let investments: [InvestmentHolding]
     let crypto: [CryptoPosition]
     let defi: DefiTotal
     let debts: [DebtItem]
@@ -462,12 +464,30 @@ struct BankAccount: Decodable, Identifiable {
     let name: String
     let type: String
     let balance: Double
+    let minPayment: Double?
+    let nextDueDate: String?
 
     enum CodingKeys: String, CodingKey {
         case id = "accountId"
         case name
         case type
         case balance
+        case minPayment
+        case nextDueDate
+    }
+}
+
+struct InvestmentHolding: Decodable, Identifiable {
+    let id: String
+    let name: String?
+    let ticker: String?
+    let value: Double
+
+    enum CodingKeys: String, CodingKey {
+        case id = "securityId"
+        case name
+        case ticker
+        case value
     }
 }
 
