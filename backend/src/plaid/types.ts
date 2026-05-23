@@ -5,6 +5,7 @@ export type PlaidPfc = {
   primary: string;
   detailed: string;
   confidence_level?: 'VERY_HIGH' | 'HIGH' | 'MEDIUM' | 'LOW' | 'UNKNOWN';
+  personal_finance_category_icon_url?: string; // PFCv2: added Dec 2023
 };
 
 export type PlaidCounterparty = {

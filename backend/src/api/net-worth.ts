@@ -34,21 +34,19 @@ export function registerNetWorthApi(app: FastifyInstance): void {
     const bankAccounts: Array<{ accountId: string; name: string; type: string; balance: number }> = [];
     try {
       const items = await getItemsByUser(userId);
-      for (const item of items) {
-        try {
-          const { accounts } = await accountsBalanceGet(item.accessToken);
-          for (const acct of accounts) {
-            const balance = acct.balances.current ?? acct.balances.available ?? 0;
+      const balanceResults = await Promise.allSettled(items.map((item) => accountsBalanceGet(item.accessToken)));
+      for (const result of balanceResults) {
+        if (result.status === 'rejected') continue;
+        for (const acct of result.value.accounts) {
+          // investment/brokerage excluded — handled by Plaid Investments product
+          if (acct.type === 'investment' || acct.type === 'brokerage') continue;
+          const balance = acct.balances.current ?? acct.balances.available ?? 0;
+          if (acct.type === 'depository') {
             bankTotal += balance;
-            bankAccounts.push({
-              accountId: acct.account_id,
-              name: acct.name,
-              type: acct.type,
-              balance,
-            });
+          } else if (acct.type === 'credit' || acct.type === 'loan') {
+            bankTotal -= balance; // liabilities subtract from net worth
           }
-        } catch {
-          // skip broken items
+          bankAccounts.push({ accountId: acct.account_id, name: acct.name, type: acct.type, balance });
         }
       }
     } catch {

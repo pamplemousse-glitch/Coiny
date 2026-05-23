@@ -143,13 +143,14 @@ async function syncItem(
     if (!res.has_more) break;
   }
 
-  if (cursor) await setCursor(item.itemId, cursor);
-
   const adapted = await Promise.all(
     allAdded.map((plaidTx) => plaidTxToInternal(plaidTx, accountBalances.get(plaidTx.account_id) ?? null, userId)),
   );
 
   await persistTransactions(userId, adapted);
+  // Cursor advances only after transactions are safely persisted. Reversing this
+  // order would cause permanent data loss if the process crashed between the two calls.
+  if (cursor) await setCursor(item.itemId, cursor);
 
   if (!item.initialSyncComplete) {
     app.log.info(
