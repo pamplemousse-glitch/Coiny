@@ -9,6 +9,7 @@ build/
 out/
 .next/
 backend/dist/
+backend/coverage/
 
 # ─── Environment & Secrets ───────────────────────────────────────
 # Catch .env at any depth — never commit API keys
