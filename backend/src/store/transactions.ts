@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { transactions } from '../db/schema.js';
 import type { Transaction } from '../types/transaction.js';
@@ -17,6 +17,36 @@ export async function persistTransactions(userId: string, txs: Transaction[]): P
     category: tx.details?.category ?? null,
   }));
   await db().insert(transactions).values(rows).onConflictDoNothing();
+}
+
+// Returns total debit spend per category for the rolling 7-day window ending today.
+// Call BEFORE persisting the current transaction batch so the snapshot excludes it.
+export async function getWeeklySpendByCategory(userId: string): Promise<Record<string, number>> {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 6);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+  const rows = await db()
+    .select({
+      category: transactions.category,
+      total: sql<string>`SUM(ABS(CAST(${transactions.amount} AS NUMERIC)))`,
+    })
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.userId, userId),
+        isNotNull(transactions.category),
+        sql`${transactions.date} >= ${cutoffStr}`,
+        sql`CAST(${transactions.amount} AS NUMERIC) < 0`,
+      ),
+    )
+    .groupBy(transactions.category);
+
+  const result: Record<string, number> = {};
+  for (const row of rows) {
+    if (row.category) result[row.category] = parseFloat(row.total ?? '0');
+  }
+  return result;
 }
 
 export async function getRecentOutflows(userId: string, days: number): Promise<StoredTransaction[]> {

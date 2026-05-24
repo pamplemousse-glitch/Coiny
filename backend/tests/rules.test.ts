@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { evaluate } from '../src/rules/engine.js';
+import { evaluate, type RuleContext } from '../src/rules/engine.js';
 import type { PetGoals } from '../src/store/pet.js';
 import type { Transaction } from '../src/types/transaction.js';
 
@@ -45,7 +45,24 @@ describe('rule engine', () => {
   });
 
   describe('overspent_in_category', () => {
-    it('fires for groceries spend over $150', () => {
+    // Helper: build context where a single transaction is the only weekly spend
+    function ctxWith(category: string, total: number): RuleContext {
+      return { weeklySpendByCategory: { [category]: total } };
+    }
+
+    it('fires when this transaction pushes weekly groceries over the $150 limit', () => {
+      // $120 already spent this week + $65 now = $185 total, crossing $150
+      const match = evaluate(
+        tx({ amount: '-65.00', type: 'card_payment', details: { category: 'groceries' } }),
+        DEFAULT_GOALS,
+        ctxWith('groceries', 185),
+      );
+      expect(match?.name).toBe('overspent_in_category');
+      expect(match?.reaction.animation).toBe('sad');
+      expect(match?.reaction.reason).toMatch(/overspent_in_category/);
+    });
+
+    it('fires when a single large transaction exceeds the limit on its own', () => {
       const match = evaluate(
         tx({
           amount: '-185.00',
@@ -53,32 +70,44 @@ describe('rule engine', () => {
           details: { category: 'groceries', counterparty: { name: 'Whole Foods', type: 'organization' } },
         }),
         DEFAULT_GOALS,
+        ctxWith('groceries', 185),
       );
       expect(match?.name).toBe('overspent_in_category');
-      expect(match?.reaction.animation).toBe('sad');
-      expect(match?.reaction.reason).toMatch(/overspent_in_category/);
     });
 
-    it('does not fire for small groceries spend', () => {
+    it('does not fire when already over limit before this transaction', () => {
+      // $200 already spent (over $150 limit); this $40 tx should not re-trigger
       const match = evaluate(
-        tx({
-          amount: '-30.00',
-          type: 'card_payment',
-          details: { category: 'groceries' },
-        }),
+        tx({ amount: '-40.00', type: 'card_payment', details: { category: 'groceries' } }),
         DEFAULT_GOALS,
+        ctxWith('groceries', 240),
+      );
+      expect(match).toBeNull();
+    });
+
+    it('does not fire when under budget', () => {
+      const match = evaluate(
+        tx({ amount: '-30.00', type: 'card_payment', details: { category: 'groceries' } }),
+        DEFAULT_GOALS,
+        ctxWith('groceries', 30),
       );
       expect(match).toBeNull();
     });
 
     it('does not fire for non-budget categories', () => {
       const match = evaluate(
-        tx({
-          amount: '-200.00',
-          type: 'card_payment',
-          details: { category: 'electronics' },
-        }),
+        tx({ amount: '-200.00', type: 'card_payment', details: { category: 'electronics' } }),
         DEFAULT_GOALS,
+        ctxWith('electronics', 200),
+      );
+      expect(match).toBeNull();
+    });
+
+    it('does not fire for a credit transaction', () => {
+      const match = evaluate(
+        tx({ amount: '30.00', details: { category: 'groceries' } }),
+        DEFAULT_GOALS,
+        ctxWith('groceries', 0),
       );
       expect(match).toBeNull();
     });

@@ -192,8 +192,8 @@ research / beta testing.
 3. What's the right pet personality balance (encouraging vs accountability)?
 4. Is sound on the device worth the battery cost?
 5. Will users pay for cosmetics / sound packs?
-6. Do users want their pet to know about investments, or stay scoped to spending?
-7. `<TBD>`
+6. ~~Do users want their pet to know about investments, or stay scoped to spending?~~ **Decided: cash flows only.** See Design Decisions §A.
+7. Do users want minute-by-minute stock/ETF prices in the Wealth tab, or is daily-updated enough?
 8. `<TBD>`
 
 ---
@@ -208,6 +208,30 @@ research / beta testing.
 
 Those come AFTER this brief is locked. This brief is the prerequisite, not
 the whole product strategy.
+
+---
+
+## Design Decisions (locked, do not re-litigate without new evidence)
+
+### A — Activity feed: cash flows only, no unrealized gains
+
+**Decision (2026-05-23):** The "Spending" tab is renamed "Activity." It shows only events where money actually moved — paychecks, purchases, bills, crypto received. Unrealized price changes (stock up 3%, SOL surged 15%) do NOT appear here.
+
+**Rationale:** Every major consumer fintech (Robinhood, Coinbase, Cash App) separates the transaction history feed from portfolio performance. Mixing "you spent $85 at Whole Foods" with "BTC is up 10%" in the same list conflates fundamentally different things and erodes trust — users may mistake a paper gain for real cash. Unrealized events live on the Crypto/Wealth tabs where the asset context already exists.
+
+**Consequence for rules:** The pet only reacts to cash flow events (Plaid transactions, Coinbase received/sent). Rules that fire on unrealized changes (crypto price surge) still fire the pet animation but the event does NOT appear in the Activity feed. If we ever want to notify users of investment milestones, those notifications should land on the relevant asset tab, not the Activity feed.
+
+---
+
+### B — Investment holdings: Plaid Investments for positions, market data API for live prices (deferred)
+
+**Decision (2026-05-23):** Plaid Investments is already wired up and gives us holdings (ticker, quantity, cost basis) for brokerage, 401k, HSA, and IRA accounts. We currently use `institution_price` for net worth, which updates once per day.
+
+**Live pricing:** Plaid does not provide real-time market prices. For minute-by-minute stock/ETF values we would need a separate market data provider (Polygon.io for $29/mo, or Finnhub free tier). This work is **deferred post-TestFlight** — the Wealth tab showing yesterday's prices labeled "as of [date]" is acceptable for prototype.
+
+**401k / HSA / mutual funds:** These are priced once daily at NAV — there is no intraday price regardless of the data provider. Only brokerage accounts with publicly traded ETFs/stocks can update in real time.
+
+**Consequence for net worth:** `GET /api/net-worth` currently makes live calls to all external APIs on every request. This is fine at small scale. When latency becomes a problem, the fix is: cache last-known values in Postgres, refresh on a 1-hour background schedule, serve cached values instantly with a `refreshed_at` timestamp and a manual pull-to-refresh trigger.
 
 ---
 

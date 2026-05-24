@@ -5,11 +5,12 @@ import { transactionsSync } from '../plaid/client.js';
 import { verifyPlaidSignature } from '../plaid/signature.js';
 import { type PlaidAccount, PlaidApiError, type PlaidWebhookEnvelope } from '../plaid/types.js';
 import { dispatchReaction } from '../reactions/dispatch.js';
+import type { RuleContext } from '../rules/engine.js';
 import { evaluate } from '../rules/engine.js';
 import { claimEvent } from '../store/events.js';
 import { disableItem, getItem, markInitialSyncComplete, setCursor } from '../store/items.js';
 import { applyHealthDelta, getGoals, recordReaction } from '../store/pet.js';
-import { persistTransactions } from '../store/transactions.js';
+import { getWeeklySpendByCategory, persistTransactions } from '../store/transactions.js';
 
 const SYNC_TRIGGERS = new Set(['SYNC_UPDATES_AVAILABLE', 'DEFAULT_UPDATE']);
 
@@ -147,6 +148,10 @@ async function syncItem(
     allAdded.map((plaidTx) => plaidTxToInternal(plaidTx, accountBalances.get(plaidTx.account_id) ?? null, userId)),
   );
 
+  // Snapshot weekly spend BEFORE persisting this batch so the running total
+  // in the evaluation loop starts from the pre-batch state.
+  const weeklySpendSnapshot = await getWeeklySpendByCategory(userId);
+
   await persistTransactions(userId, adapted);
   // Cursor advances only after transactions are safely persisted. Reversing this
   // order would cause permanent data loss if the process crashed between the two calls.
@@ -164,6 +169,9 @@ async function syncItem(
   if (adapted.length === 0) return;
 
   const goals = await getGoals(userId);
+  // runningSpend grows as we claim each new transaction, giving overspent_in_category
+  // an accurate cumulative total and allowing it to fire exactly once per threshold crossing.
+  const runningSpend = { ...weeklySpendSnapshot };
 
   for (const tx of adapted) {
     if (!(await claimEvent(tx.id))) {
@@ -171,7 +179,15 @@ async function syncItem(
       continue;
     }
 
-    const match = evaluate(tx, goals);
+    // Add this transaction to the running total before evaluating so the rule
+    // sees the post-transaction weekly spend (including this tx).
+    const cat = tx.details?.category;
+    if (cat && parseFloat(tx.amount) < 0) {
+      runningSpend[cat] = (runningSpend[cat] ?? 0) + Math.abs(parseFloat(tx.amount));
+    }
+
+    const context: RuleContext = { weeklySpendByCategory: runningSpend };
+    const match = evaluate(tx, goals, context);
     app.log.info(
       {
         transaction_id: tx.id,

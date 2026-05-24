@@ -2,9 +2,13 @@ import type { Reaction } from '../reactions/types.js';
 import type { PetGoals } from '../store/pet.js';
 import type { Transaction } from '../types/transaction.js';
 
+export type RuleContext = {
+  weeklySpendByCategory: Record<string, number>;
+};
+
 export type Rule = {
   name: string;
-  match: (tx: Transaction, goals: PetGoals) => boolean;
+  match: (tx: Transaction, goals: PetGoals, context: RuleContext) => boolean;
   react: (tx: Transaction, goals: PetGoals) => Reaction;
 };
 
@@ -47,11 +51,17 @@ export const rules: Rule[] = [
 
   {
     name: 'overspent_in_category',
-    match(tx, goals) {
+    match(tx, goals, context) {
       if (!isDebit(tx)) return false;
       const category = tx.details?.category?.toLowerCase() ?? '';
       const limit = goals.weeklyBudgetByCategory[category] ?? null;
-      return limit !== null && WEEKLY_BUDGET_CATEGORIES.has(category) && parseDollar(tx.amount) > limit;
+      if (limit === null || !WEEKLY_BUDGET_CATEGORIES.has(category)) return false;
+      // weeklyTotal already includes this transaction (caller adds it before evaluating).
+      // prevTotal reconstructs the running total before this transaction.
+      // Fire only when this transaction is the one that crosses the threshold.
+      const weeklyTotal = context.weeklySpendByCategory[category] ?? 0;
+      const prevTotal = weeklyTotal - parseDollar(tx.amount);
+      return prevTotal < limit && weeklyTotal > limit;
     },
     react(tx) {
       const category = tx.details?.category ?? 'unknown';
