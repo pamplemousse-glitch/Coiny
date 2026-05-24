@@ -9,9 +9,9 @@ vi.mock('../src/store/devices.js', () => ({
 }));
 
 import { sendApnsPush } from '../src/push/apns.js';
-import { listDeviceTokens } from '../src/store/devices.js';
 import { dispatchReaction } from '../src/reactions/dispatch.js';
 import type { Reaction } from '../src/reactions/types.js';
+import { listDeviceTokens } from '../src/store/devices.js';
 
 const mockedSendApnsPush = vi.mocked(sendApnsPush);
 const mockedListDeviceTokens = vi.mocked(listDeviceTokens);
@@ -45,8 +45,16 @@ describe('dispatchReaction', () => {
     await flushAll();
 
     expect(mockedSendApnsPush).toHaveBeenCalledTimes(2);
-    expect(mockedSendApnsPush).toHaveBeenCalledWith('token-a', expect.stringContaining('celebrating'), 'Paycheck received');
-    expect(mockedSendApnsPush).toHaveBeenCalledWith('token-b', expect.stringContaining('celebrating'), 'Paycheck received');
+    expect(mockedSendApnsPush).toHaveBeenCalledWith(
+      'token-a',
+      expect.stringContaining('celebrating'),
+      'Paycheck received',
+    );
+    expect(mockedSendApnsPush).toHaveBeenCalledWith(
+      'token-b',
+      expect.stringContaining('celebrating'),
+      'Paycheck received',
+    );
   });
 
   it('does not push when there are no device tokens', async () => {
@@ -59,9 +67,7 @@ describe('dispatchReaction', () => {
   });
 
   it('skips non-iOS tokens', async () => {
-    mockedListDeviceTokens.mockResolvedValue([
-      { token: 'android-token', platform: 'android' },
-    ]);
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'android-token', platform: 'android' }]);
 
     dispatchReaction('user-1', REACTION);
     await flushAll();

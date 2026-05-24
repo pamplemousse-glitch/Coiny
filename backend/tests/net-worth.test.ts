@@ -184,8 +184,22 @@ describe('GET /api/net-worth', () => {
     mockedInvestmentsHoldingsGet.mockResolvedValue({
       accounts: [],
       holdings: [
-        { account_id: 'acct-brokerage', security_id: 'sec-1', institution_value: 10000, quantity: 10, cost_basis: null, institution_price: null },
-        { account_id: 'acct-brokerage', security_id: 'sec-2', institution_value: 5000, quantity: 50, cost_basis: null, institution_price: null },
+        {
+          account_id: 'acct-brokerage',
+          security_id: 'sec-1',
+          institution_value: 10000,
+          quantity: 10,
+          cost_basis: null,
+          institution_price: null,
+        },
+        {
+          account_id: 'acct-brokerage',
+          security_id: 'sec-2',
+          institution_value: 5000,
+          quantity: 50,
+          cost_basis: null,
+          institution_price: null,
+        },
       ],
       securities: [
         { security_id: 'sec-1', name: 'Apple Inc', ticker_symbol: 'AAPL', type: 'equity' },
@@ -200,7 +214,11 @@ describe('GET /api/net-worth', () => {
     const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
     expect(res.statusCode).toBe(200);
 
-    const body = res.json<{ investments: number; total: number; accounts: { investments: { securityId: string; ticker: string | null }[] } }>();
+    const body = res.json<{
+      investments: number;
+      total: number;
+      accounts: { investments: { securityId: string; ticker: string | null }[] };
+    }>();
     expect(body.investments).toBe(15000);
     expect(body.total).toBe(15000);
     expect(body.accounts.investments).toHaveLength(2);
@@ -249,7 +267,9 @@ describe('GET /api/net-worth', () => {
     const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
     expect(res.statusCode).toBe(200);
 
-    const body = res.json<{ accounts: { bank: Array<{ accountId: string; minPayment: number | null; nextDueDate: string | null }> } }>();
+    const body = res.json<{
+      accounts: { bank: Array<{ accountId: string; minPayment: number | null; nextDueDate: string | null }> };
+    }>();
     const visa = body.accounts.bank.find((a) => a.accountId === 'acct-visa');
     expect(visa?.minPayment).toBe(50);
     expect(visa?.nextDueDate).toBe('2026-06-15');

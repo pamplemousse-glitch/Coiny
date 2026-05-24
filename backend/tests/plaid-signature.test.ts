@@ -1,7 +1,7 @@
 import { createHash, webcrypto } from 'node:crypto';
 import { exportJWK, type JWK, SignJWT } from 'jose';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { _clearKeyCache, setKeyFetcher, verifyPlaidSignature, _webcrypto } from '../src/plaid/signature.js';
+import { _clearKeyCache, _webcrypto, setKeyFetcher, verifyPlaidSignature } from '../src/plaid/signature.js';
 
 const TEST_KID = 'sig-test-kid';
 
@@ -67,7 +67,7 @@ describe('verifyPlaidSignature', () => {
   });
 
   it('returns malformed_jwt when kid is missing from header', async () => {
-    const { exportJWK: exportKey, importPKCS8 } = await import('jose');
+    const { importPKCS8 } = await import('jose');
     const { generateKeyPairSync } = await import('node:crypto');
     const { privateKey: pk } = generateKeyPairSync('ec', {
       namedCurve: 'P-256',

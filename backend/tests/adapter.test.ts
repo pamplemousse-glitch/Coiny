@@ -110,11 +110,7 @@ describe('plaidTxToInternal — legacy category fallback', () => {
   });
 
   it('uses merchant_name as counterparty when present', async () => {
-    const tx = await plaidTxToInternal(
-      baseTx({ merchant_name: 'Amazon', name: 'AMZN*Purchase' }),
-      null,
-      'user-1',
-    );
+    const tx = await plaidTxToInternal(baseTx({ merchant_name: 'Amazon', name: 'AMZN*Purchase' }), null, 'user-1');
     expect(tx.details.counterparty?.name).toBe('Amazon');
   });
 

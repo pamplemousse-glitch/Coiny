@@ -62,9 +62,7 @@ describe('coinbase getAccounts — with valid keys', () => {
   it('returns accounts from a single page', async () => {
     vi.mocked(fetch).mockResolvedValue(
       makeFetch({
-        accounts: [
-          { uuid: 'acc-1', currency: 'BTC', available_balance: { value: '1.5', currency: 'BTC' } },
-        ],
+        accounts: [{ uuid: 'acc-1', currency: 'BTC', available_balance: { value: '1.5', currency: 'BTC' } }],
         has_next: false,
       }),
     );
@@ -163,9 +161,7 @@ describe('coinbase getTransactions — with valid keys', () => {
   });
 
   it('appends cursor as starting_after query param', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      makeFetch({ data: [], pagination: { starting_after: null } }),
-    );
+    vi.mocked(fetch).mockResolvedValue(makeFetch({ data: [], pagination: { starting_after: null } }));
 
     const { getTransactions } = await import('../src/coinbase/client.js');
     await getTransactions('acct-1', 'cursor-abc');
@@ -197,9 +193,7 @@ describe('coinbase getTransactions — with valid keys', () => {
   });
 
   it('omits nextCursor when starting_after is null', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      makeFetch({ data: [], pagination: { starting_after: null } }),
-    );
+    vi.mocked(fetch).mockResolvedValue(makeFetch({ data: [], pagination: { starting_after: null } }));
 
     const { getTransactions } = await import('../src/coinbase/client.js');
     const result = await getTransactions('acct-1');
