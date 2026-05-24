@@ -5,6 +5,7 @@ struct SettingsView: View {
     @AppStorage("onboardingComplete") private var onboardingComplete: Bool = false
     @AppStorage("bankLinked") private var bankLinked: Bool = false
     @State private var showDeleteAlert = false
+    @State private var isUnlinkingBank = false
 
     var body: some View {
         NavigationStack {
@@ -15,10 +16,16 @@ struct SettingsView: View {
                             Label("Linked", systemImage: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
                         }
-                        Button("Unlink bank", role: .destructive) {
-                            bankLinked = false
-                            onboardingComplete = false
+                        Button(isUnlinkingBank ? "Unlinking…" : "Unlink bank", role: .destructive) {
+                            Task {
+                                isUnlinkingBank = true
+                                _ = try? await API.shared.unlinkBank()
+                                bankLinked = false
+                                onboardingComplete = false
+                                isUnlinkingBank = false
+                            }
                         }
+                        .disabled(isUnlinkingBank)
                     } else {
                         LabeledContent("Status") {
                             Text("Not linked")

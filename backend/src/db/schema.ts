@@ -58,28 +58,36 @@ export const petState = pgTable('pet_state', {
 // util/crypto.ts). Stores a free-text `reason` field plus the animation/sound/
 // led/duration payload — none of which should land in DB backups in plaintext.
 // Migration 0006 dropped the old jsonb column and re-added it as text.
-export const reactionHistory = pgTable('reaction_history', {
-  id: serial('id').primaryKey(),
-  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
-  at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
-  eventType: text('event_type').notNull(),
-  reaction: text('reaction').notNull(),
-});
+export const reactionHistory = pgTable(
+  'reaction_history',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+    eventType: text('event_type').notNull(),
+    reaction: text('reaction').notNull(),
+  },
+  (t) => [index('reaction_history_user_idx').on(t.userId)],
+);
 
 export const processedEvents = pgTable('processed_events', {
   id: text('id').primaryKey(),
   processedAt: timestamp('processed_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const plaidItems = pgTable('plaid_items', {
-  itemId: text('item_id').primaryKey(),
-  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
-  accessToken: text('access_token').notNull(),
-  cursor: text('cursor'),
-  initialSyncComplete: boolean('initial_sync_complete').notNull().default(false),
-  disabled: boolean('disabled').notNull().default(false),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const plaidItems = pgTable(
+  'plaid_items',
+  {
+    itemId: text('item_id').primaryKey(),
+    userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    accessToken: text('access_token').notNull(),
+    cursor: text('cursor'),
+    initialSyncComplete: boolean('initial_sync_complete').notNull().default(false),
+    disabled: boolean('disabled').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('plaid_items_user_idx').on(t.userId)],
+);
 
 export const transactions = pgTable('transactions', {
   transactionId: text('transaction_id').primaryKey(),

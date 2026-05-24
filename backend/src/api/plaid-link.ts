@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { itemPublicTokenExchange, linkTokenCreate } from '../plaid/client.js';
-import { upsertItem } from '../store/items.js';
+import { itemPublicTokenExchange, itemRemove, linkTokenCreate } from '../plaid/client.js';
+import { disableItem, getItemsByUser, upsertItem } from '../store/items.js';
 
 const ExchangeBodySchema = z.object({
   public_token: z.string().min(1),
@@ -22,5 +22,24 @@ export function registerPlaidLinkApi(app: FastifyInstance): void {
 
     req.log.info({ item_id }, 'plaid item linked');
     return { ok: true, item_id };
+  });
+
+  app.delete('/api/plaid/item', async (req: FastifyRequest, reply: FastifyReply) => {
+    const items = await getItemsByUser(req.user!.id);
+    if (!items.length) return reply.status(204).send();
+
+    await Promise.allSettled(
+      items.map(async (item) => {
+        try {
+          await itemRemove(item.accessToken);
+        } catch (err) {
+          req.log.warn({ err, item_id: item.itemId }, 'plaid item_remove failed during unlink');
+        }
+        await disableItem(item.itemId);
+      }),
+    );
+
+    req.log.info({ count: items.length }, 'plaid items unlinked');
+    return reply.status(204).send();
   });
 }

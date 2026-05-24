@@ -142,6 +142,10 @@ actor API {
         return try await post("/api/plaid/exchange-token", body: Body(public_token: publicToken))
     }
 
+    func unlinkBank() async throws {
+        try await deleteVoid("/api/plaid/item")
+    }
+
     // MARK: - Devices
 
     @discardableResult
