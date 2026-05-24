@@ -1,6 +1,6 @@
 # Coiny — Project Handoff
 
-**Last updated: 2026-05-24**
+**Last updated: 2026-05-24 (session 2)**
 
 Read this first. Then read `docs/tech-stack.md` and `docs/implementation-plan.md`.
 
@@ -145,9 +145,9 @@ Bank / Crypto / DeFi / Debt APIs
 
 | PR | Title | Status | Notes |
 |---|---|---|---|
-| **#102** | `test(ios): XCUITests for all 6 tabs + --ui-testing bypass` | Open | TabNavigationTests; needs merge after UITests confirmed passing |
+| **#102** | `test(ios): comprehensive UITests for all 6 tabs — 54 XCUITests + MockURLProtocol` | Open | 54 UITests + MockURLProtocol; needs Cmd+U confirmation in Xcode before merge |
 
-PRs #81, #91–#99, #101 merged. Backend at 258 tests. iOS at 86 tests (76 unit + 10 UI).
+PRs #81, #91–#99, #101 merged. Backend at 258 tests. iOS at 130 tests (76 unit + 54 UI).
 
 ---
 
@@ -234,12 +234,18 @@ Keys stored: `coiny-plaid-client-id`, `coiny-plaid-sandbox-secret`. Loaded by `b
 
 ### Immediate
 
-1. Merge PR #102 (iOS UITests) after confirming TabNavigationTests pass in Xcode
-2. **TestFlight** — blocked on Apple Developer Program ($99/yr, developer.apple.com/enroll). Once enrolled:
-   - Add Apple ID to Xcode → Settings → Accounts
-   - Run archive: `xcodebuild archive -project ios/Coiny.xcodeproj -scheme Coiny -configuration Release -archivePath /tmp/Coiny.xcarchive -allowProvisioningUpdates DEVELOPMENT_TEAM=ZQ8X74VTQQ`
-   - Upload: `xcodebuild -exportArchive -archivePath /tmp/Coiny.xcarchive -exportPath /tmp/CoinyExport -exportOptionsPlist ios/ExportOptions.plist`
-3. **Manual E2E smoke test**: tap "Debug: Skip Sign In" → link First Platypus Bank (user_good/pass_good) → tap "Reset cursor" → tap "Fire test transaction" → verify pet reacts
+1. **Confirm PR #102 UITests pass**: Open Xcode → Cmd+U with iPhone 17 Pro Simulator. Use Xcode MCP to pull results. Should show 130 tests (76 unit + 54 UI). Note: some UITests may fail due to view label mismatches — fix those before merging.
+
+2. **TestFlight** — Apple Developer enrolled ✅, certs created ✅, Team ID = `UKL98DS9D3` ✅. **Blocked on App ID registration:**
+   - Go to developer.apple.com/account → Certificates, Identifiers & Profiles → Identifiers → +
+   - App IDs → App → Bundle ID: Explicit → `app.coiny.ios` → enable Sign In with Apple → Register
+   - Then in Xcode: Product → Archive (destination: Any iOS Device arm64)
+   - Xcode Organizer → Distribute App → App Store Connect → Upload
+   - Add Antoine + Jack as internal testers in App Store Connect → TestFlight
+
+3. **Spinwheel sandbox integration tests**: Spinwheel has a real sandbox at `sandbox-api.spinwheel.io`. Register at developer.spinwheel.io for a sandbox API key. Test users: Christy Jenoval (DOB 1967-06-08), Aldo Cherry (DOB 1990-01-01). Write backend Vitest tests hitting the real sandbox endpoint.
+
+4. **Manual E2E smoke test**: tap "Debug: Skip Sign In" → link First Platypus Bank (user_good/pass_good) → tap "Reset cursor" → tap "Fire test transaction" → verify pet reacts
 
 ### iOS (highest leverage for demo readiness)
 

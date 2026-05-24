@@ -16,7 +16,7 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: NO
     # Set your 10-character Apple Developer Team ID here (found at developer.apple.com/account).
     # Also enable "Sign In with Apple" capability for bundle ID app.coiny.ios in the Developer Portal.
-    DEVELOPMENT_TEAM: "ZQ8X74VTQQ"
+    DEVELOPMENT_TEAM: "UKL98DS9D3"
 
 # Build configurations — Debug for local + Simulator, Release for TestFlight + App Store
 configs:
@@ -73,7 +73,6 @@ targets:
         SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
         GCC_TREAT_WARNINGS_AS_ERRORS: YES
         CODE_SIGN_STYLE: Automatic
-        CODE_SIGN_IDENTITY: "Apple Development"
         ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
         SWIFT_EMIT_LOC_STRINGS: YES
     dependencies:
