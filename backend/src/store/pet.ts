@@ -108,15 +108,16 @@ export async function applyHealthDelta(userId: string, delta: number): Promise<v
 export async function recordReaction(userId: string, eventType: string, reaction: Reaction): Promise<void> {
   const now = new Date();
   const encrypted = encryptString(JSON.stringify(reaction));
-  await db().insert(reactionHistory).values({ userId, at: now, eventType, reaction: encrypted });
-  await db().update(petState).set({ lastReactionAt: now }).where(eq(petState.userId, userId));
-
-  await db().execute(sql`
-    DELETE FROM ${reactionHistory}
-    WHERE id NOT IN (
-      SELECT id FROM ${reactionHistory}
-      WHERE ${reactionHistory.userId} = ${userId}
-      ORDER BY at DESC LIMIT ${MAX_HISTORY}
-    ) AND ${reactionHistory.userId} = ${userId}
-  `);
+  await db().transaction(async (tx) => {
+    await tx.insert(reactionHistory).values({ userId, at: now, eventType, reaction: encrypted });
+    await tx.update(petState).set({ lastReactionAt: now }).where(eq(petState.userId, userId));
+    await tx.execute(sql`
+      DELETE FROM ${reactionHistory}
+      WHERE id NOT IN (
+        SELECT id FROM ${reactionHistory}
+        WHERE ${reactionHistory.userId} = ${userId}
+        ORDER BY at DESC LIMIT ${MAX_HISTORY}
+      ) AND ${reactionHistory.userId} = ${userId}
+    `);
+  });
 }
