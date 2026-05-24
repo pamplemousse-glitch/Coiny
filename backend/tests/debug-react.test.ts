@@ -103,26 +103,28 @@ describe('GET /api/debug/transactions', () => {
   it('returns ingested transactions with category and rule_matched fields', async () => {
     const { db } = await import('../src/db/client.js');
     const { transactions } = await import('../src/db/schema.js');
-    await db().insert(transactions).values([
-      {
-        transactionId: 'txn_groceries',
-        userId: testUserId,
-        accountId: 'acc1',
-        merchantName: 'Whole Foods',
-        amount: '-185.00',
-        date: '2026-05-20',
-        category: 'groceries',
-      },
-      {
-        transactionId: 'txn_paycheck',
-        userId: testUserId,
-        accountId: 'acc1',
-        merchantName: 'Employer Inc',
-        amount: '2400.00',
-        date: '2026-05-21',
-        category: 'paycheck',
-      },
-    ]);
+    await db()
+      .insert(transactions)
+      .values([
+        {
+          transactionId: 'txn_groceries',
+          userId: testUserId,
+          accountId: 'acc1',
+          merchantName: 'Whole Foods',
+          amount: '-185.00',
+          date: '2026-05-20',
+          category: 'groceries',
+        },
+        {
+          transactionId: 'txn_paycheck',
+          userId: testUserId,
+          accountId: 'acc1',
+          merchantName: 'Employer Inc',
+          amount: '2400.00',
+          date: '2026-05-21',
+          category: 'paycheck',
+        },
+      ]);
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();

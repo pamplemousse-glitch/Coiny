@@ -88,9 +88,7 @@ export function registerDebugApi(app: FastifyInstance): void {
           running_balance: null,
           details: {
             category: row.category ?? undefined,
-            ...(row.merchantName
-              ? { counterparty: { name: row.merchantName, type: 'organization' as const } }
-              : {}),
+            ...(row.merchantName ? { counterparty: { name: row.merchantName, type: 'organization' as const } } : {}),
           },
         };
         const match = evaluate(fakeTx, goals);

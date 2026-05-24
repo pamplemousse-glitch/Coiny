@@ -157,7 +157,7 @@ export async function getTransactions(
   if (!config.ZERION_API_KEY) throw new ZerionError(0, 'ZERION_API_KEY is not configured');
 
   let urlOrPath: string;
-  if (cursor && cursor.startsWith('http')) {
+  if (cursor?.startsWith('http')) {
     urlOrPath = cursor; // use links.next URL as-is per Zerion docs
   } else {
     const params = new URLSearchParams({
