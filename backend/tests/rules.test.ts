@@ -134,12 +134,12 @@ describe('rule engine', () => {
   });
 
   describe('bill_paid_on_time', () => {
-    it('fires for a known biller', () => {
+    it('fires for a utility payment (category: utilities)', () => {
       const match = evaluate(
         tx({
           amount: '-89.99',
           type: 'ach',
-          details: { category: 'utilities', counterparty: { name: 'internet provider', type: 'organization' } },
+          details: { category: 'utilities', counterparty: { name: 'CONSOLIDATED EDISON', type: 'organization' } },
         }),
         DEFAULT_GOALS,
       );
@@ -149,15 +149,37 @@ describe('rule engine', () => {
       expect(match?.reaction.reason).toMatch(/bill_paid_on_time/);
     });
 
-    it('does not fire for an unknown payee', () => {
+    it('fires for a credit card payment (category: loan_payment)', () => {
+      const match = evaluate(
+        tx({
+          amount: '-200.00',
+          type: 'ach',
+          details: { category: 'loan_payment' },
+        }),
+        DEFAULT_GOALS,
+      );
+      expect(match?.name).toBe('bill_paid_on_time');
+    });
+
+    it('fires for a rent payment (category: rent)', () => {
+      const match = evaluate(tx({ amount: '-1500.00', type: 'ach', details: { category: 'rent' } }), DEFAULT_GOALS);
+      expect(match?.name).toBe('bill_paid_on_time');
+    });
+
+    it('does not fire for non-bill categories', () => {
       const match = evaluate(
         tx({
           amount: '-30.00',
           type: 'ach',
-          details: { category: 'services', counterparty: { name: 'random vendor', type: 'organization' } },
+          details: { category: 'services', counterparty: { name: 'AT&T*BILL', type: 'organization' } },
         }),
         DEFAULT_GOALS,
       );
+      expect(match).toBeNull();
+    });
+
+    it('does not fire for credit transactions', () => {
+      const match = evaluate(tx({ amount: '89.99', details: { category: 'utilities' } }), DEFAULT_GOALS);
       expect(match).toBeNull();
     });
   });
