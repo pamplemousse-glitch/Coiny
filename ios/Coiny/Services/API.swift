@@ -247,6 +247,10 @@ actor API {
         try await post("/api/debug/fire-transaction")
     }
 
+    func debugTransactions() async throws -> DebugTransactionsResponse {
+        try await get("/api/debug/transactions")
+    }
+
     /// Creates a real backend session for the fixed simulator test user and
     /// stores the token in memory. Bypasses Sign In with Apple, which doesn't
     /// work in the Simulator. Token is lost on app restart (no Keychain write).
@@ -513,3 +517,23 @@ struct DebtItem: Decodable, Identifiable {
     let balance: Double
     let monthlyPayment: Double?
 }
+
+#if DEBUG
+struct DebugTransaction: Decodable, Identifiable {
+    let id: String
+    let date: String
+    let merchant: String?
+    let amount: String
+    let category: String?
+    let ruleMatched: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, date, merchant, amount, category
+        case ruleMatched = "rule_matched"
+    }
+}
+
+struct DebugTransactionsResponse: Decodable {
+    let transactions: [DebugTransaction]
+}
+#endif

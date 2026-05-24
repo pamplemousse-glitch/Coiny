@@ -12,7 +12,7 @@ struct RootView: View {
 
             SpendingView()
                 .tabItem {
-                    Label("Spending", systemImage: "creditcard")
+                    Label("Activity", systemImage: "clock.arrow.circlepath")
                 }
 
             NetWorthView()
