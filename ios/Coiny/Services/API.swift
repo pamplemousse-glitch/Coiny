@@ -19,7 +19,13 @@ actor API {
     }()
 
     enum Endpoint {
-        static let baseURL = URL(string: "https://coiny-backend.fly.dev")!
+        static let baseURL: URL = {
+            #if targetEnvironment(simulator)
+            return URL(string: "http://127.0.0.1:3000")!
+            #else
+            return URL(string: "https://coiny-backend.fly.dev")!
+            #endif
+        }()
     }
 
     enum APIError: Error, LocalizedError {
@@ -249,6 +255,11 @@ actor API {
 
     func debugTransactions() async throws -> DebugTransactionsResponse {
         try await get("/api/debug/transactions")
+    }
+
+    @discardableResult
+    func resetCursor() async throws -> ResetCursorResponse {
+        try await post("/api/debug/reset-cursor")
     }
 
     /// Creates a real backend session for the fixed simulator test user and
@@ -535,5 +546,17 @@ struct DebugTransaction: Decodable, Identifiable {
 
 struct DebugTransactionsResponse: Decodable {
     let transactions: [DebugTransaction]
+}
+
+struct ResetCursorResponse: Decodable {
+    let ok: Bool
+    let itemsReset: Int
+    let eventsCleared: Int
+
+    enum CodingKeys: String, CodingKey {
+        case ok
+        case itemsReset = "items_reset"
+        case eventsCleared = "events_cleared"
+    }
 }
 #endif
