@@ -10,7 +10,7 @@ export type Rule = {
 
 const WEEKLY_BUDGET_CATEGORIES = new Set(['groceries', 'food_and_drink', 'restaurants']);
 const SAVINGS_MILESTONES = [0.25, 0.5, 1.0] as const;
-const KNOWN_BILLERS = ['electric company', 'water utilities', 'internet provider', 'insurance'];
+const BILL_CATEGORIES = new Set(['utilities', 'loan_payment', 'rent', 'insurance', 'mortgage']);
 
 function parseDollar(amount: string): number {
   return Math.abs(parseFloat(amount));
@@ -93,8 +93,7 @@ export const rules: Rule[] = [
     name: 'bill_paid_on_time',
     match(tx) {
       if (!isDebit(tx)) return false;
-      const counterparty = tx.details?.counterparty?.name?.toLowerCase() ?? '';
-      return KNOWN_BILLERS.some((b) => counterparty.includes(b));
+      return BILL_CATEGORIES.has(tx.details?.category ?? '');
     },
     react(tx) {
       const counterparty = tx.details?.counterparty?.name ?? 'biller';
