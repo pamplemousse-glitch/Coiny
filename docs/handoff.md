@@ -1,6 +1,6 @@
 # Coiny — Project Handoff
 
-**Last updated: 2026-05-22**
+**Last updated: 2026-05-24**
 
 Read this first. Then read `docs/tech-stack.md` and `docs/implementation-plan.md`.
 
@@ -113,7 +113,8 @@ Bank / Crypto / DeFi / Debt APIs
 - ✅ REST API: `/api/auth/apple`, `/api/pets`, `/api/plaid/*`, `/api/devices/*`, `/api/spending`, `/api/account`, `/api/coinbase/*`, `/api/zerion/*`, `/api/spinwheel/*`, `/api/net-worth`, `/api/debug/*`
 - ✅ Rate limiting: per-user (SHA-256 of bearer token) with IP fallback
 - ✅ `GET /api/net-worth` aggregates bank (Plaid) + crypto (Coinbase + CoinGecko) + DeFi (Zerion) + debts (Spinwheel), per-source try/catch (PR #81)
-- ✅ 179 Vitest tests across 21 test files — all passing
+- ✅ **E2E pipeline proven** (PR #101): Vitest test proves full Plaid → rule engine → reaction path. Test fires a sandbox webhook, verifies `paycheck_received` reaction is persisted to DB and returned by `GET /api/pets`.
+- ✅ 258 Vitest tests across 23 test files — all passing
 
 ### iOS App (Swift + SwiftUI)
 
@@ -124,16 +125,19 @@ Bank / Crypto / DeFi / Debt APIs
 - ✅ **Sign In with Apple** → backend JWT → Keychain session token
 - ✅ **OnboardingView**: Plaid Link flow (create token → open Link → exchange public token → `bankLinked = true`)
 - ✅ **PetView**: breathing animation, celebrate bounce, sad droop, WaitingForFirstReactionView with tip carousel, debug fire-transaction button
-- ✅ **SpendingView**: reaction history feed
+- ✅ **ActivityView** (formerly SpendingView): reaction history feed
 - ✅ **SettingsView**: bank status + unlink, goals display, sign-out, **Delete Account** (destructive alert → `DELETE /api/account` → coinySignedOut)
 - ✅ **CryptoView** tab container (Coinbase + Zerion sub-tabs)
 - ✅ **CoinbaseView**: connection status, connect with dev key, sync, disconnect
 - ✅ **ZerionView**: wallet list (add/remove), portfolio total, sync
 - ✅ **SpinwheelView**: SMS OTP flow (phone + DOB → OTP entry → connected), debt list, disconnect
 - ✅ **NetWorthView**: large net-worth number (green/red), bank / crypto / DeFi / debts sections, pull-to-refresh, not-connected prompts with tab hints (PR #81)
-- ✅ **RootView**: 6 tabs — Pet, Spending, Wealth, Crypto, Debt, Settings
-- ✅ 40+ iOS unit tests: APITests (15), CoinbaseViewModelTests (8), KeychainTests (3), NetWorthViewModelTests (3), PetStateDecodingTests, PetStoreTests (8), SessionStoreTests, SpinwheelViewModelTests (9), ViewSmokeTests (6), ZerionViewModelTests (7)
+- ✅ **RootView**: 6 tabs — Pet, Activity, Wealth, Crypto, Debt, Settings
+- ✅ **`--ui-testing` bypass** in `CoinyApp`: XCUITests pass `--ui-testing` launch arg to skip Sign In/Onboarding and land on `RootView` with a best-effort debug session (PR #102)
+- ✅ 76 iOS unit tests: APITests (15), CoinbaseViewModelTests (8), KeychainTests (3), NetWorthViewModelTests (3), PetStateDecodingTests, PetStoreTests (8), SessionStoreTests, SpinwheelViewModelTests (9), ViewSmokeTests (6), ZerionViewModelTests (7)
 - ✅ `AppLaunchSmokeTests` UI test (XCUITest) — verifies SignInView renders at cold launch
+- ✅ `TabNavigationTests` (8 XCUITests, PR #102) — programmatically taps all 6 tabs, asserts navigation bar title per tab (Pet/Activity/Wealth/Crypto/Debt Tracker/Settings)
+- ✅ `ExportOptions.plist` ready for TestFlight archive (method: app-store-connect, automatic signing)
 
 ---
 
@@ -141,10 +145,9 @@ Bank / Crypto / DeFi / Debt APIs
 
 | PR | Title | Status | Notes |
 |---|---|---|---|
-| **#81** | `feat(ios): Coinbase, Zerion, Spinwheel integrations + delete account` | Open, ready to merge | Contains net-worth dashboard + all auth restoration |
-| **#79** | `chore(deps): Bump undici 6→8.3.0` | Open | Security update, low risk |
+| **#102** | `test(ios): XCUITests for all 6 tabs + --ui-testing bypass` | Open | TabNavigationTests; needs merge after UITests confirmed passing |
 
-**Merge #81 first** (net worth + auth layer), then #79.
+PRs #81, #91–#99, #101 merged. Backend at 258 tests. iOS at 86 tests (76 unit + 10 UI).
 
 ---
 
@@ -229,25 +232,28 @@ Keys stored: `coiny-plaid-client-id`, `coiny-plaid-sandbox-secret`. Loaded by `b
 
 ## Next Session Priorities
 
-### Immediate (merge + housekeeping)
+### Immediate
 
-1. Merge PR #81 (net-worth + auth restoration)
-2. Merge PR #79 (undici security bump)
+1. Merge PR #102 (iOS UITests) after confirming TabNavigationTests pass in Xcode
+2. **TestFlight** — blocked on Apple Developer Program ($99/yr, developer.apple.com/enroll). Once enrolled:
+   - Add Apple ID to Xcode → Settings → Accounts
+   - Run archive: `xcodebuild archive -project ios/Coiny.xcodeproj -scheme Coiny -configuration Release -archivePath /tmp/Coiny.xcarchive -allowProvisioningUpdates DEVELOPMENT_TEAM=ZQ8X74VTQQ`
+   - Upload: `xcodebuild -exportArchive -archivePath /tmp/Coiny.xcarchive -exportPath /tmp/CoinyExport -exportOptionsPlist ios/ExportOptions.plist`
+3. **Manual E2E smoke test**: tap "Debug: Skip Sign In" → link First Platypus Bank (user_good/pass_good) → tap "Reset cursor" → tap "Fire test transaction" → verify pet reacts
 
 ### iOS (highest leverage for demo readiness)
 
-3. Replace SF Symbol face with an actual sprite / Lottie animation
-4. Wire net-worth endpoint to show real Plaid bank balances (test with sandbox accounts)
+4. Replace SF Symbol face with an actual sprite / Lottie animation
 5. Add Widgets (WidgetKit) — small widget with net worth + pet face
 6. Live Activities for paycheck events
 
 ### Backend
 
-7. Add Plaid Investments product to sync loop → net-worth crypto positions sourced from Plaid instead of Coinbase-only
-8. Add `GET /api/spending/summary` — weekly totals by category for SpendingView charts
+7. Add Plaid Investments product to sync loop → net-worth crypto from Plaid
+8. Add `GET /api/spending/summary` — weekly totals by category for ActivityView charts
 9. Begin AWS infrastructure work (M1 in `docs/implementation-plan.md`)
 
-### Firmware (once hardware arrives)
+### Firmware (once hardware arrives ~2026-05-26)
 
 10. Init `firmware/` as a Zephyr workspace (nRF Connect SDK)
 11. BLE GATT service schema matching `docs/mqtt-topics.md` command format
@@ -260,8 +266,9 @@ Keys stored: `coiny-plaid-client-id`, `coiny-plaid-sandbox-secret`. Loaded by `b
 Start a fresh Claude Code session in `/Users/antoinewiley/Tamogatchi` and say:
 
 > Read `docs/handoff.md`, `docs/tech-stack.md`, `docs/implementation-plan.md`, and `docs/product-brief.md`.
-> PR #81 (Coinbase/Zerion/Spinwheel iOS UI + net-worth dashboard) is ready to merge.
-> The backend has 179 passing tests; the iOS app has 40+ unit tests + a UI smoke test.
+> The full Plaid → rule → reaction pipeline is proven (backend E2E test, PR #101).
+> The backend has 258 passing tests; the iOS app has 86 tests (76 unit + 10 UITests).
+> PR #102 (iOS UITests) is open — merge after confirming TabNavigationTests pass.
 > Next: [describe specific task].
 
 ### Plaid sandbox credentials (for testing Link flow)
