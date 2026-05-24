@@ -373,6 +373,61 @@ describe('POST /webhooks/plaid', () => {
     await app.close();
   });
 
+  it('no-ops for ITEM webhook with non-USER_PERMISSION_REVOKED code', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const body = JSON.stringify({
+      webhook_type: 'ITEM',
+      webhook_code: 'PENDING_EXPIRATION',
+      item_id: TEST_ITEM_ID,
+    });
+    const signed = await signWebhook(body);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/webhooks/plaid',
+      headers: { 'content-type': 'application/json', 'plaid-verification': signed },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+    await flushAll();
+
+    // Item should NOT be disabled — code was not USER_PERMISSION_REVOKED
+    const { getItem } = await import('../src/store/items.js');
+    const item = await getItem(TEST_ITEM_ID);
+    expect(item?.disabled).toBe(false);
+
+    await app.close();
+  });
+
+  it('no-ops for TRANSACTIONS webhook with non-SYNC_UPDATES_AVAILABLE code', async () => {
+    const dispatchModule = await import('../src/reactions/dispatch.js');
+    const spy = vi.spyOn(dispatchModule, 'dispatchReaction');
+    spy.mockClear();
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const body = JSON.stringify({
+      webhook_type: 'TRANSACTIONS',
+      webhook_code: 'INITIAL_UPDATE',
+      item_id: TEST_ITEM_ID,
+      environment: 'sandbox',
+    });
+    const signed = await signWebhook(body);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/webhooks/plaid',
+      headers: { 'content-type': 'application/json', 'plaid-verification': signed },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+    await flushAll();
+    expect(spy).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
   it('skips sync for disabled item', async () => {
     const { disableItem } = await import('../src/store/items.js');
     await disableItem(TEST_ITEM_ID);

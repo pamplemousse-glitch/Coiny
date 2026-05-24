@@ -3,7 +3,12 @@ import { authHeader, resetDatabase, testUserId } from './db-helper.js';
 
 vi.mock('../src/plaid/client.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../src/plaid/client.js')>();
-  return { ...original, accountsBalanceGet: vi.fn() };
+  return {
+    ...original,
+    accountsBalanceGet: vi.fn(),
+    investmentsHoldingsGet: vi.fn(),
+    liabilitiesGet: vi.fn(),
+  };
 });
 vi.mock('../src/coinbase/client.js', () => ({
   getAccounts: vi.fn(),
@@ -24,11 +29,13 @@ vi.mock('../src/spinwheel/client.js', () => ({
 
 import { getAccounts } from '../src/coinbase/client.js';
 import { getPrices } from '../src/coingecko/client.js';
-import { accountsBalanceGet } from '../src/plaid/client.js';
+import { accountsBalanceGet, investmentsHoldingsGet, liabilitiesGet } from '../src/plaid/client.js';
 import { getDebtProfile } from '../src/spinwheel/client.js';
 import { getPortfolio } from '../src/zerion/client.js';
 
 const mockedAccountsBalanceGet = vi.mocked(accountsBalanceGet);
+const mockedInvestmentsHoldingsGet = vi.mocked(investmentsHoldingsGet);
+const mockedLiabilitiesGet = vi.mocked(liabilitiesGet);
 const _mockedGetAccounts = vi.mocked(getAccounts);
 const _mockedGetPrices = vi.mocked(getPrices);
 const _mockedGetPortfolio = vi.mocked(getPortfolio);
@@ -38,6 +45,19 @@ describe('GET /api/net-worth', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
     await resetDatabase();
+    // Prevent "Cannot read properties of undefined" errors in investment/liability loops
+    // when a test sets up Plaid items but doesn't care about these products.
+    mockedInvestmentsHoldingsGet.mockResolvedValue({
+      accounts: [],
+      holdings: [],
+      securities: [],
+      request_id: 'r',
+    });
+    mockedLiabilitiesGet.mockResolvedValue({
+      accounts: [],
+      liabilities: { credit: null, mortgage: null, student: null },
+      request_id: 'r',
+    });
   });
 
   it('returns zeros with no connections', async () => {
@@ -113,6 +133,147 @@ describe('GET /api/net-worth', () => {
     expect(body.bank).toBe(6500);
     expect(body.accounts.bank).toHaveLength(2);
     expect(body.total).toBe(6500);
+
+    await app.close();
+  });
+
+  it('subtracts credit and loan accounts from bank total', async () => {
+    const { upsertItem } = await import('../src/store/items.js');
+    await upsertItem({ itemId: 'item-credit-1', accessToken: 'access-credit-1', userId: testUserId });
+
+    mockedAccountsBalanceGet.mockResolvedValue({
+      accounts: [
+        {
+          account_id: 'acct-checking',
+          name: 'Checking',
+          type: 'depository',
+          subtype: 'checking',
+          official_name: null,
+          balances: { current: 5000, available: 5000, iso_currency_code: 'USD', limit: null },
+        },
+        {
+          account_id: 'acct-credit',
+          name: 'Visa Credit',
+          type: 'credit',
+          subtype: 'credit card',
+          official_name: null,
+          balances: { current: 1200, available: 800, iso_currency_code: 'USD', limit: null },
+        },
+      ],
+      request_id: 'req-credit',
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json<{ bank: number; total: number }>();
+    expect(body.bank).toBe(3800); // 5000 - 1200
+    expect(body.total).toBe(3800);
+
+    await app.close();
+  });
+
+  it('aggregates investment holdings into investmentsTotal', async () => {
+    const { upsertItem } = await import('../src/store/items.js');
+    await upsertItem({ itemId: 'item-inv-1', accessToken: 'access-inv-1', userId: testUserId });
+
+    mockedAccountsBalanceGet.mockResolvedValue({ accounts: [], request_id: 'r' });
+    mockedInvestmentsHoldingsGet.mockResolvedValue({
+      accounts: [],
+      holdings: [
+        {
+          account_id: 'acct-brokerage',
+          security_id: 'sec-1',
+          institution_value: 10000,
+          quantity: 10,
+          cost_basis: null,
+          institution_price: null,
+        },
+        {
+          account_id: 'acct-brokerage',
+          security_id: 'sec-2',
+          institution_value: 5000,
+          quantity: 50,
+          cost_basis: null,
+          institution_price: null,
+        },
+      ],
+      securities: [
+        { security_id: 'sec-1', name: 'Apple Inc', ticker_symbol: 'AAPL', type: 'equity' },
+        { security_id: 'sec-2', name: 'Vanguard 500', ticker_symbol: 'VFINX', type: 'mutual_fund' },
+      ],
+      request_id: 'r',
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json<{
+      investments: number;
+      total: number;
+      accounts: { investments: { securityId: string; ticker: string | null }[] };
+    }>();
+    expect(body.investments).toBe(15000);
+    expect(body.total).toBe(15000);
+    expect(body.accounts.investments).toHaveLength(2);
+    const aapl = body.accounts.investments.find((h) => h.securityId === 'sec-1');
+    expect(aapl?.ticker).toBe('AAPL');
+
+    await app.close();
+  });
+
+  it('enriches credit account with liability payment metadata', async () => {
+    const { upsertItem } = await import('../src/store/items.js');
+    await upsertItem({ itemId: 'item-liab-1', accessToken: 'access-liab-1', userId: testUserId });
+
+    mockedAccountsBalanceGet.mockResolvedValue({
+      accounts: [
+        {
+          account_id: 'acct-visa',
+          name: 'Visa Card',
+          type: 'credit',
+          subtype: 'credit card',
+          official_name: null,
+          balances: { current: 2000, available: 3000, iso_currency_code: 'USD', limit: null },
+        },
+      ],
+      request_id: 'r',
+    });
+    mockedLiabilitiesGet.mockResolvedValue({
+      accounts: [],
+      liabilities: {
+        credit: [
+          {
+            account_id: 'acct-visa',
+            minimum_payment_amount: 50,
+            next_payment_due_date: '2026-06-15',
+            last_statement_balance: null,
+          },
+        ],
+        mortgage: null,
+        student: null,
+      },
+      request_id: 'r',
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json<{
+      accounts: { bank: Array<{ accountId: string; minPayment: number | null; nextDueDate: string | null }> };
+    }>();
+    const visa = body.accounts.bank.find((a) => a.accountId === 'acct-visa');
+    expect(visa?.minPayment).toBe(50);
+    expect(visa?.nextDueDate).toBe('2026-06-15');
 
     await app.close();
   });

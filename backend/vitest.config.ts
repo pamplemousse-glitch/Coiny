@@ -9,7 +9,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**'],
-      exclude: ['src/db/migrations/**', 'src/push/apns.ts', 'src/coinbase/client.ts'],
+      exclude: ['src/db/migrations/**'],
       reporter: ['text', 'lcov'],
       thresholds: {
         lines: 75,
