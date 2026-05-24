@@ -162,10 +162,7 @@ describe('rule engine', () => {
     });
 
     it('fires for a rent payment (category: rent)', () => {
-      const match = evaluate(
-        tx({ amount: '-1500.00', type: 'ach', details: { category: 'rent' } }),
-        DEFAULT_GOALS,
-      );
+      const match = evaluate(tx({ amount: '-1500.00', type: 'ach', details: { category: 'rent' } }), DEFAULT_GOALS);
       expect(match?.name).toBe('bill_paid_on_time');
     });
 

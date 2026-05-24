@@ -134,9 +134,7 @@ export async function plaidTxToInternal(
   const counterparty = counterpartyName(plaidTx);
   const override = await getOverride(userId, counterparty);
   const category =
-    override ??
-    mapCategory(plaidTx.personal_finance_category?.detailed) ??
-    mapLegacyCategory(plaidTx.category);
+    override ?? mapCategory(plaidTx.personal_finance_category?.detailed) ?? mapLegacyCategory(plaidTx.category);
 
   return {
     id: plaidTx.transaction_id,
