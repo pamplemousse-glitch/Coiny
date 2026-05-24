@@ -23,8 +23,8 @@ async function flushAll() {
 
 const REACTION: Reaction = {
   animation: 'celebrate',
-  sound: 'cheer',
-  led: '#00ff00',
+  sound: 'fanfare',
+  led: 'green',
   duration: 3000,
   reason: 'Paycheck received',
 };
@@ -115,7 +115,8 @@ describe('dispatchReaction', () => {
     mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
     mockedSendApnsPush.mockResolvedValue(undefined);
 
-    dispatchReaction('user-1', { ...REACTION, animation: 'unknown_animation' });
+    // biome-ignore lint/suspicious/noExplicitAny: testing unknown animation fallback path
+    dispatchReaction('user-1', { ...REACTION, animation: 'unknown_animation' as any });
     await flushAll();
 
     expect(mockedSendApnsPush).toHaveBeenCalledWith('token-a', '🐣 Coiny reacted', 'Paycheck received');

@@ -34,7 +34,7 @@ describe('plaidTxToInternal — legacy category fallback', () => {
       null,
       'user-1',
     );
-    expect(tx.details.category).toBe('groceries');
+    expect(tx.details?.category).toBe('groceries');
   });
 
   it('maps legacy Food and Drink / Restaurants to restaurants', async () => {
@@ -43,7 +43,7 @@ describe('plaidTxToInternal — legacy category fallback', () => {
       null,
       'user-1',
     );
-    expect(tx.details.category).toBe('restaurants');
+    expect(tx.details?.category).toBe('restaurants');
   });
 
   it('maps legacy Income / Payroll to paycheck', async () => {
@@ -52,7 +52,7 @@ describe('plaidTxToInternal — legacy category fallback', () => {
       null,
       'user-1',
     );
-    expect(tx.details.category).toBe('paycheck');
+    expect(tx.details?.category).toBe('paycheck');
   });
 
   it('maps legacy Travel / Airlines to flights', async () => {
@@ -61,7 +61,7 @@ describe('plaidTxToInternal — legacy category fallback', () => {
       null,
       'user-1',
     );
-    expect(tx.details.category).toBe('flights');
+    expect(tx.details?.category).toBe('flights');
   });
 
   it('maps legacy primary with null sub (catch-all)', async () => {
@@ -70,7 +70,7 @@ describe('plaidTxToInternal — legacy category fallback', () => {
       null,
       'user-1',
     );
-    expect(tx.details.category).toBe('medical');
+    expect(tx.details?.category).toBe('medical');
   });
 
   it('returns null category when no legacy category matches', async () => {
@@ -79,12 +79,12 @@ describe('plaidTxToInternal — legacy category fallback', () => {
       null,
       'user-1',
     );
-    expect(tx.details.category).toBeNull();
+    expect(tx.details?.category).toBeNull();
   });
 
   it('returns null category when category array is empty', async () => {
     const tx = await plaidTxToInternal(baseTx({ personal_finance_category: null, category: [] }), null, 'user-1');
-    expect(tx.details.category).toBeNull();
+    expect(tx.details?.category).toBeNull();
   });
 
   it('prefers PFC over legacy category when both are present', async () => {
@@ -96,7 +96,7 @@ describe('plaidTxToInternal — legacy category fallback', () => {
       null,
       'user-1',
     );
-    expect(tx.details.category).toBe('groceries');
+    expect(tx.details?.category).toBe('groceries');
   });
 
   it('populates running_balance when accountBalance is provided', async () => {
@@ -111,7 +111,7 @@ describe('plaidTxToInternal — legacy category fallback', () => {
 
   it('uses merchant_name as counterparty when present', async () => {
     const tx = await plaidTxToInternal(baseTx({ merchant_name: 'Amazon', name: 'AMZN*Purchase' }), null, 'user-1');
-    expect(tx.details.counterparty?.name).toBe('Amazon');
+    expect(tx.details?.counterparty?.name).toBe('Amazon');
   });
 
   it('marks pending transactions with status pending', async () => {

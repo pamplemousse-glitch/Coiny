@@ -93,12 +93,20 @@ describe('verifyPlaidSignature', () => {
   });
 
   it('returns unknown_kid when fetchKey returns non-EC key', async () => {
-    setKeyFetcher(async () => ({
-      kty: 'RSA',
-      crv: undefined,
-      created_at: 0,
-      expired_at: null,
-    }));
+    setKeyFetcher(
+      async () =>
+        ({
+          kty: 'EC',
+          crv: 'P-384', // wrong curve — not P-256
+          alg: 'ES256',
+          kid: TEST_KID,
+          use: 'sig',
+          x: 'fake',
+          y: 'fake',
+          created_at: 0,
+          expired_at: null,
+        }) as never,
+    );
     const token = await signBody(TEST_BODY);
     const result = await verifyPlaidSignature(token, TEST_BODY);
     expect(result).toEqual({ ok: false, reason: 'unknown_kid' });

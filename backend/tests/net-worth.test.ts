@@ -253,6 +253,7 @@ describe('GET /api/net-worth', () => {
             account_id: 'acct-visa',
             minimum_payment_amount: 50,
             next_payment_due_date: '2026-06-15',
+            last_statement_balance: null,
           },
         ],
         mortgage: null,
