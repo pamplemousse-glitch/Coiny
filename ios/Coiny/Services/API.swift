@@ -8,8 +8,17 @@ import Foundation
 actor API {
     static let shared: API = {
         let config = URLSessionConfiguration.default
+        // In UITest mode the app hits 127.0.0.1:3000 which may not be running.
+        // waitsForConnectivity = true hangs indefinitely when no backend is up,
+        // starving Swift concurrency threads and crashing LLDB during UITests.
+        #if DEBUG
+        let isUITesting = ProcessInfo.processInfo.arguments.contains("--ui-testing")
+        config.timeoutIntervalForRequest = isUITesting ? 3 : 30
+        config.waitsForConnectivity = !isUITesting
+        #else
         config.timeoutIntervalForRequest = 30
         config.waitsForConnectivity = true
+        #endif
         let session = URLSession(configuration: config)
         return API(
             baseURL: Endpoint.baseURL,
