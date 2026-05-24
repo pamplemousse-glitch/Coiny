@@ -166,9 +166,38 @@ private struct PetLoadedView: View {
     @Environment(PetStore.self) private var store
     @State private var isFiring = false
     @State private var fireStatus: String?
+    @State private var isResetting = false
+    @State private var resetStatus: String?
 
     private var debugControls: some View {
         VStack(spacing: 6) {
+            Button {
+                Task {
+                    isResetting = true
+                    resetStatus = nil
+                    do {
+                        let r = try await API.shared.resetCursor()
+                        resetStatus = "Reset \(r.itemsReset) item(s), cleared \(r.eventsCleared) events"
+                    } catch {
+                        resetStatus = "Reset failed: \(error.localizedDescription)"
+                    }
+                    isResetting = false
+                }
+            } label: {
+                Label(isResetting ? "Resetting…" : "Reset cursor", systemImage: "arrow.counterclockwise")
+                    .font(.caption)
+                    .foregroundStyle(.blue)
+            }
+            .buttonStyle(.bordered)
+            .disabled(isResetting)
+
+            if let status = resetStatus {
+                Text(status)
+                    .font(.caption2)
+                    .foregroundStyle(status.hasPrefix("Reset failed") ? .red : .secondary)
+                    .multilineTextAlignment(.center)
+            }
+
             Button {
                 Task {
                     isFiring = true

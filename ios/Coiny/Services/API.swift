@@ -1,10 +1,5 @@
 import Foundation
 
-/// Network layer for talking to coiny-backend.fly.dev.
-///
-/// Construction takes injected dependencies (HTTPClient, SessionStore, base URL)
-/// so tests can drive the entire request/response surface without touching the
-/// real network or Keychain. Production code uses `API.shared`.
 actor API {
     static let shared: API = {
         let config = URLSessionConfiguration.default
@@ -19,7 +14,13 @@ actor API {
     }()
 
     enum Endpoint {
-        static let baseURL = URL(string: "https://coiny-backend.fly.dev")!
+        static let baseURL: URL = {
+            #if targetEnvironment(simulator)
+            return URL(string: "http://127.0.0.1:3000")!
+            #else
+            return URL(string: "https://coiny-backend.fly.dev")!
+            #endif
+        }()
     }
 
     enum APIError: Error, LocalizedError {
@@ -251,6 +252,11 @@ actor API {
         try await get("/api/debug/transactions")
     }
 
+    @discardableResult
+    func resetCursor() async throws -> ResetCursorResponse {
+        try await post("/api/debug/reset-cursor")
+    }
+
     /// Creates a real backend session for the fixed simulator test user and
     /// stores the token in memory. Bypasses Sign In with Apple, which doesn't
     /// work in the Simulator. Token is lost on app restart (no Keychain write).
@@ -404,18 +410,9 @@ struct ZerionWallet: Decodable, Identifiable {
 
 struct ZerionPortfolio: Decodable {
     let data: ZerionPortfolioData
-
-    struct ZerionPortfolioData: Decodable {
-        let attributes: ZerionPortfolioAttributes
-    }
-
-    struct ZerionPortfolioAttributes: Decodable {
-        let total: ZerionPortfolioTotal
-    }
-
-    struct ZerionPortfolioTotal: Decodable {
-        let positions: Double
-    }
+    struct ZerionPortfolioData: Decodable { let attributes: ZerionPortfolioAttributes }
+    struct ZerionPortfolioAttributes: Decodable { let total: ZerionPortfolioTotal }
+    struct ZerionPortfolioTotal: Decodable { let positions: Double }
 }
 
 struct SpinwheelStatus: Decodable {
@@ -533,7 +530,16 @@ struct DebugTransaction: Decodable, Identifiable {
     }
 }
 
-struct DebugTransactionsResponse: Decodable {
-    let transactions: [DebugTransaction]
+struct DebugTransactionsResponse: Decodable { let transactions: [DebugTransaction] }
+
+struct ResetCursorResponse: Decodable {
+    let ok: Bool
+    let itemsReset: Int
+    let eventsCleared: Int
+    enum CodingKeys: String, CodingKey {
+        case ok
+        case itemsReset = "items_reset"
+        case eventsCleared = "events_cleared"
+    }
 }
 #endif

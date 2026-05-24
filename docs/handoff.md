@@ -1,6 +1,6 @@
 # Coiny — Project Handoff
 
-**Last updated: 2026-05-22**
+**Last updated: 2026-05-24**
 
 Read this first. Then read `docs/tech-stack.md` and `docs/implementation-plan.md`.
 
@@ -34,12 +34,12 @@ Coiny/
 ├── backend/           # Node.js / TypeScript / Fastify — active, hosted on Fly.io
 │   ├── src/api/       # Route handlers (auth, pets, plaid, coinbase, zerion, spinwheel, account, net-worth)
 │   ├── src/store/     # DB queries (users, sessions, items, pets, transactions, events)
-│   ├── src/plaid/     # Plaid API client + webhook verifier
+│   ├── src/plaid/     # Plaid API client + webhook verifier + adapter
 │   ├── src/coinbase/  # Coinbase Advanced Trade client (JWT ES256)
 │   ├── src/coingecko/ # CoinGecko price lookup client
 │   ├── src/zerion/    # Zerion DeFi portfolio client (Basic auth)
 │   ├── src/spinwheel/ # Spinwheel debt client (Bearer + SMS OTP)
-│   └── tests/         # 179 Vitest tests
+│   └── tests/         # 186 Vitest tests
 ├── firmware/          # nRF52840 + Zephyr — scaffolded, not started
 ├── mobile/            # Expo React Native — legacy prototype, superseded by ios/
 ├── shared/            # Cross-package TS types — BLE schema, pet state
@@ -78,7 +78,7 @@ Bank / Crypto / DeFi / Debt APIs
 | Android | Kotlin scaffold (empty) | Full Jetpack Compose app |
 | Backend | Node + Fastify + Drizzle, Fly.io, Neon | Go + chi + sqlc, AWS ECS Fargate + Aurora |
 | Auth | Apple Sign In (JWT → session token) ✅ | WorkOS AuthKit |
-| Bank data | Plaid (Transactions) ✅ | + Investments + Liabilities + Income |
+| Bank data | Plaid (Transactions + Investments + Liabilities) ✅ | + Income |
 | Crypto data | Coinbase + CoinGecko ✅ | — |
 | DeFi | Zerion ✅ | — |
 | Debt | Spinwheel ✅ | — |
@@ -96,55 +96,82 @@ Bank / Crypto / DeFi / Debt APIs
 - ✅ pnpm workspaces + Turborepo monorepo
 - ✅ Branch-guard hook: `git commit` on main is blocked
 - ✅ `CLAUDE.md` with project conventions (auto-loaded each session)
-- ✅ GitHub Actions CI: iOS (xcodebuild + unit tests), Android (Gradle), backend (Vitest), CodeQL, Trivy, Gitleaks, Semgrep (PR #60)
-- ✅ CI hardening: SHA-pinned actions, SBOM, SCA, SwiftLint (PR #60)
+- ✅ GitHub Actions CI: iOS (xcodebuild + unit tests), Android (Gradle), backend (Vitest), CodeQL, Trivy, Gitleaks, Semgrep
+- ✅ CI hardening: SHA-pinned actions, SBOM, SCA, SwiftLint
 - ✅ Backend deployed on Fly.io (`coiny-backend.fly.dev`)
 - ✅ Postgres via Neon (prod + dev connection strings in Fly secrets)
 
 ### Backend (Node + Fastify + Drizzle, Fly.io)
 
-- ✅ Plaid webhooks with HMAC-SHA256 + JWT signature verification + replay protection (PR #2, enhanced in #60)
+- ✅ Plaid webhooks with HMAC-SHA256 + JWT signature verification + replay protection
 - ✅ Plaid `/transactions/sync` + paginated sync, idempotent via `processed_events` table
-- ✅ Rule engine: paycheck, overspend, savings milestone, bill paid, large purchase, subscription detection, decay
-- ✅ Persistent Postgres via Neon: `pet_state`, `reaction_history`, `plaid_items`, `transactions`, `category_overrides`, `device_tokens`
-- ✅ Multi-user schema: `users`, `sessions`, `coinbaseConnections`, `zerionWallets`, `spinwheelConnections` + per-user FK on all tables (PR #60, migrations 0005–0007)
+- ✅ Rule engine: paycheck, overspend, savings milestone, bill paid, large purchase, decay
+- ✅ Persistent Postgres via Neon: all tables with cascade deletes, AES-256-GCM encryption on sensitive fields
+- ✅ Multi-user schema: `users`, `sessions`, `coinbaseConnections`, `zerionWallets`, `spinwheelConnections`, `spinwheelPending`
 - ✅ Auth plugin: Apple Sign In → session token (SHA-256 hash stored, 30-day sliding TTL)
 - ✅ APNs push dispatch via background notifications + `registerDeviceToken`
-- ✅ REST API: `/api/auth/apple`, `/api/pets`, `/api/plaid/*`, `/api/devices/*`, `/api/spending`, `/api/account`, `/api/coinbase/*`, `/api/zerion/*`, `/api/spinwheel/*`, `/api/net-worth`, `/api/debug/*`
+- ✅ Full REST API across all integrations + debug endpoints (sandbox-only)
 - ✅ Rate limiting: per-user (SHA-256 of bearer token) with IP fallback
-- ✅ `GET /api/net-worth` aggregates bank (Plaid) + crypto (Coinbase + CoinGecko) + DeFi (Zerion) + debts (Spinwheel), per-source try/catch (PR #81)
-- ✅ 179 Vitest tests across 21 test files — all passing
+- ✅ `GET /api/net-worth` aggregates bank + crypto + DeFi + debts with per-source error isolation
+- ✅ **254 Vitest tests across 27 test files — all passing**
+
+### Integration Audit (completed 2026-05-23)
+
+All four external integrations were audited against their full API documentation and fixed:
+
+- ✅ **Plaid** — missing `Plaid-Version` header, cursor-before-persist bug, sequential balance fetching, credit accounts adding to net worth, PFC icon URL field, paycheck detection (PRs #A and #B)
+- ✅ **Spinwheel** — two-step OTP flow rewired (pending table for spinwheelUserId), base URL moved to config, secret key validation, OTP rate limiting (PR #91, merged)
+- ✅ **Zerion** — 429 retry with `RateLimit-Org-Second-Reset`, 202 polling for new wallets, spam filter (`filter[trash]=only_non_trash`), `filter[positions]=no_filter` for DeFi, opaque cursor handling, pagination (PR #92, merged)
+- ✅ **Coinbase** — JWT `nbf` claim, account schema (`uuid`/`available_balance`), switched transactions to v2 API (v3 endpoint doesn't exist — feature was completely broken), transaction pagination, 429 retry, coin map expanded from 12 → 45 coins (PR #93, merged)
 
 ### iOS App (Swift + SwiftUI)
 
-- ✅ XcodeGen project definition (`ios/project.yml`) with LinkKit SPM package
+- ✅ XcodeGen project definition with LinkKit SPM package
 - ✅ `CoinyApp` with three-state routing: SignInView → OnboardingView → RootView
-- ✅ `HTTPClient` / `SessionStore` / `Keychain` protocol injection — full testability
-- ✅ `API` actor with Bearer auth, auto-signout on 401, all 20+ endpoints (PR #81)
-- ✅ **Sign In with Apple** → backend JWT → Keychain session token
-- ✅ **OnboardingView**: Plaid Link flow (create token → open Link → exchange public token → `bankLinked = true`)
-- ✅ **PetView**: breathing animation, celebrate bounce, sad droop, WaitingForFirstReactionView with tip carousel, debug fire-transaction button
-- ✅ **SpendingView**: reaction history feed
-- ✅ **SettingsView**: bank status + unlink, goals display, sign-out, **Delete Account** (destructive alert → `DELETE /api/account` → coinySignedOut)
-- ✅ **CryptoView** tab container (Coinbase + Zerion sub-tabs)
-- ✅ **CoinbaseView**: connection status, connect with dev key, sync, disconnect
-- ✅ **ZerionView**: wallet list (add/remove), portfolio total, sync
-- ✅ **SpinwheelView**: SMS OTP flow (phone + DOB → OTP entry → connected), debt list, disconnect
-- ✅ **NetWorthView**: large net-worth number (green/red), bank / crypto / DeFi / debts sections, pull-to-refresh, not-connected prompts with tab hints (PR #81)
-- ✅ **RootView**: 6 tabs — Pet, Spending, Wealth, Crypto, Debt, Settings
-- ✅ 40+ iOS unit tests: APITests (15), CoinbaseViewModelTests (8), KeychainTests (3), NetWorthViewModelTests (3), PetStateDecodingTests, PetStoreTests (8), SessionStoreTests, SpinwheelViewModelTests (9), ViewSmokeTests (6), ZerionViewModelTests (7)
-- ✅ `AppLaunchSmokeTests` UI test (XCUITest) — verifies SignInView renders at cold launch
+- ✅ Full `API` actor with Bearer auth, auto-signout on 401, all endpoints
+- ✅ Sign In with Apple → backend JWT → Keychain session token
+- ✅ Debug: `Skip Sign In` button + `Fire test transaction` button (sandbox only)
+- ✅ OnboardingView: full Plaid Link flow
+- ✅ PetView: breathing animation, celebrate bounce, sad droop, 30s polling loop
+- ✅ SpendingView: reaction history feed
+- ✅ SettingsView: bank status, goals display, sign-out, delete account
+- ✅ CryptoView, CoinbaseView, ZerionView, SpinwheelView, NetWorthView
+- ✅ RootView: 5 tabs — Pet, Spending, Wealth, Crypto, More
+- ✅ 40+ iOS unit tests + AppLaunchSmokeTest (XCUITest)
+
+### Core Loop Validated (2026-05-23)
+
+Ran end-to-end on iOS Simulator (iPhone 17 Pro, iOS 26.5):
+
+- ✅ App launches, debug sign-in works
+- ✅ Plaid Link opens, First Platypus Bank linked
+- ✅ Webhook hits `/webhooks/plaid`, signature verified, 51 transactions ingested
+- ✅ `POST /api/debug/react` fires reaction, pet updates within 30s poll
+- ✅ Reaction history visible in Pet and Activity tabs
+- ✅ Transaction inspector, rule trace, cursor reset all implemented
+- ❌ Full Plaid path (new transaction → rule → reaction) not yet proven end-to-end — use `POST /api/debug/reset-cursor` then "Fire test transaction" to verify
 
 ---
 
-## In-Flight PRs
+## Open PRs
 
-| PR | Title | Status | Notes |
-|---|---|---|---|
-| **#81** | `feat(ios): Coinbase, Zerion, Spinwheel integrations + delete account` | Open, ready to merge | Contains net-worth dashboard + all auth restoration |
-| **#79** | `chore(deps): Bump undici 6→8.3.0` | Open | Security update, low risk |
+None — all merged as of 2026-05-24.
 
-**Merge #81 first** (net worth + auth layer), then #79.
+---
+
+## Known Bugs
+
+All validation bugs from 2026-05-23 have been fixed:
+
+- ✅ `overspent_in_category` now accumulates weekly spend (PR #97)
+- ✅ "Unlink bank" calls backend `DELETE /api/plaid/items/:itemId` (PR #95)
+- ✅ `recordReaction()` wrapped in DB transaction (PR #95)
+- ✅ DB indexes added on `reactionHistory.userId` and `plaidItems.userId` (PR #95)
+- ✅ Activity tab (formerly Spending) shows rule results (PR #98)
+- ✅ Full PFC taxonomy mapped + legacy category fallback (PR #94)
+- ✅ `bill_paid_on_time` rewired to PFC codes (PR #94)
+- ✅ Transaction inspector, rule trace, cursor reset added (PR #96)
+- ✅ Fire test transaction shows rule result (PR #98)
 
 ---
 
@@ -154,35 +181,33 @@ Bank / Crypto / DeFi / Debt APIs
 
 - ❌ Metal-rendered sprite animations at 120fps (currently SF Symbols placeholders)
 - ❌ Widgets (home screen, lock screen, StandBy)
-- ❌ Live Activities + Dynamic Island (paycheck celebration in notification banner)
+- ❌ Live Activities + Dynamic Island
 - ❌ Apple Watch companion app
 - ❌ Pet customization (species selection, commissioned art)
 - ❌ Sound packs
-- ❌ Cash flow forecast UI
-- ❌ SwiftData local persistence (all state is fetched live from backend)
+- ❌ SwiftData local persistence
 
 ### Backend
 
 - ❌ Go rewrite (target is `docs/implementation-plan.md` M2)
-- ❌ AWS infrastructure (target is M1 — ECS Fargate + Aurora + CloudFront + WAF)
-- ❌ Plaid Investments + Liabilities + Income (only Transactions active)
+- ❌ AWS infrastructure
 - ❌ Datadog observability
-- ❌ WorkOS authentication (currently Apple Sign In only)
-- ❌ Audit logging (`audit_log` table)
-- ❌ LaunchDarkly feature flags
+- ❌ WorkOS authentication
+- ❌ Audit logging
+- ❌ Plaid Income product
 
 ### Hardware & Firmware
 
 - ❌ Firmware project not initialized (`firmware/` is empty scaffold)
 - ❌ BLE scanning / pairing / relay
-- ❌ Hardware prototyping (M5StickS3 + DRV2605L ordered as of 2026-05-19)
-- ❌ Custom PCB (nRF54L15 + Sharp Memory LCD + LRA + APA102 + MAX77654)
+- ❌ Hardware prototyping (M5StickS3 + DRV2605L ordered, ETA 2026-05-24/26)
+- ❌ Custom PCB
 
 ### Business / Legal
 
 - ❌ Apple Developer Program ($99/yr) — needed before TestFlight
-- ❌ LLC formation — needed before Plaid production + Apple Developer Org account
-- ❌ Plaid production access — apply after sandbox validated end-to-end
+- ❌ LLC formation
+- ❌ Plaid production access
 - ❌ GLBA compliance review
 
 ---
@@ -192,66 +217,32 @@ Bank / Crypto / DeFi / Debt APIs
 ### Backend
 
 ```bash
-# Load secrets from macOS Keychain
 source bin/load-secrets.sh
-
-# Start backend (hot reload)
 pnpm --filter coiny-backend dev
-
-# Run tests
 pnpm --filter coiny-backend test
 ```
 
 ### iOS
 
 ```bash
-cd ios
-xcodegen generate          # regenerates .xcodeproj from project.yml
-open Coiny.xcodeproj       # then build + run in Xcode
-```
-
-Or from repo root:
-```bash
-xcodebuild -project ios/Coiny.xcodeproj -scheme Coiny -destination 'name=iPhone 17 Pro' build
-xcodebuild -project ios/Coiny.xcodeproj -scheme Coiny -destination 'name=iPhone 17 Pro' test
+cd ios && xcodegen generate
+open Coiny.xcodeproj
 ```
 
 ### Secrets (macOS Keychain)
 
-```bash
-security find-generic-password -a "$USER" -s "coiny-plaid-client-id" -w
-security find-generic-password -a "$USER" -s "coiny-plaid-sandbox-secret" -w
-```
-
-Keys stored: `coiny-plaid-client-id`, `coiny-plaid-sandbox-secret`. Loaded by `bin/load-secrets.sh` into env vars `PLAID_CLIENT_ID` and `PLAID_SECRET`.
+Keys: `coiny-plaid-client-id`, `coiny-plaid-sandbox-secret`. Loaded by `bin/load-secrets.sh`.
 
 ---
 
 ## Next Session Priorities
 
-### Immediate (merge + housekeeping)
+All bugs fixed. Goal is proving the full Plaid path then TestFlight prep:
 
-1. Merge PR #81 (net-worth + auth restoration)
-2. Merge PR #79 (undici security bump)
-
-### iOS (highest leverage for demo readiness)
-
-3. Replace SF Symbol face with an actual sprite / Lottie animation
-4. Wire net-worth endpoint to show real Plaid bank balances (test with sandbox accounts)
-5. Add Widgets (WidgetKit) — small widget with net worth + pet face
-6. Live Activities for paycheck events
-
-### Backend
-
-7. Add Plaid Investments product to sync loop → net-worth crypto positions sourced from Plaid instead of Coinbase-only
-8. Add `GET /api/spending/summary` — weekly totals by category for SpendingView charts
-9. Begin AWS infrastructure work (M1 in `docs/implementation-plan.md`)
-
-### Firmware (once hardware arrives)
-
-10. Init `firmware/` as a Zephyr workspace (nRF Connect SDK)
-11. BLE GATT service schema matching `docs/mqtt-topics.md` command format
-12. CoreBluetooth in the iOS app (CBCentralManager, scan/connect/write)
+1. **Prove full Plaid → rule → reaction end-to-end**: In simulator, link First Platypus Bank, then `POST /api/debug/reset-cursor`, then tap "Fire test transaction" — verify "Last reaction" updates with a real rule match (not debug)
+2. **Simulator backend URL**: `ios/Coiny/Services/API.swift` now uses `http://127.0.0.1:3000` in simulator builds, `https://coiny-backend.fly.dev` on device — keep this
+3. **Xcode MCP**: `xcrun mcpbridge` registered globally (`--scope user`) — available in all future sessions when Xcode is running
+4. **TestFlight prep**: Apple Developer Program ($99), then archive + upload
 
 ---
 
@@ -259,16 +250,13 @@ Keys stored: `coiny-plaid-client-id`, `coiny-plaid-sandbox-secret`. Loaded by `b
 
 Start a fresh Claude Code session in `/Users/antoinewiley/Tamogatchi` and say:
 
-> Read `docs/handoff.md`, `docs/tech-stack.md`, `docs/implementation-plan.md`, and `docs/product-brief.md`.
-> PR #81 (Coinbase/Zerion/Spinwheel iOS UI + net-worth dashboard) is ready to merge.
-> The backend has 179 passing tests; the iOS app has 40+ unit tests + a UI smoke test.
-> Next: [describe specific task].
+> Read `docs/handoff.md`. All integration bugs are fixed (PRs #91–#99 merged). Need to prove the full Plaid → rule → reaction path end-to-end in simulator using the cursor-reset debug endpoint, then prep for TestFlight. Backend runs locally on 127.0.0.1:3000 for simulator. Start the backend with `source bin/load-secrets.sh && pnpm --filter coiny-backend dev`.
 
-### Plaid sandbox credentials (for testing Link flow)
+### Plaid sandbox credentials
 
-- Institution: any sandbox bank
-- Username: `user_good`
-- Password: `pass_good`
+- Institution: First Platypus Bank (use this, not TrustedAuth — TrustedAuth opens OAuth browser which is slow)
+- Username: `user_good` / Password: `pass_good`
+- Debug sign-in: tap "Debug: Skip Sign In" on the sign-in screen
 
 ---
 
@@ -282,7 +270,7 @@ Start a fresh Claude Code session in `/Users/antoinewiley/Tamogatchi` and say:
 | uxcell 10mm coin vibration motor 3V (10-pack) | $8.99 | ✅ Ordered (ETA 2026-05-24) |
 | **Total** | **~$75** | |
 
-**Note:** this is the throwaway prototype. Production hardware targets Nordic nRF54L15 + Sharp Memory LCD + LRA + APA102 + MAX77654 + LiPo (see `docs/proposed-changes.md` H1–H10).
+**Note:** throwaway prototype. Production targets Nordic nRF54L15 + Sharp Memory LCD + LRA + APA102 + MAX77654 + LiPo.
 
 ---
 
@@ -292,4 +280,3 @@ Start a fresh Claude Code session in `/Users/antoinewiley/Tamogatchi` and say:
 - Production BOM at 1K units: ~$20
 - Retail target: $59–$79 hardware + $3.99/month
 - Per-user/month API cost: ~$0.30 (Plaid) to $4 (Plaid + all integrations)
-- Bank-data APIs dominate opex; subscription is structurally required
