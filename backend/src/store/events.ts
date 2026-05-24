@@ -26,3 +26,17 @@ export async function claimEvent(id: string): Promise<boolean> {
 
   return true;
 }
+
+// Sandbox-only. Deletes processedEvents rows whose IDs correspond to
+// transactions owned by this user, allowing replay through the rule engine.
+export async function clearUserEvents(userId: string): Promise<number> {
+  const result = await db().execute(sql`
+    DELETE FROM ${processedEvents}
+    WHERE id IN (
+      SELECT transaction_id FROM transactions WHERE user_id = ${userId}
+    )
+  `);
+  // drizzle execute returns postgres.js result; rowCount lives on the raw result
+  // biome-ignore lint/suspicious/noExplicitAny: driver-level result shape varies by adapter
+  return (result as any).rowCount ?? (result as any).count ?? 0;
+}

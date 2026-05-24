@@ -172,6 +172,15 @@ async function syncItem(
     }
 
     const match = evaluate(tx, goals);
+    app.log.info(
+      {
+        transaction_id: tx.id,
+        category: tx.details?.category ?? null,
+        amount: tx.amount,
+        rule_matched: match?.name ?? null,
+      },
+      'rule evaluation',
+    );
     if (match) {
       await applyHealthDelta(userId, deltaForEvent(match.name));
       await recordReaction(userId, match.name, match.reaction);

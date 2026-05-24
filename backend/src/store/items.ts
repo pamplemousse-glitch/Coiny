@@ -39,3 +39,7 @@ export async function markInitialSyncComplete(itemId: string): Promise<void> {
 export async function disableItem(itemId: string): Promise<void> {
   await db().update(plaidItems).set({ disabled: true }).where(eq(plaidItems.itemId, itemId));
 }
+
+export async function resetCursor(itemId: string): Promise<void> {
+  await db().update(plaidItems).set({ cursor: null }).where(eq(plaidItems.itemId, itemId));
+}
