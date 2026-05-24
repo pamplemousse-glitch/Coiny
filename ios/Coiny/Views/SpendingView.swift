@@ -6,7 +6,7 @@ struct SpendingView: View {
     var body: some View {
         NavigationStack {
             content
-                .navigationTitle("Spending")
+                .navigationTitle("Activity")
                 .refreshable {
                     await store.refresh()
                 }

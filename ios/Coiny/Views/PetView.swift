@@ -163,15 +163,47 @@ private struct PetLoadedView: View {
     }
 
     #if DEBUG
+    @Environment(PetStore.self) private var store
+    @State private var isFiring = false
+    @State private var fireStatus: String? = nil
+
     private var debugControls: some View {
-        Button {
-            Task { try? await API.shared.fireTestTransaction() }
-        } label: {
-            Label("Fire test transaction", systemImage: "bolt.fill")
-                .font(.caption)
-                .foregroundStyle(.orange)
+        VStack(spacing: 6) {
+            Button {
+                Task {
+                    isFiring = true
+                    fireStatus = nil
+                    try? await API.shared.fireTestTransaction()
+                    // Webhook is processed async server-side — wait before polling results.
+                    try? await Task.sleep(for: .seconds(2))
+                    if let result = try? await API.shared.debugTransactions(),
+                       let latest = result.transactions.first {
+                        if let rule = latest.ruleMatched {
+                            fireStatus = "Fired: \(rule.replacingOccurrences(of: "_", with: " "))"
+                        } else {
+                            fireStatus = "No rule matched (category: \(latest.category ?? "nil"))"
+                        }
+                    }
+                    await store.refresh()
+                    isFiring = false
+                }
+            } label: {
+                Label(isFiring ? "Firing…" : "Fire test transaction", systemImage: "bolt.fill")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+            .buttonStyle(.bordered)
+            .disabled(isFiring)
+
+            if isFiring {
+                ProgressView().scaleEffect(0.7)
+            } else if let status = fireStatus {
+                Text(status)
+                    .font(.caption2)
+                    .foregroundStyle(status.hasPrefix("Fired:") ? .green : .secondary)
+                    .multilineTextAlignment(.center)
+            }
         }
-        .buttonStyle(.bordered)
     }
     #endif
 }
