@@ -19,34 +19,63 @@ struct CoinyApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                if !isSignedIn {
-                    SignInView { name in
-                        pendingDisplayName = name
-                        isSignedIn = true
-                    }
-                } else if !onboardingComplete {
-                    OnboardingView(onboardingComplete: $onboardingComplete, appleDisplayName: pendingDisplayName)
-                } else {
-                    RootView()
-                        .environment(petStore)
-                        .task {
-                            await petStore.refresh()
-                            await requestPushPermission()
-                        }
-                        .onReceive(NotificationCenter.default.publisher(for: .coinyPushReceived)) { _ in
-                            Task { await petStore.refresh() }
-                        }
+            appRoot
+                .animation(.easeInOut, value: isSignedIn)
+                .animation(.easeInOut, value: onboardingComplete)
+                // Sign-out clears local state and returns to sign-in screen.
+                .onReceive(NotificationCenter.default.publisher(for: .coinySignedOut)) { _ in
+                    Task { await API.shared.signOut() }
+                    onboardingComplete = false
+                    isSignedIn = false
                 }
+        }
+    }
+
+    @ViewBuilder
+    private var appRoot: some View {
+        #if DEBUG
+        // XCUITest sets --ui-testing to skip sign-in/onboarding and land on
+        // RootView directly. injectDebugSession() is best-effort: if the local
+        // backend (127.0.0.1:3000) is unreachable, each tab shows its
+        // empty/error state, which is still a valid render — the test asserts
+        // structure, not data.
+        if ProcessInfo.processInfo.arguments.contains("--ui-testing") {
+            RootView()
+                .environment(petStore)
+                .task {
+                    try? await API.shared.injectDebugSession()
+                    await petStore.refresh()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .coinyPushReceived)) { _ in
+                    Task { await petStore.refresh() }
+                }
+        } else {
+            normalRoot
+        }
+        #else
+        normalRoot
+        #endif
+    }
+
+    @ViewBuilder
+    private var normalRoot: some View {
+        if !isSignedIn {
+            SignInView { name in
+                pendingDisplayName = name
+                isSignedIn = true
             }
-            .animation(.easeInOut, value: isSignedIn)
-            .animation(.easeInOut, value: onboardingComplete)
-            // Sign-out clears local state and returns to sign-in screen.
-            .onReceive(NotificationCenter.default.publisher(for: .coinySignedOut)) { _ in
-                Task { await API.shared.signOut() }
-                onboardingComplete = false
-                isSignedIn = false
-            }
+        } else if !onboardingComplete {
+            OnboardingView(onboardingComplete: $onboardingComplete, appleDisplayName: pendingDisplayName)
+        } else {
+            RootView()
+                .environment(petStore)
+                .task {
+                    await petStore.refresh()
+                    await requestPushPermission()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .coinyPushReceived)) { _ in
+                    Task { await petStore.refresh() }
+                }
         }
     }
 
