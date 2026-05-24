@@ -173,18 +173,20 @@ private struct PetLoadedView: View {
                 Task {
                     isFiring = true
                     fireStatus = nil
-                    try? await API.shared.fireTestTransaction()
-                    // Webhook is processed async server-side — wait before polling results.
-                    try? await Task.sleep(for: .seconds(2))
-                    if let result = try? await API.shared.debugTransactions(),
-                       let latest = result.transactions.first {
-                        if let rule = latest.ruleMatched {
-                            fireStatus = "Fired: \(rule.replacingOccurrences(of: "_", with: " "))"
-                        } else {
-                            fireStatus = "No rule matched (category: \(latest.category ?? "nil"))"
+                    do {
+                        try await API.shared.fireTestTransaction()
+                        // Webhook is processed async server-side — wait before polling results.
+                        try await Task.sleep(for: .seconds(2))
+                        if let result = try? await API.shared.debugTransactions(),
+                           let latest = result.transactions.first {
+                            if let rule = latest.ruleMatched {
+                                fireStatus = "Fired: \(rule.replacingOccurrences(of: "_", with: " "))"
+                            } else {
+                                fireStatus = "No rule matched (category: \(latest.category ?? "nil"))"
+                            }
                         }
-                    }
-                    await store.refresh()
+                        await store.refresh()
+                    } catch {}
                     isFiring = false
                 }
             } label: {
