@@ -42,6 +42,13 @@ struct CoinyApp: App {
         if ProcessInfo.processInfo.arguments.contains("--ui-testing") {
             RootView()
                 .environment(petStore)
+                .onAppear {
+                    // --bank-linked lets UITests assert the "Linked" bank state in
+                    // SettingsView without going through the Plaid flow.
+                    if ProcessInfo.processInfo.arguments.contains("--bank-linked") {
+                        UserDefaults.standard.set(true, forKey: "bankLinked")
+                    }
+                }
                 .task {
                     try? await API.shared.injectDebugSession()
                     await petStore.refresh()

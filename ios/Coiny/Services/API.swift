@@ -13,8 +13,22 @@ actor API {
         // starving Swift concurrency threads and crashing LLDB during UITests.
         #if DEBUG
         let isUITesting = ProcessInfo.processInfo.arguments.contains("--ui-testing")
+        let isMockNetwork = ProcessInfo.processInfo.arguments.contains("--mock-network")
         config.timeoutIntervalForRequest = isUITesting ? 3 : 30
         config.waitsForConnectivity = !isUITesting
+        if isMockNetwork {
+            // Load per-test stubs from the MOCK_STUBS environment variable.
+            // The UITest helper serialises a [String: MockURLProtocol.Stub] dict
+            // as JSON and passes it here so the app process can decode it.
+            if let stubsJSON = ProcessInfo.processInfo.environment["MOCK_STUBS"],
+               let data = stubsJSON.data(using: .utf8),
+               let stubs = try? JSONDecoder().decode(
+                   [String: MockURLProtocol.Stub].self, from: data
+               ) {
+                MockURLProtocol.stubs = stubs
+            }
+            config.protocolClasses = [MockURLProtocol.self]
+        }
         #else
         config.timeoutIntervalForRequest = 30
         config.waitsForConnectivity = true
