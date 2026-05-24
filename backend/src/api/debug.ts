@@ -87,7 +87,7 @@ export function registerDebugApi(app: FastifyInstance): void {
           type: 'card_payment',
           running_balance: null,
           details: {
-            category: row.category ?? undefined,
+            category: row.category,
             ...(row.merchantName ? { counterparty: { name: row.merchantName, type: 'organization' as const } } : {}),
           },
         };
