@@ -165,7 +165,7 @@ private struct PetLoadedView: View {
     #if DEBUG
     @Environment(PetStore.self) private var store
     @State private var isFiring = false
-    @State private var fireStatus: String? = nil
+    @State private var fireStatus: String?
 
     private var debugControls: some View {
         VStack(spacing: 6) {
