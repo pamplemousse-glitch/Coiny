@@ -12,6 +12,7 @@ import { clearUserEvents } from '../store/events.js';
 import { getItemsByUser, resetCursor } from '../store/items.js';
 import { getGoals, recordReaction } from '../store/pet.js';
 import { createSession } from '../store/sessions.js';
+import { getWeeklySpendByCategory } from '../store/transactions.js';
 import { findOrCreateUser } from '../store/users.js';
 import type { Transaction } from '../types/transaction.js';
 
@@ -73,7 +74,7 @@ export function registerDebugApi(app: FastifyInstance): void {
       .orderBy(desc(transactions.createdAt))
       .limit(50);
 
-    const goals = await getGoals(userId);
+    const [goals, weeklySpend] = await Promise.all([getGoals(userId), getWeeklySpendByCategory(userId)]);
 
     return {
       transactions: rows.map((row) => {
@@ -91,7 +92,7 @@ export function registerDebugApi(app: FastifyInstance): void {
             ...(row.merchantName ? { counterparty: { name: row.merchantName, type: 'organization' as const } } : {}),
           },
         };
-        const match = evaluate(fakeTx, goals);
+        const match = evaluate(fakeTx, goals, { weeklySpendByCategory: weeklySpend });
         return {
           id: row.transactionId,
           date: row.date,
