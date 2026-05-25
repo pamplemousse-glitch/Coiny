@@ -10,7 +10,6 @@ export PLAID_CLIENT_ID=$(security find-generic-password -a "$USER" -s "coiny-pla
 export PLAID_SECRET=$(security find-generic-password -a "$USER" -s "coiny-plaid-sandbox-secret" -w)
 export PLAID_ENV=sandbox
 export PLAID_WEBHOOK_URL="${PLAID_WEBHOOK_URL:-http://localhost:3000/webhooks/plaid}"
-export COINGECKO_API_KEY=$(security find-generic-password -a "$USER" -s "coiny-coingecko-api-key" -w)
 export COINBASE_API_KEY_ID=$(security find-generic-password -a "$USER" -s "coiny-coinbase-sandbox-api-key-id" -w)
 export COINBASE_API_KEY_SECRET=$(security find-generic-password -a "$USER" -s "coiny-coinbase-sandbox-api-key-secret" -w)
 export ZERION_API_KEY=$(security find-generic-password -a "$USER" -s "coiny-zerion-sandbox-api-key" -w)

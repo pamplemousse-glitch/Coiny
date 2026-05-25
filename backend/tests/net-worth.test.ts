@@ -13,9 +13,7 @@ vi.mock('../src/plaid/client.js', async (importOriginal) => {
 vi.mock('../src/coinbase/client.js', () => ({
   getAccounts: vi.fn(),
   getTransactions: vi.fn(),
-}));
-vi.mock('../src/coingecko/client.js', () => ({
-  getPrices: vi.fn(),
+  getSpotPrices: vi.fn(),
 }));
 vi.mock('../src/zerion/client.js', () => ({
   getPortfolio: vi.fn(),
@@ -29,8 +27,7 @@ vi.mock('../src/spinwheel/client.js', () => ({
   deleteUser: vi.fn(),
 }));
 
-import { getAccounts } from '../src/coinbase/client.js';
-import { getPrices } from '../src/coingecko/client.js';
+import { getAccounts, getSpotPrices } from '../src/coinbase/client.js';
 import { accountsBalanceGet, investmentsHoldingsGet, liabilitiesGet } from '../src/plaid/client.js';
 import { getDebtProfile } from '../src/spinwheel/client.js';
 import { getPortfolio } from '../src/zerion/client.js';
@@ -39,7 +36,7 @@ const mockedAccountsBalanceGet = vi.mocked(accountsBalanceGet);
 const mockedInvestmentsHoldingsGet = vi.mocked(investmentsHoldingsGet);
 const mockedLiabilitiesGet = vi.mocked(liabilitiesGet);
 const _mockedGetAccounts = vi.mocked(getAccounts);
-const _mockedGetPrices = vi.mocked(getPrices);
+const _mockedGetSpotPrices = vi.mocked(getSpotPrices);
 const _mockedGetPortfolio = vi.mocked(getPortfolio);
 const mockedGetDebtProfile = vi.mocked(getDebtProfile);
 

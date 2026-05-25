@@ -151,3 +151,31 @@ export async function getTransactions(
     ...(nextCursor ? { nextCursor } : {}),
   };
 }
+
+const SpotPriceResponseSchema = z.object({
+  data: z.object({ amount: z.string() }),
+});
+
+/**
+ * Returns USD spot prices for the given crypto symbols (e.g. ['BTC', 'ETH']).
+ * Uses the public v2 endpoint — no auth required. Symbols that fail are omitted.
+ * Always hits production (api.coinbase.com) regardless of COINBASE_BASE_URL.
+ */
+export async function getSpotPrices(symbols: string[]): Promise<Map<string, number>> {
+  const unique = [...new Set(symbols)];
+  const results = await Promise.allSettled(
+    unique.map(async (sym) => {
+      const res = await fetch(`https://api.coinbase.com/v2/prices/${encodeURIComponent(sym)}-USD/spot`);
+      if (!res.ok) throw new Error(`spot price ${sym} failed: ${res.status}`);
+      const raw: unknown = await res.json();
+      const parsed = SpotPriceResponseSchema.parse(raw);
+      return { sym, price: parseFloat(parsed.data.amount) };
+    }),
+  );
+
+  const map = new Map<string, number>();
+  for (const r of results) {
+    if (r.status === 'fulfilled') map.set(r.value.sym, r.value.price);
+  }
+  return map;
+}
