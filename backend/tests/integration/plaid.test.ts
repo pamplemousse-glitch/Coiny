@@ -8,13 +8,13 @@
  * Note: /sandbox/item/create is not available on our plan.
  * We use /sandbox/public_token/create + /item/public_token/exchange instead.
  */
-import { describe, it, expect, afterAll } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import {
-  sandboxPublicTokenCreate,
-  itemPublicTokenExchange,
   investmentsHoldingsGet,
-  liabilitiesGet,
+  itemPublicTokenExchange,
   itemRemove,
+  liabilitiesGet,
+  sandboxPublicTokenCreate,
 } from '../../src/plaid/client.js';
 
 const skip = !process.env.INTEGRATION_TEST || !process.env.PLAID_CLIENT_ID || !process.env.PLAID_SECRET;

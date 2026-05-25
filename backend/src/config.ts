@@ -30,9 +30,6 @@ const configSchema = z
     RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
     RATE_LIMIT_WINDOW: z.string().default('1 second'),
 
-    // CoinGecko price API (Pro tier). Empty = free tier (no header sent).
-    COINGECKO_API_KEY: z.string().default(''),
-
     // Coinbase Advanced Trade API (ECDSA key pair).
     COINBASE_API_KEY_ID: z.string().default(''),
     COINBASE_API_KEY_SECRET: z.string().default(''), // PEM-encoded EC private key

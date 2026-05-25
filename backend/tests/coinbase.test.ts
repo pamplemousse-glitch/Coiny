@@ -4,18 +4,14 @@ import { authHeader, resetDatabase, testUserId } from './db-helper.js';
 vi.mock('../src/coinbase/client.js', () => ({
   getAccounts: vi.fn(),
   getTransactions: vi.fn(),
+  getSpotPrices: vi.fn(),
 }));
 
-vi.mock('../src/coingecko/client.js', () => ({
-  getPrices: vi.fn(),
-}));
-
-import { getAccounts, getTransactions } from '../src/coinbase/client.js';
-import { getPrices } from '../src/coingecko/client.js';
+import { getAccounts, getSpotPrices, getTransactions } from '../src/coinbase/client.js';
 
 const mockedGetAccounts = vi.mocked(getAccounts);
 const mockedGetTransactions = vi.mocked(getTransactions);
-const mockedGetPrices = vi.mocked(getPrices);
+const mockedGetSpotPrices = vi.mocked(getSpotPrices);
 
 describe('GET /api/coinbase/status', () => {
   beforeEach(async () => {
@@ -152,7 +148,7 @@ describe('POST /api/coinbase/sync', () => {
         },
       ],
     });
-    mockedGetPrices.mockResolvedValue(new Map([['bitcoin', { usd: 50000, change24h: 2 }]]));
+    mockedGetSpotPrices.mockResolvedValue(new Map([['BTC', 50000]]));
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
@@ -183,7 +179,7 @@ describe('POST /api/coinbase/sync', () => {
         },
       ],
     });
-    mockedGetPrices.mockResolvedValue(new Map());
+    mockedGetSpotPrices.mockResolvedValue(new Map());
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
@@ -214,14 +210,15 @@ describe('POST /api/coinbase/sync', () => {
         },
       ],
     });
-    mockedGetPrices.mockResolvedValue(new Map([['solana', { usd: 200, change24h: 15 }]]));
+    mockedGetSpotPrices.mockResolvedValue(new Map([['SOL', 200]]));
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
     const res = await app.inject({ method: 'POST', url: '/api/coinbase/sync', headers: authHeader() });
     expect(res.statusCode).toBe(200);
-    expect(res.json<{ reacted: number }>().reacted).toBe(2);
+    // Price surge reactions removed (no 24h change data from spot API); only crypto_received fires.
+    expect(res.json<{ reacted: number }>().reacted).toBe(1);
 
     await app.close();
   });
@@ -245,7 +242,7 @@ describe('POST /api/coinbase/sync', () => {
         },
       ],
     });
-    mockedGetPrices.mockResolvedValue(new Map());
+    mockedGetSpotPrices.mockResolvedValue(new Map());
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
@@ -257,7 +254,7 @@ describe('POST /api/coinbase/sync', () => {
     await app.close();
   });
 
-  it('continues gracefully when getPrices throws', async () => {
+  it('continues gracefully when getSpotPrices throws', async () => {
     const { db } = await import('../src/db/client.js');
     const { coinbaseConnections } = await import('../src/db/schema.js');
     await db().insert(coinbaseConnections).values({ userId: testUserId, mode: 'dev_key' });
@@ -276,7 +273,7 @@ describe('POST /api/coinbase/sync', () => {
         },
       ],
     });
-    mockedGetPrices.mockRejectedValue(new Error('rate limit'));
+    mockedGetSpotPrices.mockRejectedValue(new Error('rate limit'));
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();

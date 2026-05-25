@@ -10,13 +10,10 @@
  * Test personas (sandbox): Christy Jenoval (DOB 1967-06-08), Aldo Cherry (DOB 1990-01-01)
  * Sandbox OTP: 000000
  */
-import { describe, it, expect } from 'vitest';
-import { sendSmsOtp, verifySmsOtp, getDebtProfile, getUser, deleteUser } from '../../src/spinwheel/client.js';
+import { describe, expect, it } from 'vitest';
+import { deleteUser, getDebtProfile, getUser, sendSmsOtp, verifySmsOtp } from '../../src/spinwheel/client.js';
 
-const skip =
-  !process.env.INTEGRATION_TEST ||
-  !process.env.SPINWHEEL_SECRET_KEY ||
-  !process.env.SPINWHEEL_TEST_PHONE;
+const skip = !process.env.INTEGRATION_TEST || !process.env.SPINWHEEL_SECRET_KEY || !process.env.SPINWHEEL_TEST_PHONE;
 
 // Unique extUserId per test run to avoid conflicts with stale sandbox state.
 const EXT_USER_ID = `integration-test-${Date.now()}`;

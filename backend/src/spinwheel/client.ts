@@ -163,7 +163,7 @@ export async function getCreditScore(
   spinwheelUserId: string,
 ): Promise<{ score: number | null; utilization: number | null }> {
   const user = await getUser(spinwheelUserId);
-  const rawScore = user['vantageScore3'] ?? user['creditScore'] ?? user['score'];
+  const rawScore = user.vantageScore3 ?? user.creditScore ?? user.score;
   const score = typeof rawScore === 'number' ? rawScore : null;
 
   let utilization: number | null = null;

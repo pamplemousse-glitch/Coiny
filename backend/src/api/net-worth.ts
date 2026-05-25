@@ -1,7 +1,6 @@
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
-import { getAccounts } from '../coinbase/client.js';
-import { getPrices } from '../coingecko/client.js';
+import { getAccounts, getSpotPrices } from '../coinbase/client.js';
 import { db } from '../db/client.js';
 import { coinbaseConnections, spinwheelConnections, zerionWallets } from '../db/schema.js';
 import { accountsBalanceGet, investmentsHoldingsGet, liabilitiesGet } from '../plaid/client.js';
@@ -9,22 +8,6 @@ import { getDebtProfile } from '../spinwheel/client.js';
 import { getItemsByUser } from '../store/items.js';
 import { getRecentOutflows } from '../store/transactions.js';
 import { getPortfolio } from '../zerion/client.js';
-
-// Incomplete — only the major coins for price enrichment.
-const SYMBOL_TO_COINGECKO_ID: Record<string, string> = {
-  BTC: 'bitcoin',
-  ETH: 'ethereum',
-  SOL: 'solana',
-  USDC: 'usd-coin',
-  USDT: 'tether',
-  MATIC: 'matic-network',
-  AVAX: 'avalanche-2',
-  DOGE: 'dogecoin',
-  LTC: 'litecoin',
-  DOT: 'polkadot',
-  ADA: 'cardano',
-  LINK: 'chainlink',
-};
 
 export function registerNetWorthApi(app: FastifyInstance): void {
   app.get('/api/net-worth', async (req, _reply) => {
@@ -136,19 +119,14 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       if (connection) {
         coinbaseConnected = true;
         const accounts = await getAccounts();
-        const symbols = accounts
-          .map((a) => a.currency)
-          .filter((s): s is string => typeof s === 'string' && s in SYMBOL_TO_COINGECKO_ID);
-        const coinIds = [...new Set(symbols.map((s) => SYMBOL_TO_COINGECKO_ID[s]!))];
-        const prices =
-          coinIds.length > 0 ? await getPrices(coinIds) : new Map<string, { usd: number; change24h: number }>();
+        const symbols = accounts.map((a) => a.currency).filter((s): s is string => typeof s === 'string');
+        const prices = symbols.length > 0 ? await getSpotPrices(symbols) : new Map<string, number>();
 
         for (const acct of accounts) {
           const amount = parseFloat(acct.available_balance.value);
           if (amount <= 0) continue;
-          const coinId = SYMBOL_TO_COINGECKO_ID[acct.currency];
-          const priceData = coinId ? prices.get(coinId) : undefined;
-          const valueUSD = priceData ? amount * priceData.usd : 0;
+          const usd = prices.get(acct.currency);
+          const valueUSD = usd ? amount * usd : 0;
           cryptoTotal += valueUSD;
           cryptoPositions.push({
             id: acct.uuid,

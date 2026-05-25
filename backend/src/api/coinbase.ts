@@ -1,7 +1,6 @@
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { getAccounts, getTransactions } from '../coinbase/client.js';
-import { getPrices } from '../coingecko/client.js';
+import { getAccounts, getSpotPrices, getTransactions } from '../coinbase/client.js';
 import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { coinbaseConnections } from '../db/schema.js';
@@ -9,57 +8,6 @@ import { dispatchReaction } from '../reactions/dispatch.js';
 import { evaluateExternalEvent } from '../reactions/external.js';
 import { claimEvent } from '../store/events.js';
 import { recordReaction } from '../store/pet.js';
-
-const SYMBOL_TO_COINGECKO_ID: Record<string, string> = {
-  BTC: 'bitcoin',
-  ETH: 'ethereum',
-  SOL: 'solana',
-  USDC: 'usd-coin',
-  USDT: 'tether',
-  MATIC: 'matic-network',
-  POL: 'matic-network',
-  AVAX: 'avalanche-2',
-  DOGE: 'dogecoin',
-  LTC: 'litecoin',
-  DOT: 'polkadot',
-  ADA: 'cardano',
-  LINK: 'chainlink',
-  XRP: 'ripple',
-  UNI: 'uniswap',
-  SHIB: 'shiba-inu',
-  TON: 'the-open-network',
-  TRX: 'tron',
-  XLM: 'stellar',
-  ATOM: 'cosmos',
-  NEAR: 'near',
-  APT: 'aptos',
-  ARB: 'arbitrum',
-  OP: 'optimism',
-  SUI: 'sui',
-  INJ: 'injective-protocol',
-  IMX: 'immutable-x',
-  FIL: 'filecoin',
-  ICP: 'internet-computer',
-  HBAR: 'hedera-hashgraph',
-  VET: 'vechain',
-  ALGO: 'algorand',
-  MANA: 'decentraland',
-  SAND: 'the-sandbox',
-  AXS: 'axie-infinity',
-  CRV: 'curve-dao-token',
-  AAVE: 'aave',
-  MKR: 'maker',
-  SNX: 'havven',
-  COMP: 'compound-governance-token',
-  GRT: 'the-graph',
-  LDO: 'lido-dao',
-  RPL: 'rocket-pool',
-  CBETH: 'coinbase-wrapped-staked-eth',
-  WBTC: 'wrapped-bitcoin',
-  DAI: 'dai',
-  TUSD: 'true-usd',
-  PYUSD: 'paypal-usd',
-};
 
 export function registerCoinbaseApi(app: FastifyInstance): void {
   // GET /api/coinbase/status
@@ -125,19 +73,13 @@ export function registerCoinbaseApi(app: FastifyInstance): void {
       } while (cursor && pagesLeft > 0);
     }
 
-    // Fetch price data for unique currencies.
+    // Fetch spot prices for unique currencies — non-fatal if it fails.
     const currencies = [...new Set(allTxs.map((t) => t.currency))];
-    const coinIds = currencies.flatMap((sym) => {
-      const id = SYMBOL_TO_COINGECKO_ID[sym];
-      return id ? [id] : [];
-    });
-
-    let prices = new Map<string, { usd: number; change24h: number }>();
+    let prices = new Map<string, number>();
     try {
-      prices = await getPrices(coinIds);
+      prices = await getSpotPrices(currencies);
     } catch (err) {
-      // Non-fatal — proceed without price enrichment.
-      req.log.warn({ err }, 'coingecko price fetch failed during coinbase sync');
+      req.log.warn({ err }, 'coinbase spot price fetch failed during sync');
     }
 
     let reacted = 0;
@@ -146,12 +88,10 @@ export function registerCoinbaseApi(app: FastifyInstance): void {
       const claimed = await claimEvent(eventId);
       if (!claimed) continue;
 
-      const coinId = SYMBOL_TO_COINGECKO_ID[currency];
-      const priceData = coinId ? prices.get(coinId) : undefined;
+      const usd = prices.get(currency);
       const amountNum = Math.abs(Number.parseFloat(tx.amount.amount));
-      const amountUsd = priceData ? amountNum * priceData.usd : undefined;
+      const amountUsd = usd ? amountNum * usd : undefined;
 
-      // Determine event type from transaction type and direction.
       let eventType: import('../reactions/external.js').ExternalEventType | null = null;
       const txType = tx.type.toLowerCase();
       const amount = Number.parseFloat(tx.amount.amount);
@@ -165,28 +105,6 @@ export function registerCoinbaseApi(app: FastifyInstance): void {
       }
 
       if (!eventType) continue;
-
-      // Also check price surge/drop if we have price data.
-      if (priceData && Math.abs(priceData.change24h) >= 10) {
-        const priceEventId = `coinbase:price:${currency}:${new Date().toISOString().slice(0, 10)}`;
-        const priceClaimed = await claimEvent(priceEventId);
-        if (priceClaimed) {
-          const priceEventType: import('../reactions/external.js').ExternalEventType =
-            priceData.change24h >= 10 ? 'crypto_price_surge' : 'crypto_price_drop';
-          const priceReaction = evaluateExternalEvent({
-            id: priceEventId,
-            userId,
-            type: priceEventType,
-            symbol: currency,
-            source: 'coinbase',
-          });
-          if (priceReaction) {
-            dispatchReaction(userId, priceReaction);
-            await recordReaction(userId, priceEventType, priceReaction);
-            reacted++;
-          }
-        }
-      }
 
       const reaction = evaluateExternalEvent({
         id: eventId,

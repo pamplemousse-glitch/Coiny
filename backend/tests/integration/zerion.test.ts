@@ -5,7 +5,7 @@
  *   source bin/load-secrets.sh
  *   INTEGRATION_TEST=1 pnpm --filter coiny-backend test backend/tests/integration/zerion.test.ts
  */
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { getPortfolio, getTransactions } from '../../src/zerion/client.js';
 
 const skip = !process.env.INTEGRATION_TEST || !process.env.ZERION_API_KEY;

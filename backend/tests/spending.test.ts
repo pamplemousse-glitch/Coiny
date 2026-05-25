@@ -39,9 +39,36 @@ describe('GET /api/spending/summary', () => {
     const dateStr = recent.toISOString().slice(0, 10);
 
     await persistTransactions(testUserId, [
-      { id: 'tx-income-1', account_id: 'acct-1', amount: '4000', date: dateStr, description: '', status: 'posted', type: 'credit', running_balance: null },
-      { id: 'tx-spend-1', account_id: 'acct-1', amount: '-1000', date: dateStr, description: '', status: 'posted', type: 'debit', running_balance: null },
-      { id: 'tx-spend-2', account_id: 'acct-1', amount: '-500', date: dateStr, description: '', status: 'posted', type: 'debit', running_balance: null },
+      {
+        id: 'tx-income-1',
+        account_id: 'acct-1',
+        amount: '4000',
+        date: dateStr,
+        description: '',
+        status: 'posted',
+        type: 'credit',
+        running_balance: null,
+      },
+      {
+        id: 'tx-spend-1',
+        account_id: 'acct-1',
+        amount: '-1000',
+        date: dateStr,
+        description: '',
+        status: 'posted',
+        type: 'debit',
+        running_balance: null,
+      },
+      {
+        id: 'tx-spend-2',
+        account_id: 'acct-1',
+        amount: '-500',
+        date: dateStr,
+        description: '',
+        status: 'posted',
+        type: 'debit',
+        running_balance: null,
+      },
     ]);
 
     const { buildApp } = await import('../src/server.js');
@@ -68,8 +95,26 @@ describe('GET /api/spending/summary', () => {
 
     // Small deposit ($30) should be excluded; only outflows count
     await persistTransactions(testUserId, [
-      { id: 'tx-small-1', account_id: 'acct-1', amount: '30', date: dateStr, description: '', status: 'posted', type: 'credit', running_balance: null },
-      { id: 'tx-spend-3', account_id: 'acct-1', amount: '-200', date: dateStr, description: '', status: 'posted', type: 'debit', running_balance: null },
+      {
+        id: 'tx-small-1',
+        account_id: 'acct-1',
+        amount: '30',
+        date: dateStr,
+        description: '',
+        status: 'posted',
+        type: 'credit',
+        running_balance: null,
+      },
+      {
+        id: 'tx-spend-3',
+        account_id: 'acct-1',
+        amount: '-200',
+        date: dateStr,
+        description: '',
+        status: 'posted',
+        type: 'debit',
+        running_balance: null,
+      },
     ]);
 
     const { buildApp } = await import('../src/server.js');
@@ -93,8 +138,26 @@ describe('GET /api/spending/summary', () => {
     const dateStr = recent.toISOString().slice(0, 10);
 
     await persistTransactions(testUserId, [
-      { id: 'tx-inc-2', account_id: 'acct-1', amount: '1000', date: dateStr, description: '', status: 'posted', type: 'credit', running_balance: null },
-      { id: 'tx-big-spend', account_id: 'acct-1', amount: '-3000', date: dateStr, description: '', status: 'posted', type: 'debit', running_balance: null },
+      {
+        id: 'tx-inc-2',
+        account_id: 'acct-1',
+        amount: '1000',
+        date: dateStr,
+        description: '',
+        status: 'posted',
+        type: 'credit',
+        running_balance: null,
+      },
+      {
+        id: 'tx-big-spend',
+        account_id: 'acct-1',
+        amount: '-3000',
+        date: dateStr,
+        description: '',
+        status: 'posted',
+        type: 'debit',
+        running_balance: null,
+      },
     ]);
 
     const { buildApp } = await import('../src/server.js');
