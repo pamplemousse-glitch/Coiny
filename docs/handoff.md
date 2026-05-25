@@ -1,6 +1,6 @@
 # Coiny — Project Handoff
 
-**Last updated: 2026-05-25 (session 6)**
+**Last updated: 2026-05-25 (session 7)**
 
 Read this first. Then read `docs/tech-stack.md` and `docs/implementation-plan.md`.
 
@@ -170,30 +170,30 @@ Bank / Crypto / DeFi / Debt APIs
 
 | PR | Branch | Status | Action |
 |---|---|---|---|
-| **#107** | `test/integration-vendors` | **Open** | CoinGecko removal + Coinbase spot price API + JWT fix. 259 tests pass. Merge when ready. |
+| **#108** | `fix/vendor-client-bugs` | **Open** | 3 vendor client bug fixes (see Known Integration Bugs below). 259 tests pass. Merge when ready. |
 
-PRs #81, #91–#99, #101, #103, #104, #105 merged. PR #102 closed (superseded by #103).
+PRs #81, #91–#99, #101, #103, #104, #105, #107 merged. PR #102 closed (superseded by #103).
 
 ---
 
-## Known Integration Bugs (NOT YET FIXED — fix before production)
+## Known Integration Bugs
 
-Found via audit against official docs in `docs/context/`. Priority order:
+### ✅ All three confirmed bugs fixed in PR #108 (`fix/vendor-client-bugs`) — merge when ready
 
-### 1. Spinwheel — `getCreditScore` always returns null ⛔
-**File:** `backend/src/spinwheel/client.ts`
-**Bug:** Reads `vantageScore3 / creditScore / score` from the user profile GET endpoint. Docs confirm credit scores live inside `debtProfile.creditReports`, not the user object. Will return `null` every time.
-**Fix:** Call `getDebtProfile` with `creditScoreModel: 'VANTAGE_SCORE_3_0'` in the body, then read the score from `creditReports[0]`.
+### 1. Spinwheel — `getCreditScore` always returns null ✅ FIXED in PR #108
+**Was:** Reading `vantageScore3/creditScore/score` from `GET /v1/users/{id}` — that field doesn't exist on the user profile.
+**Fix:** `fetchRawDebtProfile` helper passes required body params (`creditReportType: '1_BUREAU.FULL'`, `sourceBureau: 'Equifax'`, `creditScoreModel: 'VANTAGE_SCORE_3_0'`). `getCreditScore` reads from `creditReports[0].profile.creditScore` and makes one API call instead of two.
 
-### 2. Spinwheel — `getDebtProfile` sends empty body ⛔
-**File:** `backend/src/spinwheel/client.ts`
-**Bug:** Sends `{}` as request body. Docs require `creditReportType` (`1_BUREAU.FULL`), `sourceBureau`, and `creditScoreModel`. API may return incomplete or errored data without these.
-**Fix:** Pass the required fields in the body.
+### 2. Spinwheel — `getDebtProfile` sends empty body ✅ FIXED in PR #108
+**Was:** Sending `{}` body — Spinwheel returns incomplete/errored data without the required params.
+**Fix:** Body now always includes the three required fields (same shared helper as above).
 
-### 3. Zerion — `transfers[].value` field name unconfirmed ⚠️
-**File:** `backend/src/zerion/client.ts`
-**Bug:** Parses `transfers[].value` for USD amount. Docs list `quantity` as the field name — `value` may be wrong and silently return `$0` for every transaction.
-**Fix:** Use Zerion live MCP (`zerion` MCP server in Claude Code) to query a real wallet transaction and confirm the exact field name before coding.
+### 3. Coinbase — `getTransactions` pagination cursor never advanced ✅ FIXED in PR #108
+**Was:** Reading `pagination.starting_after` as the next cursor — this reflects the cursor sent in the *current* request (null on page 1). Sync was silently capped at 25 transactions per account.
+**Fix:** Now reads `pagination.next_uri` and extracts `starting_after` from it.
+
+### 4. Zerion — `transfers[].value` ✅ confirmed correct
+Docs (`docs/context/zerion.md`) explicitly state `transfers[].value` is the USD value field. Nullable — `?? 0` fallback is correct. Not a bug.
 
 ---
 
