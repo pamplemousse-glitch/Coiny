@@ -81,7 +81,7 @@ Bank / Crypto / DeFi / Debt APIs
 | Bank data | Plaid — Transactions + Investments + Liabilities ✅ | — |
 | Crypto data | Coinbase Advanced Trade + CoinGecko ✅ | — |
 | DeFi | Zerion ✅ | — |
-| Debt | Spinwheel (balances only; credit score not yet wired) ✅ | + credit score |
+| Debt | Spinwheel (balances + credit score + utilization) ✅ | — |
 | Firmware | nRF52840 scaffold | Nordic nRF54L15 + Zephyr RTOS |
 | Observability | pino logs | Datadog full suite |
 | Secrets | macOS Keychain → Fly secrets | AWS Secrets Manager + KMS |
@@ -141,9 +141,10 @@ Bank / Crypto / DeFi / Debt APIs
 
 | PR | Branch | Status | Action |
 |---|---|---|---|
-| **#103** | `feat/ui-reform` | **Open — ready to merge** | Workstream A: 3-tab UI reform. Build compiles clean. Awaiting final test run + review. |
+| **#104** | `feat/financial-metrics` | **Open** | Workstream C: credit score, utilization, savings rate, emergency fund. 268 backend + 77 iOS unit tests. |
+| **#105** | `test/integration-vendors` | **Open** | Workstream D: vendor integration tests. D1+D4+D5 pass (9 tests). D2 needs test phone, D3 needs key re-entry. |
 
-PRs #81, #91–#99, #101 merged. PR #102 closed (superseded by #103).
+PRs #81, #91–#99, #101, #103 merged. PR #102 closed (superseded by #103).
 
 ---
 
@@ -191,12 +192,15 @@ PRs #81, #91–#99, #101 merged. PR #102 closed (superseded by #103).
 - ❌ Audit logging (`audit_log` table)
 - ❌ LaunchDarkly feature flags
 
-### Integrations (tested with mocks only — real sandbox/live tests pending Workstream D)
+### Integrations (Workstream D — PR #105, branch `test/integration-vendors`)
 
-- ❌ Spinwheel sandbox Vitest tests (test users and sandbox URL documented below)
-- ❌ Plaid Investments + Liabilities sandbox Vitest tests
-- ❌ Zerion live API Vitest test (against known public wallet)
-- ❌ CoinGecko Vitest test (against live free API)
+- ✅ Plaid sandbox — `sandboxPublicTokenCreate` + `investmentsHoldingsGet` + `liabilitiesGet` (3/3 pass)
+- ✅ Zerion — `getPortfolio` + `getTransactions` against Vitalik's wallet (2/2 pass)
+- ✅ CoinGecko — `getPrices` + `getCoinImageUrl` (4/4 pass; Demo key fix: `x-cg-demo-api-key` on `api.coingecko.com`)
+- ⚠️ Coinbase — test written; **keychain key truncated**. Re-enter: `security add-generic-password -a "$USER" -s "coiny-coinbase-sandbox-api-key-secret" -w`
+- ⚠️ Spinwheel — test written (full OTP flow); **needs `SPINWHEEL_TEST_PHONE`** from developer.spinwheel.io/docs/test-users. Run: `INTEGRATION_TEST=1 SPINWHEEL_TEST_PHONE="+1XXXXXXXXXX" pnpm --filter coiny-backend test tests/integration/spinwheel.test.ts`
+
+Run all: `source bin/load-secrets.sh && INTEGRATION_TEST=1 pnpm --filter coiny-backend test tests/integration/`
 
 ### Hardware & Firmware
 
