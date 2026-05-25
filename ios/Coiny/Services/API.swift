@@ -226,8 +226,18 @@ actor API {
         try await get("/api/spinwheel/debts")
     }
 
+    func getSpinwheelCreditScore() async throws -> SpinwheelCreditScoreResponse {
+        try await get("/api/spinwheel/credit-score")
+    }
+
     func disconnectSpinwheel() async throws {
         try await deleteVoid("/api/spinwheel/connect")
+    }
+
+    // MARK: - Spending
+
+    func getSpendingSummary() async throws -> SpendingSummaryResponse {
+        try await get("/api/spending/summary")
     }
 
     // MARK: - Net Worth
@@ -424,17 +434,32 @@ struct SpinwheelDebt: Decodable, Identifiable {
     let debtType: String?
     let balance: Double?
     let monthlyPayment: Double?
+    let creditLimit: Double?
 
     enum CodingKeys: String, CodingKey {
         case id
         case debtType = "type"
         case balance
         case monthlyPayment
+        case creditLimit
     }
 }
 
 struct SpinwheelDebtsResponse: Decodable {
     let debts: [SpinwheelDebt]
+}
+
+struct SpinwheelCreditScoreResponse: Decodable {
+    let score: Int?
+    let utilization: Double?
+}
+
+// MARK: - Spending DTOs
+
+struct SpendingSummaryResponse: Decodable {
+    let monthlySpend: Double
+    let monthlyIncome: Double
+    let savingsRate: Int?
 }
 
 // MARK: - Net Worth DTOs
@@ -446,6 +471,7 @@ struct NetWorthResponse: Decodable {
     let crypto: Double
     let defi: Double
     let debts: Double
+    let liquidCashMonths: Double?
     let accounts: NetWorthAccounts
     let connections: NetWorthConnections
 }

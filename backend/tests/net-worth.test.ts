@@ -25,6 +25,8 @@ vi.mock('../src/spinwheel/client.js', () => ({
   sendSmsOtp: vi.fn(),
   verifySmsOtp: vi.fn(),
   getDebtProfile: vi.fn(),
+  getCreditScore: vi.fn(),
+  deleteUser: vi.fn(),
 }));
 
 import { getAccounts } from '../src/coinbase/client.js';
@@ -274,6 +276,58 @@ describe('GET /api/net-worth', () => {
     const visa = body.accounts.bank.find((a) => a.accountId === 'acct-visa');
     expect(visa?.minPayment).toBe(50);
     expect(visa?.nextDueDate).toBe('2026-06-15');
+
+    await app.close();
+  });
+
+  it('returns liquidCashMonths as null when no transactions exist', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json<{ liquidCashMonths: number | null }>();
+    expect(body.liquidCashMonths).toBeNull();
+
+    await app.close();
+  });
+
+  it('computes liquidCashMonths from depository balance and 90-day outflows', async () => {
+    const { upsertItem } = await import('../src/store/items.js');
+    const { persistTransactions } = await import('../src/store/transactions.js');
+    await upsertItem({ itemId: 'item-lc-1', accessToken: 'access-lc-1', userId: testUserId });
+
+    mockedAccountsBalanceGet.mockResolvedValue({
+      accounts: [
+        {
+          account_id: 'acct-checking',
+          name: 'Checking',
+          type: 'depository',
+          subtype: 'checking',
+          official_name: null,
+          balances: { current: 6000, available: 6000, iso_currency_code: 'USD', limit: null },
+        },
+      ],
+      request_id: 'r',
+    });
+
+    // 3 months of $6000 total outflows over 90 days → avgMonthlyBurn = $2000 → 6000/2000 = 3 months
+    const txDate = new Date();
+    txDate.setDate(txDate.getDate() - 30);
+    const dateStr = txDate.toISOString().slice(0, 10);
+    await persistTransactions(testUserId, [
+      { id: 'tx-1', account_id: 'acct-checking', amount: '-6000', date: dateStr, description: '', status: 'posted', type: 'debit', running_balance: null },
+    ]);
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json<{ liquidCashMonths: number | null }>();
+    expect(body.liquidCashMonths).toBe(3);
 
     await app.close();
   });

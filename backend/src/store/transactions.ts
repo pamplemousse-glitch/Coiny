@@ -49,6 +49,42 @@ export async function getWeeklySpendByCategory(userId: string): Promise<Record<s
   return result;
 }
 
+export interface SpendingSummary {
+  monthlySpend: number;
+  monthlyIncome: number;
+  savingsRate: number | null;
+}
+
+// 30-day income vs spend from the transactions table.
+// Inflows < $50 are excluded as petty transfers; outflows are all negative amounts.
+// savingsRate is null when there is no recorded income.
+export async function getSpendingSummary(userId: string): Promise<SpendingSummary> {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 30);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+  const rows = await db()
+    .select({ amount: sql<string>`CAST(${transactions.amount} AS TEXT)` })
+    .from(transactions)
+    .where(and(eq(transactions.userId, userId), sql`${transactions.date} >= ${cutoffStr}`));
+
+  let monthlySpend = 0;
+  let monthlyIncome = 0;
+  for (const row of rows) {
+    const amount = parseFloat(row.amount ?? '0');
+    if (amount < 0) {
+      monthlySpend += Math.abs(amount);
+    } else if (amount >= 50) {
+      monthlyIncome += amount;
+    }
+  }
+
+  const savingsRate =
+    monthlyIncome > 0 ? Math.max(0, Math.min(100, Math.round((1 - monthlySpend / monthlyIncome) * 100))) : null;
+
+  return { monthlySpend, monthlyIncome, savingsRate };
+}
+
 export async function getRecentOutflows(userId: string, days: number): Promise<StoredTransaction[]> {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);

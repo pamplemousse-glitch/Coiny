@@ -74,6 +74,18 @@ struct NetWorthView: View {
         GroupBox {
             VStack(spacing: 0) {
                 sectionHeader(title: "Bank", total: data.bank, icon: "building.columns.fill", color: .blue)
+                if let months = data.liquidCashMonths {
+                    Divider().padding(.vertical, 6)
+                    HStack {
+                        Label("Emergency runway", systemImage: "shield.fill")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text("\(months, specifier: "%.1f") mo")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(months >= 3 ? .green : months >= 1 ? .orange : .red)
+                    }
+                }
                 if data.accounts.bank.isEmpty {
                     Text("No bank accounts linked")
                         .font(.caption)
@@ -136,6 +148,36 @@ struct NetWorthView: View {
         GroupBox {
             VStack(spacing: 0) {
                 sectionHeader(title: "Debts", total: data.debts, icon: "creditcard.fill", color: .red)
+                if spinwheelVM.isConnected {
+                    if let score = spinwheelVM.creditScore {
+                        Divider().padding(.vertical, 6)
+                        HStack {
+                            Label("Credit score", systemImage: "chart.bar.fill")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text("\(score)")
+                                .font(.caption.monospacedDigit().weight(.semibold))
+                                .foregroundStyle(score >= 740 ? .green : score >= 670 ? .orange : .red)
+                        }
+                    }
+                    if let utilization = spinwheelVM.creditUtilization {
+                        Divider().padding(.vertical, 6)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Label("Credit utilization", systemImage: "percent")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text("\(utilization, specifier: "%.1f")%")
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(utilization <= 30 ? .green : utilization <= 50 ? .orange : .red)
+                            }
+                            ProgressView(value: min(utilization / 100, 1))
+                                .tint(utilization <= 30 ? .green : utilization <= 50 ? .orange : .red)
+                        }
+                    }
+                }
                 Divider().padding(.vertical, 6)
                 SpinwheelInlineView(vm: spinwheelVM)
             }
