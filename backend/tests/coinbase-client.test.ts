@@ -161,7 +161,7 @@ describe('coinbase getTransactions — with valid keys', () => {
   });
 
   it('appends cursor as starting_after query param', async () => {
-    vi.mocked(fetch).mockResolvedValue(makeFetch({ data: [], pagination: { starting_after: null } }));
+    vi.mocked(fetch).mockResolvedValue(makeFetch({ data: [], pagination: { next_uri: null } }));
 
     const { getTransactions } = await import('../src/coinbase/client.js');
     await getTransactions('acct-1', 'cursor-abc');
@@ -170,7 +170,7 @@ describe('coinbase getTransactions — with valid keys', () => {
     expect(url).toContain('starting_after=cursor-abc');
   });
 
-  it('returns transactions and nextCursor from paginated response', async () => {
+  it('returns transactions and nextCursor extracted from next_uri', async () => {
     vi.mocked(fetch).mockResolvedValue(
       makeFetch({
         data: [
@@ -182,7 +182,9 @@ describe('coinbase getTransactions — with valid keys', () => {
             created_at: '2026-01-01T00:00:00Z',
           },
         ],
-        pagination: { starting_after: 'next-cursor' },
+        pagination: {
+          next_uri: '/v2/accounts/acct-1/transactions?starting_after=next-cursor',
+        },
       }),
     );
 
@@ -192,8 +194,8 @@ describe('coinbase getTransactions — with valid keys', () => {
     expect(result.nextCursor).toBe('next-cursor');
   });
 
-  it('omits nextCursor when starting_after is null', async () => {
-    vi.mocked(fetch).mockResolvedValue(makeFetch({ data: [], pagination: { starting_after: null } }));
+  it('omits nextCursor when next_uri is null', async () => {
+    vi.mocked(fetch).mockResolvedValue(makeFetch({ data: [], pagination: { next_uri: null } }));
 
     const { getTransactions } = await import('../src/coinbase/client.js');
     const result = await getTransactions('acct-1');

@@ -94,12 +94,14 @@ const CoinbaseTransactionSchema = z.object({
   created_at: z.string(),
 });
 
-// v2 API: response uses `data` array; pagination cursor is `starting_after`
+// v2 API: response uses `data` array; next_uri contains starting_after cursor for the next page.
+// `pagination.starting_after` reflects the cursor that was sent in the request (null on first page),
+// not the next cursor — use `next_uri` instead.
 const CoinbaseTransactionsResponseSchema = z.object({
   data: z.array(CoinbaseTransactionSchema),
   pagination: z
     .object({
-      starting_after: z.string().nullable().optional(),
+      next_uri: z.string().nullable().optional(),
     })
     .optional(),
 });
@@ -145,7 +147,19 @@ export async function getTransactions(
   const result = await coinbaseGet(path, CoinbaseTransactionsResponseSchema);
   if (!result) return { transactions: [] };
 
-  const nextCursor = result.pagination?.starting_after ?? null;
+  // Extract starting_after from next_uri (e.g. "/v2/accounts/.../transactions?starting_after=abc")
+  let nextCursor: string | undefined;
+  const nextUri = result.pagination?.next_uri;
+  if (nextUri) {
+    try {
+      const url = new URL(nextUri, 'https://api.coinbase.com');
+      const sa = url.searchParams.get('starting_after');
+      if (sa) nextCursor = sa;
+    } catch {
+      // nextCursor stays undefined
+    }
+  }
+
   return {
     transactions: result.data,
     ...(nextCursor ? { nextCursor } : {}),
