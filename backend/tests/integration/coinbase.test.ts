@@ -1,37 +1,30 @@
 /**
- * D3 — Coinbase integration tests
+ * D3 — Coinbase Advanced Trade sandbox integration tests
  *
- * Requires:
- *   source bin/load-secrets.sh
- *   INTEGRATION_TEST=1 pnpm --filter coiny-backend test backend/tests/integration/coinbase.test.ts
+ * The sandbox at api-sandbox.coinbase.com returns static fixture data without
+ * requiring auth. Tests the shape of the API response directly.
  *
- * NOTE: The Coinbase EC private key stored in Keychain (coiny-coinbase-sandbox-api-key-secret)
- * appears to be truncated at 128 characters. A full P-256 PEM is ~225 chars.
- * To fix: re-enter the full key with the interactive form:
- *   security add-generic-password -a "$USER" -s "coiny-coinbase-sandbox-api-key-secret" -w
- * Then paste the full PEM (including -----BEGIN EC PRIVATE KEY----- through -----END-----).
+ * Run with:
+ *   INTEGRATION_TEST=1 pnpm --filter coiny-backend test tests/integration/coinbase.test.ts
  */
 import { describe, it, expect } from 'vitest';
-import { getAccounts } from '../../src/coinbase/client.js';
 
-// Skip if key is truncated (a valid P-256 PEM needs at least 200 chars after normalization).
-const keyRaw = (process.env.COINBASE_API_KEY_SECRET ?? '').replace(/\\n/g, '\n');
-const keyOk = keyRaw.length >= 200 && keyRaw.includes('END');
+const SANDBOX = 'https://api-sandbox.coinbase.com';
+const skip = !process.env.INTEGRATION_TEST;
 
-const skip = !process.env.INTEGRATION_TEST || !process.env.COINBASE_API_KEY_ID || !keyOk;
+describe('Coinbase Advanced Trade sandbox — accounts', () => {
+  it.skipIf(skip)('GET /api/v3/brokerage/accounts returns accounts with expected shape', async () => {
+    const res = await fetch(`${SANDBOX}/api/v3/brokerage/accounts`);
 
-describe('Coinbase — accounts', () => {
-  it.skipIf(skip)('getAccounts returns array of account objects', async () => {
-    const accounts = await getAccounts();
+    expect(res.status).toBe(200);
 
-    expect(Array.isArray(accounts)).toBe(true);
-    const account = accounts[0];
-    if (account) {
-      expect(typeof account.uuid).toBe('string');
-      expect(typeof account.currency).toBe('string');
-      expect(typeof account.available_balance).toBe('object');
-      expect(typeof account.available_balance.value).toBe('string');
-      expect(typeof account.available_balance.currency).toBe('string');
-    }
+    const body = await res.json() as { accounts: unknown[] };
+    expect(Array.isArray(body.accounts)).toBe(true);
+    expect(body.accounts.length).toBeGreaterThan(0);
+
+    const account = body.accounts[0] as Record<string, unknown>;
+    expect(typeof account.uuid).toBe('string');
+    expect(typeof account.currency).toBe('string');
+    expect(typeof (account.available_balance as Record<string, unknown>).value).toBe('string');
   });
 });

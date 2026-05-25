@@ -3,7 +3,7 @@ import { importJWK, SignJWT } from 'jose';
 import { z } from 'zod';
 import { config } from '../config.js';
 
-const BASE_URL = 'https://api.coinbase.com';
+const BASE_URL = () => config.COINBASE_BASE_URL;
 
 export class CoinbaseAuthError extends Error {
   constructor() {
@@ -36,7 +36,7 @@ async function makeJwt(method: string, path: string): Promise<string> {
 
 async function coinbaseFetch(path: string, attempt = 0): Promise<Response> {
   const jwt = await makeJwt('GET', path);
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${BASE_URL()}${path}`, {
     headers: {
       Authorization: `Bearer ${jwt}`,
       'Content-Type': 'application/json',
