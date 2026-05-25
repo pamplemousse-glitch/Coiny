@@ -6,6 +6,7 @@ protocol SpinwheelViewModelAPI: Sendable {
     func sendSpinwheelOtp(phone: String, dateOfBirth: String) async throws -> EmptyResponse
     func verifySpinwheelOtp(phone: String, code: String) async throws -> EmptyResponse
     func getSpinwheelDebts() async throws -> SpinwheelDebtsResponse
+    func getSpinwheelCreditScore() async throws -> SpinwheelCreditScoreResponse
     func disconnectSpinwheel() async throws
 }
 
@@ -18,6 +19,8 @@ final class SpinwheelViewModel {
     private(set) var isLoading = false
     private(set) var showOtpEntry = false
     private(set) var debts: [SpinwheelDebt] = []
+    private(set) var creditScore: Int?
+    private(set) var creditUtilization: Double?
     private(set) var errorMessage: String?
 
     private(set) var pendingPhone = ""
@@ -35,7 +38,12 @@ final class SpinwheelViewModel {
             let s = try await api.getSpinwheelStatus()
             isConnected = s.connected
             if isConnected {
-                debts = (try? await api.getSpinwheelDebts())?.debts ?? []
+                async let debtsResult = api.getSpinwheelDebts()
+                async let scoreResult = api.getSpinwheelCreditScore()
+                let (dr, sr) = (try? await debtsResult, try? await scoreResult)
+                debts = dr?.debts ?? []
+                creditScore = sr?.score
+                creditUtilization = sr?.utilization
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -71,6 +79,8 @@ final class SpinwheelViewModel {
             try await api.disconnectSpinwheel()
             isConnected = false
             debts = []
+            creditScore = nil
+            creditUtilization = nil
         } catch {
             errorMessage = error.localizedDescription
         }

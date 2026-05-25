@@ -7,6 +7,7 @@ import { coinbaseConnections, spinwheelConnections, zerionWallets } from '../db/
 import { accountsBalanceGet, investmentsHoldingsGet, liabilitiesGet } from '../plaid/client.js';
 import { getDebtProfile } from '../spinwheel/client.js';
 import { getItemsByUser } from '../store/items.js';
+import { getRecentOutflows } from '../store/transactions.js';
 import { getPortfolio } from '../zerion/client.js';
 
 // Incomplete — only the major coins for price enrichment.
@@ -31,6 +32,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
 
     // --- Bank, Investments, Liabilities (Plaid) ---
     let bankTotal = 0;
+    let liquidDeposits = 0;
     let investmentsTotal = 0;
     const bankAccounts: Array<{
       accountId: string;
@@ -89,6 +91,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
           const balance = acct.balances.current ?? acct.balances.available ?? 0;
           if (acct.type === 'depository') {
             bankTotal += balance;
+            liquidDeposits += Math.max(0, balance);
           } else if (acct.type === 'credit' || acct.type === 'loan') {
             bankTotal -= balance;
           }
@@ -208,6 +211,19 @@ export function registerNetWorthApi(app: FastifyInstance): void {
 
     const total = bankTotal + investmentsTotal + cryptoTotal + defiTotal - debtsTotal;
 
+    // --- Emergency fund coverage (C4) ---
+    let liquidCashMonths: number | null = null;
+    try {
+      const outflows90 = await getRecentOutflows(userId, 90);
+      const totalOutflows90 = outflows90.reduce((sum, tx) => sum + Math.abs(parseFloat(tx.amount)), 0);
+      const avgMonthlyBurn = totalOutflows90 / 3;
+      if (avgMonthlyBurn > 0 && liquidDeposits > 0) {
+        liquidCashMonths = Math.round((liquidDeposits / avgMonthlyBurn) * 10) / 10;
+      }
+    } catch {
+      // no transactions yet
+    }
+
     return {
       total,
       bank: bankTotal,
@@ -215,6 +231,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       crypto: cryptoTotal,
       defi: defiTotal,
       debts: -debtsTotal,
+      liquidCashMonths,
       accounts: {
         bank: bankAccounts,
         investments: investmentHoldings,

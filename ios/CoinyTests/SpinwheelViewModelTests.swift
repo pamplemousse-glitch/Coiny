@@ -11,6 +11,7 @@ final class SpinwheelViewModelTests: XCTestCase {
         private var otpResult: Result<EmptyResponse, Error> = .success(EmptyResponse())
         private var verifyResult: Result<EmptyResponse, Error> = .success(EmptyResponse())
         private var debtsResult: Result<SpinwheelDebtsResponse, Error> = .success(SpinwheelDebtsResponse(debts: []))
+        private var creditScoreResult: Result<SpinwheelCreditScoreResponse, Error> = .success(SpinwheelCreditScoreResponse(score: nil, utilization: nil))
         private var disconnectError: Error?
 
         func setStatusResult(_ result: Result<SpinwheelStatus, Error>) {
@@ -31,6 +32,11 @@ final class SpinwheelViewModelTests: XCTestCase {
         func setDebtsResult(_ result: Result<SpinwheelDebtsResponse, Error>) {
             lock.lock(); defer { lock.unlock() }
             debtsResult = result
+        }
+
+        func setCreditScoreResult(_ result: Result<SpinwheelCreditScoreResponse, Error>) {
+            lock.lock(); defer { lock.unlock() }
+            creditScoreResult = result
         }
 
         func setDisconnectError(_ error: Error?) {
@@ -55,6 +61,11 @@ final class SpinwheelViewModelTests: XCTestCase {
 
         func getSpinwheelDebts() async throws -> SpinwheelDebtsResponse {
             lock.lock(); let r = debtsResult; lock.unlock()
+            return try r.get()
+        }
+
+        func getSpinwheelCreditScore() async throws -> SpinwheelCreditScoreResponse {
+            lock.lock(); let r = creditScoreResult; lock.unlock()
             return try r.get()
         }
 
@@ -86,6 +97,19 @@ final class SpinwheelViewModelTests: XCTestCase {
 
         XCTAssertTrue(vm.isConnected)
         XCTAssertNil(vm.errorMessage)
+    }
+
+    func testLoadStatusPopulatesCreditScore() async {
+        let fake = FakeAPI()
+        fake.setStatusResult(.success(SpinwheelStatus(connected: true)))
+        fake.setDebtsResult(.success(SpinwheelDebtsResponse(debts: [])))
+        fake.setCreditScoreResult(.success(SpinwheelCreditScoreResponse(score: 720, utilization: 34.5)))
+        let vm = SpinwheelViewModel(api: fake)
+
+        await vm.loadStatus()
+
+        XCTAssertEqual(vm.creditScore, 720)
+        XCTAssertEqual(vm.creditUtilization, 34.5)
     }
 
     func testLoadStatusOnErrorSetsErrorMessage() async {

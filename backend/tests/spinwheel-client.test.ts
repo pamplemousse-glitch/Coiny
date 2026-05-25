@@ -136,3 +136,58 @@ describe('spinwheel getDebtProfile', () => {
     await expect(getDebtProfile('sw-bad')).rejects.toBeInstanceOf(SpinwheelError);
   });
 });
+
+describe('spinwheel getCreditScore', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('extracts vantageScore3 from getUser and returns utilization from credit cards', async () => {
+    vi.mocked(fetch)
+      // First call: getUser
+      .mockResolvedValueOnce(envelope({ vantageScore3: 720 }))
+      // Second call: getDebtProfile (POST) for utilization
+      .mockResolvedValueOnce(
+        envelope({
+          creditCards: [{ id: 'c-1', type: 'CREDIT_CARD', balance: 500, creditLimit: 2000 }],
+        }),
+      );
+
+    const { getCreditScore } = await import('../src/spinwheel/client.js');
+    const result = await getCreditScore('sw-user-1');
+
+    expect(result.score).toBe(720);
+    expect(result.utilization).toBe(25); // 500/2000 = 25%
+  });
+
+  it('returns null score when no known credit score field exists', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(envelope({ userId: 'sw-user-2', name: 'Test User' }))
+      .mockResolvedValueOnce(envelope({}));
+
+    const { getCreditScore } = await import('../src/spinwheel/client.js');
+    const result = await getCreditScore('sw-user-2');
+
+    expect(result.score).toBeNull();
+  });
+
+  it('returns null utilization when no credit cards have limits', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(envelope({ vantageScore3: 680 }))
+      .mockResolvedValueOnce(
+        envelope({
+          studentLoans: [{ id: 's-1', type: 'STUDENT_LOAN', balance: 10000 }],
+        }),
+      );
+
+    const { getCreditScore } = await import('../src/spinwheel/client.js');
+    const result = await getCreditScore('sw-user-3');
+
+    expect(result.score).toBe(680);
+    expect(result.utilization).toBeNull();
+  });
+});

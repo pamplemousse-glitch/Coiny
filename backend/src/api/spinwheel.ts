@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/client.js';
 import { spinwheelConnections, spinwheelPending } from '../db/schema.js';
-import { deleteUser, getDebtProfile, sendSmsOtp, verifySmsOtp } from '../spinwheel/client.js';
+import { deleteUser, getCreditScore, getDebtProfile, sendSmsOtp, verifySmsOtp } from '../spinwheel/client.js';
 
 const SendOtpBodySchema = z.object({
   phoneNumber: z.string().min(1),
@@ -87,6 +87,17 @@ export function registerSpinwheelApi(app: FastifyInstance): void {
 
     const debts = await getDebtProfile(connection.spinwheelUserId);
     return { debts };
+  });
+
+  // GET /api/spinwheel/credit-score
+  app.get('/api/spinwheel/credit-score', async (req: FastifyRequest, reply: FastifyReply) => {
+    const userId = req.user!.id;
+    const rows = await db().select().from(spinwheelConnections).where(eq(spinwheelConnections.userId, userId));
+    const connection = rows[0];
+    if (!connection) {
+      return reply.status(409).send({ error: 'No Spinwheel connection found. Connect first.' });
+    }
+    return getCreditScore(connection.spinwheelUserId);
   });
 
   // DELETE /api/spinwheel/connect

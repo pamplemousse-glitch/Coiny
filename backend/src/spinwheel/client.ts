@@ -117,6 +117,7 @@ export const SpinwheelDebtSchema = z.object({
   balance: z.number().nullable().optional(),
   interestRate: z.number().nullable().optional(),
   minimumPayment: z.number().nullable().optional(),
+  creditLimit: z.number().nullable().optional(),
 });
 
 export type SpinwheelDebt = z.infer<typeof SpinwheelDebtSchema>;
@@ -154,6 +155,31 @@ export async function getUser(spinwheelUserId: string): Promise<Record<string, u
   const schema = envelopeSchema(z.object({}).passthrough());
   const result = await spinwheelGet(`/v1/users/${encodeURIComponent(spinwheelUserId)}`, schema);
   return result.data as Record<string, unknown>;
+}
+
+// GET /v1/users/{spinwheelUserId} — credit score + credit utilization from debt profile.
+// Returns score (vantageScore3 or similar) and utilization % across all credit cards.
+export async function getCreditScore(
+  spinwheelUserId: string,
+): Promise<{ score: number | null; utilization: number | null }> {
+  const user = await getUser(spinwheelUserId);
+  const rawScore = user['vantageScore3'] ?? user['creditScore'] ?? user['score'];
+  const score = typeof rawScore === 'number' ? rawScore : null;
+
+  let utilization: number | null = null;
+  try {
+    const debts = await getDebtProfile(spinwheelUserId);
+    const cards = debts.filter((d) => d.type === 'CREDIT_CARD');
+    const totalBalance = cards.reduce((sum, c) => sum + (c.balance ?? 0), 0);
+    const totalLimit = cards.reduce((sum, c) => sum + (c.creditLimit ?? 0), 0);
+    if (totalLimit > 0) {
+      utilization = Math.round((totalBalance / totalLimit) * 1000) / 10;
+    }
+  } catch {
+    // utilization stays null if debt profile fails
+  }
+
+  return { score, utilization };
 }
 
 // DELETE /v1/users/{spinwheelUserId} — called on disconnect to remove user data from Spinwheel.
