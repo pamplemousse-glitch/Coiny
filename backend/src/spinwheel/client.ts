@@ -122,31 +122,43 @@ export const SpinwheelDebtSchema = z.object({
 
 export type SpinwheelDebt = z.infer<typeof SpinwheelDebtSchema>;
 
+// Spinwheel docs require these fields in every debtProfile request body.
+const DEBT_PROFILE_BODY = {
+  creditReportType: '1_BUREAU.FULL',
+  sourceBureau: 'Equifax',
+  creditScoreModel: 'VANTAGE_SCORE_3_0',
+} as const;
+
+const DEBT_LIABILITY_KEYS = [
+  'debts',
+  'creditCards',
+  'autoLoans',
+  'studentLoans',
+  'homeLoans',
+  'personalLoans',
+  'miscellaneousLiabilities',
+] as const;
+
+// Shared internal fetch: POST /v1/users/{spinwheelUserId}/debtProfile with required params.
+async function fetchRawDebtProfile(spinwheelUserId: string): Promise<Record<string, unknown>> {
+  const schema = envelopeSchema(z.object({}).passthrough());
+  const result = await spinwheelPost(
+    `/v1/users/${encodeURIComponent(spinwheelUserId)}/debtProfile`,
+    DEBT_PROFILE_BODY,
+    schema,
+  );
+  return result.data as Record<string, unknown>;
+}
+
 // POST /v1/users/{spinwheelUserId}/debtProfile
 // Returns normalized debt array across all liability types.
 export async function getDebtProfile(spinwheelUserId: string): Promise<SpinwheelDebt[]> {
-  const DataSchema = z.object({}).passthrough();
-  const schema = envelopeSchema(DataSchema);
-  const result = await spinwheelPost(`/v1/users/${encodeURIComponent(spinwheelUserId)}/debtProfile`, {}, schema);
-
-  // Spinwheel may return per-type arrays or a flat debts array depending on API version.
-  // Normalize both shapes into our SpinwheelDebt[].
-  const data = result.data as Record<string, unknown>;
-  const liabilityKeys = [
-    'debts',
-    'creditCards',
-    'autoLoans',
-    'studentLoans',
-    'homeLoans',
-    'personalLoans',
-    'miscellaneousLiabilities',
-  ];
+  const data = await fetchRawDebtProfile(spinwheelUserId);
   const raw: unknown[] = [];
-  for (const key of liabilityKeys) {
+  for (const key of DEBT_LIABILITY_KEYS) {
     const arr = data[key];
     if (Array.isArray(arr)) raw.push(...arr);
   }
-
   return raw.map((item) => SpinwheelDebtSchema.parse(item));
 }
 
@@ -157,26 +169,31 @@ export async function getUser(spinwheelUserId: string): Promise<Record<string, u
   return result.data as Record<string, unknown>;
 }
 
-// GET /v1/users/{spinwheelUserId} — credit score + credit utilization from debt profile.
-// Returns score (vantageScore3 or similar) and utilization % across all credit cards.
+// Credit score + credit utilization from a single debtProfile call.
+// Score lives in creditReports[0].profile.creditScore per Spinwheel docs.
 export async function getCreditScore(
   spinwheelUserId: string,
 ): Promise<{ score: number | null; utilization: number | null }> {
-  const user = await getUser(spinwheelUserId);
-  const rawScore = user.vantageScore3 ?? user.creditScore ?? user.score;
+  const data = await fetchRawDebtProfile(spinwheelUserId);
+
+  const creditReports = Array.isArray(data.creditReports) ? data.creditReports : [];
+  const report = creditReports[0] as Record<string, unknown> | undefined;
+  const profile = report?.profile as Record<string, unknown> | undefined;
+  const rawScore = profile?.creditScore;
   const score = typeof rawScore === 'number' ? rawScore : null;
 
   let utilization: number | null = null;
-  try {
-    const debts = await getDebtProfile(spinwheelUserId);
-    const cards = debts.filter((d) => d.type === 'CREDIT_CARD');
-    const totalBalance = cards.reduce((sum, c) => sum + (c.balance ?? 0), 0);
-    const totalLimit = cards.reduce((sum, c) => sum + (c.creditLimit ?? 0), 0);
-    if (totalLimit > 0) {
-      utilization = Math.round((totalBalance / totalLimit) * 1000) / 10;
-    }
-  } catch {
-    // utilization stays null if debt profile fails
+  const raw: unknown[] = [];
+  for (const key of DEBT_LIABILITY_KEYS) {
+    const arr = data[key];
+    if (Array.isArray(arr)) raw.push(...arr);
+  }
+  const debts = raw.map((item) => SpinwheelDebtSchema.parse(item));
+  const cards = debts.filter((d) => d.type === 'CREDIT_CARD');
+  const totalBalance = cards.reduce((sum, c) => sum + (c.balance ?? 0), 0);
+  const totalLimit = cards.reduce((sum, c) => sum + (c.creditLimit ?? 0), 0);
+  if (totalLimit > 0) {
+    utilization = Math.round((totalBalance / totalLimit) * 1000) / 10;
   }
 
   return { score, utilization };
