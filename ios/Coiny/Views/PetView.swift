@@ -4,14 +4,26 @@ struct PetView: View {
     @Environment(PetStore.self) private var store
     @State private var celebrating = false
     @State private var sadTriggered = false
+    @State private var showSettings = false
 
     var body: some View {
         NavigationStack {
             content
                 .navigationTitle("Coiny")
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button { showSettings = true } label: {
+                            Image(systemName: "gear")
+                        }
+                        .accessibilityLabel("Settings")
+                    }
+                }
                 .refreshable {
                     await store.refresh()
                 }
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
         }
         .task {
             // CoinyApp triggers the first load; this loop keeps PetView fresh.

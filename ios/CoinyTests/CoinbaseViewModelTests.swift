@@ -13,58 +13,40 @@ final class CoinbaseViewModelTests: XCTestCase {
         private var syncQueue: [Result<SyncResult, Error>] = []
 
         func enqueueStatus(_ result: Result<CoinbaseStatus, Error>) {
-            lock.lock(); defer { lock.unlock() }
-            statusQueue.append(result)
+            lock.withLock { statusQueue.append(result) }
         }
 
         func setConnectResult(_ result: Result<EmptyResponse, Error>) {
-            lock.lock(); defer { lock.unlock() }
-            connectResult = result
+            lock.withLock { connectResult = result }
         }
 
         func setDisconnectError(_ error: Error?) {
-            lock.lock(); defer { lock.unlock() }
-            disconnectError = error
+            lock.withLock { disconnectError = error }
         }
 
         func enqueueSync(_ result: Result<SyncResult, Error>) {
-            lock.lock(); defer { lock.unlock() }
-            syncQueue.append(result)
+            lock.withLock { syncQueue.append(result) }
         }
 
         func getCoinbaseStatus() async throws -> CoinbaseStatus {
-            lock.lock()
-            guard !statusQueue.isEmpty else {
-                lock.unlock()
-                return CoinbaseStatus(connected: false, mode: nil)
-            }
-            let r = statusQueue.removeFirst()
-            lock.unlock()
+            let r = lock.withLock { statusQueue.isEmpty ? nil : statusQueue.removeFirst() }
+            guard let r else { return CoinbaseStatus(connected: false, mode: nil) }
             return try r.get()
         }
 
         func connectCoinbaseDevKey() async throws -> EmptyResponse {
-            lock.lock()
-            let r = connectResult
-            lock.unlock()
+            let r = lock.withLock { connectResult }
             return try r.get()
         }
 
         func disconnectCoinbase() async throws {
-            lock.lock()
-            let e = disconnectError
-            lock.unlock()
+            let e = lock.withLock { disconnectError }
             if let e { throw e }
         }
 
         func syncCoinbase() async throws -> SyncResult {
-            lock.lock()
-            guard !syncQueue.isEmpty else {
-                lock.unlock()
-                return SyncResult(reacted: 0)
-            }
-            let r = syncQueue.removeFirst()
-            lock.unlock()
+            let r = lock.withLock { syncQueue.isEmpty ? nil : syncQueue.removeFirst() }
+            guard let r else { return SyncResult(reacted: 0) }
             return try r.get()
         }
     }

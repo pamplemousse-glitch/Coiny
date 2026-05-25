@@ -9,32 +9,20 @@ struct RootView: View {
                 .tabItem {
                     Label("Pet", systemImage: "face.smiling")
                 }
+                .accessibilityIdentifier("tab.pet")
 
             SpendingView()
                 .tabItem {
                     Label("Activity", systemImage: "clock.arrow.circlepath")
                 }
+                .accessibilityIdentifier("tab.activity")
 
             NetWorthView()
                 .environment(netWorthVM)
                 .tabItem {
                     Label("Wealth", systemImage: "chart.pie.fill")
                 }
-
-            CryptoView()
-                .tabItem {
-                    Label("Crypto", systemImage: "bitcoinsign.circle")
-                }
-
-            SpinwheelView()
-                .tabItem {
-                    Label("Debt", systemImage: "banknote")
-                }
-
-            SettingsView()
-                .tabItem {
-                    Label("Settings", systemImage: "gear")
-                }
+                .accessibilityIdentifier("tab.wealth")
         }
         .tint(.accentColor)
     }

@@ -105,7 +105,13 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.coiny.ios.uitests
         GENERATE_INFOPLIST_FILE: YES
-        TEST_TARGET_NAME: Coiny
+        # XcodeGen 2.x bleeds BUNDLE_LOADER from the base settings template into
+        # ui-testing targets. BUNDLE_LOADER must be empty for UI tests — setting
+        # it to the app binary (as for unit tests) causes the test runner to try
+        # to inject the bundle as a hosted unit test, which hangs the simulator
+        # indefinitely on iOS 16+. Explicitly clear it here to override.
+        BUNDLE_LOADER: ""
+        TEST_HOST: ""
 
 schemes:
   Coiny:
