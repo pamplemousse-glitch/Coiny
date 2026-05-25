@@ -9,7 +9,6 @@ import { evaluateExternalEvent } from '../reactions/external.js';
 import { claimEvent } from '../store/events.js';
 import { recordReaction } from '../store/pet.js';
 
-
 export function registerCoinbaseApi(app: FastifyInstance): void {
   // GET /api/coinbase/status
   app.get('/api/coinbase/status', async (req: FastifyRequest) => {

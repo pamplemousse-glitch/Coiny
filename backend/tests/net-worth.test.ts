@@ -314,7 +314,16 @@ describe('GET /api/net-worth', () => {
     txDate.setDate(txDate.getDate() - 30);
     const dateStr = txDate.toISOString().slice(0, 10);
     await persistTransactions(testUserId, [
-      { id: 'tx-1', account_id: 'acct-checking', amount: '-6000', date: dateStr, description: '', status: 'posted', type: 'debit', running_balance: null },
+      {
+        id: 'tx-1',
+        account_id: 'acct-checking',
+        amount: '-6000',
+        date: dateStr,
+        description: '',
+        status: 'posted',
+        type: 'debit',
+        running_balance: null,
+      },
     ]);
 
     const { buildApp } = await import('../src/server.js');

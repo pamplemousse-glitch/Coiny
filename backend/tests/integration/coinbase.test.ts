@@ -7,7 +7,7 @@
  * Run with:
  *   INTEGRATION_TEST=1 pnpm --filter coiny-backend test tests/integration/coinbase.test.ts
  */
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 const SANDBOX = 'https://api-sandbox.coinbase.com';
 const skip = !process.env.INTEGRATION_TEST;
@@ -18,7 +18,7 @@ describe('Coinbase Advanced Trade sandbox — accounts', () => {
 
     expect(res.status).toBe(200);
 
-    const body = await res.json() as { accounts: unknown[] };
+    const body = (await res.json()) as { accounts: unknown[] };
     expect(Array.isArray(body.accounts)).toBe(true);
     expect(body.accounts.length).toBeGreaterThan(0);
 

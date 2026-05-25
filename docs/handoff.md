@@ -1,8 +1,36 @@
 # Coiny — Project Handoff
 
-**Last updated: 2026-05-24 (session 4)**
+**Last updated: 2026-05-25 (session 6)**
 
 Read this first. Then read `docs/tech-stack.md` and `docs/implementation-plan.md`.
+
+---
+
+## Claude Code Integration Setup (READ BEFORE CODING)
+
+### Vendor API Documentation (primary sources — always prefer these over memory)
+
+Each vendor has a complete single-file AI-optimized doc set downloaded to `docs/context/`:
+
+| Vendor | File | Source |
+|---|---|---|
+| Plaid | `docs/context/plaid.md` | plaid.com/docs/llms-full.txt (~5.9 MB, complete) |
+| Coinbase CDP | `docs/context/coinbase.md` | docs.cdp.coinbase.com/llms-full.txt (~12.6 MB, complete) |
+| Zerion | `docs/context/zerion.md` | developers.zerion.io/llms.txt |
+| Spinwheel | `docs/context/spinwheel.md` | docs.spinwheel.io/llms.txt |
+
+**Before implementing any vendor endpoint, read the relevant file first.** Do not rely on training knowledge for endpoint paths, field names, or auth requirements — they drift.
+
+### MCP Servers (live API access — restart Claude Code to activate)
+
+Two MCP servers are connected to this project:
+
+| Server | Type | What it does |
+|---|---|---|
+| `zerion` | Live HTTP MCP (`developers.zerion.io/mcp`) | Query real Zerion wallet data mid-conversation |
+| `coinbase-cdp` | Docs MCP (`docs.cdp.coinbase.com/mcp`) | Search Coinbase CDP documentation |
+
+Use the Zerion MCP to verify response field names and shapes before implementing parsing logic — do not guess field names from memory (see Zerion bug below).
 
 ---
 
@@ -35,11 +63,10 @@ Coiny/
 │   ├── src/api/       # Route handlers (auth, pets, plaid, coinbase, zerion, spinwheel, account, net-worth)
 │   ├── src/store/     # DB queries (users, sessions, items, pets, transactions, events)
 │   ├── src/plaid/     # Plaid API client + webhook verifier + category adapter
-│   ├── src/coinbase/  # Coinbase Advanced Trade client (JWT ES256)
-│   ├── src/coingecko/ # CoinGecko price lookup client
+│   ├── src/coinbase/  # Coinbase Advanced Trade client (JWT ES256) + public spot prices
 │   ├── src/zerion/    # Zerion DeFi portfolio client (Basic auth)
 │   ├── src/spinwheel/ # Spinwheel debt client (Bearer + SMS OTP)
-│   └── tests/         # 258 Vitest tests, all passing
+│   └── tests/         # 259 Vitest tests, all passing
 ├── firmware/          # nRF52840 + Zephyr — scaffolded, not started
 ├── mobile/            # Expo React Native — legacy prototype, superseded by ios/
 ├── shared/            # Cross-package TS types — BLE schema, pet state
@@ -79,7 +106,7 @@ Bank / Crypto / DeFi / Debt APIs
 | Backend | Node + Fastify + Drizzle, Fly.io, Neon | Go + chi + sqlc, AWS ECS Fargate + Aurora |
 | Auth | Apple Sign In (JWT → session token) ✅ | WorkOS AuthKit |
 | Bank data | Plaid — Transactions + Investments + Liabilities ✅ | — |
-| Crypto data | Coinbase Advanced Trade + CoinGecko ✅ | — |
+| Crypto data | Coinbase Advanced Trade + public spot price API ✅ | — |
 | DeFi | Zerion ✅ | — |
 | Debt | Spinwheel (balances + credit score + utilization) ✅ | — |
 | Firmware | nRF52840 scaffold | Nordic nRF54L15 + Zephyr RTOS |
@@ -101,7 +128,7 @@ Bank / Crypto / DeFi / Debt APIs
 - ✅ Backend deployed on Fly.io (`coiny-backend.fly.dev`)
 - ✅ Postgres via Neon (prod + dev connection strings in Fly secrets)
 
-### Backend (Node + Fastify + Drizzle, Fly.io) — 258 Vitest tests, all passing
+### Backend (Node + Fastify + Drizzle, Fly.io) — 259 Vitest tests, all passing
 
 - ✅ Plaid webhooks with HMAC-SHA256 + JWT signature verification + replay protection (PR #2, enhanced in #60)
 - ✅ Plaid `/transactions/sync` + paginated sync, idempotent via `processed_events` table
@@ -114,7 +141,9 @@ Bank / Crypto / DeFi / Debt APIs
 - ✅ APNs push dispatch via background notifications + `registerDeviceToken`
 - ✅ REST API: `/api/auth/apple`, `/api/pets`, `/api/plaid/*`, `/api/devices/*`, `/api/spending`, `/api/account`, `/api/coinbase/*`, `/api/zerion/*`, `/api/spinwheel/*`, `/api/net-worth`, `/api/debug/*`
 - ✅ Rate limiting: per-user (SHA-256 of bearer token) with IP fallback
-- ✅ `GET /api/net-worth` aggregates: bank balances (Plaid) + investment holdings (Plaid) + crypto (Coinbase + CoinGecko) + DeFi (Zerion) + debts (Spinwheel), per-source try/catch so one failure doesn't block others (PR #81)
+- ✅ `GET /api/net-worth` aggregates: bank balances (Plaid) + investment holdings (Plaid) + crypto (Coinbase + public spot prices) + DeFi (Zerion) + debts (Spinwheel), per-source try/catch so one failure doesn't block others (PR #81)
+- ✅ CoinGecko removed (PR #107) — replaced with Coinbase's public `/v2/prices/{sym}-USD/spot` endpoint (no auth, no extra dependency). Price-surge/drop reactions removed (no 24h delta from spot API).
+- ✅ Coinbase JWT `typ: "JWT"` header fix — required by Coinbase docs, was missing from protected header
 - ✅ **E2E pipeline proven** (PR #101): Vitest test fires a Plaid sandbox webhook → verifies `paycheck_received` reaction is persisted and returned by `GET /api/pets`
 
 ### iOS App (Swift + SwiftUI) — 148 unit tests passing, 1 UI smoke test passing
@@ -141,10 +170,30 @@ Bank / Crypto / DeFi / Debt APIs
 
 | PR | Branch | Status | Action |
 |---|---|---|---|
-| **#104** | `feat/financial-metrics` | **Open** | Workstream C: credit score, utilization, savings rate, emergency fund. 268 backend + 77 iOS unit tests. |
-| **#105** | `test/integration-vendors` | **Open** | Workstream D: vendor integration tests. D1+D4+D5 pass (9 tests). D2 needs test phone, D3 needs key re-entry. |
+| **#107** | `test/integration-vendors` | **Open** | CoinGecko removal + Coinbase spot price API + JWT fix. 259 tests pass. Merge when ready. |
 
-PRs #81, #91–#99, #101, #103 merged. PR #102 closed (superseded by #103).
+PRs #81, #91–#99, #101, #103, #104, #105 merged. PR #102 closed (superseded by #103).
+
+---
+
+## Known Integration Bugs (NOT YET FIXED — fix before production)
+
+Found via audit against official docs in `docs/context/`. Priority order:
+
+### 1. Spinwheel — `getCreditScore` always returns null ⛔
+**File:** `backend/src/spinwheel/client.ts`
+**Bug:** Reads `vantageScore3 / creditScore / score` from the user profile GET endpoint. Docs confirm credit scores live inside `debtProfile.creditReports`, not the user object. Will return `null` every time.
+**Fix:** Call `getDebtProfile` with `creditScoreModel: 'VANTAGE_SCORE_3_0'` in the body, then read the score from `creditReports[0]`.
+
+### 2. Spinwheel — `getDebtProfile` sends empty body ⛔
+**File:** `backend/src/spinwheel/client.ts`
+**Bug:** Sends `{}` as request body. Docs require `creditReportType` (`1_BUREAU.FULL`), `sourceBureau`, and `creditScoreModel`. API may return incomplete or errored data without these.
+**Fix:** Pass the required fields in the body.
+
+### 3. Zerion — `transfers[].value` field name unconfirmed ⚠️
+**File:** `backend/src/zerion/client.ts`
+**Bug:** Parses `transfers[].value` for USD amount. Docs list `quantity` as the field name — `value` may be wrong and silently return `$0` for every transaction.
+**Fix:** Use Zerion live MCP (`zerion` MCP server in Claude Code) to query a real wallet transaction and confirm the exact field name before coding.
 
 ---
 
@@ -192,15 +241,15 @@ PRs #81, #91–#99, #101, #103 merged. PR #102 closed (superseded by #103).
 - ❌ Audit logging (`audit_log` table)
 - ❌ LaunchDarkly feature flags
 
-### Integrations (Workstream D — PR #105, branch `test/integration-vendors`)
+### Integrations
 
 - ✅ Plaid sandbox — `sandboxPublicTokenCreate` + `investmentsHoldingsGet` + `liabilitiesGet` (3/3 pass)
-- ✅ Zerion — `getPortfolio` + `getTransactions` against Vitalik's wallet (2/2 pass)
-- ✅ CoinGecko — `getPrices` + `getCoinImageUrl` (4/4 pass; Demo key fix: `x-cg-demo-api-key` on `api.coingecko.com`)
-- ⚠️ Coinbase — test written; **keychain key truncated**. Re-enter: `security add-generic-password -a "$USER" -s "coiny-coinbase-sandbox-api-key-secret" -w`
-- ⚠️ Spinwheel — test written (full OTP flow); **needs `SPINWHEEL_TEST_PHONE`** from developer.spinwheel.io/docs/test-users. Run: `INTEGRATION_TEST=1 SPINWHEEL_TEST_PHONE="+1XXXXXXXXXX" pnpm --filter coiny-backend test tests/integration/spinwheel.test.ts`
+- ✅ Zerion — `getPortfolio` + `getTransactions` against Vitalik's wallet (2/2 pass). No sandbox — Zerion has none; Vitalik's public wallet is the standard test approach.
+- ✅ Coinbase — Advanced Trade sandbox (`api-sandbox.coinbase.com`) validates endpoint shape. Auth path untested (sandbox ignores JWT). No official TS SDK for Advanced Trade — hand-rolled client is correct.
+- ⚠️ Spinwheel — test written; **needs `SPINWHEEL_TEST_PHONE`**. Also has two production bugs (see Known Integration Bugs above).
+- ❌ CoinGecko — **removed entirely** (PR #107). Replaced with Coinbase public spot price API.
 
-Run all: `source bin/load-secrets.sh && INTEGRATION_TEST=1 pnpm --filter coiny-backend test tests/integration/`
+Run integration tests: `source bin/load-secrets.sh && INTEGRATION_TEST=1 pnpm --filter coiny-backend test tests/integration/`
 
 ### Hardware & Firmware
 
@@ -411,12 +460,6 @@ Goal: prove each vendor connection works against its real sandbox/live environme
 - Write Vitest test: `getPortfolio(vitalikAddress)` → assert `total_usd > 0`
 - Skip if `ZERION_API_KEY` not set
 
-#### D5 — CoinGecko (ref: `docs/coingecko-catalog.md`)
-
-- Free Demo plan, hits live data, no credentials required for basic calls
-- Write Vitest test: `getPrices(['bitcoin', 'ethereum'])` → assert both keys present and `usd > 0`
-- Write Vitest test: `getCoinImageUrl('bitcoin')` → assert returns a non-null URL string
-
 **GitHub moves:**
 ```bash
 git checkout main && git pull
@@ -538,12 +581,12 @@ Keys to add before Workstream D:
 
 Start a fresh Claude Code session in `/Users/antoinewiley/Tamogatchi` and say:
 
-> Read `docs/handoff.md`, `docs/tech-stack.md`, and `docs/product-brief.md`.
-> Session 3 complete. 148 iOS unit tests pass. 54 UI tests ran — 27 pass, 27 fail (two known bug categories fully documented in handoff).
-> Four workstreams planned: A (UI Reform), B (Fix UI Tests), C (New Metrics), D (Integration Tests). Execute A → B → C/D.
-> PR #102 (`test/ios-uitest-tabs`) should be closed — superseded by Workstream A.
-> Simulator: iPhone 17 Pro UDID `A445C692-84CF-4D18-9CE1-ADD92174D731`. Use `xcbeautify`. Always `xcodegen generate` before `xcodebuild`. Never open Xcode while xcodebuild runs.
-> Next: [describe specific workstream task].
+> Read `docs/handoff.md`. Session 6 complete.
+> Before touching any vendor integration (Plaid, Coinbase, Zerion, Spinwheel), read the relevant file in `docs/context/` — these are the official AI-optimized docs, always prefer them over training knowledge.
+> Two MCP servers are connected: `zerion` (live wallet queries) and `coinbase-cdp` (doc search). Use the Zerion MCP to verify field names before implementing response parsing.
+> Fix the two Spinwheel bugs and the Zerion field name issue (see "Known Integration Bugs") before any other backend work.
+> Then merge PR #107 (CoinGecko removal).
+> Simulator: iPhone 17 Pro UDID `A445C692-84CF-4D18-9CE1-ADD92174D731`. Use `xcbeautify`. Always `xcodegen generate` before `xcodebuild`.
 
 ### Plaid sandbox credentials
 

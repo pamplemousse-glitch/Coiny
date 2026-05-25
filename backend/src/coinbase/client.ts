@@ -27,7 +27,7 @@ async function makeJwt(method: string, path: string): Promise<string> {
   const uri = `${method.toUpperCase()} api.coinbase.com${path}`;
   const now = Math.floor(Date.now() / 1000);
   return new SignJWT({ iss: 'cdp', sub: keyName, uri })
-    .setProtectedHeader({ alg: 'ES256', kid: keyName, nonce: randomHex(16) })
+    .setProtectedHeader({ alg: 'ES256', kid: keyName, nonce: randomHex(16), typ: 'JWT' })
     .setIssuedAt(now)
     .setNotBefore(now)
     .setExpirationTime('2m')

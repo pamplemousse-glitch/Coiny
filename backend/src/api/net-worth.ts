@@ -9,7 +9,6 @@ import { getItemsByUser } from '../store/items.js';
 import { getRecentOutflows } from '../store/transactions.js';
 import { getPortfolio } from '../zerion/client.js';
 
-
 export function registerNetWorthApi(app: FastifyInstance): void {
   app.get('/api/net-worth', async (req, _reply) => {
     const userId = req.user!.id;
