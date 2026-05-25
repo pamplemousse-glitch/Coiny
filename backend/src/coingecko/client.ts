@@ -1,7 +1,14 @@
 import { z } from 'zod';
 import { config } from '../config.js';
 
-const BASE_URL = 'https://api.coingecko.com/api/v3';
+// Demo keys use api.coingecko.com + x-cg-demo-api-key header.
+// Pro keys use pro-api.coingecko.com + x-cg-pro-api-key header.
+// Config comment says "Pro tier" but the stored key is Demo; detect by CG- prefix.
+function baseUrl(): string {
+  const key = config.COINGECKO_API_KEY;
+  if (key && !key.startsWith('CG-')) return 'https://pro-api.coingecko.com/api/v3';
+  return 'https://api.coingecko.com/api/v3';
+}
 
 export class CoinGeckoRateLimitError extends Error {
   constructor() {
@@ -11,8 +18,9 @@ export class CoinGeckoRateLimitError extends Error {
 }
 
 function authHeaders(): Record<string, string> {
-  if (!config.COINGECKO_API_KEY) return {};
-  return { 'x-cg-pro-api-key': config.COINGECKO_API_KEY };
+  const key = config.COINGECKO_API_KEY;
+  if (!key) return {};
+  return key.startsWith('CG-') ? { 'x-cg-demo-api-key': key } : { 'x-cg-pro-api-key': key };
 }
 
 const PricesResponseSchema = z.record(
@@ -42,7 +50,7 @@ export async function getPrices(coinIds: string[]): Promise<Map<string, { usd: n
     include_24hr_change: 'true',
   });
 
-  const res = await fetch(`${BASE_URL}/simple/price?${params.toString()}`, {
+  const res = await fetch(`${baseUrl()}/simple/price?${params.toString()}`, {
     headers: { ...authHeaders() },
   });
 
@@ -64,7 +72,7 @@ export async function getPrices(coinIds: string[]): Promise<Map<string, { usd: n
  */
 export async function getCoinImageUrl(coinId: string): Promise<string | null> {
   const res = await fetch(
-    `${BASE_URL}/coins/${encodeURIComponent(coinId)}?localization=false&tickers=false&market_data=false&community_data=false&developer_data=false`,
+    `${baseUrl()}/coins/${encodeURIComponent(coinId)}?localization=false&tickers=false&market_data=false&community_data=false&developer_data=false`,
     {
       headers: { ...authHeaders() },
     },

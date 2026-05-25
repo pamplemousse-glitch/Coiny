@@ -125,3 +125,15 @@ export function sandboxItemFireWebhook(args: {
     webhook_type: args.webhook_type ?? 'TRANSACTIONS',
   });
 }
+
+export function sandboxPublicTokenCreate(args: {
+  institution_id: string;
+  initial_products: string[];
+  options?: { override_username?: string; override_password?: string };
+}): Promise<{ public_token: string; request_id: string }> {
+  return plaidPost('/sandbox/public_token/create', {
+    institution_id: args.institution_id,
+    initial_products: args.initial_products,
+    options: args.options ?? { override_username: 'user_good', override_password: 'pass_good' },
+  });
+}

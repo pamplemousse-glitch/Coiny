@@ -1,5 +1,5 @@
-import { randomBytes } from 'node:crypto';
-import { importPKCS8, SignJWT } from 'jose';
+import { createPrivateKey, randomBytes } from 'node:crypto';
+import { importJWK, SignJWT } from 'jose';
 import { z } from 'zod';
 import { config } from '../config.js';
 
@@ -18,7 +18,12 @@ function randomHex(n: number): string {
 
 async function makeJwt(method: string, path: string): Promise<string> {
   const keyName = config.COINBASE_API_KEY_ID;
-  const privateKey = await importPKCS8(config.COINBASE_API_KEY_SECRET, 'ES256');
+  // Normalize literal \n escapes (as stored in Keychain via security CLI) to real newlines.
+  const pemStr = config.COINBASE_API_KEY_SECRET.replace(/\\n/g, '\n');
+  // createPrivateKey handles both SEC1 (BEGIN EC PRIVATE KEY) and PKCS#8 (BEGIN PRIVATE KEY).
+  const nodeKey = createPrivateKey({ key: pemStr, format: 'pem' });
+  const jwk = nodeKey.export({ format: 'jwk' }) as Record<string, string>;
+  const privateKey = await importJWK({ ...jwk, alg: 'ES256' }, 'ES256');
   const uri = `${method.toUpperCase()} api.coinbase.com${path}`;
   const now = Math.floor(Date.now() / 1000);
   return new SignJWT({ iss: 'cdp', sub: keyName, uri })
