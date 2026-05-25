@@ -36,6 +36,7 @@ const configSchema = z
     // Coinbase Advanced Trade API (ECDSA key pair).
     COINBASE_API_KEY_ID: z.string().default(''),
     COINBASE_API_KEY_SECRET: z.string().default(''), // PEM-encoded EC private key
+    COINBASE_BASE_URL: z.string().default('https://api.coinbase.com'),
 
     // Zerion DeFi portfolio API.
     ZERION_API_KEY: z.string().default(''),
