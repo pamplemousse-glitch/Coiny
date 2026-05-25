@@ -1,6 +1,6 @@
 # Coiny — Project Handoff
 
-**Last updated: 2026-05-24 (session 3)**
+**Last updated: 2026-05-24 (session 4)**
 
 Read this first. Then read `docs/tech-stack.md` and `docs/implementation-plan.md`.
 
@@ -117,7 +117,7 @@ Bank / Crypto / DeFi / Debt APIs
 - ✅ `GET /api/net-worth` aggregates: bank balances (Plaid) + investment holdings (Plaid) + crypto (Coinbase + CoinGecko) + DeFi (Zerion) + debts (Spinwheel), per-source try/catch so one failure doesn't block others (PR #81)
 - ✅ **E2E pipeline proven** (PR #101): Vitest test fires a Plaid sandbox webhook → verifies `paycheck_received` reaction is persisted and returned by `GET /api/pets`
 
-### iOS App (Swift + SwiftUI) — 148 unit tests passing, 54 UI tests (27 pass / 27 fail)
+### iOS App (Swift + SwiftUI) — 148 unit tests passing, 1 UI smoke test passing
 
 - ✅ XcodeGen project definition (`ios/project.yml`) with LinkKit SPM package
 - ✅ `CoinyApp` with three-state routing: SignInView → OnboardingView → RootView
@@ -131,10 +131,9 @@ Bank / Crypto / DeFi / Debt APIs
 - ✅ **CryptoView**: Coinbase section (connect dev key, sync, disconnect) + Zerion section (add/remove wallets, portfolio total)
 - ✅ **SpinwheelView**: SMS OTP flow (phone + DOB → OTP entry → connected), debt list, disconnect
 - ✅ **NetWorthView**: net worth total (green/red), bank / crypto / DeFi / debts sections, pull-to-refresh, not-connected prompts
-- ✅ **RootView**: currently 6 tabs — Pet, Activity, Wealth, Crypto, Debt, Settings — ⚠️ iOS hides tabs 5–6 behind a "More" button; Workstream A fixes this
-- ✅ `--ui-testing` + `--mock-network` launch args bypass Sign In/Onboarding and inject `MockURLProtocol` stub responses (PR #102)
+- ✅ **RootView**: **3 tabs — Pet, Activity, Wealth** (PR #103). Settings moved to gear-button sheet on Pet. Crypto + Debt folded into Wealth as inline sections.
 - ✅ 148 iOS unit tests: APIEndpointTests (22), APITests (15), CoinbaseViewModelTests (15), KeychainTests (8), NetWorthViewModelTests (11), PetStateDecodingTests (18), PetStoreTests (9), SessionStoreTests (4), SpendingViewModelTests (5), SpinwheelViewModelTests (16), ViewSmokeTests (9), ZerionViewModelTests (16) — all passing
-- ✅ 54 UI tests across 7 suites — 27 passing, 27 failing (2 known bugs, see below)
+- ✅ 1 UI smoke test (`AppLaunchSmokeTests`) — checks cold-launch SignIn screen
 
 ---
 
@@ -142,27 +141,27 @@ Bank / Crypto / DeFi / Debt APIs
 
 | PR | Branch | Status | Action |
 |---|---|---|---|
-| **#102** | `test/ios-uitest-tabs` | Open — 27/54 UI tests pass | **Close without merging.** UI reform (Workstream A) will supersede this PR entirely. The 6-tab structure it tests is being replaced. |
+| **#103** | `feat/ui-reform` | **Open — ready to merge** | Workstream A: 3-tab UI reform. Build compiles clean. Awaiting final test run + review. |
 
-All other PRs (#81, #91–#99, #101) are merged.
+PRs #81, #91–#99, #101 merged. PR #102 closed (superseded by #103).
 
 ---
 
-## Known iOS UI Test Bugs (found session 3)
+## Known iOS UI Test Issues
 
-### Bug 1 — App crash cascade (6 tests fail)
+### Bug 1 — App crash cascade (historical, files deleted)
 
-**Root cause:** In `PetTabUITests` and `ActivityTabUITests`, some tests call `freshApp.launch()` inside the test body. Calling `launch()` on a new `XCUIApplication` with the same bundle ID kills the class-level app (same process). After `freshApp.terminate()`, the class-level app is also dead. Every subsequent test in the class that uses the class-level app fails with "app is not running."
+**Status:** The UITest files that had this bug (`PetTabUITests.swift`, `ActivityTabUITests.swift`, etc.) were deleted from main when PR #102 was cleaned up. The root cause is documented here for future reference.
 
-**Affected tests:** `testPetTabPullToRefreshTriggersReload`, `testPetTabShowsHealthBar`, `testPetTabShowsLastReactionCardWhenHistoryNonEmpty`, `testPetTabShowsLoadingThenFace`, `testPetTabShowsWaitingViewWhenNoHistory`, `testActivityTabShowsReactionWhenHistoryNonEmpty`
+**Root cause:** Calling `freshApp.launch()` on a new `XCUIApplication` with the same bundle ID kills the class-level app. After `freshApp.terminate()`, the class-level app is dead — every subsequent test using it fails.
 
-**Fix:** After `freshApp.terminate()` in the `defer` block, re-launch the class-level app. Resolved in Workstream B.
+**Fix when re-adding these tests:** After `freshApp.terminate()` in the defer block, call `Self.app.launch()` to re-launch the class-level app.
 
-### Bug 2 — Debt/Settings tabs not found (21 tests fail)
+### Bug 2 — Debt/Settings tabs not found (21 tests) — ✅ FIXED in PR #103
 
-**Root cause:** iOS tab bar shows only 4 tabs + a "More" button when there are 5+ tabs. With 6 tabs, Debt (tab 5) and Settings (tab 6) are hidden. Tests that call `app.tabBars.firstMatch.buttons["Debt"].tap()` fail because the button is not in the tab bar.
+**Root cause:** iOS tab bar shows only 4 tabs + a "More" button when there are 5+ tabs. With 6 tabs, Debt (tab 5) and Settings (tab 6) were hidden.
 
-**Fix:** Workstream A collapses the tab bar to 3 tabs, eliminating the "More" issue. Debt/Settings UI tests get rewritten for the new structure.
+**Fix:** PR #103 collapses to 3 tabs. Debt is now a section in the Wealth tab. Settings is a gear-button sheet on the Pet tab.
 
 ---
 
@@ -221,10 +220,12 @@ Execute in order: **A → B → C → D**. C and D can be parallelized once A+B 
 
 ---
 
-### Workstream A — UI Reform
+### Workstream A — UI Reform ✅ IN PR
 
-**Branch:** `feat/ui-reform`
-**PR title:** `feat(ios): collapse to 3-tab UI — Wealth absorbs Crypto + Debt, Settings as sheet`
+**Branch:** `feat/ui-reform`  
+**PR:** [#103](https://github.com/pamplemousse-glitch/Coiny/pull/103) — open, build compiles clean, awaiting test run + merge
+
+**PR title:** `feat(ios): reform tab structure from 6 to 3 tabs`
 
 **Why:** iOS tab bar on iPhone hides tabs 5+ behind a "More" button. The current 6-tab layout makes Debt and Settings unreachable. All financial data belongs in one Wealth view — this is how Mint, Monarch, and Copilot organize it. Net worth = assets (bank + investments + crypto + DeFi) minus liabilities (debt).
 
