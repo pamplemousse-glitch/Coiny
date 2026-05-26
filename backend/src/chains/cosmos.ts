@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fetchWithRetry } from '../util/fetch.js';
 
 const LCD_URLS: Record<string, string> = {
   cosmos: 'https://cosmos-rest.publicnode.com',
@@ -36,7 +37,7 @@ export async function getCosmosBalance(chain: string, address: string): Promise<
   const denom = NATIVE_DENOMS[chain];
   if (!baseUrl || !denom) throw new CosmosLcdError(0, `Unsupported chain: ${chain}`);
 
-  const res = await fetch(`${baseUrl}/cosmos/bank/v1beta1/balances/${encodeURIComponent(address)}`);
+  const res = await fetchWithRetry(`${baseUrl}/cosmos/bank/v1beta1/balances/${encodeURIComponent(address)}`);
 
   if (res.status === 404) return 0;
   if (!res.ok) throw new CosmosLcdError(res.status, `Cosmos LCD error: ${res.status}`);

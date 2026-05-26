@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fetchWithRetry } from '../util/fetch.js';
 
 const BASE_URL = 'https://api.blockcypher.com/v1';
 
@@ -28,7 +29,7 @@ export async function getBlockcypherBalance(chain: string, address: string): Pro
   const path = CHAIN_PATHS[chain];
   if (!path) throw new BlockcypherError(0, `Unsupported chain: ${chain}`);
 
-  const res = await fetch(`${BASE_URL}/${path}/addrs/${encodeURIComponent(address)}/balance`);
+  const res = await fetchWithRetry(`${BASE_URL}/${path}/addrs/${encodeURIComponent(address)}/balance`);
 
   if (res.status === 404) return 0;
   if (!res.ok) throw new BlockcypherError(res.status, `BlockCypher API error: ${res.status}`);

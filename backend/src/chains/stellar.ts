@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fetchWithRetry } from '../util/fetch.js';
 
 const HORIZON_URL = 'https://horizon.stellar.org';
 
@@ -24,7 +25,7 @@ const AccountSchema = z.object({
 // Returns native XLM balance for a Stellar account address.
 // Returns 0 for accounts that don't exist (404). Throws HorizonError on API errors.
 export async function getStellarBalance(address: string): Promise<number> {
-  const res = await fetch(`${HORIZON_URL}/accounts/${encodeURIComponent(address)}`);
+  const res = await fetchWithRetry(`${HORIZON_URL}/accounts/${encodeURIComponent(address)}`);
 
   if (res.status === 404) return 0;
   if (!res.ok) throw new HorizonError(res.status, `Horizon API error: ${res.status}`);
