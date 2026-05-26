@@ -8,6 +8,7 @@ import {
   PlaidApiError,
   type PlaidErrorResponse,
   type PublicTokenExchangeResponse,
+  type RecurringTransactionsResponse,
   type TransactionsSyncResponse,
   type WebhookVerificationKeyGetResponse,
 } from './types.js';
@@ -101,6 +102,10 @@ export function investmentsHoldingsGet(accessToken: string): Promise<Investments
 
 export function liabilitiesGet(accessToken: string): Promise<LiabilitiesGetResponse> {
   return plaidPost('/liabilities/get', { access_token: accessToken });
+}
+
+export function recurringTransactionsGet(accessToken: string): Promise<RecurringTransactionsResponse> {
+  return plaidPost('/transactions/recurring/get', { access_token: accessToken });
 }
 
 export function webhookVerificationKeyGet(keyId: string): Promise<WebhookVerificationKeyGetResponse> {

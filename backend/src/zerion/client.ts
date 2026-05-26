@@ -81,6 +81,7 @@ const ZerionPortfolioResponseSchema = z.object({
 
 export type ZerionPortfolio = {
   total_usd: number;
+  change_1d_abs: number | null;
   change_1d_pct: number | null;
 };
 
@@ -142,7 +143,114 @@ export async function getPortfolio(walletAddress: string, options: { sync?: bool
   const attrs = parsed.data.data.attributes;
   return {
     total_usd: attrs.total.positions,
+    change_1d_abs: attrs.changes?.absolute_1d ?? null,
     change_1d_pct: attrs.changes?.percent_1d ?? null,
+  };
+}
+
+const ZerionPositionSchema = z.object({
+  id: z.string(),
+  attributes: z.object({
+    value: z.number().nullable().optional(),
+    quantity: z.object({ float: z.number() }).optional(),
+    fungible_info: z
+      .object({
+        symbol: z.string().nullable().optional(),
+        name: z.string().nullable().optional(),
+      })
+      .optional(),
+  }),
+});
+
+const ZerionPositionsResponseSchema = z.object({
+  data: z.array(ZerionPositionSchema),
+});
+
+export type ZerionPosition = {
+  id: string;
+  symbol: string;
+  name: string;
+  quantity: number;
+  value_usd: number;
+};
+
+const ZerionPnlSchema = z.object({
+  data: z.object({
+    attributes: z.object({
+      unrealized_gain: z.number().nullable().optional(),
+      realized_gain: z.number().nullable().optional(),
+      total_gain: z.number().nullable().optional(),
+    }),
+  }),
+});
+
+export type ZerionPnl = {
+  unrealized_gain: number | null;
+  realized_gain: number | null;
+  total_gain: number | null;
+};
+
+export async function getPositions(walletAddress: string): Promise<ZerionPosition[]> {
+  if (!config.ZERION_API_KEY) throw new ZerionError(0, 'ZERION_API_KEY is not configured');
+
+  const params = new URLSearchParams({
+    'filter[positions]': 'no_filter',
+    'filter[trash]': 'only_non_trash',
+    currency: 'usd',
+  });
+
+  const raw = await zerionGet(`/v1/wallets/${encodeURIComponent(walletAddress)}/positions/?${params}`);
+  if (!raw) return [];
+
+  const parsed = ZerionPositionsResponseSchema.safeParse(raw);
+  if (!parsed.success) return [];
+
+  return parsed.data.data.map((item) => ({
+    id: item.id,
+    symbol: item.attributes.fungible_info?.symbol ?? '',
+    name: item.attributes.fungible_info?.name ?? '',
+    quantity: item.attributes.quantity?.float ?? 0,
+    value_usd: item.attributes.value ?? 0,
+  }));
+}
+
+export async function getDeFiPositions(walletAddress: string): Promise<ZerionPosition[]> {
+  if (!config.ZERION_API_KEY) throw new ZerionError(0, 'ZERION_API_KEY is not configured');
+
+  const params = new URLSearchParams({
+    'filter[positions]': 'only_complex',
+    currency: 'usd',
+  });
+
+  const raw = await zerionGet(`/v1/wallets/${encodeURIComponent(walletAddress)}/positions/?${params}`);
+  if (!raw) return [];
+
+  const parsed = ZerionPositionsResponseSchema.safeParse(raw);
+  if (!parsed.success) return [];
+
+  return parsed.data.data.map((item) => ({
+    id: item.id,
+    symbol: item.attributes.fungible_info?.symbol ?? '',
+    name: item.attributes.fungible_info?.name ?? '',
+    quantity: item.attributes.quantity?.float ?? 0,
+    value_usd: item.attributes.value ?? 0,
+  }));
+}
+
+export async function getPnl(walletAddress: string): Promise<ZerionPnl> {
+  if (!config.ZERION_API_KEY) throw new ZerionError(0, 'ZERION_API_KEY is not configured');
+
+  const raw = await zerionGet(`/v1/wallets/${encodeURIComponent(walletAddress)}/pnl`);
+  if (!raw) return { unrealized_gain: null, realized_gain: null, total_gain: null };
+
+  const parsed = ZerionPnlSchema.safeParse(raw);
+  if (!parsed.success) return { unrealized_gain: null, realized_gain: null, total_gain: null };
+
+  const attrs = parsed.data.data.attributes;
+  return {
+    unrealized_gain: attrs.unrealized_gain ?? null,
+    realized_gain: attrs.realized_gain ?? null,
+    total_gain: attrs.total_gain ?? null,
   };
 }
 

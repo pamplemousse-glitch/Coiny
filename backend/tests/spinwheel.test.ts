@@ -4,6 +4,7 @@ import { authHeader, resetDatabase, testUserId } from './db-helper.js';
 vi.mock('../src/spinwheel/client.js', () => ({
   sendSmsOtp: vi.fn(),
   verifySmsOtp: vi.fn(),
+  subscribeMonthly: vi.fn(),
   getDebtProfile: vi.fn(),
   getCreditScore: vi.fn(),
   deleteUser: vi.fn(),

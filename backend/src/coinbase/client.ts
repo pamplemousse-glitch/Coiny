@@ -108,6 +108,17 @@ const CoinbaseTransactionsResponseSchema = z.object({
 
 export type CoinbaseTransaction = z.infer<typeof CoinbaseTransactionSchema>;
 
+export type CoinbaseTxClass = 'earn' | 'unstake' | 'trade' | 'defi' | 'transfer' | 'other';
+
+export function classifyTransaction(type: string): CoinbaseTxClass {
+  if (type === 'earn_payout' || type === 'staking_transfer') return 'earn';
+  if (type === 'unstaking_transfer') return 'unstake';
+  if (type === 'advanced_trade_fill') return 'trade';
+  if (type === 'wrap_asset' || type === 'unwrap_asset') return 'defi';
+  if (type === 'send' || type === 'receive') return 'transfer';
+  return 'other';
+}
+
 /**
  * Returns all Coinbase accounts for the authenticated key, following pagination.
  * Returns empty array when API keys are not configured or account not found.
@@ -166,19 +177,55 @@ export async function getTransactions(
   };
 }
 
+const CoinbasePortfolioSchema = z.object({
+  portfolios: z.array(
+    z.object({
+      portfolio_balances: z.object({
+        total_cash_equivalent_balance: z.object({ value: z.string() }),
+        total_crypto_balance: z.object({ value: z.string() }),
+        unrealized_pnl: z.object({ value: z.string() }),
+      }),
+    }),
+  ),
+});
+
+export async function getPortfolioSummary(): Promise<{
+  totalCash: number;
+  totalCrypto: number;
+  unrealizedPnl: number;
+} | null> {
+  const result = await coinbaseGet('/api/v3/brokerage/portfolios', CoinbasePortfolioSchema);
+  if (!result || result.portfolios.length === 0) return null;
+  const b = result.portfolios[0]!.portfolio_balances;
+  return {
+    totalCash: parseFloat(b.total_cash_equivalent_balance.value),
+    totalCrypto: parseFloat(b.total_crypto_balance.value),
+    unrealizedPnl: parseFloat(b.unrealized_pnl.value),
+  };
+}
+
 const SpotPriceResponseSchema = z.object({
   data: z.object({ amount: z.string() }),
 });
 
+const SPOT_PRICE_TTL_MS = 60_000;
+const spotPriceCache = new Map<string, { price: number; fetchedAt: number }>();
+
 /**
  * Returns USD spot prices for the given crypto symbols (e.g. ['BTC', 'ETH']).
  * Uses the public v2 endpoint — no auth required. Symbols that fail are omitted.
- * Always hits production (api.coinbase.com) regardless of COINBASE_BASE_URL.
+ * Results are cached for 60s. Always hits production regardless of COINBASE_BASE_URL.
  */
 export async function getSpotPrices(symbols: string[]): Promise<Map<string, number>> {
   const unique = [...new Set(symbols)];
+  const now = Date.now();
+  const toFetch = unique.filter((sym) => {
+    const cached = spotPriceCache.get(sym);
+    return !cached || now - cached.fetchedAt >= SPOT_PRICE_TTL_MS;
+  });
+
   const results = await Promise.allSettled(
-    unique.map(async (sym) => {
+    toFetch.map(async (sym) => {
       const res = await fetch(`https://api.coinbase.com/v2/prices/${encodeURIComponent(sym)}-USD/spot`);
       if (!res.ok) throw new Error(`spot price ${sym} failed: ${res.status}`);
       const raw: unknown = await res.json();
@@ -187,9 +234,16 @@ export async function getSpotPrices(symbols: string[]): Promise<Map<string, numb
     }),
   );
 
-  const map = new Map<string, number>();
   for (const r of results) {
-    if (r.status === 'fulfilled') map.set(r.value.sym, r.value.price);
+    if (r.status === 'fulfilled') {
+      spotPriceCache.set(r.value.sym, { price: r.value.price, fetchedAt: now });
+    }
+  }
+
+  const map = new Map<string, number>();
+  for (const sym of unique) {
+    const cached = spotPriceCache.get(sym);
+    if (cached) map.set(sym, cached.price);
   }
   return map;
 }

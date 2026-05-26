@@ -136,9 +136,11 @@ export type InvestmentsHoldingsGetResponse = {
 
 export type PlaidCreditLiability = {
   account_id: string;
+  is_overdue: boolean | null;
   minimum_payment_amount: number | null;
   next_payment_due_date: string | null;
   last_statement_balance: number | null;
+  aprs: { apr_percentage: number; apr_type: string }[] | null;
 };
 
 export type PlaidMortgageLiability = {
@@ -161,6 +163,22 @@ export type LiabilitiesGetResponse = {
     mortgage: PlaidMortgageLiability[] | null;
     student: PlaidStudentLoan[] | null;
   };
+  request_id: string;
+};
+
+export type RecurringStream = {
+  stream_id: string;
+  account_id: string;
+  merchant_name: string | null;
+  description: string;
+  frequency: string;
+  average_amount: { amount: number } | null;
+  is_user_modified: boolean;
+};
+
+export type RecurringTransactionsResponse = {
+  inflow_streams: RecurringStream[];
+  outflow_streams: RecurringStream[];
   request_id: string;
 };
 
