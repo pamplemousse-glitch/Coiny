@@ -2,11 +2,16 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { config } from '../config.js';
 
 // AES-256-GCM envelope: hex(iv):hex(authTag):hex(ciphertext).
-// If DATA_ENCRYPTION_KEY is unset (dev convenience) the helpers pass
-// plaintext through unchanged so local-only flows keep working without
-// a key set. Production refuses to start without the key (see config.ts).
+// DATA_ENCRYPTION_KEY is required in production (config.ts enforces this).
+// In dev/test without a key set, encryption is skipped as a convenience —
+// the server will refuse to start in production if the key is missing.
 export function encryptString(plaintext: string): string {
-  if (!config.DATA_ENCRYPTION_KEY) return plaintext;
+  if (!config.DATA_ENCRYPTION_KEY) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('encryptString called without DATA_ENCRYPTION_KEY in production');
+    }
+    return plaintext;
+  }
   const key = Buffer.from(config.DATA_ENCRYPTION_KEY, 'hex');
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
@@ -16,7 +21,13 @@ export function encryptString(plaintext: string): string {
 }
 
 export function decryptString(stored: string): string {
-  if (!config.DATA_ENCRYPTION_KEY || !stored.includes(':')) return stored;
+  if (!config.DATA_ENCRYPTION_KEY) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('decryptString called without DATA_ENCRYPTION_KEY in production');
+    }
+    return stored;
+  }
+  if (!stored.includes(':')) return stored;
   const parts = stored.split(':');
   if (parts.length !== 3) return stored;
   const [ivHex, tagHex, ctHex] = parts as [string, string, string];
