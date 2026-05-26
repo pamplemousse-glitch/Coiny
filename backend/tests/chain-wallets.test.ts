@@ -18,9 +18,13 @@ vi.mock('../src/chains/stellar.js', () => ({
 vi.mock('../src/chains/blockcypher.js', () => ({
   getBlockcypherBalance: vi.fn(),
 }));
+vi.mock('../src/chains/cosmos.js', () => ({
+  getCosmosBalance: vi.fn(),
+}));
 
 import { getBitcoinBalance } from '../src/chains/bitcoin.js';
 import { getBlockcypherBalance } from '../src/chains/blockcypher.js';
+import { getCosmosBalance } from '../src/chains/cosmos.js';
 import { getStellarBalance } from '../src/chains/stellar.js';
 import { getXrpBalance } from '../src/chains/xrp.js';
 import { getSpotPrices } from '../src/coinbase/client.js';
@@ -30,6 +34,7 @@ const mockedGetBitcoinBalance = vi.mocked(getBitcoinBalance);
 const mockedGetXrpBalance = vi.mocked(getXrpBalance);
 const mockedGetStellarBalance = vi.mocked(getStellarBalance);
 const mockedGetBlockcypherBalance = vi.mocked(getBlockcypherBalance);
+const mockedGetCosmosBalance = vi.mocked(getCosmosBalance);
 
 describe('GET /api/chain-wallets', () => {
   beforeEach(async () => {
@@ -342,23 +347,24 @@ describe('POST /api/chain-wallets/sync', () => {
     await app.close();
   });
 
-  it('returns updated: 0 for chains without a client yet', async () => {
+  it('updates balance and returns updated: 1 for cosmos wallet', async () => {
     const { db } = await import('../src/db/client.js');
     const { chainWallets } = await import('../src/db/schema.js');
     await db().insert(chainWallets).values({ userId: testUserId, chain: 'cosmos', address: 'cosmos1test' });
 
+    mockedGetCosmosBalance.mockResolvedValue(50);
     mockedGetSpotPrices.mockResolvedValue(new Map([['ATOM', 8]]));
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/chain-wallets/sync',
-      headers: authHeader(),
-    });
+    const res = await app.inject({ method: 'POST', url: '/api/chain-wallets/sync', headers: authHeader() });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ updated: 0 });
+    expect(res.json()).toEqual({ updated: 1 });
+
+    const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
+    const wallet = list.json<{ lastBalanceUsd: number }[]>()[0];
+    expect(wallet?.lastBalanceUsd).toBeCloseTo(400, 0);
 
     await app.close();
   });
