@@ -6,14 +6,28 @@ import {
   chainWallets,
   coinbaseConnections,
   hyperliquidAccounts,
+  petState,
   spinwheelConnections,
   zerionWallets,
 } from '../db/schema.js';
 import { accountsBalanceGet, investmentsHoldingsGet, liabilitiesGet } from '../plaid/client.js';
+import { dispatchReaction } from '../reactions/dispatch.js';
+import { evaluateExternalEvent } from '../reactions/external.js';
 import { getDebtProfile } from '../spinwheel/client.js';
+import { recordReaction } from '../store/pet.js';
 import { getItemsByUser } from '../store/items.js';
 import { getRecentOutflows } from '../store/transactions.js';
 import { getPortfolio } from '../zerion/client.js';
+
+const NET_WORTH_MILESTONES = [10_000, 25_000, 50_000, 100_000, 250_000, 500_000, 1_000_000];
+
+function crossedMilestone(prev: number, current: number): number | null {
+  for (let i = NET_WORTH_MILESTONES.length - 1; i >= 0; i--) {
+    const m = NET_WORTH_MILESTONES[i]!;
+    if (prev < m && current >= m) return m;
+  }
+  return null;
+}
 
 export function registerNetWorthApi(app: FastifyInstance): void {
   app.get('/api/net-worth', async (req, _reply) => {
@@ -217,6 +231,36 @@ export function registerNetWorthApi(app: FastifyInstance): void {
 
     const total =
       bankTotal + investmentsTotal + cryptoTotal + defiTotal + chainWalletsTotal + hyperliquidTotal - debtsTotal;
+
+    // --- Net worth milestone reaction ---
+    try {
+      const [pet] = await db().select().from(petState).where(eq(petState.userId, userId));
+      const prev = pet?.lastNetWorthUsd !== null && pet?.lastNetWorthUsd !== undefined
+        ? parseFloat(pet.lastNetWorthUsd)
+        : null;
+      const milestone = prev !== null ? crossedMilestone(prev, total) : null;
+      if (milestone !== null) {
+        const reaction = evaluateExternalEvent({
+          id: `nw-milestone-${userId}-${milestone}`,
+          userId,
+          type: 'net_worth_milestone',
+          amountUsd: milestone,
+          source: 'zerion',
+        });
+        if (reaction) {
+          await recordReaction(userId, 'net_worth_milestone', reaction);
+          dispatchReaction(userId, reaction);
+        }
+      }
+      if (prev === null || Math.abs(total - prev) > 0.01) {
+        await db()
+          .update(petState)
+          .set({ lastNetWorthUsd: total.toString() })
+          .where(eq(petState.userId, userId));
+      }
+    } catch {
+      // pet row may not exist yet; skip milestone check
+    }
 
     // --- Emergency fund coverage (C4) ---
     let liquidCashMonths: number | null = null;
