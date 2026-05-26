@@ -249,6 +249,19 @@ export const metalHoldings = pgTable('metal_holdings', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// SnapTrade connections — one per user; snaptradeUserSecret is AES-256-GCM encrypted.
+// snapUserId is a copy of the Coiny user ID registered with SnapTrade.
+export const snaptradeConnections = pgTable('snaptrade_connections', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  snapUserId: text('snap_user_id').notNull(),
+  snapUserSecret: text('snap_user_secret').notNull(),
+  lastBrokerageTotal: numeric('last_brokerage_total'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Temporary storage for the Spinwheel userId returned by the SMS OTP send step.
 // Needed because the verify call requires the spinwheelUserId in the URL path.
 // Cleared on successful verify or replaced on new OTP request.

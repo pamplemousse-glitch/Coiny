@@ -9,6 +9,7 @@ import {
   metalHoldings,
   petState,
   realEstateAssets,
+  snaptradeConnections,
   spinwheelConnections,
   vehicleAssets,
   zerionWallets,
@@ -239,6 +240,19 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // table not yet populated
     }
 
+    // --- SnapTrade brokerage (pre-synced total) ---
+    let snaptradeTotal = 0;
+    let snaptradeConnected = false;
+    try {
+      const [snap] = await db().select().from(snaptradeConnections).where(eq(snaptradeConnections.userId, userId));
+      if (snap) {
+        snaptradeConnected = true;
+        if (snap.lastBrokerageTotal !== null) snaptradeTotal += parseFloat(snap.lastBrokerageTotal);
+      }
+    } catch {
+      // table not yet populated
+    }
+
     // --- Debts (Spinwheel) ---
     let debtsTotal = 0;
     const debtItems: Array<{ id: string; type: string; balance: number; monthlyPayment: number }> = [];
@@ -274,7 +288,8 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       hyperliquidTotal +
       realEstateTotal +
       vehiclesTotal +
-      metalsTotal -
+      metalsTotal +
+      snaptradeTotal -
       debtsTotal;
 
     // --- Net worth milestone reaction ---
@@ -327,6 +342,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       realEstate: realEstateTotal,
       vehicles: vehiclesTotal,
       metals: metalsTotal,
+      snaptrade: snaptradeTotal,
       debts: -debtsTotal,
       liquidCashMonths,
       accounts: {
@@ -340,6 +356,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
         coinbase: coinbaseConnected,
         zerion: zerionConnected,
         spinwheel: spinwheelConnected,
+        snaptrade: snaptradeConnected,
       },
     };
   });
