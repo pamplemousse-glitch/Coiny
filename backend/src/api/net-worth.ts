@@ -2,7 +2,13 @@ import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { getAccounts, getSpotPrices } from '../coinbase/client.js';
 import { db } from '../db/client.js';
-import { chainWallets, coinbaseConnections, spinwheelConnections, zerionWallets } from '../db/schema.js';
+import {
+  chainWallets,
+  coinbaseConnections,
+  hyperliquidAccounts,
+  spinwheelConnections,
+  zerionWallets,
+} from '../db/schema.js';
 import { accountsBalanceGet, investmentsHoldingsGet, liabilitiesGet } from '../plaid/client.js';
 import { getDebtProfile } from '../spinwheel/client.js';
 import { getItemsByUser } from '../store/items.js';
@@ -172,6 +178,17 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // table not yet populated
     }
 
+    // --- Hyperliquid perp accounts (pre-synced account values) ---
+    let hyperliquidTotal = 0;
+    try {
+      const hlRows = await db().select().from(hyperliquidAccounts).where(eq(hyperliquidAccounts.userId, userId));
+      for (const r of hlRows) {
+        if (r.lastAccountValueUsd !== null) hyperliquidTotal += parseFloat(r.lastAccountValueUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
     // --- Debts (Spinwheel) ---
     let debtsTotal = 0;
     const debtItems: Array<{ id: string; type: string; balance: number; monthlyPayment: number }> = [];
@@ -198,7 +215,8 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // spinwheel not connected or error
     }
 
-    const total = bankTotal + investmentsTotal + cryptoTotal + defiTotal + chainWalletsTotal - debtsTotal;
+    const total =
+      bankTotal + investmentsTotal + cryptoTotal + defiTotal + chainWalletsTotal + hyperliquidTotal - debtsTotal;
 
     // --- Emergency fund coverage (C4) ---
     let liquidCashMonths: number | null = null;
@@ -220,6 +238,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       crypto: cryptoTotal,
       defi: defiTotal,
       chainWallets: chainWalletsTotal,
+      hyperliquid: hyperliquidTotal,
       debts: -debtsTotal,
       liquidCashMonths,
       accounts: {

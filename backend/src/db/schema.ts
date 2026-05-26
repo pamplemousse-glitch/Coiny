@@ -178,6 +178,24 @@ export const chainWallets = pgTable(
   (t) => [uniqueIndex('chain_wallets_user_chain_address_idx').on(t.userId, t.chain, t.address)],
 );
 
+// Hyperliquid perp accounts — many per user, one row per EVM address.
+// lastAccountValueUsd is updated by POST /api/hyperliquid/sync (already USD-denominated).
+export const hyperliquidAccounts = pgTable(
+  'hyperliquid_accounts',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    address: text('address').notNull(),
+    label: text('label'),
+    lastAccountValueUsd: numeric('last_account_value_usd'),
+    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('hyperliquid_accounts_user_address_idx').on(t.userId, t.address)],
+);
+
 // Temporary storage for the Spinwheel userId returned by the SMS OTP send step.
 // Needed because the verify call requires the spinwheelUserId in the URL path.
 // Cleared on successful verify or replaced on new OTP request.

@@ -246,6 +246,25 @@ actor API {
         try await get("/api/net-worth")
     }
 
+    // MARK: - Hyperliquid
+
+    func getHyperliquidAccounts() async throws -> [HyperliquidAccount] {
+        try await get("/api/hyperliquid/accounts")
+    }
+
+    func addHyperliquidAccount(address: String, label: String?) async throws {
+        struct Body: Encodable { let address: String; let label: String? }
+        let _: EmptyResponse = try await post("/api/hyperliquid/accounts", body: Body(address: address, label: label))
+    }
+
+    func removeHyperliquidAccount(address: String) async throws {
+        try await deleteVoid("/api/hyperliquid/accounts/\(address)")
+    }
+
+    func syncHyperliquid() async throws -> HyperliquidSyncResult {
+        try await post("/api/hyperliquid/sync")
+    }
+
     // MARK: - Misc
 
     func health() async throws -> HealthResponse {
@@ -470,6 +489,8 @@ struct NetWorthResponse: Decodable {
     let investments: Double
     let crypto: Double
     let defi: Double
+    let chainWallets: Double
+    let hyperliquid: Double
     let debts: Double
     let liquidCashMonths: Double?
     let accounts: NetWorthAccounts
@@ -539,6 +560,21 @@ struct DebtItem: Decodable, Identifiable {
     let type: String?
     let balance: Double
     let monthlyPayment: Double?
+}
+
+// MARK: - Hyperliquid DTOs
+
+struct HyperliquidAccount: Decodable, Identifiable {
+    let id: Int
+    let address: String
+    let label: String?
+    let lastAccountValueUsd: Double?
+    let lastSyncedAt: String?
+    let createdAt: String
+}
+
+struct HyperliquidSyncResult: Decodable {
+    let updated: Int
 }
 
 #if DEBUG
