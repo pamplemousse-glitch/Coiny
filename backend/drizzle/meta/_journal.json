@@ -99,6 +99,13 @@
       "when": 1748304000000,
       "tag": "0013_hyperliquid_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1748390400000,
+      "tag": "0014_net_worth_milestones",
+      "breakpoints": true
     }
   ]
 }

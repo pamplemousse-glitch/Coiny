@@ -53,6 +53,7 @@ export const petState = pgTable('pet_state', {
   savingsGoal: integer('savings_goal').notNull().default(1000),
   paycheckMinAmount: integer('paycheck_min_amount').notNull().default(500),
   largePurchaseThreshold: integer('large_purchase_threshold').notNull().default(200),
+  lastNetWorthUsd: numeric('last_net_worth_usd'),
 });
 
 // `reaction` holds an AES-256-GCM-encrypted JSON blob (envelope format from
@@ -156,6 +157,7 @@ export const spinwheelConnections = pgTable('spinwheel_connections', {
     .primaryKey()
     .references(() => users.id, { onDelete: 'cascade' }),
   spinwheelUserId: text('spinwheel_user_id').notNull(),
+  lastCreditScore: integer('last_credit_score'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
