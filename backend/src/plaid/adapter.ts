@@ -62,7 +62,8 @@ const PFC_MAP: Array<[RegExp, string]> = [
   [/^GOVERNMENT_AND_NON_PROFIT_DONATIONS$/, 'donations'],
   [/^GOVERNMENT_AND_NON_PROFIT_/, 'government'],
 
-  // TRANSFERS
+  // TRANSFERS — payroll-specific before generic catch-all so ACH payroll fires paycheck_received
+  [/^TRANSFER_IN_PAYROLL_AND_TAX_REFUNDS$/, 'paycheck'],
   [/^TRANSFER_IN_/, 'transfer'],
   [/^TRANSFER_OUT_/, 'transfer'],
 ];
