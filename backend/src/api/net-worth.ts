@@ -12,6 +12,7 @@ import {
   snaptradeConnections,
   spinwheelConnections,
   vehicleAssets,
+  ynabConnections,
   zerionWallets,
 } from '../db/schema.js';
 import { accountsBalanceGet, investmentsHoldingsGet, liabilitiesGet } from '../plaid/client.js';
@@ -240,6 +241,19 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // table not yet populated
     }
 
+    // --- YNAB budgets (pre-synced total) ---
+    let ynabTotal = 0;
+    let ynabConnected = false;
+    try {
+      const [ynab] = await db().select().from(ynabConnections).where(eq(ynabConnections.userId, userId));
+      if (ynab) {
+        ynabConnected = true;
+        if (ynab.lastNetWorthUsd !== null) ynabTotal += parseFloat(ynab.lastNetWorthUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
     // --- SnapTrade brokerage (pre-synced total) ---
     let snaptradeTotal = 0;
     let snaptradeConnected = false;
@@ -289,7 +303,8 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       realEstateTotal +
       vehiclesTotal +
       metalsTotal +
-      snaptradeTotal -
+      snaptradeTotal +
+      ynabTotal -
       debtsTotal;
 
     // --- Net worth milestone reaction ---
@@ -343,6 +358,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       vehicles: vehiclesTotal,
       metals: metalsTotal,
       snaptrade: snaptradeTotal,
+      ynab: ynabTotal,
       debts: -debtsTotal,
       liquidCashMonths,
       accounts: {
@@ -357,6 +373,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
         zerion: zerionConnected,
         spinwheel: spinwheelConnected,
         snaptrade: snaptradeConnected,
+        ynab: ynabConnected,
       },
     };
   });

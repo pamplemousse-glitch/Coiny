@@ -262,6 +262,17 @@ export const snaptradeConnections = pgTable('snaptrade_connections', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// YNAB connections — one per user; apiKey is AES-256-GCM encrypted personal access token.
+export const ynabConnections = pgTable('ynab_connections', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  apiKey: text('api_key').notNull(),
+  lastNetWorthUsd: numeric('last_net_worth_usd'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Temporary storage for the Spinwheel userId returned by the SMS OTP send step.
 // Needed because the verify call requires the spinwheelUserId in the URL path.
 // Cleared on successful verify or replaced on new OTP request.
