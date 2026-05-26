@@ -193,3 +193,100 @@ describe('spinwheel getCreditScore', () => {
     expect(result.utilization).toBeNull();
   });
 });
+
+describe('spinwheel subscribeMonthly', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('posts to correct subscriptions endpoint and resolves void', async () => {
+    vi.mocked(fetch).mockResolvedValue(envelope({}));
+
+    const { subscribeMonthly } = await import('../src/spinwheel/client.js');
+    await expect(subscribeMonthly('sw-user-1')).resolves.toBeUndefined();
+
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      expect.stringContaining('/v1/users/sw-user-1/subscriptions'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ type: 'CREDIT_PROFILE', frequency: 'MONTHLY' }),
+      }),
+    );
+  });
+
+  it('throws SpinwheelError on non-ok response', async () => {
+    vi.mocked(fetch).mockResolvedValue(errorResponse(400));
+
+    const { subscribeMonthly, SpinwheelError } = await import('../src/spinwheel/client.js');
+    await expect(subscribeMonthly('sw-bad')).rejects.toBeInstanceOf(SpinwheelError);
+  });
+});
+
+describe('spinwheel SpinwheelDebt — expanded optional fields', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('parses dueDate, accountStatus, lastPaymentDate, openDate, paymentHistoryCodes when present', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      envelope({
+        creditCards: [
+          {
+            id: 'cc-1',
+            type: 'CREDIT_CARD',
+            balance: 1500,
+            dueDate: '2026-06-01',
+            accountStatus: 'OPEN',
+            lastPaymentDate: '2026-05-01',
+            openDate: '2020-03-15',
+            paymentHistoryCodes: ['OK', 'OK', 'LATE'],
+          },
+        ],
+      }),
+    );
+
+    const { getDebtProfile } = await import('../src/spinwheel/client.js');
+    const debts = await getDebtProfile('sw-user-1');
+    const debt = debts[0]!;
+    expect(debt.dueDate).toBe('2026-06-01');
+    expect(debt.accountStatus).toBe('OPEN');
+    expect(debt.lastPaymentDate).toBe('2026-05-01');
+    expect(debt.openDate).toBe('2020-03-15');
+    expect(debt.paymentHistoryCodes).toEqual(['OK', 'OK', 'LATE']);
+  });
+
+  it('accepts DELINQUENT accountStatus', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      envelope({
+        creditCards: [{ id: 'cc-2', type: 'CREDIT_CARD', balance: 500, accountStatus: 'DELINQUENT' }],
+      }),
+    );
+
+    const { getDebtProfile } = await import('../src/spinwheel/client.js');
+    const debts = await getDebtProfile('sw-user-1');
+    expect(debts[0]?.accountStatus).toBe('DELINQUENT');
+  });
+
+  it('tolerates absent optional fields', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      envelope({
+        studentLoans: [{ id: 's-1', type: 'STUDENT_LOAN', balance: 8000 }],
+      }),
+    );
+
+    const { getDebtProfile } = await import('../src/spinwheel/client.js');
+    const debts = await getDebtProfile('sw-user-1');
+    const debt = debts[0]!;
+    expect(debt.dueDate).toBeUndefined();
+    expect(debt.accountStatus).toBeUndefined();
+    expect(debt.paymentHistoryCodes).toBeUndefined();
+  });
+});

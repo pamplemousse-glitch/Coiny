@@ -202,3 +202,151 @@ describe('coinbase getTransactions — with valid keys', () => {
     expect(result.nextCursor).toBeUndefined();
   });
 });
+
+describe('coinbase classifyTransaction', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.doMock('../src/config.js', () => ({
+      config: { COINBASE_API_KEY_ID: '', COINBASE_API_KEY_SECRET: '' },
+    }));
+  });
+
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it('classifies all known transaction types correctly', async () => {
+    const { classifyTransaction } = await import('../src/coinbase/client.js');
+    expect(classifyTransaction('earn_payout')).toBe('earn');
+    expect(classifyTransaction('staking_transfer')).toBe('earn');
+    expect(classifyTransaction('unstaking_transfer')).toBe('unstake');
+    expect(classifyTransaction('advanced_trade_fill')).toBe('trade');
+    expect(classifyTransaction('wrap_asset')).toBe('defi');
+    expect(classifyTransaction('unwrap_asset')).toBe('defi');
+    expect(classifyTransaction('send')).toBe('transfer');
+    expect(classifyTransaction('receive')).toBe('transfer');
+    expect(classifyTransaction('some_unknown_type')).toBe('other');
+  });
+});
+
+describe('coinbase getSpotPrices — TTL cache', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.doMock('../src/config.js', () => ({
+      config: { COINBASE_API_KEY_ID: '', COINBASE_API_KEY_SECRET: '' },
+    }));
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.resetModules();
+    vi.unstubAllGlobals();
+  });
+
+  it('fetches price on first call and returns parsed amount', async () => {
+    vi.mocked(fetch).mockResolvedValue(makeFetch({ data: { amount: '50000.00' } }));
+
+    const { getSpotPrices } = await import('../src/coinbase/client.js');
+    const result = await getSpotPrices(['BTC']);
+    expect(result.get('BTC')).toBe(50000);
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not re-fetch within TTL on second call in same import', async () => {
+    vi.mocked(fetch).mockResolvedValue(makeFetch({ data: { amount: '50000.00' } }));
+
+    const { getSpotPrices } = await import('../src/coinbase/client.js');
+    await getSpotPrices(['BTC']);
+    vi.mocked(fetch).mockClear();
+
+    const result = await getSpotPrices(['BTC']);
+    expect(result.get('BTC')).toBe(50000);
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+
+  it('deduplicates repeated symbols in the same call', async () => {
+    vi.mocked(fetch).mockResolvedValue(makeFetch({ data: { amount: '3000.00' } }));
+
+    const { getSpotPrices } = await import('../src/coinbase/client.js');
+    await getSpotPrices(['ETH', 'ETH', 'ETH']);
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it('omits symbols whose fetch failed', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(makeFetch({ data: { amount: '50000.00' } }))
+      .mockResolvedValueOnce(makeFetch(null, 500));
+
+    const { getSpotPrices } = await import('../src/coinbase/client.js');
+    const result = await getSpotPrices(['BTC', 'UNKNOWN']);
+    expect(result.has('BTC')).toBe(true);
+    expect(result.has('UNKNOWN')).toBe(false);
+  });
+});
+
+describe('coinbase getPortfolioSummary — with valid keys', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.doMock('../src/config.js', () => ({
+      config: { COINBASE_API_KEY_ID: 'test-key-id', COINBASE_API_KEY_SECRET: TEST_PEM },
+    }));
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.resetModules();
+    vi.unstubAllGlobals();
+  });
+
+  it('returns parsed portfolio balances', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeFetch({
+        portfolios: [
+          {
+            portfolio_balances: {
+              total_cash_equivalent_balance: { value: '1000.50' },
+              total_crypto_balance: { value: '5500.75' },
+              unrealized_pnl: { value: '-200.25' },
+            },
+          },
+        ],
+      }),
+    );
+
+    const { getPortfolioSummary } = await import('../src/coinbase/client.js');
+    const result = await getPortfolioSummary();
+    expect(result?.totalCash).toBe(1000.5);
+    expect(result?.totalCrypto).toBe(5500.75);
+    expect(result?.unrealizedPnl).toBe(-200.25);
+  });
+
+  it('returns null when portfolios array is empty', async () => {
+    vi.mocked(fetch).mockResolvedValue(makeFetch({ portfolios: [] }));
+
+    const { getPortfolioSummary } = await import('../src/coinbase/client.js');
+    const result = await getPortfolioSummary();
+    expect(result).toBeNull();
+  });
+});
+
+describe('coinbase getPortfolioSummary — no keys', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.doMock('../src/config.js', () => ({
+      config: { COINBASE_API_KEY_ID: '', COINBASE_API_KEY_SECRET: '' },
+    }));
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.resetModules();
+    vi.unstubAllGlobals();
+  });
+
+  it('returns null without making a network call', async () => {
+    const { getPortfolioSummary } = await import('../src/coinbase/client.js');
+    const result = await getPortfolioSummary();
+    expect(result).toBeNull();
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+});

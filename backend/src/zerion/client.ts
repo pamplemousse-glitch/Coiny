@@ -135,10 +135,10 @@ export async function getPortfolio(walletAddress: string, options: { sync?: bool
   if (options.sync) params.set('sync', 'true');
 
   const raw = await zerionGet(`/v1/wallets/${encodeURIComponent(walletAddress)}/portfolio?${params}`);
-  if (!raw) return { total_usd: 0, change_1d_pct: null };
+  if (!raw) return { total_usd: 0, change_1d_abs: null, change_1d_pct: null };
 
   const parsed = ZerionPortfolioResponseSchema.safeParse(raw);
-  if (!parsed.success) return { total_usd: 0, change_1d_pct: null };
+  if (!parsed.success) return { total_usd: 0, change_1d_abs: null, change_1d_pct: null };
 
   const attrs = parsed.data.data.attributes;
   return {
