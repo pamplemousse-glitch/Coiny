@@ -110,4 +110,26 @@ describe('evaluateExternalEvent', () => {
     const result = evaluateExternalEvent({ ...base, type: 'crypto_sent' });
     expect(result).toBeNull();
   });
+
+  it('net_worth_milestone returns celebrate reaction with milestone amount', () => {
+    const result = evaluateExternalEvent({ ...base, type: 'net_worth_milestone', amountUsd: 50_000 });
+    expect(result?.animation).toBe('celebrate');
+    expect(result?.sound).toBe('fanfare');
+    expect(result?.led).toBe('rainbow');
+    expect(result?.reason).toContain('50000');
+  });
+
+  it('credit_score_improved returns celebrate reaction with point delta', () => {
+    const result = evaluateExternalEvent({ ...base, type: 'credit_score_improved', amountUsd: 25 });
+    expect(result?.animation).toBe('celebrate');
+    expect(result?.sound).toBe('chime');
+    expect(result?.reason).toContain('25 pts');
+  });
+
+  it('credit_score_dropped returns sad reaction with point delta', () => {
+    const result = evaluateExternalEvent({ ...base, type: 'credit_score_dropped', amountUsd: 30 });
+    expect(result?.animation).toBe('sad');
+    expect(result?.led).toBe('red');
+    expect(result?.reason).toContain('30 pts');
+  });
 });

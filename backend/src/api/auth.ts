@@ -38,7 +38,7 @@ export function registerAuthApi(app: FastifyInstance): void {
     }
 
     if (sub !== user_id) {
-      req.log.warn({ sub, user_id }, 'apple token sub mismatch');
+      req.log.warn('apple token sub mismatch');
       return reply.status(401).send({ error: 'Invalid identity token' });
     }
 

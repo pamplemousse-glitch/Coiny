@@ -1,0 +1,249 @@
+# Cosmos Docs
+
+> Developer documentation for the Cosmos stack. Build secure, reliable, and high-performance blockchains.
+
+## Docs
+
+- [API Reference](https://docs.cosmos.network/enterprise/components/group/api.md): Complete API reference for Group module queries and messages
+- [Architecture](https://docs.cosmos.network/enterprise/components/group/architecture.md): System architecture, core concepts, and module integration details for the Group module
+- [Overview](https://docs.cosmos.network/enterprise/components/group/overview.md): On-Chain Multisig Accounts and Collective Decision-Making
+- [Attestor](https://docs.cosmos.network/enterprise/components/interoperability/attestor.md): Lightweight, blockchain-agnostic attestation service for IBC cross-chain communication.
+- [Deployment Overview](https://docs.cosmos.network/enterprise/components/interoperability/deployment.md): End-to-end IBC v2 deployment for mint/burn transfers between Cosmos and EVM chains.
+- [Relayer](https://docs.cosmos.network/enterprise/components/interoperability/relayer.md): Production-ready, request-driven relayer service for the IBC v2 Protocol.
+- [Network Manager](https://docs.cosmos.network/enterprise/components/network-manager.md): Unified deployment, orchestration, and lifecycle management for production Cosmos networks.
+- [API Reference](https://docs.cosmos.network/enterprise/components/poa/api.md): Complete API reference for PoA module gRPC queries and transactions
+- [Architecture](https://docs.cosmos.network/enterprise/components/poa/architecture.md): System architecture and module integration details for the PoA module
+- [Fee Distribution](https://docs.cosmos.network/enterprise/components/poa/distribution.md): Fee distribution mechanics and algorithms in the PoA module
+- [Governance Integration](https://docs.cosmos.network/enterprise/components/poa/governance.md): Governance integration and power-based voting in the PoA module
+- [Overview](https://docs.cosmos.network/enterprise/components/poa/overview.md): Enterprise-Ready Network Security and Operations
+- [Enterprise Overview](https://docs.cosmos.network/enterprise/overview.md): Enterprise-grade modules, infrastructure, and support for production Cosmos networks.
+- [Professional Services](https://docs.cosmos.network/enterprise/professional-services.md): Enterprise-grade support, advisory, and delivery services for production Cosmos networks.
+- [Security & Long-Term Stability](https://docs.cosmos.network/enterprise/security.md): Security assurance, compliance readiness, and long-term stability guarantees for production Cosmos networks.
+- [Cosmos Developer Documentation](https://docs.cosmos.network/index.md)
+- [Changelog](https://docs.cosmos.network/sdk/latest/changelog/release-notes.md): Release history and changelog for Cosmos SDK
+- [Block-STM: Parallel Transaction Execution](https://docs.cosmos.network/sdk/latest/experimental/blockstm.md)
+- [ABCI Overview](https://docs.cosmos.network/sdk/latest/guides/abci/abci.md): ABCI, Application Blockchain Interface is the interface between CometBFT and the application. More information about ABCI can be found here. CometBFT version 0.38 included a new version of ABCI (called ABCI 2.0) which added several new methods.
+- [Application Mempool](https://docs.cosmos.network/sdk/latest/guides/abci/app-mempool.md)
+- [Vote Extensions](https://docs.cosmos.network/sdk/latest/guides/abci/vote-extensions.md)
+- [Guides Overview](https://docs.cosmos.network/sdk/latest/guides/guides.md): Deep dives into specific Cosmos SDK topics for developers who have completed the tutorial.
+- [Module Design Considerations](https://docs.cosmos.network/sdk/latest/guides/module-design/module-design-considerations.md)
+- [Object-Capability Model](https://docs.cosmos.network/sdk/latest/guides/module-design/ocap.md): How the Cosmos SDK uses object capabilities to isolate modules and limit the blast radius of faulty or malicious code.
+- [Address Encoding](https://docs.cosmos.network/sdk/latest/guides/reference/bech32.md)
+- [SDK Go Packages](https://docs.cosmos.network/sdk/latest/guides/reference/packages.md): The Cosmos SDK is a collection of Go modules. This section provides documentation on various packages that can be used when developing a Cosmos SDK chain. It lists all standalone Go modules that are part of the Cosmos SDK.
+- [Cosmos Protobuf Docs](https://docs.cosmos.network/sdk/latest/guides/reference/proto-docs.md)
+- [Protobuf Annotations](https://docs.cosmos.network/sdk/latest/guides/reference/protobuf-annotations.md): This document explains the various protobuf scalars that have been added to make working with protobuf easier for Cosmos SDK application developers
+- [Collections API](https://docs.cosmos.network/sdk/latest/guides/state/collections.md): Collections is a library meant to simplify the experience with respect to module state handling.
+- [Module Store Internals](https://docs.cosmos.network/sdk/latest/guides/state/store.md)
+- [Log v2](https://docs.cosmos.network/sdk/latest/guides/testing/log.md)
+- [Module Simulation](https://docs.cosmos.network/sdk/latest/guides/testing/simulator.md)
+- [Telemetry](https://docs.cosmos.network/sdk/latest/guides/testing/telemetry.md)
+- [Writing CLI Commands](https://docs.cosmos.network/sdk/latest/guides/tooling/autocli.md)
+- [Confix](https://docs.cosmos.network/sdk/latest/guides/tooling/confix.md): Confix is a configuration management tool that allows you to manage your configuration via CLI.
+- [Tool Guide](https://docs.cosmos.network/sdk/latest/guides/tooling/tool-guide.md): What tools should I use and for what? A practical guide to the Cosmos SDK developer toolbox.
+- [Cosmovisor](https://docs.cosmos.network/sdk/latest/guides/upgrades/cosmovisor.md)
+- [Upgrades and Store Migrations](https://docs.cosmos.network/sdk/latest/guides/upgrades/upgrade.md)
+- [Cosmos SDK Docs](https://docs.cosmos.network/sdk/latest/learn.md): Version: v0.54
+- [Accounts](https://docs.cosmos.network/sdk/latest/learn/concepts/accounts.md)
+- [app.go Overview](https://docs.cosmos.network/sdk/latest/learn/concepts/app-go.md)
+- [BaseApp Overview](https://docs.cosmos.network/sdk/latest/learn/concepts/baseapp.md)
+- [CLI, gRPC, and REST API](https://docs.cosmos.network/sdk/latest/learn/concepts/cli-grpc-rest.md)
+- [Execution Context, Gas, and Events](https://docs.cosmos.network/sdk/latest/learn/concepts/context-gas-events.md)
+- [Protobuf and Signing](https://docs.cosmos.network/sdk/latest/learn/concepts/encoding.md)
+- [Transaction Lifecycle](https://docs.cosmos.network/sdk/latest/learn/concepts/lifecycle.md)
+- [Intro to Modules](https://docs.cosmos.network/sdk/latest/learn/concepts/modules.md)
+- [Cosmos Blockchain Structure](https://docs.cosmos.network/sdk/latest/learn/concepts/sdk-structure.md)
+- [State, Storage, and Genesis](https://docs.cosmos.network/sdk/latest/learn/concepts/store.md)
+- [Testing in the SDK](https://docs.cosmos.network/sdk/latest/learn/concepts/testing.md)
+- [Transactions, Messages, and Queries](https://docs.cosmos.network/sdk/latest/learn/concepts/transactions.md)
+- [Blockchain Basics](https://docs.cosmos.network/sdk/latest/learn/intro/blockchain-basics.md): Learn the fundamentals of blockchains, state machines, and how Cosmos SDK applications work.
+- [The Cosmos Stack](https://docs.cosmos.network/sdk/latest/learn/intro/cosmos-stack.md): Understanding the modular architecture of the Cosmos blockchain stack
+- [What is the Cosmos SDK](https://docs.cosmos.network/sdk/latest/learn/intro/overview.md)
+- [Cosmos Architecture](https://docs.cosmos.network/sdk/latest/learn/intro/sdk-app-architecture.md): How Cosmos SDK implements blockchains through separation of consensus, interface, and application logic.
+- [Start Here](https://docs.cosmos.network/sdk/latest/learn/start-here.md): Pick the path that matches what you want to do with the Cosmos SDK.
+- [x/auth](https://docs.cosmos.network/sdk/latest/modules/auth/auth.md): This document specifies the auth module of the Cosmos SDK.
+- [x/auth/tx](https://docs.cosmos.network/sdk/latest/modules/auth/tx.md)
+- [x/auth/vesting](https://docs.cosmos.network/sdk/latest/modules/auth/vesting.md)
+- [x/authz](https://docs.cosmos.network/sdk/latest/modules/authz/README.md)
+- [x/bank](https://docs.cosmos.network/sdk/latest/modules/bank/README.md): This document specifies the bank module of the Cosmos SDK.
+- [x/circuit](https://docs.cosmos.network/sdk/latest/modules/circuit/README.md)
+- [x/consensus](https://docs.cosmos.network/sdk/latest/modules/consensus/README.md): Functionality to modify CometBFT's ABCI consensus params.
+- [x/crisis](https://docs.cosmos.network/sdk/latest/modules/crisis/README.md): x/crisis has been moved to ./contrib/x/crisis and is no longer part of the core Cosmos SDK.
+- [x/distribution](https://docs.cosmos.network/sdk/latest/modules/distribution/README.md)
+- [x/epochs](https://docs.cosmos.network/sdk/latest/modules/epochs/README.md)
+- [x/evidence](https://docs.cosmos.network/sdk/latest/modules/evidence/README.md): Concepts State Messages Events Parameters BeginBlock Client CLI REST gRPC
+- [x/feegrant](https://docs.cosmos.network/sdk/latest/modules/feegrant/README.md): This document specifies the fee grant module. For the full ADR, please see Fee Grant ADR-029.
+- [x/genutil](https://docs.cosmos.network/sdk/latest/modules/genutil/README.md): The genutil package contains a variety of genesis utility functionalities for usage within a blockchain application. Namely:
+- [x/gov](https://docs.cosmos.network/sdk/latest/modules/gov/README.md): This paper specifies the Governance module of the Cosmos SDK, which was first described in the Cosmos Whitepaper in June 2016.
+- [x/group](https://docs.cosmos.network/sdk/latest/modules/group/README.md): The following documents specify the group module.
+- [x/mint](https://docs.cosmos.network/sdk/latest/modules/mint/README.md): The x/mint module handles the regular minting of new tokens in a configurable manner.
+- [Module Directory](https://docs.cosmos.network/sdk/latest/modules/modules.md): Here are some production-grade modules that can be used in Cosmos SDK applications, along with their respective documentation.
+- [x/nft](https://docs.cosmos.network/sdk/latest/modules/nft/README.md): ## Abstract
+- [x/params](https://docs.cosmos.network/sdk/latest/modules/params/README.md): NOTE: x/params is deprecated as of Cosmos SDK v0.53 and will be removed in the next release.
+- [x/protocolpool](https://docs.cosmos.network/sdk/latest/modules/protocolpool/README.md)
+- [x/slashing](https://docs.cosmos.network/sdk/latest/modules/slashing/README.md): This section specifies the slashing module of the Cosmos SDK, which implements functionality first outlined in the Cosmos Whitepaper in June 2016.
+- [x/staking](https://docs.cosmos.network/sdk/latest/modules/staking/README.md): This paper specifies the Staking module of the Cosmos SDK that was first described in the Cosmos Whitepaper in June 2016.
+- [x/upgrade](https://docs.cosmos.network/sdk/latest/modules/upgrade/README.md)
+- [Interacting with a Node](https://docs.cosmos.network/sdk/latest/node/interact-node.md)
+- [Setting up the keyring](https://docs.cosmos.network/sdk/latest/node/keyring.md)
+- [Prerequisites](https://docs.cosmos.network/sdk/latest/node/prerequisites.md)
+- [Running a Node](https://docs.cosmos.network/sdk/latest/node/run-node.md)
+- [Running in Production](https://docs.cosmos.network/sdk/latest/node/run-production.md)
+- [Running a Testnet](https://docs.cosmos.network/sdk/latest/node/run-testnet.md)
+- [Generating, Signing and Broadcasting Transactions](https://docs.cosmos.network/sdk/latest/node/txs.md)
+- [ADR Creation Process](https://docs.cosmos.network/sdk/latest/reference/architecture/PROCESS.md)
+- [Architecture Decision Records (ADR)](https://docs.cosmos.network/sdk/latest/reference/architecture/README.md): This is a location to record all high-level architecture decisions in the Cosmos-SDK.
+- [ADR 002: SDK Documentation Structure](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-002-docs-structure.md): There is a need for a scalable structure of the Cosmos SDK documentation. Current documentation includes a lot of non-related Cosmos SDK material, is difficult to maintain and hard to follow as a user.
+- [ADR 003: Dynamic Capability Store](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-003-dynamic-capability-store.md): 12 December 2019: Initial version 02 April 2020: Memory Store Revisions
+- [ADR 004: Split Denomination Keys](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-004-split-denomination-keys.md): 2020-01-08: Initial version 2020-01-09: Alterations to handle vesting accounts 2020-01-14: Updates from review feedback 2020-01-30: Updates from implementation
+- [ADR 006: Secret Store Replacement](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-006-secret-store-replacement.md): July 29th, 2019: Initial draft September 11th, 2019: Work has started November 4th: Cosmos SDK changes merged in November 18th: Gaia changes merged in
+- [ADR 007: Specialization Groups](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-007-specialization-groups.md): 2019 Jul 31: Initial Draft
+- [ADR 008: Decentralized Computer Emergency Response Team (dCERT) Group](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-008-dCERT-group.md): 2019 Jul 31: Initial Draft
+- [ADR 009: Evidence Module](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-009-evidence-module.md): 2019 July 31: Initial draft 2019 October 24: Initial implementation
+- [ADR 010: Modular AnteHandler](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-010-modular-antehandler.md): 2019 Aug 31: Initial draft 2021 Sep 14: Superseded by ADR-045
+- [ADR 011: Generalize Genesis Accounts](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-011-generalize-genesis-accounts.md): 2019-08-30: initial draft
+- [ADR 012: State Accessors](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-012-state-accessors.md): 2019 Sep 04: Initial draft
+- [ADR 013: Observability](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-013-metrics.md): 20-01-2020: Initial Draft
+- [ADR 14: Proportional Slashing](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-014-proportional-slashing.md): 2019-10-15: Initial draft 2020-05-25: Removed correlation root slashing 2020-07-01: Updated to include S-curve function instead of linear
+- [ADR 016: Validator Consensus Key Rotation](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-016-validator-consensus-key-rotation.md): 2019 Oct 23: Initial draft 2019 Nov 28: Add key rotation fee
+- [ADR 17: Historical Header Module](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-017-historical-header-module.md): 26 November 2019: Start of first version 2 December 2019: Final draft of first version
+- [ADR 18: Extendable Voting Periods](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-018-extendable-voting-period.md): 1 January 2020: Start of first version
+- [ADR 019: Protocol Buffer State Encoding](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-019-protobuf-state-encoding.md)
+- [ADR 020: Protocol Buffer Transaction Encoding](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-020-protobuf-transaction-encoding.md)
+- [ADR 021: Protocol Buffer Query Encoding](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-021-protobuf-query-encoding.md): 2020 March 27: Initial Draft
+- [ADR 022: Custom BaseApp panic handling](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-022-custom-panic-handling.md): 2020 Apr 24: Initial Draft 2021 Sep 14: Superseded by ADR-045
+- [ADR 023: Protocol Buffer Naming and Versioning Conventions](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-023-protobuf-naming.md): 2020 April 27: Initial Draft 2020 August 5: Update guidelines
+- [ADR 024: Coin Metadata](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-024-coin-metadata.md): 05/19/2020: Initial draft
+- [ADR 027: Deterministic Protobuf Serialization](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-027-deterministic-protobuf-serialization.md): 2020-08-07: Initial Draft 2020-09-01: Further clarify rules
+- [ADR 028: Public Key Addresses](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-028-public-key-addresses.md): 2020/08/18: Initial version 2021/01/15: Analysis and algorithm update
+- [ADR 029: Fee Grant Module](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-029-fee-grant-module.md): 2020/08/18: Initial Draft 2021/05/05: Removed height based expiration support and simplified naming.
+- [ADR 030: Authorization Module](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-030-authz-module.md)
+- [ADR 031: Protobuf Msg Services](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-031-msg-service.md): 2020-10-05: Initial Draft 2021-04-21: Remove ServiceMsgs to follow Protobuf Any's spec, see #9063.
+- [ADR 032: Typed Events](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-032-typed-events.md): 28-Sept-2020: Initial Draft
+- [ADR 033: Protobuf-based Inter-Module Communication](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-033-protobuf-inter-module-comm.md): 2020-10-05: Initial Draft
+- [ADR 034: Account Rekeying](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-034-account-rekeying.md): 30-09-2020: Initial Draft
+- [ADR 035: Rosetta API Support](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-035-rosetta-api-support.md): Jonathan Gimeno (@jgimeno) David Grierson (@senormonito) Alessio Treglia (@alessio) Frojdy Dymylja (@fdymylja)
+- [ADR 036: Arbitrary Message Signature Specification](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-036-arbitrary-signature.md): 28/10/2020 - Initial draft
+- [ADR 037: Governance split votes](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-037-gov-split-vote.md): 2020/10/28: Intial draft
+- [ADR 038: KVStore state listening](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-038-state-listening.md)
+- [ADR 039: Epoched Staking](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-039-epoched-staking.md): 10-Feb-2021: Initial Draft
+- [ADR 040: Storage and SMT State Commitments](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-040-storage-and-smt-state-commitments.md): 2020-01-15: Draft
+- [ADR 041: In-Place Store Migrations](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-041-in-place-store-migrations.md): 17.02.2021: Initial Draft
+- [ADR 042: Group Module](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-042-group-module.md): 2020/04/09: Initial Draft
+- [ADR 43: NFT Module](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-043-nft-module.md): 2021-05-01: Initial Draft 2021-07-02: Review updates 2022-06-15: Add batch operation 2022-11-11: Remove strict validation of classID and tokenID
+- [ADR 044: Guidelines for Updating Protobuf Definitions](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-044-protobuf-updates-guidelines.md): 28.06.2021: Initial Draft 02.12.2021: Add Since: comment for new fields 21.07.2022: Remove the rule of no new Msg in the same proto version.
+- [Adr 045 check delivertx middlewares](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-045-check-delivertx-middlewares.md): 20.08.2021: Initial draft. 07.12.2021: Update tx.Handler interface (\#10693). 17.05.2022: ADR is abandoned, as middlewares are deemed too hard to reason about.
+- [ADR 046: Module Params](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-046-module-params.md): Sep 22, 2021: Initial Draft
+- [ADR 047: Extend Upgrade Plan](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-047-extend-upgrade-plan.md): Nov, 23, 2021: Initial Draft May, 16, 2023: Proposal ABANDONED. prerun and postrun are not necessary anymore and adding the artifacts brings minor benefits.
+- [ADR 048: Multi Tire Gas Price System](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-048-consensus-fees.md): Dec 1, 2021: Initial Draft
+- [ADR 049: State Sync Hooks](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-049-state-sync-hooks.md): Jan 19, 2022: Initial Draft Apr 29, 2022: Safer extension snapshotter interface
+- [ADR 050: SIGN_MODE_TEXTUAL](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-050-sign-mode-textual.md)
+- [ADR 050: SIGN_MODE_TEXTUAL: Annex 1 Value Renderers](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-050-sign-mode-textual-annex1.md)
+- [ADR 050: SIGN_MODE_TEXTUAL: Annex 2 XXX](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-050-sign-mode-textual-annex2.md): Oct 3, 2022: Initial Draft
+- [ADR 053: Go Module Refactoring](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-053-go-module-refactoring.md): 2022-04-27: First Draft
+- [ADR 054: Semver Compatible SDK Modules](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-054-semver-compatible-modules.md): 2022-04-27: First draft
+- [ADR 055: ORM](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-055-orm.md): 2022-04-27: First draft
+- [ADR 057: App Wiring](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-057-app-wiring.md): 2022-05-04: Initial Draft 2022-08-19: Updates
+- [ADR 058: Auto-Generated CLI](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-058-auto-generated-cli.md): 2022-05-04: Initial Draft
+- [ADR 059: Test Scopes](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-059-test-scopes.md): 2022-08-02: Initial Draft 2023-03-02: Add precision for integration tests 2023-03-23: Add precision for E2E tests
+- [ADR 60: ABCI 1.0 Integration (Phase I)](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-060-abci-1.0.md): 2022-08-10: Initial Draft (@alexanderbez, @tac0turtle) Nov 12, 2022: Update PrepareProposal and ProcessProposal semantics per the initial implementation PR (@alexanderbez)
+- [ADR ADR-061: Liquid Staking](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-061-liquid-staking.md): 2022-09-10: Initial Draft (@zmanian)
+- [ADR 062: Collections, a simplified storage layer for cosmos-sdk modules.](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-062-collections-state-layer.md): 30/11/2022: PROPOSED
+- [ADR 063: Core Module API](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-063-core-module-api.md): 2022-08-18 First Draft 2022-12-08 First Draft 2023-01-24 Updates
+- [ADR 64: ABCI 2.0 Integration (Phase II)](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-064-abci-2.0.md)
+- [ADR-065: Store V2](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-065-store-v2.md): Feb 14, 2023: Initial Draft (@alexanderbez)
+- [ADR 068: Preblock](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-068-preblock.md): Sept 13, 2023: Initial Draft
+- [ADR 070: Unordered Transactions](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-070-unordered-account.md)
+- [Cosmos SDK Transaction Malleability Risk Review and Recommendations](https://docs.cosmos.network/sdk/latest/reference/architecture/adr-076-tx-malleability.md): 2025-03-10: Initial draft (@aaronc)
+- [Cosmos SDK Repository](https://docs.cosmos.network/sdk/latest/reference/cosmos-sdk-repo.md)
+- [Tutorial Example Repository](https://docs.cosmos.network/sdk/latest/reference/example-repo.md)
+- [RFC Creation Process](https://docs.cosmos.network/sdk/latest/reference/rfc/PROCESS.md)
+- [Requests for Comments](https://docs.cosmos.network/sdk/latest/reference/rfc/README.md): A Request for Comments (RFC) is a record of discussion on an open-ended topic related to the design and implementation of the Cosmos SDK, for which no immediate decision is required.
+- [RFC 001: Transaction Validation](https://docs.cosmos.network/sdk/latest/reference/rfc/rfc-001-tx-validation.md): 2023-03-12: Proposed
+- [Rfc template](https://docs.cosmos.network/sdk/latest/reference/rfc/rfc-template.md)
+- [Specifications](https://docs.cosmos.network/sdk/latest/reference/spec/README.md): This directory contains specifications for the modules of the Cosmos SDK as well as Interchain Standards (ICS) and other specifications.
+- [Specification of Modules](https://docs.cosmos.network/sdk/latest/reference/spec/SPEC_MODULE.md): This file intends to outline the common structure for specifications within this directory.
+- [What is an SDK standard?](https://docs.cosmos.network/sdk/latest/reference/spec/SPEC_STANDARD.md)
+- [Release Families](https://docs.cosmos.network/sdk/latest/release-family.md): What release families are, what they contain, and how upgrades work.
+- [Security Audits](https://docs.cosmos.network/sdk/latest/security/audits.md): Security audits and transparency reports for Cosmos Stack components
+- [Bug Bounty Program](https://docs.cosmos.network/sdk/latest/security/bug-bounty.md): Security and maintenance policy documentation for the Cosmos Stack
+- [Security and Maintenance Policy](https://docs.cosmos.network/sdk/latest/security/security-policy.md): Security and maintenance policy documentation for the Cosmos Stack
+- [Node Tutorial](https://docs.cosmos.network/sdk/latest/tutorials.md): Version: v0.54
+- [Tutorial Intro](https://docs.cosmos.network/sdk/latest/tutorials/example/00-overview.md): Build a module from scratch, wire it into a chain, and run it locally, all in minutes.
+- [Prerequisites](https://docs.cosmos.network/sdk/latest/tutorials/example/01-prerequisites.md): Install dependencies
+- [Chain Quickstart](https://docs.cosmos.network/sdk/latest/tutorials/example/02-quickstart.md): Start a chain, submit a transaction, and query the result in minutes
+- [Build a Module from Scratch](https://docs.cosmos.network/sdk/latest/tutorials/example/03-build-a-module.md): Build a simple counter module from scratch in minutes
+- [Full Counter Module Walkthrough](https://docs.cosmos.network/sdk/latest/tutorials/example/04-counter-walkthrough.md)
+- [Run, Test, and Configure](https://docs.cosmos.network/sdk/latest/tutorials/example/05-run-and-test.md): Learn how to run and test a chain
+- [v0.54 Release Notes](https://docs.cosmos.network/sdk/latest/upgrade/release.md): What's new in the latest Cosmos SDK release, including performance improvements, new features, and removals.
+- [v0.54 Upgrade Guide](https://docs.cosmos.network/sdk/latest/upgrade/upgrade.md): Reference for upgrading from v0.53 to v0.54 of Cosmos SDK
+- [`allow_unsafe`: Preventing & Handling Bad Execution](https://docs.cosmos.network/skip-go/advanced-swapping/allow_unsafe-preventing-handling-bad-execution.md)
+- [SAFE Swapping: How to Protect Users from Bad Trades](https://docs.cosmos.network/skip-go/advanced-swapping/safe-swapping-how-to-protect-users-from-harming-themselves.md)
+- [Smart Swap](https://docs.cosmos.network/skip-go/advanced-swapping/smart-swap-options.md): This page introduces the Smart Swap functionality provided by the Skip Go API to improve swap speed, price, and customization.
+- [Understanding Quote Quality Metrics](https://docs.cosmos.network/skip-go/advanced-swapping/understanding-quote-quality-metrics.md): This doc covers the various ways route quote quality is measured -- slippage, USD estimates of the amount in and out, and price impact
+- [CW20 Tokens & Their Limitations](https://docs.cosmos.network/skip-go/advanced-transfer/cw20-swaps.md): Information about performing CW20 swaps
+- [EVM Transactions](https://docs.cosmos.network/skip-go/advanced-transfer/evm-transactions.md): This doc covers how to interact with the EvmTx type returned by the Skip Go API
+- [Experimental Features](https://docs.cosmos.network/skip-go/advanced-transfer/experimental-features.md): This page provides a living record of the features that can be turned on with the experimental_features flag
+- [Go Fast](https://docs.cosmos.network/skip-go/advanced-transfer/go-fast.md): A brief overview of the Go Fast Transfer system
+- [Cross-chain Failure Cases](https://docs.cosmos.network/skip-go/advanced-transfer/handling-cross-chain-failure-cases.md): This page covers the different ways our cross-chain swaps + transfers might fail to help identify failures and manage user expectations
+- [IBC Token Routing: Problem + Skip Go API Routing Algorithm](https://docs.cosmos.network/skip-go/advanced-transfer/ibc-routing-algorithm.md): This page describes the IBC token routing problem and the algorithm Skip Go API uses to select / recommend token denoms and IBC paths
+- [Interpreting Transaction & Transfer Status](https://docs.cosmos.network/skip-go/advanced-transfer/interpreting-transaction-status.md): Learn how to interpret the status of transactions and individual transfer steps from the Skip Go API's /v2/tx/status endpoint to provide accurate feedback to users.
+- [SVM Transactions](https://docs.cosmos.network/skip-go/advanced-transfer/svm-transaction-details.md): This document explains how to use Skip Go API and Client TypeScript Package to construct SVM transactions.
+- [API Error Codes & Status Messages](https://docs.cosmos.network/skip-go/api-reference/error-codes.md): Reference for error codes and status messages returned by the Skip Go API, including transaction, bridge, and packet-specific statuses.
+- [Get /v2/fungible/assets](https://docs.cosmos.network/skip-go/api-reference/prod/fungible/get-v2fungibleassets.md): Get supported assets. Optionally limit to assets on a given chain and/or native assets.
+- [Get /v2/fungible/venues](https://docs.cosmos.network/skip-go/api-reference/prod/fungible/get-v2fungiblevenues.md): Get supported swap venues.
+- [Post /v2/fungible/assets_between_chains](https://docs.cosmos.network/skip-go/api-reference/prod/fungible/post-v2fungibleassets_between_chains.md): Given 2 chain IDs, returns a list of equivalent assets that can be transferred
+- [Post /v2/fungible/assets_from_source](https://docs.cosmos.network/skip-go/api-reference/prod/fungible/post-v2fungibleassets_from_source.md): Get assets that can be reached from a source via transfers under different conditions (e.g. single vs multiple txs)
+- [Post /v2/fungible/ibc_origin_assets](https://docs.cosmos.network/skip-go/api-reference/prod/fungible/post-v2fungibleibc_origin_assets.md): Get origin assets from a given list of denoms and chain IDs.
+- [Post /v2/fungible/msgs](https://docs.cosmos.network/skip-go/api-reference/prod/fungible/post-v2fungiblemsgs.md): This supports cross-chain actions among EVM chains, Cosmos chains, and between them. Returns minimal number of messages required to execute a multi-chain swap or transfer. Input consists of the output of route with additional information required for message construction (e.g. destination addresses…
+- [Post /v2/fungible/msgs_direct](https://docs.cosmos.network/skip-go/api-reference/prod/fungible/post-v2fungiblemsgs_direct.md): This supports cross-chain actions among EVM chains, Cosmos chains, and between them. Returns minimal number of messages required to execute a multi-chain swap or transfer. This is a convenience endpoint that combines /route and /msgs into a single call.
+- [Post /v2/fungible/route](https://docs.cosmos.network/skip-go/api-reference/prod/fungible/post-v2fungibleroute.md): This supports cross-chain actions among EVM chains, Cosmos chains, and between them. Returns the sequence of transfers and/or swaps to reach the given destination asset from the given source asset, along with estimated amount out. Commonly called before /msgs to generate route info and quote.
+- [Get /v2/info/bridges](https://docs.cosmos.network/skip-go/api-reference/prod/info/get-v2infobridges.md): Get all supported bridges
+- [Get /v2/info/chains](https://docs.cosmos.network/skip-go/api-reference/prod/info/get-v2infochains.md): Get all supported chains along with additional data useful for building applications + frontends that interface with them (e.g. logo URI, IBC capabilities, fee assets, bech32 prefix, etc...)
+- [Post /v2/info/balances](https://docs.cosmos.network/skip-go/api-reference/prod/info/post-v2infobalances.md): Get the balances of a given set of assets on a given chain and wallet address. Compatible with all Skip Go-supported assets, excluding CW20 assets, across SVM, EVM, and Cosmos chains.
+- [Get /v2/tx/status](https://docs.cosmos.network/skip-go/api-reference/prod/transaction/get-v2txstatus.md): Get the status of the specified transaction and any subsequent IBC or Axelar transfers if routing assets cross chain. The transaction must have previously been submitted to either the /submit or /track endpoints.
+- [Post /v2/tx/submit](https://docs.cosmos.network/skip-go/api-reference/prod/transaction/post-v2txsubmit.md): Submit a signed base64 encoded transaction to be broadcast to the specified network. On successful submission, the status of the transaction and any subsequent IBC or Axelar transfers can be queried through the /status endpoint.
+- [Post /v2/tx/track](https://docs.cosmos.network/skip-go/api-reference/prod/transaction/post-v2txtrack.md): Requests tracking of a transaction that has already landed on-chain but was not broadcast through the Skip Go API. The status of a tracked transaction and subsequent IBC or Axelar transfers if routing assets cross chain can be queried through the /status endpoint.
+- [Advanced Features](https://docs.cosmos.network/skip-go/client/advanced-features.md): This page details advanced features and utilities in the Skip Go client library.
+- [Balances, Gas and Transaction Fee Utilities](https://docs.cosmos.network/skip-go/client/balance-gas-and-fee-tooling.md): This page details the utility functions for token balances, gas calculations, and transaction fees in Skip Go.
+- [Executing a route](https://docs.cosmos.network/skip-go/client/executing-a-route.md): This page documents the executeRoute function, used to execute a token transfer/swap using a route from /v2/fungible/route API
+- [Gas on Receive with Custom Frontends](https://docs.cosmos.network/skip-go/client/gas-on-receive.md): Implement Gas on Receive functionality in your custom frontend using the Skip Go Client Library
+- [Getting Started](https://docs.cosmos.network/skip-go/client/getting-started.md): @skip-go/client is a TypeScript library that streamlines interaction with the Skip Go API, enabling cross-chain swaps and transfers across multiple ecosystems.
+- [Migration Guide](https://docs.cosmos.network/skip-go/client/migration-guide.md)
+- [Contract Addresses](https://docs.cosmos.network/skip-go/eureka/contract-addresses.md): Key contract addresses for the IBC Eureka deployment.
+- [Custom ERC20 Integration](https://docs.cosmos.network/skip-go/eureka/custom-erc20-integration.md): A guide for asset issuers to deploy and register custom ERC20 contracts for their tokens on Ethereum
+- [Overview](https://docs.cosmos.network/skip-go/eureka/eureka-overview.md): An overview of IBC Eureka for developers
+- [Technical Overview](https://docs.cosmos.network/skip-go/eureka/eureka-tech-overview.md): Technical details of how IBC Eureka works
+- [Integration Guide](https://docs.cosmos.network/skip-go/eureka/integration-guide.md): A guide on how to integrate IBC Eureka for chain developers, asset issuers, and application developers
+- [Security Properties](https://docs.cosmos.network/skip-go/eureka/security-properties.md)
+- [Setting Affiliate Fees](https://docs.cosmos.network/skip-go/general/affiliate-fees.md): This page covers how integrators can earn affiliate fees on swaps.
+- [Requesting & Using API Keys](https://docs.cosmos.network/skip-go/general/api-keys.md)
+- [Skip Explorer Integration](https://docs.cosmos.network/skip-go/general/explorer-integration.md): Guide to integrating Skip Explorer v2 for transaction visualization and tracking in your applications.
+- [FAQ](https://docs.cosmos.network/skip-go/general/faq.md)
+- [Getting Fee Info](https://docs.cosmos.network/skip-go/general/fee-info.md): Understand how Skip Go handles user-facing fees
+- [Introduction](https://docs.cosmos.network/skip-go/general/getting-started.md): This pages explains what the Skip Go API is, gives examples of applications built with it, and provides guidance on standard ways to use it.
+- [Transaction Tracking](https://docs.cosmos.network/skip-go/general/multi-chain-realtime-transaction-and-packet-tracking.md): This document covers the tooling provided in Skip Go for tracking transaction status across multiple chains and bridge hops.
+- [Overview & Common Usage Patterns](https://docs.cosmos.network/skip-go/general/overview-and-typical-usage.md)
+- [Post-Route Actions](https://docs.cosmos.network/skip-go/general/post-route-actions.md): How to specify actions to perform after a route of transfers/swaps is completed
+- [Quickstart Guide](https://docs.cosmos.network/skip-go/general/quickstart-guide.md): This guide walks you through the process of setting up and using the Skip Go Client to perform a cross-chain from USDC on Noble to TIA on Celestia.
+- [Smart Relay](https://docs.cosmos.network/skip-go/general/smart-relay.md): This page covers Smart Relay -- Skip Go API's universal cross-chain data & token delivery service
+- [Supported Ecosystems](https://docs.cosmos.network/skip-go/general/supported-ecosystems-and-bridges.md)
+- [Transaction Support](https://docs.cosmos.network/skip-go/general/transaction-support.md)
+- [Skip Go Asset Registry & Overrides](https://docs.cosmos.network/skip-go/support-requirements/asset-registry-overrides.md)
+- [Chain Integration Request](https://docs.cosmos.network/skip-go/support-requirements/chain-integration-request.md)
+- [Chain Support Requirements](https://docs.cosmos.network/skip-go/support-requirements/chain-support-requirements.md): This document describes what new chains need to do the support Skip Go API
+- [Swap Venue Requirements](https://docs.cosmos.network/skip-go/support-requirements/swap-venue-requirements.md): This document covers what Skip Go API requires of DEXes to support them as potential swapping venues within the API's cross-chain DEX aggregation functionality. At the end, the document provides instructions for helping the Skip team add your DEX to the API as a swapping venue
+- [Token & Route Support Requirements](https://docs.cosmos.network/skip-go/support-requirements/token-support-requirements.md): This document describes the steps you must complete for the Skip Go API to begin providing new routes for users to transfer a token over to various remote chains using IBC.
+- [Configuration](https://docs.cosmos.network/skip-go/widget/configuration.md): This page details your widget configuration options. Tweak it to fit your exact user experience needs!
+- [FAQ](https://docs.cosmos.network/skip-go/widget/faq.md)
+- [Gas on Receive](https://docs.cosmos.network/skip-go/widget/gas-on-receive.md): Automatically provide users with gas tokens on destination chains during cross-chain swaps
+- [Getting Started](https://docs.cosmos.network/skip-go/widget/getting-started.md)
+- [Migration Guide](https://docs.cosmos.network/skip-go/widget/migration-guide.md)
+- [Web Component](https://docs.cosmos.network/skip-go/widget/web-component.md)
+
+## OpenAPI Specs
+
+- [openapi](https://docs.cosmos.network/cometbft/latest/api-reference/rpc/openapi.yaml)
+- [swagger](https://docs.cosmos.network/swagger.yml)
+- [cosmos-sdk-complete](https://docs.cosmos.network/docs/api-specs/cosmos-sdk-complete.yaml)
+- [cosmos-evm](https://docs.cosmos.network/docs/api-specs/cosmos-evm.json)
+- [cosmos-evm-from-source](https://docs.cosmos.network/docs/api-specs/cosmos-evm-from-source.json)

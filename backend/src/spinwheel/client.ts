@@ -117,35 +117,53 @@ export const SpinwheelDebtSchema = z.object({
   balance: z.number().nullable().optional(),
   interestRate: z.number().nullable().optional(),
   minimumPayment: z.number().nullable().optional(),
+  creditLimit: z.number().nullable().optional(),
+  dueDate: z.string().nullable().optional(),
+  accountStatus: z.enum(['OPEN', 'CLOSED', 'DELINQUENT']).nullable().optional(),
+  lastPaymentDate: z.string().nullable().optional(),
+  openDate: z.string().nullable().optional(),
+  paymentHistoryCodes: z.array(z.string()).nullable().optional(),
 });
 
 export type SpinwheelDebt = z.infer<typeof SpinwheelDebtSchema>;
 
+// Spinwheel docs require these fields in every debtProfile request body.
+const DEBT_PROFILE_BODY = {
+  creditReportType: '1_BUREAU.FULL',
+  sourceBureau: 'Equifax',
+  creditScoreModel: 'VANTAGE_SCORE_3_0',
+} as const;
+
+const DEBT_LIABILITY_KEYS = [
+  'debts',
+  'creditCards',
+  'autoLoans',
+  'studentLoans',
+  'homeLoans',
+  'personalLoans',
+  'miscellaneousLiabilities',
+] as const;
+
+// Shared internal fetch: POST /v1/users/{spinwheelUserId}/debtProfile with required params.
+async function fetchRawDebtProfile(spinwheelUserId: string): Promise<Record<string, unknown>> {
+  const schema = envelopeSchema(z.object({}).passthrough());
+  const result = await spinwheelPost(
+    `/v1/users/${encodeURIComponent(spinwheelUserId)}/debtProfile`,
+    DEBT_PROFILE_BODY,
+    schema,
+  );
+  return result.data as Record<string, unknown>;
+}
+
 // POST /v1/users/{spinwheelUserId}/debtProfile
 // Returns normalized debt array across all liability types.
 export async function getDebtProfile(spinwheelUserId: string): Promise<SpinwheelDebt[]> {
-  const DataSchema = z.object({}).passthrough();
-  const schema = envelopeSchema(DataSchema);
-  const result = await spinwheelPost(`/v1/users/${encodeURIComponent(spinwheelUserId)}/debtProfile`, {}, schema);
-
-  // Spinwheel may return per-type arrays or a flat debts array depending on API version.
-  // Normalize both shapes into our SpinwheelDebt[].
-  const data = result.data as Record<string, unknown>;
-  const liabilityKeys = [
-    'debts',
-    'creditCards',
-    'autoLoans',
-    'studentLoans',
-    'homeLoans',
-    'personalLoans',
-    'miscellaneousLiabilities',
-  ];
+  const data = await fetchRawDebtProfile(spinwheelUserId);
   const raw: unknown[] = [];
-  for (const key of liabilityKeys) {
+  for (const key of DEBT_LIABILITY_KEYS) {
     const arr = data[key];
     if (Array.isArray(arr)) raw.push(...arr);
   }
-
   return raw.map((item) => SpinwheelDebtSchema.parse(item));
 }
 
@@ -154,6 +172,47 @@ export async function getUser(spinwheelUserId: string): Promise<Record<string, u
   const schema = envelopeSchema(z.object({}).passthrough());
   const result = await spinwheelGet(`/v1/users/${encodeURIComponent(spinwheelUserId)}`, schema);
   return result.data as Record<string, unknown>;
+}
+
+// Credit score + credit utilization from a single debtProfile call.
+// Score lives in creditReports[0].profile.creditScore per Spinwheel docs.
+export async function getCreditScore(
+  spinwheelUserId: string,
+): Promise<{ score: number | null; utilization: number | null }> {
+  const data = await fetchRawDebtProfile(spinwheelUserId);
+
+  const creditReports = Array.isArray(data.creditReports) ? data.creditReports : [];
+  const report = creditReports[0] as Record<string, unknown> | undefined;
+  const profile = report?.profile as Record<string, unknown> | undefined;
+  const rawScore = profile?.creditScore;
+  const score = typeof rawScore === 'number' ? rawScore : null;
+
+  let utilization: number | null = null;
+  const raw: unknown[] = [];
+  for (const key of DEBT_LIABILITY_KEYS) {
+    const arr = data[key];
+    if (Array.isArray(arr)) raw.push(...arr);
+  }
+  const debts = raw.map((item) => SpinwheelDebtSchema.parse(item));
+  const cards = debts.filter((d) => d.type === 'CREDIT_CARD');
+  const totalBalance = cards.reduce((sum, c) => sum + (c.balance ?? 0), 0);
+  const totalLimit = cards.reduce((sum, c) => sum + (c.creditLimit ?? 0), 0);
+  if (totalLimit > 0) {
+    utilization = Math.round((totalBalance / totalLimit) * 1000) / 10;
+  }
+
+  return { score, utilization };
+}
+
+// POST /v1/users/{spinwheelUserId}/subscriptions — registers a monthly credit profile pull.
+// Call once after OTP verify; Spinwheel fires USER_DEBT_PROFILE_UPDATED webhooks monthly.
+export async function subscribeMonthly(spinwheelUserId: string): Promise<void> {
+  const schema = envelopeSchema(z.object({}).passthrough());
+  await spinwheelPost(
+    `/v1/users/${encodeURIComponent(spinwheelUserId)}/subscriptions`,
+    { type: 'CREDIT_PROFILE', frequency: 'MONTHLY' },
+    schema,
+  );
 }
 
 // DELETE /v1/users/{spinwheelUserId} — called on disconnect to remove user data from Spinwheel.

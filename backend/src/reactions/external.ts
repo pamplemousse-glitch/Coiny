@@ -10,7 +10,10 @@ export type ExternalEventType =
   | 'wallet_receive'
   | 'debt_paydown'
   | 'debt_missed_payment'
-  | 'new_liability';
+  | 'new_liability'
+  | 'net_worth_milestone' // crossed a round-number net worth threshold
+  | 'credit_score_improved' // score up ≥20 points
+  | 'credit_score_dropped'; // score down ≥20 points
 
 export type ExternalEvent = {
   id: string;
@@ -96,6 +99,33 @@ export function evaluateExternalEvent(event: ExternalEvent): Reaction | null {
         led: 'amber',
         duration: 3000,
         reason: `New liability detected:${amountStr}`,
+      };
+
+    case 'net_worth_milestone':
+      return {
+        animation: 'celebrate',
+        sound: 'fanfare',
+        led: 'rainbow',
+        duration: 5000,
+        reason: `Net worth milestone reached:${amountStr}`,
+      };
+
+    case 'credit_score_improved':
+      return {
+        animation: 'celebrate',
+        sound: 'chime',
+        led: 'green',
+        duration: 4000,
+        reason: `Credit score improved${amountStr ? ` by ${Math.abs(event.amountUsd ?? 0).toFixed(0)} pts` : ''}`,
+      };
+
+    case 'credit_score_dropped':
+      return {
+        animation: 'sad',
+        sound: 'warning',
+        led: 'red',
+        duration: 4000,
+        reason: `Credit score dropped${amountStr ? ` by ${Math.abs(event.amountUsd ?? 0).toFixed(0)} pts` : ''}`,
       };
 
     case 'crypto_sent':

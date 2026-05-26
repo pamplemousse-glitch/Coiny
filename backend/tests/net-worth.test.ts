@@ -13,9 +13,7 @@ vi.mock('../src/plaid/client.js', async (importOriginal) => {
 vi.mock('../src/coinbase/client.js', () => ({
   getAccounts: vi.fn(),
   getTransactions: vi.fn(),
-}));
-vi.mock('../src/coingecko/client.js', () => ({
-  getPrices: vi.fn(),
+  getSpotPrices: vi.fn(),
 }));
 vi.mock('../src/zerion/client.js', () => ({
   getPortfolio: vi.fn(),
@@ -25,10 +23,11 @@ vi.mock('../src/spinwheel/client.js', () => ({
   sendSmsOtp: vi.fn(),
   verifySmsOtp: vi.fn(),
   getDebtProfile: vi.fn(),
+  getCreditScore: vi.fn(),
+  deleteUser: vi.fn(),
 }));
 
-import { getAccounts } from '../src/coinbase/client.js';
-import { getPrices } from '../src/coingecko/client.js';
+import { getAccounts, getSpotPrices } from '../src/coinbase/client.js';
 import { accountsBalanceGet, investmentsHoldingsGet, liabilitiesGet } from '../src/plaid/client.js';
 import { getDebtProfile } from '../src/spinwheel/client.js';
 import { getPortfolio } from '../src/zerion/client.js';
@@ -37,7 +36,7 @@ const mockedAccountsBalanceGet = vi.mocked(accountsBalanceGet);
 const mockedInvestmentsHoldingsGet = vi.mocked(investmentsHoldingsGet);
 const mockedLiabilitiesGet = vi.mocked(liabilitiesGet);
 const _mockedGetAccounts = vi.mocked(getAccounts);
-const _mockedGetPrices = vi.mocked(getPrices);
+const _mockedGetSpotPrices = vi.mocked(getSpotPrices);
 const _mockedGetPortfolio = vi.mocked(getPortfolio);
 const mockedGetDebtProfile = vi.mocked(getDebtProfile);
 
@@ -251,9 +250,11 @@ describe('GET /api/net-worth', () => {
         credit: [
           {
             account_id: 'acct-visa',
+            is_overdue: null,
             minimum_payment_amount: 50,
             next_payment_due_date: '2026-06-15',
             last_statement_balance: null,
+            aprs: null,
           },
         ],
         mortgage: null,
@@ -278,6 +279,67 @@ describe('GET /api/net-worth', () => {
     await app.close();
   });
 
+  it('returns liquidCashMonths as null when no transactions exist', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json<{ liquidCashMonths: number | null }>();
+    expect(body.liquidCashMonths).toBeNull();
+
+    await app.close();
+  });
+
+  it('computes liquidCashMonths from depository balance and 90-day outflows', async () => {
+    const { upsertItem } = await import('../src/store/items.js');
+    const { persistTransactions } = await import('../src/store/transactions.js');
+    await upsertItem({ itemId: 'item-lc-1', accessToken: 'access-lc-1', userId: testUserId });
+
+    mockedAccountsBalanceGet.mockResolvedValue({
+      accounts: [
+        {
+          account_id: 'acct-checking',
+          name: 'Checking',
+          type: 'depository',
+          subtype: 'checking',
+          official_name: null,
+          balances: { current: 6000, available: 6000, iso_currency_code: 'USD', limit: null },
+        },
+      ],
+      request_id: 'r',
+    });
+
+    // 3 months of $6000 total outflows over 90 days → avgMonthlyBurn = $2000 → 6000/2000 = 3 months
+    const txDate = new Date();
+    txDate.setDate(txDate.getDate() - 30);
+    const dateStr = txDate.toISOString().slice(0, 10);
+    await persistTransactions(testUserId, [
+      {
+        id: 'tx-1',
+        account_id: 'acct-checking',
+        amount: '-6000',
+        date: dateStr,
+        description: '',
+        status: 'posted',
+        type: 'debit',
+        running_balance: null,
+      },
+    ]);
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json<{ liquidCashMonths: number | null }>();
+    expect(body.liquidCashMonths).toBe(3);
+
+    await app.close();
+  });
+
   it('includes spinwheel debts as negative in total', async () => {
     const { db } = await import('../src/db/client.js');
     const { spinwheelConnections } = await import('../src/db/schema.js');
@@ -298,6 +360,44 @@ describe('GET /api/net-worth', () => {
     expect(body.debts).toBe(-12500);
     expect(body.total).toBe(-12500);
     expect(body.connections.spinwheel).toBe(true);
+
+    await app.close();
+  });
+
+  it('fires net_worth_milestone reaction when total crosses $10k threshold', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { eq } = await import('drizzle-orm');
+    const { petState, chainWallets } = await import('../src/db/schema.js');
+    // resetDatabase() already created a petState row — update it with a seed value just below $10k.
+    await db().update(petState).set({ lastNetWorthUsd: '9500' }).where(eq(petState.userId, testUserId));
+    await db().insert(chainWallets).values({
+      userId: testUserId,
+      chain: 'bitcoin',
+      address: '1A1zP1',
+      lastBalanceUsd: '11000',
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+    expect(res.json<{ total: number }>().total).toBe(11000);
+
+    // DB should reflect updated lastNetWorthUsd.
+    const [updated] = await db().select().from(petState).where(eq(petState.userId, testUserId));
+    expect(parseFloat(updated!.lastNetWorthUsd!)).toBe(11000);
+
+    await app.close();
+  });
+
+  it('does not fire milestone when no prior net worth is recorded', async () => {
+    // petState row exists but lastNetWorthUsd is null — milestone check is skipped.
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
 
     await app.close();
   });

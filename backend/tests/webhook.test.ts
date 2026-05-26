@@ -567,6 +567,103 @@ describe('POST /webhooks/plaid', () => {
     await app.close();
   });
 
+  it('calls liabilitiesGet and logs summary on LIABILITIES/DEFAULT_UPDATE', async () => {
+    mockAgent
+      .get('https://sandbox.plaid.com')
+      .intercept({ path: '/liabilities/get', method: 'POST' })
+      .reply(200, {
+        liabilities: { credit: [{ account_id: 'acc-cc-1' }], student: [], mortgage: [] },
+        accounts: [],
+        item: {},
+        request_id: 'req_liab_1',
+      });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const body = JSON.stringify({
+      webhook_type: 'LIABILITIES',
+      webhook_code: 'DEFAULT_UPDATE',
+      item_id: TEST_ITEM_ID,
+    });
+    const signed = await signWebhook(body);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/webhooks/plaid',
+      headers: { 'content-type': 'application/json', 'plaid-verification': signed },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+    await flushAll();
+    await app.close();
+  });
+
+  it('calls recurringTransactionsGet and logs summary on RECURRING_TRANSACTIONS_UPDATE', async () => {
+    mockAgent
+      .get('https://sandbox.plaid.com')
+      .intercept({ path: '/transactions/recurring/get', method: 'POST' })
+      .reply(200, {
+        inflow_streams: [
+          {
+            stream_id: 's-1',
+            account_id: 'acc-1',
+            description: 'Paycheck',
+            frequency: 'WEEKLY',
+            is_user_modified: false,
+            merchant_name: null,
+            average_amount: { amount: 2400 },
+          },
+        ],
+        outflow_streams: [],
+        request_id: 'req_rec_1',
+      });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const body = JSON.stringify({
+      webhook_type: 'TRANSACTIONS',
+      webhook_code: 'RECURRING_TRANSACTIONS_UPDATE',
+      item_id: TEST_ITEM_ID,
+    });
+    const signed = await signWebhook(body);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/webhooks/plaid',
+      headers: { 'content-type': 'application/json', 'plaid-verification': signed },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+    await flushAll();
+    await app.close();
+  });
+
+  it('no-ops gracefully for ITEM/NEW_ACCOUNTS_AVAILABLE without disabling item', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const body = JSON.stringify({
+      webhook_type: 'ITEM',
+      webhook_code: 'NEW_ACCOUNTS_AVAILABLE',
+      item_id: TEST_ITEM_ID,
+    });
+    const signed = await signWebhook(body);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/webhooks/plaid',
+      headers: { 'content-type': 'application/json', 'plaid-verification': signed },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+    await flushAll();
+
+    const { getItem } = await import('../src/store/items.js');
+    const item = await getItem(TEST_ITEM_ID);
+    expect(item?.disabled).toBe(false);
+
+    await app.close();
+  });
+
   it('concurrent webhooks for same item — both return 200 and only dispatch once per unique tx', async () => {
     const { markInitialSyncComplete } = await import('../src/store/items.js');
     await markInitialSyncComplete(TEST_ITEM_ID);

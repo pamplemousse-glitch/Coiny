@@ -3,7 +3,19 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/client.js';
 import { spinwheelConnections, spinwheelPending } from '../db/schema.js';
-import { deleteUser, getDebtProfile, sendSmsOtp, verifySmsOtp } from '../spinwheel/client.js';
+import { dispatchReaction } from '../reactions/dispatch.js';
+import { evaluateExternalEvent } from '../reactions/external.js';
+import {
+  deleteUser,
+  getCreditScore,
+  getDebtProfile,
+  sendSmsOtp,
+  subscribeMonthly,
+  verifySmsOtp,
+} from '../spinwheel/client.js';
+import { recordReaction } from '../store/pet.js';
+
+const CREDIT_SCORE_REACTION_THRESHOLD = 20;
 
 const SendOtpBodySchema = z.object({
   phoneNumber: z.string().min(1),
@@ -71,6 +83,15 @@ export function registerSpinwheelApi(app: FastifyInstance): void {
 
     await db().delete(spinwheelPending).where(eq(spinwheelPending.userId, userId));
 
+    // Fire-and-forget: register monthly credit profile refresh. Non-fatal if it fails.
+    void (async () => {
+      try {
+        await subscribeMonthly(pending.spinwheelUserId);
+      } catch (err) {
+        req.log.warn({ userId, err }, 'spinwheel monthly subscription failed — continuing');
+      }
+    })();
+
     req.log.info({ userId }, 'spinwheel connection established');
     return { ok: true };
   });
@@ -87,6 +108,48 @@ export function registerSpinwheelApi(app: FastifyInstance): void {
 
     const debts = await getDebtProfile(connection.spinwheelUserId);
     return { debts };
+  });
+
+  // GET /api/spinwheel/credit-score
+  app.get('/api/spinwheel/credit-score', async (req: FastifyRequest, reply: FastifyReply) => {
+    const userId = req.user!.id;
+    const rows = await db().select().from(spinwheelConnections).where(eq(spinwheelConnections.userId, userId));
+    const connection = rows[0];
+    if (!connection) {
+      return reply.status(409).send({ error: 'No Spinwheel connection found. Connect first.' });
+    }
+    const result = await getCreditScore(connection.spinwheelUserId);
+
+    // Fire a reaction if score changed significantly since last check.
+    const score =
+      typeof result === 'object' && result !== null && 'score' in result
+        ? ((result as { score?: number }).score ?? null)
+        : null;
+    if (score !== null && connection.lastCreditScore !== null && connection.lastCreditScore !== undefined) {
+      const delta = score - connection.lastCreditScore;
+      if (Math.abs(delta) >= CREDIT_SCORE_REACTION_THRESHOLD) {
+        const type = delta > 0 ? 'credit_score_improved' : 'credit_score_dropped';
+        const reaction = evaluateExternalEvent({
+          id: `cs-${userId}-${Date.now()}`,
+          userId,
+          type,
+          amountUsd: Math.abs(delta),
+          source: 'spinwheel',
+        });
+        if (reaction) {
+          await recordReaction(userId, type, reaction);
+          dispatchReaction(userId, reaction);
+        }
+      }
+    }
+    if (score !== null) {
+      await db()
+        .update(spinwheelConnections)
+        .set({ lastCreditScore: score })
+        .where(eq(spinwheelConnections.userId, userId));
+    }
+
+    return result;
   });
 
   // DELETE /api/spinwheel/connect

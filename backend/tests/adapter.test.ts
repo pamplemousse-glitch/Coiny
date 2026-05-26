@@ -119,3 +119,29 @@ describe('plaidTxToInternal — legacy category fallback', () => {
     expect(tx.status).toBe('pending');
   });
 });
+
+describe('plaidTxToInternal — PFC category mapping', () => {
+  it('maps TRANSFER_IN_PAYROLL_AND_TAX_REFUNDS to paycheck', async () => {
+    const tx = await plaidTxToInternal(
+      baseTx({
+        personal_finance_category: { primary: 'TRANSFER_IN', detailed: 'TRANSFER_IN_PAYROLL_AND_TAX_REFUNDS' },
+        amount: -3000,
+      }),
+      null,
+      'user-1',
+    );
+    expect(tx.details?.category).toBe('paycheck');
+  });
+
+  it('maps generic TRANSFER_IN to transfer (not paycheck)', async () => {
+    const tx = await plaidTxToInternal(
+      baseTx({
+        personal_finance_category: { primary: 'TRANSFER_IN', detailed: 'TRANSFER_IN_DEPOSIT' },
+        amount: -500,
+      }),
+      null,
+      'user-1',
+    );
+    expect(tx.details?.category).toBe('transfer');
+  });
+});

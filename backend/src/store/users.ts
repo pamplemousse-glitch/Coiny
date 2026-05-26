@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { petState, users } from '../db/schema.js';
+import { decryptString, encryptString } from '../util/crypto.js';
 
 export type UserRow = typeof users.$inferSelect;
 
@@ -15,9 +16,10 @@ export async function findOrCreateUser(args: {
 
   const id = randomUUID();
   await db().transaction(async (tx) => {
+    const encryptedEmail = args.email ? encryptString(args.email) : null;
     await tx
       .insert(users)
-      .values({ id, appleSub: args.appleSub, email: args.email ?? null, displayName: args.displayName ?? null });
+      .values({ id, appleSub: args.appleSub, email: encryptedEmail, displayName: args.displayName ?? null });
     // Every user gets exactly one pet row, initialized with defaults.
     await tx.insert(petState).values({ userId: id });
   });
@@ -31,7 +33,9 @@ export async function updateDisplayName(userId: string, displayName: string): Pr
 
 export async function getUserById(id: string): Promise<UserRow | null> {
   const rows = await db().select().from(users).where(eq(users.id, id));
-  return rows[0] ?? null;
+  const row = rows[0];
+  if (!row) return null;
+  return { ...row, email: row.email ? decryptString(row.email) : null };
 }
 
 // Deletes the user row. All child tables (sessions, pet_state, plaid_items,

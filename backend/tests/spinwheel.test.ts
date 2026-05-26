@@ -4,15 +4,18 @@ import { authHeader, resetDatabase, testUserId } from './db-helper.js';
 vi.mock('../src/spinwheel/client.js', () => ({
   sendSmsOtp: vi.fn(),
   verifySmsOtp: vi.fn(),
+  subscribeMonthly: vi.fn(),
   getDebtProfile: vi.fn(),
+  getCreditScore: vi.fn(),
   deleteUser: vi.fn(),
 }));
 
-import { deleteUser, getDebtProfile, sendSmsOtp, verifySmsOtp } from '../src/spinwheel/client.js';
+import { deleteUser, getCreditScore, getDebtProfile, sendSmsOtp, verifySmsOtp } from '../src/spinwheel/client.js';
 
 const mockedSendSmsOtp = vi.mocked(sendSmsOtp);
 const mockedVerifySmsOtp = vi.mocked(verifySmsOtp);
 const mockedGetDebtProfile = vi.mocked(getDebtProfile);
+const mockedGetCreditScore = vi.mocked(getCreditScore);
 const mockedDeleteUser = vi.mocked(deleteUser);
 
 describe('GET /api/spinwheel/status', () => {
@@ -272,6 +275,72 @@ describe('DELETE /api/spinwheel/connect', () => {
 
     const status = await app.inject({ method: 'GET', url: '/api/spinwheel/status', headers: authHeader() });
     expect(status.json<{ connected: boolean }>().connected).toBe(false);
+
+    await app.close();
+  });
+});
+
+describe('GET /api/spinwheel/credit-score', () => {
+  beforeEach(async () => {
+    vi.resetAllMocks();
+    await resetDatabase();
+  });
+
+  it('returns 409 when not connected', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/spinwheel/credit-score', headers: authHeader() });
+    expect(res.statusCode).toBe(409);
+
+    await app.close();
+  });
+
+  it('returns 401 without auth', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/spinwheel/credit-score' });
+    expect(res.statusCode).toBe(401);
+
+    await app.close();
+  });
+
+  it('returns score and utilization from getCreditScore when connected', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { spinwheelConnections } = await import('../src/db/schema.js');
+    await db().insert(spinwheelConnections).values({ userId: testUserId, spinwheelUserId: 'sw-cs-1' });
+
+    mockedGetCreditScore.mockResolvedValue({ score: 720, utilization: 34.5 });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/spinwheel/credit-score', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{ score: number | null; utilization: number | null }>();
+    expect(body.score).toBe(720);
+    expect(body.utilization).toBe(34.5);
+    expect(mockedGetCreditScore).toHaveBeenCalledWith('sw-cs-1');
+
+    await app.close();
+  });
+
+  it('returns null score and utilization when Spinwheel has no data', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { spinwheelConnections } = await import('../src/db/schema.js');
+    await db().insert(spinwheelConnections).values({ userId: testUserId, spinwheelUserId: 'sw-cs-2' });
+
+    mockedGetCreditScore.mockResolvedValue({ score: null, utilization: null });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/spinwheel/credit-score', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{ score: number | null; utilization: number | null }>();
+    expect(body.score).toBeNull();
+    expect(body.utilization).toBeNull();
 
     await app.close();
   });

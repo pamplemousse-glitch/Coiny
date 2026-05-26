@@ -86,7 +86,7 @@ final class ViewSmokeTests: XCTestCase {
     }
 
     func testRootViewRenders() {
-        // RootView is a TabView wrapping all 6 tabs — constructing it exercises
+        // RootView is a TabView wrapping all 3 tabs — constructing it exercises
         // all children's init in one shot.
         smoke(
             RootView()

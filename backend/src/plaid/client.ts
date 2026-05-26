@@ -8,6 +8,7 @@ import {
   PlaidApiError,
   type PlaidErrorResponse,
   type PublicTokenExchangeResponse,
+  type RecurringTransactionsResponse,
   type TransactionsSyncResponse,
   type WebhookVerificationKeyGetResponse,
 } from './types.js';
@@ -103,6 +104,10 @@ export function liabilitiesGet(accessToken: string): Promise<LiabilitiesGetRespo
   return plaidPost('/liabilities/get', { access_token: accessToken });
 }
 
+export function recurringTransactionsGet(accessToken: string): Promise<RecurringTransactionsResponse> {
+  return plaidPost('/transactions/recurring/get', { access_token: accessToken });
+}
+
 export function webhookVerificationKeyGet(keyId: string): Promise<WebhookVerificationKeyGetResponse> {
   return plaidPost('/webhook_verification_key/get', { key_id: keyId });
 }
@@ -123,5 +128,17 @@ export function sandboxItemFireWebhook(args: {
     access_token: args.access_token,
     webhook_code: args.webhook_code,
     webhook_type: args.webhook_type ?? 'TRANSACTIONS',
+  });
+}
+
+export function sandboxPublicTokenCreate(args: {
+  institution_id: string;
+  initial_products: string[];
+  options?: { override_username?: string; override_password?: string };
+}): Promise<{ public_token: string; request_id: string }> {
+  return plaidPost('/sandbox/public_token/create', {
+    institution_id: args.institution_id,
+    initial_products: args.initial_products,
+    options: args.options ?? { override_username: 'user_good', override_password: 'pass_good' },
   });
 }

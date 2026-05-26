@@ -30,12 +30,10 @@ const configSchema = z
     RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
     RATE_LIMIT_WINDOW: z.string().default('1 second'),
 
-    // CoinGecko price API (Pro tier). Empty = free tier (no header sent).
-    COINGECKO_API_KEY: z.string().default(''),
-
     // Coinbase Advanced Trade API (ECDSA key pair).
     COINBASE_API_KEY_ID: z.string().default(''),
     COINBASE_API_KEY_SECRET: z.string().default(''), // PEM-encoded EC private key
+    COINBASE_BASE_URL: z.string().default('https://api.coinbase.com'),
 
     // Zerion DeFi portfolio API.
     ZERION_API_KEY: z.string().default(''),
@@ -44,6 +42,26 @@ const configSchema = z
     SPINWHEEL_SECRET_KEY: z.string().default(''),
     // Standard host. Sandbox: https://sandbox-api.spinwheel.io  Prod: https://api.spinwheel.io
     SPINWHEEL_BASE_URL: z.string().url().default('https://sandbox-api.spinwheel.io'),
+
+    // RentCast AVM — real estate property value estimates.
+    RENTCAST_API_KEY: z.string().default(''),
+
+    // MarketCheck — vehicle value estimates.
+    MARKETCHECK_API_KEY: z.string().default(''),
+
+    // GoldAPI.io — precious metals spot prices.
+    GOLDAPI_API_KEY: z.string().default(''),
+
+    // SnapTrade brokerage aggregator (Fidelity, Vanguard, Schwab, Robinhood, etc.)
+    SNAPTRADE_CLIENT_ID: z.string().default(''),
+    SNAPTRADE_CONSUMER_KEY: z.string().default(''),
+
+    // Subscan API key for Polkadot (DOT) balance queries.
+    SUBSCAN_API_KEY: z.string().default(''),
+    // Blockfrost project ID for Cardano (ADA) balance queries.
+    BLOCKFROST_PROJECT_ID: z.string().default(''),
+    // TonCenter API key for TON balance queries.
+    TONCENTER_API_KEY: z.string().default(''),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {

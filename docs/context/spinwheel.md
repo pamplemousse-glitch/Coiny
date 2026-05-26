@@ -1,0 +1,122 @@
+# Source: https://docs.spinwheel.io/llms.txt
+
+# Embedded Debt Solutions API Docs Documentation
+
+## Guides
+- [Connect - SMS UI Prompt](https://docs.spinwheel.io/docs/connect-ai-ui.md): Paste this prompt into the AI coding tool of your choice to help create the UI for your integration.
+- [Debt Profile UI Prompt](https://docs.spinwheel.io/docs/debt-profile-ai-ui.md): Paste this prompt into the AI coding tool of your choice to help create the UI for your integration.
+- [Building With AI](https://docs.spinwheel.io/docs/building-with-ai.md): A guide to help you get started utilizing AI application building tools.
+- [Welcome to Spinwheel!](https://docs.spinwheel.io/docs/getting-started-1.md)
+- [Account Ratings](https://docs.spinwheel.io/docs/account-ratings-1.md)
+- [Bankruptcy Codes](https://docs.spinwheel.io/docs/bankruptcy-codes.md)
+- [Collection Status Codes](https://docs.spinwheel.io/docs/collection-status-codes.md)
+- [Credit Score Details & Factors](https://docs.spinwheel.io/docs/credit-score-factors.md): The below codes represent the credit score factors object provided within the creditReports object.
+- [Glossary](https://docs.spinwheel.io/docs/glossary-copy.md): Here is a list of key terms that we use at Spinwheel which may not be immediately obvious.
+- [Industry Codes and Types](https://docs.spinwheel.io/docs/industry-codes-and-types.md): A list of all the industryCodes and industryTypes.
+- [Liability Subtypes](https://docs.spinwheel.io/docs/liability-subtypes.md)
+- [Narrative Codes](https://docs.spinwheel.io/docs/narrative-codes.md)
+- [Payment History Codes](https://docs.spinwheel.io/docs/payment-history-codes.md): Below are the codes and descriptions for the payment history codes provided per liability.
+- [User Consent](https://docs.spinwheel.io/docs/user-consent.md): As you look to integrate with our APIs, make sure to capture the user's consent.
+- [Retrieve Assets From ID](https://docs.spinwheel.io/docs/card-assets-from-id.md): This guide outlines how to utilize with Spinwheel's Credit Card Brand Asset endpoint to retrieve the card program name and artwork by providing the userId.
+- [Credit Card Brand Assets](https://docs.spinwheel.io/docs/credit-card-brand-assets.md)
+- [Retrieve Assets From Card Details](https://docs.spinwheel.io/docs/retrieving-credit-card-brands.md): This guide outlines how to securely integrate with Spinwheel's Credit Card Brand Asset endpoint to retrieve the card program name and artwork by providing credit card metadata.
+- [Credit Card Account Number Update](https://docs.spinwheel.io/docs/credit-card-account-number-update.md)
+- [Debt Profile Statuses](https://docs.spinwheel.io/docs/debt-profile-statuses.md)
+- [Multi-Bureau Support](https://docs.spinwheel.io/docs/multi-bureau-support.md)
+- [Student Loan - Bill Payment Requirements](https://docs.spinwheel.io/docs/account-number-management.md)
+- [Payments](https://docs.spinwheel.io/docs/embedded-payments.md)
+- [Error Description Superset](https://docs.spinwheel.io/docs/error-description-superset.md): an errorDescription may be returned for a FAILED/RETURNED payment
+- [Payment Process](https://docs.spinwheel.io/docs/payments-process.md): Get started with bill pay, to make payments towards liabilities.
+- [Bank Account Real-Time Balances](https://docs.spinwheel.io/docs/bank-account-real-time-balances.md)
+- [Refreshing Data](https://docs.spinwheel.io/docs/refreshing-data.md): Updating of your user's report and liability data.
+- [Liability Real-Time Data](https://docs.spinwheel.io/docs/real-time-balance.md): This guide will take you through the dos and don'ts for real-time balances
+- [Student Loan Payoff Quote](https://docs.spinwheel.io/docs/student-loan-payoff-quote.md)
+- [Debt Profile Refresh Subscriptions](https://docs.spinwheel.io/docs/user-refresh-subscriptions.md): Updating a user's tradelines and data in their Profile by subscribing them to Debt Profile Refreshes.
+- [Sandbox Test Users](https://docs.spinwheel.io/docs/test-users.md): All of our sandbox test users and their uses.
+- [KBA](https://docs.spinwheel.io/docs/connect-api-kba.md): The following guide will provide guidance on connecting users with our KBA auth flow via API.
+- [Pre-Verified (Phone)](https://docs.spinwheel.io/docs/connect-api-pre-verified.md): The following guide will best practices on connecting users that have been pre-verified via SMS or phone call.
+- [SMS](https://docs.spinwheel.io/docs/connect-api-sms.md): The following guide will provide guidance on connecting users with our SMS OTP flow via API.
+- [Network Token](https://docs.spinwheel.io/docs/spinwheel-network-token.md)
+- [Risk Layer: Enhanced Fraud Protection & User Corrections](https://docs.spinwheel.io/docs/enhanced-fraud-protection-user-corrections.md)
+- [Connect a User](https://docs.spinwheel.io/docs/user-connect.md): Authenticate a user, and connect their liabilities - all with a phone number and date of birth.
+- [Webhooks](https://docs.spinwheel.io/docs/webhooks.md): This guide will describe how to integrate with and consume Spinwheel webhooks.
+
+## API Reference
+- [Retrieve Credit Card Brand Information](https://docs.spinwheel.io/reference/create-credit-card-brand.md): Retrieve credit card brand information for a user and their associated credit cards.
+- [Retrieve Credit Card Brand for Connected User](https://docs.spinwheel.io/reference/get-credit-card-brands-for-connected-user.md): Retrieve credit card brand information for a connected user and their associated credit cards.
+- [Connect a User - Phone](https://docs.spinwheel.io/reference/connect-preverified-phone-number.md): Connect a User that has already been pre-verified by phone number/SMS. This API requires Spinwheel Support approval to enable it before it can be used.
+- [Connect a User - User Profile](https://docs.spinwheel.io/reference/connect-preverified-user-profile.md): Connect a User that has already been verified using another credit bureau. This API requires Spinwheel Support approval to enable it before it can be used.
+- [Connect a User via KBA](https://docs.spinwheel.io/reference/connect-with-kba.md): Connect a User using a set of personal questions provided by a credit bureau.
+- [Submit Answers for KBA](https://docs.spinwheel.io/reference/verify-kba-answers.md): Complete a connect KBA flow by providing the users's answers to the previously returned security questions.
+- [Connect a User via SMS](https://docs.spinwheel.io/reference/connect-with-sms.md): Connect a User using SMS verification. The connection will complete once the user has been verified using the sms verify endpoint.
+- [Verify an SMS Connection](https://docs.spinwheel.io/reference/verify-code.md): Complete an SMS connection using the passcode sent to the user's device.
+- [Connect a User via Network Token](https://docs.spinwheel.io/reference/create-network-user.md): Create user from Spinwheel network token.
+- [Request a Debt Profile](https://docs.spinwheel.io/reference/fetch-debt-profile.md): Requests the most recent available debt profile for a given user using the provided configuration options.
+- [Get a PDF Credit Report](https://docs.spinwheel.io/reference/get-credit-report-pdf.md): Returns a PDF of the user's credit report
+- [Delete Refresh Subscriptions](https://docs.spinwheel.io/reference/delete-refresh-subscriptions.md): Delete a subscription for a user. By default, all subscriptions are deleted unless specific filters are provided.
+- [Get Refresh Subscriptions](https://docs.spinwheel.io/reference/get-refresh-subscriptions.md): Get a list of all subscriptions for a user. Optional query parameters allow filtering by status or subscription type.
+- [Subscribe to Debt Profile Refresh](https://docs.spinwheel.io/reference/subscribe-to-debt-profile-refresh.md): Subscribe to updates for a user.
+- [Get a List of Constants](https://docs.spinwheel.io/reference/get-constants-1.md): Returns a list of codes as key value pairs.
+- [Get a List of Makes](https://docs.spinwheel.io/reference/get-makes.md): Get a list of makes for vehicles
+- [Get a List of Models](https://docs.spinwheel.io/reference/get-models.md): Get a list of models for vehicles
+- [Get a List of Trims](https://docs.spinwheel.io/reference/get-trims.md): Get a list of trims for vehicles
+- [Get a List of Years](https://docs.spinwheel.io/reference/get-years.md): Get a list of years for vehicles
+- [Get Details From License Plate and State](https://docs.spinwheel.io/reference/parse-license-plate.md): Get vehicle details from a license plate and state
+- [Get Details from VIN](https://docs.spinwheel.io/reference/parse-vin.md): Get vehicle details
+- [Poll Request Status](https://docs.spinwheel.io/reference/get-refresh-status.md): Polling API to get status of refresh transactions based on the extRequestId
+- [Request Liability Data](https://docs.spinwheel.io/reference/refresh.md): This API will trigger the process of refreshing liabilities given in the POST body. This process is asynchronous and you can either poll results by using API GET /v1/users/{userId}/liabilities/refresh/{extRequestId} or register for a webhook
+- [Request Bank Account Data](https://docs.spinwheel.io/reference/request-bank-account-data.md): Request the current balance for a bank account
+- [Retrieve Bank Account Data](https://docs.spinwheel.io/reference/retrieve-bank-account-data.md): Get the status of a real time balance lookup
+- [Add a Bank Account](https://docs.spinwheel.io/reference/create-bank-account.md): Create a bank account for the user
+- [Create a Payable Bank Account](https://docs.spinwheel.io/reference/create-payable-bank-account.md): Create a payable bank account for the user
+- [Delete a Bank Account](https://docs.spinwheel.io/reference/delete-bank-account.md): Delete a bank account for the user
+- [Update a Bank Account](https://docs.spinwheel.io/reference/update-bank-account.md): Update a bank account for the user
+- [Delete a User](https://docs.spinwheel.io/reference/delete.md): This API allows you to delete a User. We do not retain user information, so you must re-authenticate as a new user if you need to connect again.
+- [Retrieve a User](https://docs.spinwheel.io/reference/get-user-profile.md): Returns a User object
+- [Update an Auto Loan](https://docs.spinwheel.io/reference/update-auto-loan.md): This API updates user records with accurate auto loan account numbers.
+- [Update a Home Loan](https://docs.spinwheel.io/reference/update-home-loan.md): This API updates user records with accurate home loan account numbers.
+- [Update a Miscellaneous Liability](https://docs.spinwheel.io/reference/update-miscellaneous-liability.md): This API updates user records with accurate miscellaneous liability account numbers.
+- [Update a Personal Loan](https://docs.spinwheel.io/reference/update-personal-loan.md): This API updates user records with accurate personal loan account numbers.
+- [Update a Student Loan](https://docs.spinwheel.io/reference/update-student-loan.md): This API updates user records with accurate student loan account numbers and correct billing addresses to ensure proper payments to institutions.
+- [Update a Credit Card](https://docs.spinwheel.io/reference/update.md): This API updates user records with accurate credit card account numbers.
+- [Create a Partner Payer](https://docs.spinwheel.io/reference/create-partner-payer.md): To fund your FBO account, you must first link an external bank account by creating a Payer object. This object acts as the designated source of funds for all Payment to Platform transactions. You may create as many Payers as needed to represent various funding sources. Upon a successful POST request, the API returns a PayerId. You will use this ID in subsequent calls to specify which account should be debited.  To create a valid Payer, you must provide either: - accountNumber, routingNumber, and accountType - token and tokenType  All other fields are mandatory as they are required by the loan servicers themselves.
+- [Delete a Payer](https://docs.spinwheel.io/reference/delete-payer.md): Should you or your customers want to remove a Payer, you can do so using this API. In your DELETE request, simply add the PayerId as a slug. Please note that when a Payer is deleted, we will keep a reference to it in order to maintain the integrity of the transaction history. A success response will contain a confirmation message with a reference to the deleted payer account.
+- [Verify a Payer](https://docs.spinwheel.io/reference/execute-verification.md): This API will allow payer to verify their bank account.
+- [Get Single Payer Details](https://docs.spinwheel.io/reference/get-payer-account-details.md): This API will allow you to get a single payer account details with a given payerId if it exists.
+- [Get a List of Payers](https://docs.spinwheel.io/reference/get-payers.md): You can retrieve a list of the Payers you've created by sending a GET request to: /v1/payments/payers  A successful response returns an array that contains identifying information for each of the Payers, including the PayerId, the name of the institution, and the last four digits of the account number.
+- [Create a Payment](https://docs.spinwheel.io/reference/create-request-1.md): This API will allow you to create a Payment request for a user.
+- [Delete a Payment](https://docs.spinwheel.io/reference/delete-payment-request-1.md): This API will allow you to delete one of the Payment request with a provided requestId if it exists.
+- [Get a List of Payments](https://docs.spinwheel.io/reference/get-request-1.md): This API will allow you to get list of the Payment requests created for a user with a provided userId, extRequestId or requestId. One of userId, extRequestId or requestId is required.
+- [Get Single Payment Details](https://docs.spinwheel.io/reference/get-request-by-id-1.md): This API will allow you to get a single Payment request with a provided requestId if it exists.
+- [Request Payment Rail Details](https://docs.spinwheel.io/reference/resolve-payment-rails.md)
+- [Get Account Balance](https://docs.spinwheel.io/reference/get-payment-to-platform-balance.md): This API will allow you to get the balance of your master payment to platform account.
+- [Make a Payment to Platform](https://docs.spinwheel.io/reference/payment-to-platform-1.md): This API will allow you to make a payment to platform.
+- [Reverse a Payment to Platform](https://docs.spinwheel.io/reference/reverse-payment-to-platform.md): This API will allow you to reverse a payment to platform. The original external requestId (extRequestId) from the original payment to platform request is needed to match the original transaction.  The amount field is optional, some considerations:   - If no amount is provided, it will attempt to reverse the entire value from the original extRequestId   - If an amount is provided, it can be up to the entire amount of the original extRequestId (paymentToPlatform)   - However, there is also tracking of the partial amounts that have previously been reversed. The partner cannot go over the original paymentToPlatform amount that was sent in increments of reversals.
+- [Get Single Transaction Details](https://docs.spinwheel.io/reference/get-transaction-1.md): This API will allow you to get a single transactions with a transactionsId if it exists.
+- [Get a List of Transactions](https://docs.spinwheel.io/reference/get-transaction-list-1.md): This API will allow you to get list of the transactions created for a user with a userId or by a requestId or an extRequestId.
+- [Simulate Transaction Flow in Sandbox](https://docs.spinwheel.io/reference/post-simulate-transaction-flow.md): This API will allow you to simulate through different transaction statuses in sandbox environment
+- [Create a Webhook](https://docs.spinwheel.io/reference/create-webhook-1.md): This API allows you to create a webhook subscription
+- [Create a Webhook](https://docs.spinwheel.io/reference/create-webhook.md): This API allows you to create a webhook subscription
+- [Delete a Webhook](https://docs.spinwheel.io/reference/delete-webhook-1.md): This API allows you to delete a specified webhook
+- [Delete a Webhook](https://docs.spinwheel.io/reference/delete-webhook.md): This API allows you to delete a specified webhook
+- [Get Single Webhook Details](https://docs.spinwheel.io/reference/get-webhooks-by-id-1.md): This API allows you to get webhook details when subscribed to a particular webhookId
+- [Get Single Webhook Details](https://docs.spinwheel.io/reference/get-webhooks-by-id.md): This API allows you to get webhook details when subscribed to a particular webhookId
+- [Get a List of Webhooks](https://docs.spinwheel.io/reference/get-webhooks-list-1.md): This API allows you to retrieve a list of webhooks you have subscribed to
+- [Get a List of Webhooks](https://docs.spinwheel.io/reference/get-webhooks-list.md): This API allows you to retrieve a list of webhooks you have subscribed to
+- [Update a Webhook Header](https://docs.spinwheel.io/reference/update-headers-1.md): This API allows you to update headers of a specified webhook
+- [Update a Webhook Header](https://docs.spinwheel.io/reference/update-headers.md): This API allows you to update headers of a specified webhook
+- [Update a Webhook](https://docs.spinwheel.io/reference/update-webhook-1.md): This API allows you to update a specified webhook
+- [Update a Webhook](https://docs.spinwheel.io/reference/update-webhook.md): This API allows you to update a specified webhook
+
+## Recipes
+- [Authentication & Retrieve User Info](https://docs.spinwheel.io/recipes/authentication-retrieve-user-info.md)
+- [Connect - SMS and Equifax Debt Profile](https://docs.spinwheel.io/recipes/connect-sms-and-equifax-debt-profile.md)
+- [Connect - SMS and TransUnion Debt Profile](https://docs.spinwheel.io/recipes/connect-sms-and-transunion-debt-profile.md)
+- [Get a Bank Account Balance](https://docs.spinwheel.io/recipes/get-a-bank-account-balance.md)
+
+## Changelog
+- [Q1 2026](https://docs.spinwheel.io/changelog/q1-20226.md)
+- [October 2025](https://docs.spinwheel.io/changelog/october-2025.md)
+- [August 2025](https://docs.spinwheel.io/changelog/august-2025.md)
+- [November 2024](https://docs.spinwheel.io/changelog/november-2024-changes.md)
+- [October 2024](https://docs.spinwheel.io/changelog/october-2024-changes.md)
