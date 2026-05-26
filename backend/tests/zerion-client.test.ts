@@ -92,6 +92,31 @@ describe('zerion getPortfolio', () => {
     expect(url).toContain('filter%5Bpositions%5D=no_filter');
     expect(url).toContain('currency=usd');
   });
+
+  it('returns change_1d_abs when present in response', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeFetchResponse({
+        data: {
+          attributes: {
+            total: { positions: 10000 },
+            changes: { percent_1d: 0.0325, absolute_1d: 312.5 },
+          },
+        },
+      }),
+    );
+
+    const { getPortfolio } = await import('../src/zerion/client.js');
+    const result = await getPortfolio('0xabc123');
+    expect(result.change_1d_abs).toBe(312.5);
+  });
+
+  it('returns change_1d_abs: null on 404', async () => {
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse(null, 404));
+
+    const { getPortfolio } = await import('../src/zerion/client.js');
+    const result = await getPortfolio('0xnotfound');
+    expect(result.change_1d_abs).toBeNull();
+  });
 });
 
 describe('zerion getTransactions', () => {
@@ -208,5 +233,172 @@ describe('zerion getTransactions', () => {
     expect(result.transactions).toHaveLength(1);
     expect(result.transactions[0]?.direction).toBe('out');
     expect(result.transactions[0]?.quantity_usd).toBe(0);
+  });
+});
+
+describe('zerion getPositions', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns parsed positions with symbol, name, quantity, value_usd', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeFetchResponse({
+        data: [
+          {
+            id: 'pos-1',
+            attributes: {
+              value: 4200.0,
+              quantity: { float: 1.5 },
+              fungible_info: { symbol: 'ETH', name: 'Ethereum' },
+            },
+          },
+        ],
+      }),
+    );
+
+    const { getPositions } = await import('../src/zerion/client.js');
+    const result = await getPositions('0xabc');
+    expect(result).toHaveLength(1);
+    expect(result[0]?.symbol).toBe('ETH');
+    expect(result[0]?.name).toBe('Ethereum');
+    expect(result[0]?.quantity).toBe(1.5);
+    expect(result[0]?.value_usd).toBe(4200.0);
+  });
+
+  it('returns empty array on 404', async () => {
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse(null, 404));
+
+    const { getPositions } = await import('../src/zerion/client.js');
+    const result = await getPositions('0xnotfound');
+    expect(result).toEqual([]);
+  });
+
+  it('returns empty array on invalid response shape', async () => {
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ unexpected: true }));
+
+    const { getPositions } = await import('../src/zerion/client.js');
+    const result = await getPositions('0xbad');
+    expect(result).toEqual([]);
+  });
+
+  it('sends filter[positions]=no_filter and filter[trash]=only_non_trash', async () => {
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ data: [] }));
+
+    const { getPositions } = await import('../src/zerion/client.js');
+    await getPositions('0xabc');
+
+    const url = vi.mocked(fetch).mock.calls[0]?.[0] as string;
+    expect(url).toContain('filter%5Bpositions%5D=no_filter');
+    expect(url).toContain('filter%5Btrash%5D=only_non_trash');
+    expect(url).toContain('currency=usd');
+  });
+});
+
+describe('zerion getDeFiPositions', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns DeFi positions using only_complex filter', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeFetchResponse({
+        data: [
+          {
+            id: 'defi-1',
+            attributes: {
+              value: 1800.0,
+              quantity: { float: 500 },
+              fungible_info: { symbol: 'USDC', name: 'USD Coin' },
+            },
+          },
+        ],
+      }),
+    );
+
+    const { getDeFiPositions } = await import('../src/zerion/client.js');
+    const result = await getDeFiPositions('0xabc');
+    expect(result).toHaveLength(1);
+    expect(result[0]?.symbol).toBe('USDC');
+
+    const url = vi.mocked(fetch).mock.calls[0]?.[0] as string;
+    expect(url).toContain('filter%5Bpositions%5D=only_complex');
+  });
+
+  it('returns empty array on 404', async () => {
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse(null, 404));
+
+    const { getDeFiPositions } = await import('../src/zerion/client.js');
+    const result = await getDeFiPositions('0xnotfound');
+    expect(result).toEqual([]);
+  });
+});
+
+describe('zerion getPnl', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns unrealized, realized, and total gain from response', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeFetchResponse({
+        data: {
+          attributes: {
+            unrealized_gain: 1200.5,
+            realized_gain: 450.0,
+            total_gain: 1650.5,
+          },
+        },
+      }),
+    );
+
+    const { getPnl } = await import('../src/zerion/client.js');
+    const result = await getPnl('0xabc');
+    expect(result.unrealized_gain).toBe(1200.5);
+    expect(result.realized_gain).toBe(450.0);
+    expect(result.total_gain).toBe(1650.5);
+  });
+
+  it('returns null gains when fields are absent', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeFetchResponse({
+        data: { attributes: {} },
+      }),
+    );
+
+    const { getPnl } = await import('../src/zerion/client.js');
+    const result = await getPnl('0xabc');
+    expect(result.unrealized_gain).toBeNull();
+    expect(result.realized_gain).toBeNull();
+    expect(result.total_gain).toBeNull();
+  });
+
+  it('returns all nulls on 404', async () => {
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse(null, 404));
+
+    const { getPnl } = await import('../src/zerion/client.js');
+    const result = await getPnl('0xnotfound');
+    expect(result.unrealized_gain).toBeNull();
+    expect(result.realized_gain).toBeNull();
+    expect(result.total_gain).toBeNull();
+  });
+
+  it('throws ZerionError on non-ok non-404 response', async () => {
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ errors: [{ detail: 'Forbidden' }] }, 403));
+
+    const { getPnl, ZerionError } = await import('../src/zerion/client.js');
+    await expect(getPnl('0xfail')).rejects.toBeInstanceOf(ZerionError);
   });
 });

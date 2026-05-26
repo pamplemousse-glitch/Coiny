@@ -118,6 +118,11 @@ export const SpinwheelDebtSchema = z.object({
   interestRate: z.number().nullable().optional(),
   minimumPayment: z.number().nullable().optional(),
   creditLimit: z.number().nullable().optional(),
+  dueDate: z.string().nullable().optional(),
+  accountStatus: z.enum(['OPEN', 'CLOSED', 'DELINQUENT']).nullable().optional(),
+  lastPaymentDate: z.string().nullable().optional(),
+  openDate: z.string().nullable().optional(),
+  paymentHistoryCodes: z.array(z.string()).nullable().optional(),
 });
 
 export type SpinwheelDebt = z.infer<typeof SpinwheelDebtSchema>;
@@ -197,6 +202,17 @@ export async function getCreditScore(
   }
 
   return { score, utilization };
+}
+
+// POST /v1/users/{spinwheelUserId}/subscriptions — registers a monthly credit profile pull.
+// Call once after OTP verify; Spinwheel fires USER_DEBT_PROFILE_UPDATED webhooks monthly.
+export async function subscribeMonthly(spinwheelUserId: string): Promise<void> {
+  const schema = envelopeSchema(z.object({}).passthrough());
+  await spinwheelPost(
+    `/v1/users/${encodeURIComponent(spinwheelUserId)}/subscriptions`,
+    { type: 'CREDIT_PROFILE', frequency: 'MONTHLY' },
+    schema,
+  );
 }
 
 // DELETE /v1/users/{spinwheelUserId} — called on disconnect to remove user data from Spinwheel.

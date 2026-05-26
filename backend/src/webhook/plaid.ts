@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { deltaForEvent } from '../health/score.js';
 import { plaidTxToInternal } from '../plaid/adapter.js';
-import { transactionsSync } from '../plaid/client.js';
+import { liabilitiesGet, recurringTransactionsGet, transactionsSync } from '../plaid/client.js';
 import { verifyPlaidSignature } from '../plaid/signature.js';
 import { type PlaidAccount, PlaidApiError, type PlaidWebhookEnvelope } from '../plaid/types.js';
 import { dispatchReaction } from '../reactions/dispatch.js';
@@ -69,12 +69,52 @@ async function dispatch(app: FastifyInstance, envelope: PlaidWebhookEnvelope): P
       await disableItem(item_id);
       return;
     }
+    if (webhook_code === 'PENDING_EXPIRATION' && item_id) {
+      app.log.warn({ item_id }, 'plaid item pending expiration — re-auth required');
+      return;
+    }
+    if (webhook_code === 'NEW_ACCOUNTS_AVAILABLE' && item_id) {
+      app.log.info({ item_id }, 'plaid new accounts available');
+      return;
+    }
     app.log.info({ webhook_type, webhook_code, item_id }, 'plaid item webhook — no-op');
+    return;
+  }
+
+  if (webhook_type === 'LIABILITIES' && webhook_code === 'DEFAULT_UPDATE') {
+    const item = await getItem(item_id);
+    if (!item?.userId || item.disabled) {
+      app.log.info({ item_id }, 'plaid liabilities webhook — item not found or disabled');
+      return;
+    }
+    const liabilities = await liabilitiesGet(item.accessToken);
+    app.log.info(
+      {
+        item_id,
+        credit_count: liabilities.liabilities.credit?.length ?? 0,
+        student_count: liabilities.liabilities.student?.length ?? 0,
+      },
+      'plaid liabilities updated',
+    );
     return;
   }
 
   if (webhook_type !== 'TRANSACTIONS') {
     app.log.info({ webhook_type, webhook_code }, 'plaid webhook unhandled type — no-op');
+    return;
+  }
+
+  if (webhook_code === 'RECURRING_TRANSACTIONS_UPDATE') {
+    const item = await getItem(item_id);
+    if (!item?.userId || item.disabled) {
+      app.log.info({ item_id }, 'plaid recurring webhook — item not found or disabled');
+      return;
+    }
+    const recurring = await recurringTransactionsGet(item.accessToken);
+    app.log.info(
+      { item_id, inflow: recurring.inflow_streams.length, outflow: recurring.outflow_streams.length },
+      'plaid recurring transactions updated',
+    );
     return;
   }
 

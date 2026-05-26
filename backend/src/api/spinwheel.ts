@@ -3,7 +3,14 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/client.js';
 import { spinwheelConnections, spinwheelPending } from '../db/schema.js';
-import { deleteUser, getCreditScore, getDebtProfile, sendSmsOtp, verifySmsOtp } from '../spinwheel/client.js';
+import {
+  deleteUser,
+  getCreditScore,
+  getDebtProfile,
+  sendSmsOtp,
+  subscribeMonthly,
+  verifySmsOtp,
+} from '../spinwheel/client.js';
 
 const SendOtpBodySchema = z.object({
   phoneNumber: z.string().min(1),
@@ -70,6 +77,15 @@ export function registerSpinwheelApi(app: FastifyInstance): void {
       .onConflictDoUpdate({ target: spinwheelConnections.userId, set: { spinwheelUserId: pending.spinwheelUserId } });
 
     await db().delete(spinwheelPending).where(eq(spinwheelPending.userId, userId));
+
+    // Fire-and-forget: register monthly credit profile refresh. Non-fatal if it fails.
+    void (async () => {
+      try {
+        await subscribeMonthly(pending.spinwheelUserId);
+      } catch (err) {
+        req.log.warn({ userId, err }, 'spinwheel monthly subscription failed — continuing');
+      }
+    })();
 
     req.log.info({ userId }, 'spinwheel connection established');
     return { ok: true };

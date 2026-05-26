@@ -250,9 +250,11 @@ describe('GET /api/net-worth', () => {
         credit: [
           {
             account_id: 'acct-visa',
+            is_overdue: null,
             minimum_payment_amount: 50,
             next_payment_due_date: '2026-06-15',
             last_statement_balance: null,
+            aprs: null,
           },
         ],
         mortgage: null,
