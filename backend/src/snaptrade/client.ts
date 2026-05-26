@@ -30,7 +30,7 @@ async function snap<T>(
   const res = await fetch(`${BASE}${fullPath}?${qs}`, {
     method,
     headers: { 'Content-Type': 'application/json', Signature: signature },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
 
   if (!res.ok) throw new Error(`SnapTrade ${method} ${pathSuffix} → ${res.status}`);
