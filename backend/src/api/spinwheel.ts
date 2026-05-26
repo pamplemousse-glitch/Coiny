@@ -121,9 +121,10 @@ export function registerSpinwheelApi(app: FastifyInstance): void {
     const result = await getCreditScore(connection.spinwheelUserId);
 
     // Fire a reaction if score changed significantly since last check.
-    const score = typeof result === 'object' && result !== null && 'score' in result
-      ? (result as { score?: number }).score ?? null
-      : null;
+    const score =
+      typeof result === 'object' && result !== null && 'score' in result
+        ? ((result as { score?: number }).score ?? null)
+        : null;
     if (score !== null && connection.lastCreditScore !== null && connection.lastCreditScore !== undefined) {
       const delta = score - connection.lastCreditScore;
       if (Math.abs(delta) >= CREDIT_SCORE_REACTION_THRESHOLD) {

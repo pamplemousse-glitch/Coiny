@@ -14,8 +14,8 @@ import { accountsBalanceGet, investmentsHoldingsGet, liabilitiesGet } from '../p
 import { dispatchReaction } from '../reactions/dispatch.js';
 import { evaluateExternalEvent } from '../reactions/external.js';
 import { getDebtProfile } from '../spinwheel/client.js';
-import { recordReaction } from '../store/pet.js';
 import { getItemsByUser } from '../store/items.js';
+import { recordReaction } from '../store/pet.js';
 import { getRecentOutflows } from '../store/transactions.js';
 import { getPortfolio } from '../zerion/client.js';
 
@@ -235,9 +235,8 @@ export function registerNetWorthApi(app: FastifyInstance): void {
     // --- Net worth milestone reaction ---
     try {
       const [pet] = await db().select().from(petState).where(eq(petState.userId, userId));
-      const prev = pet?.lastNetWorthUsd !== null && pet?.lastNetWorthUsd !== undefined
-        ? parseFloat(pet.lastNetWorthUsd)
-        : null;
+      const prev =
+        pet?.lastNetWorthUsd !== null && pet?.lastNetWorthUsd !== undefined ? parseFloat(pet.lastNetWorthUsd) : null;
       const milestone = prev !== null ? crossedMilestone(prev, total) : null;
       if (milestone !== null) {
         const reaction = evaluateExternalEvent({
@@ -253,10 +252,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
         }
       }
       if (prev === null || Math.abs(total - prev) > 0.01) {
-        await db()
-          .update(petState)
-          .set({ lastNetWorthUsd: total.toString() })
-          .where(eq(petState.userId, userId));
+        await db().update(petState).set({ lastNetWorthUsd: total.toString() }).where(eq(petState.userId, userId));
       }
     } catch {
       // pet row may not exist yet; skip milestone check
