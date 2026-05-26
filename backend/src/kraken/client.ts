@@ -8,7 +8,9 @@ const BASE = 'https://api.kraken.com';
 // 3. message = path + SHA256(nonce + postData)   [SHA256 as binary, not hex]
 // 4. signature = HMAC-SHA512(message, base64-decode(privateKey)) as base64
 function sign(path: string, nonce: string, postData: string, privateKey: string): string {
-  const hash = createHash('sha256').update(nonce + postData).digest();
+  const hash = createHash('sha256')
+    .update(nonce + postData)
+    .digest();
   const message = Buffer.concat([Buffer.from(path), hash]);
   return createHmac('sha512', Buffer.from(privateKey, 'base64')).update(message).digest('base64');
 }

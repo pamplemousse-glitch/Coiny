@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { authHeader, resetDatabase, testUserId } from './db-helper.js';
+import { authHeader, resetDatabase } from './db-helper.js';
 
 vi.mock('../src/ynab/client.js', () => ({
   getBudgets: vi.fn(),
@@ -14,7 +14,14 @@ const mockedGetAccounts = vi.mocked(getAccounts);
 const mockedGetTotalNetWorth = vi.mocked(getTotalNetWorth);
 
 const fakeBudget = { id: 'budget-1', name: 'My Budget', currency_format: { iso_code: 'USD' } };
-const fakeAccount = { id: 'acct-1', name: 'Checking', type: 'checking', balance: 250000, closed: false, deleted: false };
+const fakeAccount = {
+  id: 'acct-1',
+  name: 'Checking',
+  type: 'checking',
+  balance: 250000,
+  closed: false,
+  deleted: false,
+};
 
 describe('POST /api/ynab/connect', () => {
   beforeEach(async () => {
