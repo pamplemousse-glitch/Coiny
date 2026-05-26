@@ -3,6 +3,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgTable,
   primaryKey,
   serial,
@@ -157,6 +158,25 @@ export const spinwheelConnections = pgTable('spinwheel_connections', {
   spinwheelUserId: text('spinwheel_user_id').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Chain wallets — many per user, one row per (user, chain, address).
+// lastBalanceUsd is updated by POST /api/chain-wallets/sync using live chain data + Coinbase spot prices.
+export const chainWallets = pgTable(
+  'chain_wallets',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    chain: text('chain').notNull(),
+    address: text('address').notNull(),
+    label: text('label'),
+    lastBalanceUsd: numeric('last_balance_usd'),
+    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('chain_wallets_user_chain_address_idx').on(t.userId, t.chain, t.address)],
+);
 
 // Temporary storage for the Spinwheel userId returned by the SMS OTP send step.
 // Needed because the verify call requires the spinwheelUserId in the URL path.
