@@ -42,6 +42,26 @@ const configSchema = z
     SPINWHEEL_SECRET_KEY: z.string().default(''),
     // Standard host. Sandbox: https://sandbox-api.spinwheel.io  Prod: https://api.spinwheel.io
     SPINWHEEL_BASE_URL: z.string().url().default('https://sandbox-api.spinwheel.io'),
+
+    // RentCast AVM — real estate property value estimates.
+    RENTCAST_API_KEY: z.string().default(''),
+
+    // MarketCheck — vehicle value estimates.
+    MARKETCHECK_API_KEY: z.string().default(''),
+
+    // GoldAPI.io — precious metals spot prices.
+    GOLDAPI_API_KEY: z.string().default(''),
+
+    // SnapTrade brokerage aggregator (Fidelity, Vanguard, Schwab, Robinhood, etc.)
+    SNAPTRADE_CLIENT_ID: z.string().default(''),
+    SNAPTRADE_CONSUMER_KEY: z.string().default(''),
+
+    // Subscan API key for Polkadot (DOT) balance queries.
+    SUBSCAN_API_KEY: z.string().default(''),
+    // Blockfrost project ID for Cardano (ADA) balance queries.
+    BLOCKFROST_PROJECT_ID: z.string().default(''),
+    // TonCenter API key for TON balance queries.
+    TONCENTER_API_KEY: z.string().default(''),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {

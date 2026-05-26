@@ -1,10 +1,17 @@
 import { and, eq } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { getAptosBalance } from '../chains/aptos.js';
 import { getBitcoinBalance } from '../chains/bitcoin.js';
 import { getBlockcypherBalance } from '../chains/blockcypher.js';
+import { getCardanoBalance } from '../chains/cardano.js';
 import { getCosmosBalance } from '../chains/cosmos.js';
+import { getHederaBalance } from '../chains/hedera.js';
+import { getNearBalance } from '../chains/near.js';
+import { getPolkadotBalance } from '../chains/polkadot.js';
 import { getStellarBalance } from '../chains/stellar.js';
+import { getSuiBalance } from '../chains/sui.js';
+import { getTonBalance } from '../chains/ton.js';
 import { getXrpBalance } from '../chains/xrp.js';
 import { getSpotPrices } from '../coinbase/client.js';
 import { db } from '../db/client.js';
@@ -20,6 +27,13 @@ export const CHAIN_SYMBOLS: Record<string, string> = {
   bch: 'BCH',
   cosmos: 'ATOM',
   osmosis: 'OSMO',
+  near: 'NEAR',
+  aptos: 'APT',
+  sui: 'SUI',
+  hedera: 'HBAR',
+  polkadot: 'DOT',
+  cardano: 'ADA',
+  ton: 'TON',
 };
 
 // Returns native-unit balance for the given chain and address.
@@ -39,13 +53,43 @@ export async function fetchNativeBalance(chain: string, address: string): Promis
     case 'cosmos':
     case 'osmosis':
       return getCosmosBalance(chain, address);
+    case 'near':
+      return getNearBalance(address);
+    case 'aptos':
+      return getAptosBalance(address);
+    case 'sui':
+      return getSuiBalance(address);
+    case 'hedera':
+      return getHederaBalance(address);
+    case 'polkadot':
+      return getPolkadotBalance(address);
+    case 'cardano':
+      return getCardanoBalance(address);
+    case 'ton':
+      return getTonBalance(address);
     default:
       return null;
   }
 }
 
 const AddWalletBodySchema = z.object({
-  chain: z.enum(['bitcoin', 'xrp', 'stellar', 'doge', 'ltc', 'bch', 'cosmos', 'osmosis']),
+  chain: z.enum([
+    'bitcoin',
+    'xrp',
+    'stellar',
+    'doge',
+    'ltc',
+    'bch',
+    'cosmos',
+    'osmosis',
+    'near',
+    'aptos',
+    'sui',
+    'hedera',
+    'polkadot',
+    'cardano',
+    'ton',
+  ]),
   address: z.string().min(1).max(200),
   label: z.string().max(100).optional(),
 });

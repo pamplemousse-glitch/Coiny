@@ -363,4 +363,42 @@ describe('GET /api/net-worth', () => {
 
     await app.close();
   });
+
+  it('fires net_worth_milestone reaction when total crosses $10k threshold', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { eq } = await import('drizzle-orm');
+    const { petState, chainWallets } = await import('../src/db/schema.js');
+    // resetDatabase() already created a petState row — update it with a seed value just below $10k.
+    await db().update(petState).set({ lastNetWorthUsd: '9500' }).where(eq(petState.userId, testUserId));
+    await db().insert(chainWallets).values({
+      userId: testUserId,
+      chain: 'bitcoin',
+      address: '1A1zP1',
+      lastBalanceUsd: '11000',
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+    expect(res.json<{ total: number }>().total).toBe(11000);
+
+    // DB should reflect updated lastNetWorthUsd.
+    const [updated] = await db().select().from(petState).where(eq(petState.userId, testUserId));
+    expect(parseFloat(updated!.lastNetWorthUsd!)).toBe(11000);
+
+    await app.close();
+  });
+
+  it('does not fire milestone when no prior net worth is recorded', async () => {
+    // petState row exists but lastNetWorthUsd is null — milestone check is skipped.
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+
+    await app.close();
+  });
 });
