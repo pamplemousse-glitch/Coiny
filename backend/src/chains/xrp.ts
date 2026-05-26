@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fetchWithRetry } from '../util/fetch.js';
 
 const XRPL_URL = 'https://xrplcluster.com';
 
@@ -24,7 +25,7 @@ const AccountInfoSchema = z.object({
 // Returns confirmed XRP balance for an XRPL account address.
 // Returns 0 for accounts that don't exist (actNotFound). Throws XrplError on API errors.
 export async function getXrpBalance(address: string): Promise<number> {
-  const res = await fetch(XRPL_URL, {
+  const res = await fetchWithRetry(XRPL_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

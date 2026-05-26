@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fetchWithRetry } from '../util/fetch.js';
 
 const BASE_URL = 'https://blockstream.info/api';
 
@@ -22,7 +23,7 @@ const AddressSchema = z.object({
 // Returns confirmed BTC balance for a Bitcoin address.
 // Returns 0 for addresses with no history (404). Throws BlockstreamError on API errors.
 export async function getBitcoinBalance(address: string): Promise<number> {
-  const res = await fetch(`${BASE_URL}/address/${encodeURIComponent(address)}`);
+  const res = await fetchWithRetry(`${BASE_URL}/address/${encodeURIComponent(address)}`);
 
   if (res.status === 404) return 0;
   if (!res.ok) throw new BlockstreamError(res.status, `Blockstream API error: ${res.status}`);
