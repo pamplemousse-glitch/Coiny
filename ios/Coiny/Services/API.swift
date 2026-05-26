@@ -246,6 +246,20 @@ actor API {
         try await get("/api/net-worth")
     }
 
+    // MARK: - Performance
+
+    func getCoinbasePerformance() async throws -> CoinbasePerformance {
+        try await get("/api/coinbase/performance")
+    }
+
+    func getZerionPnl() async throws -> ZerionPnl {
+        try await get("/api/zerion/pnl")
+    }
+
+    func getDefiPositions() async throws -> DefiPositionsResponse {
+        try await get("/api/zerion/defi-positions")
+    }
+
     // MARK: - Misc
 
     func health() async throws -> HealthResponse {

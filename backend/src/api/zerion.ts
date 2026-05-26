@@ -7,7 +7,7 @@ import { dispatchReaction } from '../reactions/dispatch.js';
 import { evaluateExternalEvent } from '../reactions/external.js';
 import { claimEvent } from '../store/events.js';
 import { recordReaction } from '../store/pet.js';
-import { getPortfolio, getTransactions } from '../zerion/client.js';
+import { getDeFiPositions, getPnl, getPortfolio, getTransactions } from '../zerion/client.js';
 
 const AddWalletBodySchema = z.object({
   address: z.string().min(1).max(100),
@@ -91,6 +91,104 @@ export function registerZerionApi(app: FastifyInstance): void {
     }
 
     return { total_usd, wallets };
+  });
+
+  // GET /api/zerion/pnl
+  app.get('/api/zerion/pnl', async (req: FastifyRequest) => {
+    const userId = req.user!.id;
+    const rows = await db().select().from(zerionWallets).where(eq(zerionWallets.userId, userId));
+
+    if (rows.length === 0) {
+      return { unrealizedGain: 0, realizedGain: 0, totalGain: 0, wallets: [] };
+    }
+
+    const results = await Promise.allSettled(rows.map((r) => getPnl(r.address)));
+
+    let unrealizedGain = 0;
+    let realizedGain = 0;
+    let totalGain = 0;
+    const wallets: Array<{
+      address: string;
+      label: string | null;
+      unrealizedGain: number;
+      realizedGain: number;
+      totalGain: number;
+    }> = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const result = results[i];
+      if (!row) continue;
+
+      if (result?.status === 'fulfilled') {
+        const pnl = result.value;
+        const wUnrealized = pnl.unrealized_gain ?? 0;
+        const wRealized = pnl.realized_gain ?? 0;
+        const wTotal = pnl.total_gain ?? 0;
+        unrealizedGain += wUnrealized;
+        realizedGain += wRealized;
+        totalGain += wTotal;
+        wallets.push({
+          address: row.address,
+          label: row.label ?? null,
+          unrealizedGain: wUnrealized,
+          realizedGain: wRealized,
+          totalGain: wTotal,
+        });
+      } else {
+        wallets.push({
+          address: row.address,
+          label: row.label ?? null,
+          unrealizedGain: 0,
+          realizedGain: 0,
+          totalGain: 0,
+        });
+      }
+    }
+
+    return { unrealizedGain, realizedGain, totalGain, wallets };
+  });
+
+  // GET /api/zerion/defi-positions
+  app.get('/api/zerion/defi-positions', async (req: FastifyRequest) => {
+    const userId = req.user!.id;
+    const rows = await db().select().from(zerionWallets).where(eq(zerionWallets.userId, userId));
+
+    if (rows.length === 0) {
+      return { positions: [] };
+    }
+
+    const results = await Promise.allSettled(rows.map((r) => getDeFiPositions(r.address)));
+
+    const positions: Array<{
+      id: string;
+      symbol: string;
+      name: string;
+      quantity: number;
+      valueUsd: number;
+      walletAddress: string;
+    }> = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const result = results[i];
+      if (!row) continue;
+
+      if (result?.status === 'fulfilled') {
+        for (const pos of result.value) {
+          positions.push({
+            id: pos.id,
+            symbol: pos.symbol,
+            name: pos.name,
+            quantity: pos.quantity,
+            valueUsd: pos.value_usd,
+            walletAddress: row.address,
+          });
+        }
+      }
+    }
+
+    return { positions };
   });
 
   // POST /api/zerion/sync
