@@ -101,7 +101,7 @@ Goal: the most complete net worth picture possible, with every integration that 
 **Per-token positions**
 - `GET /v1/wallets/{address}/positions/` with `filter[positions]=no_filter&filter[trash]=only_non_trash&currency=usd`.
 - Returns `attributes.value`, `attributes.quantity.float`, `attributes.fungible_info.symbol` per token.
-- Fires "token up/down X%" events.
+- Fires "token up/down X%" events.jjjjjjjkGQVw2
 - Add `getPositions(address: string): Promise<ZerionPosition[]>` to `src/zerion/client.ts`.
 
 **Portfolio 1d change**
@@ -128,8 +128,7 @@ Goal: the most complete net worth picture possible, with every integration that 
 
 ### Spinwheel
 
-**P0 — Directly feed pet reactions**
-
+**P0 — Directly feed pet reactions*no
 **Liability balance refresh**
 - `POST /v1/users/{spinwheelUserId}/liabilities/refresh` — real-time pull of current balances.
 - Call after user requests refresh or on `NEW_LIABILITIES_REPORTED` webhook.
@@ -177,6 +176,16 @@ Goal: the most complete net worth picture possible, with every integration that 
 **SnapTrade** (`dashboard.snaptrade.com`) — broad brokerage/IRA aggregator: Fidelity, Vanguard, Schwab, Robinhood, Webull, M1, Betterment, Wealthfront, Interactive Brokers, Empower, tastytrade, Public, and 20+ more. $0 dev tier, $1–$2/user/month in prod. Use as catch-all for anything Plaid misses.
 
 **[ACTION]** Sign up at `dashboard.snaptrade.com/signup` — free tier, no CC.
+
+**YNAB** (`api.ynab.com`) — You Need A Budget. OAuth 2.0. Strong overlap with Coiny's financially-conscious audience. Pull account balances and net worth snapshot from users who budget in YNAB. Free for developers. User authorizes via OAuth; we read their budget accounts and balances.
+
+**[ACTION]** Register at `api.ynab.com` — free developer account.
+
+**Alpaca** (`alpaca.markets`) — developer-first brokerage for US stocks and ETFs. Read-only API key auth (users generate in their Alpaca dashboard, paste into Coiny). Pull portfolio positions and current values. No signup needed from us — user-supplied keys only.
+
+**Tradier** (`developer.tradier.com`) — brokerage focused on equity and options traders. OAuth 2.0. Pull equity positions, options positions (value changes fast — strong candidate for pet reactions). Sandbox available. Free developer account.
+
+**[ACTION]** Register at `developer.tradier.com` — free sandbox.
 
 ---
 
