@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { getAccounts, getSpotPrices, getTransactions } from '../coinbase/client.js';
+import { getAccounts, getPortfolioSummary, getSpotPrices, getTransactions } from '../coinbase/client.js';
 import { config } from '../config.js';
 import { dispatchReaction } from '../reactions/dispatch.js';
 import { evaluateExternalEvent } from '../reactions/external.js';
@@ -8,6 +8,23 @@ import { claimEvent } from '../store/events.js';
 import { recordReaction } from '../store/pet.js';
 
 export function registerCoinbaseApi(app: FastifyInstance): void {
+  // GET /api/coinbase/performance
+  app.get('/api/coinbase/performance', async (_req: FastifyRequest) => {
+    try {
+      const summary = await getPortfolioSummary();
+      if (!summary) {
+        return { unrealizedPnl: null, totalCash: null, totalCrypto: null };
+      }
+      return {
+        unrealizedPnl: summary.unrealizedPnl,
+        totalCash: summary.totalCash,
+        totalCrypto: summary.totalCrypto,
+      };
+    } catch {
+      return { unrealizedPnl: null, totalCash: null, totalCrypto: null };
+    }
+  });
+
   // GET /api/coinbase/status
   app.get('/api/coinbase/status', async (req: FastifyRequest) => {
     const conn = await getCoinbaseConnection(req.user!.id);

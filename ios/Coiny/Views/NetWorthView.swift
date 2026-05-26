@@ -5,6 +5,7 @@ struct NetWorthView: View {
     @State private var coinbaseVM = CoinbaseViewModel()
     @State private var zerionVM = ZerionViewModel()
     @State private var spinwheelVM = SpinwheelViewModel()
+    @State private var performanceVM = PerformanceViewModel()
     @State private var chainWalletsVM = ChainWalletsViewModel()
     @State private var hyperliquidVM = HyperliquidViewModel()
 
@@ -17,6 +18,7 @@ struct NetWorthView: View {
         .task { await reload() }
         .environment(coinbaseVM)
         .environment(zerionVM)
+        .environment(performanceVM)
         .environment(chainWalletsVM)
         .environment(hyperliquidVM)
     }
@@ -26,9 +28,10 @@ struct NetWorthView: View {
         async let coinbase: () = coinbaseVM.loadStatus()
         async let zerion: () = zerionVM.loadWallets()
         async let spinwheel: () = spinwheelVM.loadStatus()
+        async let performance: () = performanceVM.load()
         async let chainWallets: () = chainWalletsVM.loadWallets()
         async let hyperliquid: () = hyperliquidVM.loadAccounts()
-        _ = await (netWorth, coinbase, zerion, spinwheel, chainWallets, hyperliquid)
+        _ = await (netWorth, coinbase, zerion, spinwheel, performance, chainWallets, hyperliquid)
     }
 
     @ViewBuilder
@@ -48,6 +51,7 @@ struct NetWorthView: View {
                     chainWalletsSection(data)
                     hyperliquidSection(data)
                     debtsSection(data)
+                    performanceSection()
                     Spacer(minLength: 32)
                 }
                 .padding(.horizontal)
@@ -210,6 +214,10 @@ struct NetWorthView: View {
                 SpinwheelInlineView(vm: spinwheelVM)
             }
         }
+    }
+
+    private func performanceSection() -> some View {
+        PerformanceView()
     }
 
     private func sectionHeader(title: String, total: Double, icon: String, color: Color) -> some View {

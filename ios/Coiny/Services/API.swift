@@ -380,6 +380,49 @@ actor API {
     }
 }
 
+// MARK: - Performance API
+extension API {
+    func getCoinbasePerformance() async throws -> CoinbasePerformance {
+        try await get("/api/coinbase/performance")
+    }
+
+    func getZerionPnl() async throws -> ZerionPnl {
+        try await get("/api/zerion/pnl")
+    }
+
+    func getDefiPositions() async throws -> DefiPositionsResponse {
+        try await get("/api/zerion/defi-positions")
+    }
+}
+
+#if DEBUG
+// MARK: - Debug API
+extension API {
+    @discardableResult
+    func fireTestTransaction() async throws -> EmptyResponse {
+        try await post("/api/debug/fire-transaction")
+    }
+
+    func debugTransactions() async throws -> DebugTransactionsResponse {
+        try await get("/api/debug/transactions")
+    }
+
+    @discardableResult
+    func resetCursor() async throws -> ResetCursorResponse {
+        try await post("/api/debug/reset-cursor")
+    }
+
+    func injectDebugSession() async throws {
+        struct DebugSessionResponse: Decodable { let token: String }
+        let response: DebugSessionResponse = try await request(
+            method: "POST", path: "/api/debug/session",
+            body: Optional<String>.none, requiresAuth: false
+        )
+        sessionToken = response.token
+    }
+}
+#endif
+
 // MARK: - DTOs
 
 struct Empty: Encodable {}
@@ -455,86 +498,6 @@ struct SpendingSummaryResponse: Decodable {
     let monthlySpend: Double
     let monthlyIncome: Double
     let savingsRate: Int?
-}
-
-// MARK: - Net Worth DTOs
-
-struct NetWorthResponse: Decodable {
-    let total: Double
-    let bank: Double
-    let investments: Double
-    let crypto: Double
-    let defi: Double
-    let chainWallets: Double
-    let hyperliquid: Double
-    let debts: Double
-    let liquidCashMonths: Double?
-    let accounts: NetWorthAccounts
-    let connections: NetWorthConnections
-}
-
-struct NetWorthAccounts: Decodable {
-    let bank: [BankAccount]
-    let investments: [InvestmentHolding]
-    let crypto: [CryptoPosition]
-    let defi: DefiTotal
-    let debts: [DebtItem]
-}
-
-struct NetWorthConnections: Decodable {
-    let coinbase: Bool
-    let zerion: Bool
-    let spinwheel: Bool
-}
-struct BankAccount: Decodable, Identifiable {
-    let id: String
-    let name: String
-    let type: String
-    let balance: Double
-    let minPayment: Double?
-    let nextDueDate: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id = "accountId"
-        case name
-        case type
-        case balance
-        case minPayment
-        case nextDueDate
-    }
-}
-
-struct InvestmentHolding: Decodable, Identifiable {
-    let id: String
-    let name: String?
-    let ticker: String?
-    let value: Double
-
-    enum CodingKeys: String, CodingKey {
-        case id = "securityId"
-        case name
-        case ticker
-        case value
-    }
-}
-
-struct CryptoPosition: Decodable, Identifiable {
-    let id: String
-    let name: String
-    let symbol: String
-    let amount: Double
-    let valueUSD: Double
-}
-
-struct DefiTotal: Decodable {
-    let totalUSD: Double
-}
-
-struct DebtItem: Decodable, Identifiable {
-    let id: String
-    let type: String?
-    let balance: Double
-    let monthlyPayment: Double?
 }
 
 struct ChainWallet: Decodable, Identifiable {
