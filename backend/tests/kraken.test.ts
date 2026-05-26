@@ -115,8 +115,8 @@ describe('GET /api/kraken/balances', () => {
     const res = await app.inject({ method: 'GET', url: '/api/kraken/balances', headers: authHeader() });
     expect(res.statusCode).toBe(200);
     const body = res.json<Record<string, string>>();
-    expect(body['XXBT']).toBe('0.5');
-    expect(body['ZUSD']).toBe('1000.00');
+    expect(body.XXBT).toBe('0.5');
+    expect(body.ZUSD).toBe('1000.00');
 
     await app.close();
   });
