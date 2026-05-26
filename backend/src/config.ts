@@ -51,6 +51,13 @@ const configSchema = z
 
     // GoldAPI.io — precious metals spot prices.
     GOLDAPI_API_KEY: z.string().default(''),
+
+    // Subscan API key for Polkadot (DOT) balance queries.
+    SUBSCAN_API_KEY: z.string().default(''),
+    // Blockfrost project ID for Cardano (ADA) balance queries.
+    BLOCKFROST_PROJECT_ID: z.string().default(''),
+    // TonCenter API key for TON balance queries.
+    TONCENTER_API_KEY: z.string().default(''),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {
