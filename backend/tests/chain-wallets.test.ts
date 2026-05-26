@@ -6,10 +6,15 @@ vi.mock('../src/coinbase/client.js', () => ({
   getAccounts: vi.fn(),
   getTransactions: vi.fn(),
 }));
+vi.mock('../src/chains/bitcoin.js', () => ({
+  getBitcoinBalance: vi.fn(),
+}));
 
+import { getBitcoinBalance } from '../src/chains/bitcoin.js';
 import { getSpotPrices } from '../src/coinbase/client.js';
 
 const mockedGetSpotPrices = vi.mocked(getSpotPrices);
+const mockedGetBitcoinBalance = vi.mocked(getBitcoinBalance);
 
 describe('GET /api/chain-wallets', () => {
   beforeEach(async () => {
@@ -230,12 +235,38 @@ describe('POST /api/chain-wallets/sync', () => {
     await app.close();
   });
 
-  it('returns updated: 0 when chain has no client yet (foundation state)', async () => {
+  it('updates balance and returns updated: 1 for bitcoin wallet', async () => {
     const { db } = await import('../src/db/client.js');
     const { chainWallets } = await import('../src/db/schema.js');
     await db().insert(chainWallets).values({ userId: testUserId, chain: 'bitcoin', address: 'bc1qtest' });
 
+    mockedGetBitcoinBalance.mockResolvedValue(0.5);
     mockedGetSpotPrices.mockResolvedValue(new Map([['BTC', 50000]]));
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/chain-wallets/sync',
+      headers: authHeader(),
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ updated: 1 });
+
+    const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
+    const wallet = list.json<{ lastBalanceUsd: number }[]>()[0];
+    expect(wallet?.lastBalanceUsd).toBeCloseTo(25000, 0);
+
+    await app.close();
+  });
+
+  it('returns updated: 0 for chains without a client yet', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { chainWallets } = await import('../src/db/schema.js');
+    await db().insert(chainWallets).values({ userId: testUserId, chain: 'cosmos', address: 'cosmos1test' });
+
+    mockedGetSpotPrices.mockResolvedValue(new Map([['ATOM', 8]]));
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
