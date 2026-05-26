@@ -514,4 +514,3 @@ struct DebtItem: Decodable, Identifiable {
     let balance: Double
     let monthlyPayment: Double?
 }
-
