@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { getBitcoinBalance } from '../chains/bitcoin.js';
+import { getXrpBalance } from '../chains/xrp.js';
 import { getSpotPrices } from '../coinbase/client.js';
 import { db } from '../db/client.js';
 import { chainWallets } from '../db/schema.js';
@@ -24,7 +25,8 @@ export async function fetchNativeBalance(chain: string, address: string): Promis
   switch (chain) {
     case 'bitcoin':
       return getBitcoinBalance(address);
-    // xrp: added in feat/chain-xrp
+    case 'xrp':
+      return getXrpBalance(address);
     // stellar: added in feat/chain-stellar
     // doge, ltc, bch: added in feat/chain-blockcypher
     // cosmos, osmosis: added in feat/chain-cosmos

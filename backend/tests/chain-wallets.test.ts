@@ -9,12 +9,17 @@ vi.mock('../src/coinbase/client.js', () => ({
 vi.mock('../src/chains/bitcoin.js', () => ({
   getBitcoinBalance: vi.fn(),
 }));
+vi.mock('../src/chains/xrp.js', () => ({
+  getXrpBalance: vi.fn(),
+}));
 
 import { getBitcoinBalance } from '../src/chains/bitcoin.js';
+import { getXrpBalance } from '../src/chains/xrp.js';
 import { getSpotPrices } from '../src/coinbase/client.js';
 
 const mockedGetSpotPrices = vi.mocked(getSpotPrices);
 const mockedGetBitcoinBalance = vi.mocked(getBitcoinBalance);
+const mockedGetXrpBalance = vi.mocked(getXrpBalance);
 
 describe('GET /api/chain-wallets', () => {
   beforeEach(async () => {
@@ -257,6 +262,28 @@ describe('POST /api/chain-wallets/sync', () => {
     const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
     const wallet = list.json<{ lastBalanceUsd: number }[]>()[0];
     expect(wallet?.lastBalanceUsd).toBeCloseTo(25000, 0);
+
+    await app.close();
+  });
+
+  it('updates balance and returns updated: 1 for xrp wallet', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { chainWallets } = await import('../src/db/schema.js');
+    await db().insert(chainWallets).values({ userId: testUserId, chain: 'xrp', address: 'rTestXrp' });
+
+    mockedGetXrpBalance.mockResolvedValue(100);
+    mockedGetSpotPrices.mockResolvedValue(new Map([['XRP', 0.5]]));
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'POST', url: '/api/chain-wallets/sync', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ updated: 1 });
+
+    const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
+    const wallet = list.json<{ lastBalanceUsd: number }[]>()[0];
+    expect(wallet?.lastBalanceUsd).toBeCloseTo(50, 1);
 
     await app.close();
   });
