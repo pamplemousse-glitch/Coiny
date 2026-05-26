@@ -26,9 +26,7 @@ describe('getCardanoBalance', () => {
   });
 
   it('returns ADA balance converted from lovelace (÷ 1e6)', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      makeResponse({ amount: [{ unit: 'lovelace', quantity: '5000000000' }] }),
-    );
+    vi.mocked(fetch).mockResolvedValue(makeResponse({ amount: [{ unit: 'lovelace', quantity: '5000000000' }] }));
 
     const { getCardanoBalance } = await import('../src/chains/cardano.js');
     const balance = await getCardanoBalance('addr1test');
@@ -36,9 +34,7 @@ describe('getCardanoBalance', () => {
   });
 
   it('fetches from correct Blockfrost endpoint with project_id header', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      makeResponse({ amount: [{ unit: 'lovelace', quantity: '0' }] }),
-    );
+    vi.mocked(fetch).mockResolvedValue(makeResponse({ amount: [{ unit: 'lovelace', quantity: '0' }] }));
 
     const { getCardanoBalance } = await import('../src/chains/cardano.js');
     await getCardanoBalance('addr1abc');
@@ -65,9 +61,7 @@ describe('getCardanoBalance', () => {
   });
 
   it('returns 0 when lovelace unit is absent from amount array', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      makeResponse({ amount: [{ unit: 'sometoken', quantity: '9999' }] }),
-    );
+    vi.mocked(fetch).mockResolvedValue(makeResponse({ amount: [{ unit: 'sometoken', quantity: '9999' }] }));
 
     const { getCardanoBalance } = await import('../src/chains/cardano.js');
     const balance = await getCardanoBalance('addr1nolovelace');
