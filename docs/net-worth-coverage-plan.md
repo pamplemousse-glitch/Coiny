@@ -33,6 +33,7 @@ _Last updated 2026-05-26. Full research detail in `docs/api-expansion-plan.md`._
 | Vehicle market value | MarketCheck | vehicle_assets table — needs MARKETCHECK_API_KEY |
 | Precious metals (gold, silver, platinum) | GoldAPI.io | metal_holdings table — needs GOLDAPI_API_KEY |
 | Brokerage aggregator (Fidelity, Vanguard, Schwab, etc.) | SnapTrade | snaptrade_connections table — needs SNAPTRADE_CLIENT_ID + SNAPTRADE_CONSUMER_KEY |
+| YNAB budgets (all accounts across all budgets) | YNAB API | ynab_connections table — per-user personal access token |
 
 ---
 
@@ -56,7 +57,7 @@ _Last updated 2026-05-26. Full research detail in `docs/api-expansion-plan.md`._
 | Fidelity workplace 401k | Akoya | Medium | Form-based sandbox: `docs.akoya.com` |
 | Empower retirement (largest 401k) | Empower API | Medium | Form: `developer.empower-retirement.com` |
 | TIAA (403b) | TIAA API | Medium | Form: `developer.tiaa.org` |
-| YNAB (budgeting users) | YNAB API | Low | `app.ynab.com/settings/developer` — free personal access token |
+| ~~YNAB~~ | ~~YNAB API~~ | ~~Low~~ | ✅ Done |
 | Alpaca (brokerage) | Alpaca API | Low | User-supplied API key — no vendor signup |
 | Tradier (equity + options) | Tradier API | Low | `developer.tradier.com` free sandbox |
 | Trading cards (Pokémon, MTG, Yu-Gi-Oh) | TCGPlayer API | Low | OAuth flow — more complex than a simple key |
