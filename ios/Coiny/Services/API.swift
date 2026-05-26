@@ -45,7 +45,7 @@ actor API {
     private let http: HTTPClient
     private let sessionStore: SessionStore
     private let decoder: JSONDecoder
-    private var sessionToken: String?
+    var sessionToken: String?
 
     init(baseURL: URL, http: HTTPClient, sessionStore: SessionStore) {
         self.baseURL = baseURL
@@ -246,83 +246,36 @@ actor API {
         try await get("/api/net-worth")
     }
 
-    // MARK: - Hyperliquid
-
-    func getHyperliquidAccounts() async throws -> [HyperliquidAccount] {
-        try await get("/api/hyperliquid/accounts")
-    }
-
-    func addHyperliquidAccount(address: String, label: String?) async throws {
-        struct Body: Encodable { let address: String; let label: String? }
-        let _: EmptyResponse = try await post("/api/hyperliquid/accounts", body: Body(address: address, label: label))
-    }
-
-    func removeHyperliquidAccount(address: String) async throws {
-        try await deleteVoid("/api/hyperliquid/accounts/\(address)")
-    }
-
-    func syncHyperliquid() async throws -> HyperliquidSyncResult {
-        try await post("/api/hyperliquid/sync")
-    }
-
     // MARK: - Misc
 
     func health() async throws -> HealthResponse {
         try await request(method: "GET", path: "/health", body: Optional<Empty>.none, requiresAuth: false)
     }
 
-    #if DEBUG
-    @discardableResult
-    func fireTestTransaction() async throws -> EmptyResponse {
-        try await post("/api/debug/fire-transaction")
-    }
-
-    func debugTransactions() async throws -> DebugTransactionsResponse {
-        try await get("/api/debug/transactions")
-    }
-
-    @discardableResult
-    func resetCursor() async throws -> ResetCursorResponse {
-        try await post("/api/debug/reset-cursor")
-    }
-
-    /// Creates a real backend session for the fixed simulator test user and
-    /// stores the token in memory. Bypasses Sign In with Apple, which doesn't
-    /// work in the Simulator. Token is lost on app restart (no Keychain write).
-    func injectDebugSession() async throws {
-        struct DebugSessionResponse: Decodable { let token: String }
-        let response: DebugSessionResponse = try await request(
-            method: "POST", path: "/api/debug/session",
-            body: Optional<String>.none, requiresAuth: false
-        )
-        sessionToken = response.token
-    }
-    #endif
-
     // MARK: - Internals
 
-    private func get<T: Decodable>(_ path: String) async throws -> T {
+    func get<T: Decodable>(_ path: String) async throws -> T {
         try await request(method: "GET", path: path, body: Optional<Empty>.none, requiresAuth: true)
     }
 
-    private func put<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T {
+    func put<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T {
         try await request(method: "PUT", path: path, body: body, requiresAuth: true)
     }
 
-    private func post<T: Decodable>(_ path: String) async throws -> T {
+    func post<T: Decodable>(_ path: String) async throws -> T {
         try await request(method: "POST", path: path, body: Optional<Empty>.none, requiresAuth: true)
     }
 
-    private func post<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T {
+    func post<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T {
         try await request(method: "POST", path: path, body: body, requiresAuth: true)
     }
 
-    private func delete<T: Decodable>(_ path: String) async throws -> T {
+    func delete<T: Decodable>(_ path: String) async throws -> T {
         try await request(method: "DELETE", path: path, body: Optional<Empty>.none, requiresAuth: true)
     }
 
     /// DELETE for endpoints that return 204 No Content.
-    private func deleteVoid(_ path: String) async throws {
+    func deleteVoid(_ path: String) async throws {
         guard let url = URL(string: path, relativeTo: baseURL) else {
             throw APIError.invalidURL
         }
@@ -354,7 +307,7 @@ actor API {
         }
     }
 
-    private func request<T: Decodable, B: Encodable>(
+    func request<T: Decodable, B: Encodable>(
         method: String,
         path: String,
         body: B?,
@@ -562,46 +515,3 @@ struct DebtItem: Decodable, Identifiable {
     let monthlyPayment: Double?
 }
 
-// MARK: - Hyperliquid DTOs
-
-struct HyperliquidAccount: Decodable, Identifiable {
-    let id: Int
-    let address: String
-    let label: String?
-    let lastAccountValueUsd: Double?
-    let lastSyncedAt: String?
-    let createdAt: String
-}
-
-struct HyperliquidSyncResult: Decodable {
-    let updated: Int
-}
-
-#if DEBUG
-struct DebugTransaction: Decodable, Identifiable {
-    let id: String
-    let date: String
-    let merchant: String?
-    let amount: String
-    let category: String?
-    let ruleMatched: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id, date, merchant, amount, category
-        case ruleMatched = "rule_matched"
-    }
-}
-
-struct DebugTransactionsResponse: Decodable { let transactions: [DebugTransaction] }
-
-struct ResetCursorResponse: Decodable {
-    let ok: Bool
-    let itemsReset: Int
-    let eventsCleared: Int
-    enum CodingKeys: String, CodingKey {
-        case ok
-        case itemsReset = "items_reset"
-        case eventsCleared = "events_cleared"
-    }
-}
-#endif
