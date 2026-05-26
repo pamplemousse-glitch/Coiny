@@ -16,6 +16,7 @@ import { registerPetsApi } from './api/pets.js';
 import { registerPlaidLinkApi } from './api/plaid-link.js';
 import { registerRealEstateApi } from './api/real-estate.js';
 import { registerSpendingApi } from './api/spending.js';
+import { registerSnaptradeApi } from './api/snaptrade.js';
 import { registerSpinwheelApi } from './api/spinwheel.js';
 import { registerSubscriptionsApi } from './api/subscriptions.js';
 import { registerVehiclesApi } from './api/vehicles.js';
@@ -93,6 +94,7 @@ async function buildApp() {
     registerCoinbaseApi(scope);
     registerZerionApi(scope);
     registerSpinwheelApi(scope);
+    registerSnaptradeApi(scope);
     registerChainWalletsApi(scope);
     registerHyperliquidApi(scope);
     registerRealEstateApi(scope);
