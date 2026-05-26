@@ -234,6 +234,29 @@ actor API {
         try await deleteVoid("/api/spinwheel/connect")
     }
 
+    // MARK: - Chain Wallets
+
+    func getChainWallets() async throws -> [ChainWallet] {
+        try await get("/api/chain-wallets")
+    }
+
+    func addChainWallet(chain: String, address: String, label: String?) async throws {
+        struct Body: Encodable { let chain: String; let address: String; let label: String? }
+        let _: EmptyResponse = try await post("/api/chain-wallets", body: Body(chain: chain, address: address, label: label))
+    }
+
+    func removeChainWallet(chain: String, address: String) async throws {
+        try await deleteVoid("/api/chain-wallets/\(chain)/\(encodePathComponent(address))")
+    }
+
+    func syncChainWallets() async throws -> ChainWalletSyncResult {
+        try await post("/api/chain-wallets/sync")
+    }
+
+    private func encodePathComponent(_ s: String) -> String {
+        s.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? s
+    }
+
     // MARK: - Spending
 
     func getSpendingSummary() async throws -> SpendingSummaryResponse {
@@ -470,6 +493,7 @@ struct NetWorthResponse: Decodable {
     let investments: Double
     let crypto: Double
     let defi: Double
+    let chainWallets: Double
     let debts: Double
     let liquidCashMonths: Double?
     let accounts: NetWorthAccounts
@@ -539,6 +563,19 @@ struct DebtItem: Decodable, Identifiable {
     let type: String?
     let balance: Double
     let monthlyPayment: Double?
+}
+
+struct ChainWallet: Decodable, Identifiable {
+    let id: Int
+    let chain: String
+    let address: String
+    let label: String?
+    let lastBalanceUsd: Double?
+    let lastSyncedAt: String?
+}
+
+struct ChainWalletSyncResult: Decodable {
+    let updated: Int
 }
 
 #if DEBUG

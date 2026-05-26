@@ -11,7 +11,7 @@ final class NetWorthViewModelTests: XCTestCase {
 
         init() {
             result = .success(NetWorthResponse(
-                total: 0, bank: 0, investments: 0, crypto: 0, defi: 0, debts: 0, liquidCashMonths: nil,
+                total: 0, bank: 0, investments: 0, crypto: 0, defi: 0, chainWallets: 0, debts: 0, liquidCashMonths: nil,
                 accounts: NetWorthAccounts(bank: [], investments: [], crypto: [], defi: DefiTotal(totalUSD: 0), debts: []),
                 connections: NetWorthConnections(coinbase: false, zerion: false, spinwheel: false)
             ))
@@ -33,6 +33,7 @@ final class NetWorthViewModelTests: XCTestCase {
             investments: 0,
             crypto: 0,
             defi: 0,
+            chainWallets: 0,
             debts: 0,
             liquidCashMonths: nil,
             accounts: NetWorthAccounts(
@@ -66,6 +67,7 @@ final class NetWorthViewModelTests: XCTestCase {
             investments: 0,
             crypto: 2000,
             defi: 0,
+            chainWallets: 0,
             debts: 0,
             liquidCashMonths: 3.5,
             accounts: NetWorthAccounts(
@@ -114,6 +116,7 @@ final class NetWorthViewModelTests: XCTestCase {
             investments: 0,
             crypto: 0,
             defi: 0,
+            chainWallets: 0,
             debts: -2000,
             liquidCashMonths: nil,
             accounts: NetWorthAccounts(

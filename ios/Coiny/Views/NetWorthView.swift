@@ -5,6 +5,7 @@ struct NetWorthView: View {
     @State private var coinbaseVM = CoinbaseViewModel()
     @State private var zerionVM = ZerionViewModel()
     @State private var spinwheelVM = SpinwheelViewModel()
+    @State private var chainWalletsVM = ChainWalletsViewModel()
 
     var body: some View {
         NavigationStack {
@@ -15,6 +16,7 @@ struct NetWorthView: View {
         .task { await reload() }
         .environment(coinbaseVM)
         .environment(zerionVM)
+        .environment(chainWalletsVM)
     }
 
     private func reload() async {
@@ -22,7 +24,8 @@ struct NetWorthView: View {
         async let coinbase: () = coinbaseVM.loadStatus()
         async let zerion: () = zerionVM.loadWallets()
         async let spinwheel: () = spinwheelVM.loadStatus()
-        _ = await (netWorth, coinbase, zerion, spinwheel)
+        async let chainWallets: () = chainWalletsVM.loadWallets()
+        _ = await (netWorth, coinbase, zerion, spinwheel, chainWallets)
     }
 
     @ViewBuilder
@@ -39,6 +42,7 @@ struct NetWorthView: View {
                     bankSection(data)
                     cryptoSection(data)
                     defiSection(data)
+                    chainWalletsSection(data)
                     debtsSection(data)
                     Spacer(minLength: 32)
                 }
@@ -140,6 +144,16 @@ struct NetWorthView: View {
                 sectionHeader(title: "DeFi", total: data.defi, icon: "link.circle.fill", color: .purple)
                 Divider().padding(.vertical, 6)
                 ZerionView()
+            }
+        }
+    }
+
+    private func chainWalletsSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "On-chain", total: data.chainWallets, icon: "bitcoinsign.square.fill", color: .yellow)
+                Divider().padding(.vertical, 6)
+                ChainWalletsView()
             }
         }
     }
