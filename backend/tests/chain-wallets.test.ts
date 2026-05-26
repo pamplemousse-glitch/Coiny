@@ -15,8 +15,12 @@ vi.mock('../src/chains/xrp.js', () => ({
 vi.mock('../src/chains/stellar.js', () => ({
   getStellarBalance: vi.fn(),
 }));
+vi.mock('../src/chains/blockcypher.js', () => ({
+  getBlockcypherBalance: vi.fn(),
+}));
 
 import { getBitcoinBalance } from '../src/chains/bitcoin.js';
+import { getBlockcypherBalance } from '../src/chains/blockcypher.js';
 import { getStellarBalance } from '../src/chains/stellar.js';
 import { getXrpBalance } from '../src/chains/xrp.js';
 import { getSpotPrices } from '../src/coinbase/client.js';
@@ -25,6 +29,7 @@ const mockedGetSpotPrices = vi.mocked(getSpotPrices);
 const mockedGetBitcoinBalance = vi.mocked(getBitcoinBalance);
 const mockedGetXrpBalance = vi.mocked(getXrpBalance);
 const mockedGetStellarBalance = vi.mocked(getStellarBalance);
+const mockedGetBlockcypherBalance = vi.mocked(getBlockcypherBalance);
 
 describe('GET /api/chain-wallets', () => {
   beforeEach(async () => {
@@ -311,6 +316,28 @@ describe('POST /api/chain-wallets/sync', () => {
     const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
     const wallet = list.json<{ lastBalanceUsd: number }[]>()[0];
     expect(wallet?.lastBalanceUsd).toBeCloseTo(100, 1);
+
+    await app.close();
+  });
+
+  it('updates balance and returns updated: 1 for doge wallet', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { chainWallets } = await import('../src/db/schema.js');
+    await db().insert(chainWallets).values({ userId: testUserId, chain: 'doge', address: 'DTestDoge' });
+
+    mockedGetBlockcypherBalance.mockResolvedValue(10000);
+    mockedGetSpotPrices.mockResolvedValue(new Map([['DOGE', 0.08]]));
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'POST', url: '/api/chain-wallets/sync', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ updated: 1 });
+
+    const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
+    const wallet = list.json<{ lastBalanceUsd: number }[]>()[0];
+    expect(wallet?.lastBalanceUsd).toBeCloseTo(800, 0);
 
     await app.close();
   });
