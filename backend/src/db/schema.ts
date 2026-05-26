@@ -273,6 +273,18 @@ export const ynabConnections = pgTable('ynab_connections', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Kraken CEX connections — one per user; apiKey and privateKey are AES-256-GCM encrypted.
+export const krakenConnections = pgTable('kraken_connections', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  apiKey: text('api_key').notNull(), // encrypted
+  privateKey: text('private_key').notNull(), // encrypted
+  lastTotalUsd: numeric('last_total_usd'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Temporary storage for the Spinwheel userId returned by the SMS OTP send step.
 // Needed because the verify call requires the spinwheelUserId in the URL path.
 // Cleared on successful verify or replaced on new OTP request.

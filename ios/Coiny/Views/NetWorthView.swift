@@ -6,6 +6,7 @@ struct NetWorthView: View {
     @State private var zerionVM = ZerionViewModel()
     @State private var spinwheelVM = SpinwheelViewModel()
     @State private var performanceVM = PerformanceViewModel()
+    @State private var chainWalletsVM = ChainWalletsViewModel()
     @State private var hyperliquidVM = HyperliquidViewModel()
 
     var body: some View {
@@ -18,6 +19,7 @@ struct NetWorthView: View {
         .environment(coinbaseVM)
         .environment(zerionVM)
         .environment(performanceVM)
+        .environment(chainWalletsVM)
         .environment(hyperliquidVM)
     }
 
@@ -27,8 +29,9 @@ struct NetWorthView: View {
         async let zerion: () = zerionVM.loadWallets()
         async let spinwheel: () = spinwheelVM.loadStatus()
         async let performance: () = performanceVM.load()
+        async let chainWallets: () = chainWalletsVM.loadWallets()
         async let hyperliquid: () = hyperliquidVM.loadAccounts()
-        _ = await (netWorth, coinbase, zerion, spinwheel, performance, hyperliquid)
+        _ = await (netWorth, coinbase, zerion, spinwheel, performance, chainWallets, hyperliquid)
     }
 
     @ViewBuilder
@@ -45,6 +48,7 @@ struct NetWorthView: View {
                     bankSection(data)
                     cryptoSection(data)
                     defiSection(data)
+                    chainWalletsSection(data)
                     hyperliquidSection(data)
                     debtsSection(data)
                     performanceSection()
@@ -148,6 +152,16 @@ struct NetWorthView: View {
                 sectionHeader(title: "DeFi", total: data.defi, icon: "link.circle.fill", color: .purple)
                 Divider().padding(.vertical, 6)
                 ZerionView()
+            }
+        }
+    }
+
+    private func chainWalletsSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "On-chain", total: data.chainWallets, icon: "bitcoinsign.square.fill", color: .yellow)
+                Divider().padding(.vertical, 6)
+                ChainWalletsView()
             }
         }
     }
