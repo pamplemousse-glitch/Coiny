@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { getBitcoinBalance } from '../chains/bitcoin.js';
 import { getBlockcypherBalance } from '../chains/blockcypher.js';
+import { getCosmosBalance } from '../chains/cosmos.js';
 import { getStellarBalance } from '../chains/stellar.js';
 import { getXrpBalance } from '../chains/xrp.js';
 import { getSpotPrices } from '../coinbase/client.js';
@@ -35,7 +36,9 @@ export async function fetchNativeBalance(chain: string, address: string): Promis
     case 'ltc':
     case 'bch':
       return getBlockcypherBalance(chain, address);
-    // cosmos, osmosis: added in feat/chain-cosmos
+    case 'cosmos':
+    case 'osmosis':
+      return getCosmosBalance(chain, address);
     default:
       return null;
   }
