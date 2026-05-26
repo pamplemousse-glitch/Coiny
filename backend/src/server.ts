@@ -4,6 +4,7 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
 import { registerAccountApi } from './api/account.js';
 import { registerAuthApi } from './api/auth.js';
+import { registerChainWalletsApi } from './api/chain-wallets.js';
 import { registerCoinbaseApi } from './api/coinbase.js';
 import { registerDebugApi, registerDebugSessionApi } from './api/debug.js';
 import { registerDevicesApi } from './api/devices.js';
@@ -88,6 +89,7 @@ async function buildApp() {
     registerCoinbaseApi(scope);
     registerZerionApi(scope);
     registerSpinwheelApi(scope);
+    registerChainWalletsApi(scope);
     registerNetWorthApi(scope);
   });
 

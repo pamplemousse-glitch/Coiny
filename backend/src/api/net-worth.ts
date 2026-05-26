@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { getAccounts, getSpotPrices } from '../coinbase/client.js';
 import { db } from '../db/client.js';
-import { coinbaseConnections, spinwheelConnections, zerionWallets } from '../db/schema.js';
+import { chainWallets, coinbaseConnections, spinwheelConnections, zerionWallets } from '../db/schema.js';
 import { accountsBalanceGet, investmentsHoldingsGet, liabilitiesGet } from '../plaid/client.js';
 import { getDebtProfile } from '../spinwheel/client.js';
 import { getItemsByUser } from '../store/items.js';
@@ -161,6 +161,17 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // zerion not connected
     }
 
+    // --- Other chains (chain_wallets — pre-synced balances) ---
+    let chainWalletsTotal = 0;
+    try {
+      const walletRows = await db().select().from(chainWallets).where(eq(chainWallets.userId, userId));
+      for (const w of walletRows) {
+        if (w.lastBalanceUsd !== null) chainWalletsTotal += parseFloat(w.lastBalanceUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
     // --- Debts (Spinwheel) ---
     let debtsTotal = 0;
     const debtItems: Array<{ id: string; type: string; balance: number; monthlyPayment: number }> = [];
@@ -187,7 +198,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // spinwheel not connected or error
     }
 
-    const total = bankTotal + investmentsTotal + cryptoTotal + defiTotal - debtsTotal;
+    const total = bankTotal + investmentsTotal + cryptoTotal + defiTotal + chainWalletsTotal - debtsTotal;
 
     // --- Emergency fund coverage (C4) ---
     let liquidCashMonths: number | null = null;
@@ -208,6 +219,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       investments: investmentsTotal,
       crypto: cryptoTotal,
       defi: defiTotal,
+      chainWallets: chainWalletsTotal,
       debts: -debtsTotal,
       liquidCashMonths,
       accounts: {
