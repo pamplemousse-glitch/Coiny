@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { getSpotPrices } from '../coinbase/client.js';
 import { db } from '../db/client.js';
 import { chainWallets } from '../db/schema.js';
+import { getBitcoinBalance } from '../chains/bitcoin.js';
 
 // Maps chain identifier to the Coinbase spot price symbol.
 export const CHAIN_SYMBOLS: Record<string, string> = {
@@ -19,8 +20,17 @@ export const CHAIN_SYMBOLS: Record<string, string> = {
 
 // Returns native-unit balance for the given chain and address.
 // Returns null when no client is available for the chain yet — each chain PR adds a case.
-export async function fetchNativeBalance(_chain: string, _address: string): Promise<number | null> {
-  return null;
+export async function fetchNativeBalance(chain: string, address: string): Promise<number | null> {
+  switch (chain) {
+    case 'bitcoin':
+      return getBitcoinBalance(address);
+    // xrp: added in feat/chain-xrp
+    // stellar: added in feat/chain-stellar
+    // doge, ltc, bch: added in feat/chain-blockcypher
+    // cosmos, osmosis: added in feat/chain-cosmos
+    default:
+      return null;
+  }
 }
 
 const AddWalletBodySchema = z.object({
