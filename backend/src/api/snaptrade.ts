@@ -23,11 +23,13 @@ export function registerSnaptradeApi(app: FastifyInstance): void {
       snapUserId = reg.userId;
       snapUserSecret = reg.userSecret;
 
-      await db().insert(snaptradeConnections).values({
-        userId,
-        snapUserId,
-        snapUserSecret: encryptString(snapUserSecret),
-      });
+      await db()
+        .insert(snaptradeConnections)
+        .values({
+          userId,
+          snapUserId,
+          snapUserSecret: encryptString(snapUserSecret),
+        });
 
       req.log.info({ userId }, 'snaptrade user registered');
     }
