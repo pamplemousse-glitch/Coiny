@@ -3,8 +3,8 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/client.js';
 import { ynabConnections } from '../db/schema.js';
-import { getAccounts, getBudgets, getTotalNetWorth } from '../ynab/client.js';
 import { decryptString, encryptString } from '../util/crypto.js';
+import { getAccounts, getBudgets, getTotalNetWorth } from '../ynab/client.js';
 
 const ConnectBodySchema = z.object({
   apiKey: z.string().min(1),
@@ -44,7 +44,14 @@ export function registerYnabApi(app: FastifyInstance): void {
 
     const apiKey = decryptString(connection.apiKey);
     const budgets = await getBudgets(apiKey);
-    const result: Array<{ budgetId: string; budgetName: string; id: string; name: string; type: string; balanceUsd: number }> = [];
+    const result: Array<{
+      budgetId: string;
+      budgetName: string;
+      id: string;
+      name: string;
+      type: string;
+      balanceUsd: number;
+    }> = [];
 
     for (const budget of budgets) {
       const accounts = await getAccounts(apiKey, budget.id);
