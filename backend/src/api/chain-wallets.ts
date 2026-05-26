@@ -1,10 +1,10 @@
 import { and, eq } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { getBitcoinBalance } from '../chains/bitcoin.js';
 import { getSpotPrices } from '../coinbase/client.js';
 import { db } from '../db/client.js';
 import { chainWallets } from '../db/schema.js';
-import { getBitcoinBalance } from '../chains/bitcoin.js';
 
 // Maps chain identifier to the Coinbase spot price symbol.
 export const CHAIN_SYMBOLS: Record<string, string> = {

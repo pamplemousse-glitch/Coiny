@@ -32,16 +32,12 @@ describe('getBitcoinBalance', () => {
   });
 
   it('fetches from correct Blockstream Esplora URL', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      makeFetchResponse({ chain_stats: { funded_txo_sum: 0, spent_txo_sum: 0 } }),
-    );
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ chain_stats: { funded_txo_sum: 0, spent_txo_sum: 0 } }));
 
     const { getBitcoinBalance } = await import('../src/chains/bitcoin.js');
     await getBitcoinBalance('bc1qabc123');
 
-    expect(vi.mocked(fetch).mock.calls[0]?.[0]).toBe(
-      'https://blockstream.info/api/address/bc1qabc123',
-    );
+    expect(vi.mocked(fetch).mock.calls[0]?.[0]).toBe('https://blockstream.info/api/address/bc1qabc123');
   });
 
   it('returns 0 for address with no history (404)', async () => {
@@ -53,9 +49,7 @@ describe('getBitcoinBalance', () => {
   });
 
   it('returns 0 for address with no transactions (zero sats)', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      makeFetchResponse({ chain_stats: { funded_txo_sum: 0, spent_txo_sum: 0 } }),
-    );
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ chain_stats: { funded_txo_sum: 0, spent_txo_sum: 0 } }));
 
     const { getBitcoinBalance } = await import('../src/chains/bitcoin.js');
     const balance = await getBitcoinBalance('bc1qempty');
@@ -78,9 +72,7 @@ describe('getBitcoinBalance', () => {
   });
 
   it('correctly handles satoshi precision for small balances', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      makeFetchResponse({ chain_stats: { funded_txo_sum: 546, spent_txo_sum: 0 } }),
-    );
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ chain_stats: { funded_txo_sum: 546, spent_txo_sum: 0 } }));
 
     const { getBitcoinBalance } = await import('../src/chains/bitcoin.js');
     const balance = await getBitcoinBalance('bc1qdust');

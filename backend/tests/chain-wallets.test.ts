@@ -10,8 +10,8 @@ vi.mock('../src/chains/bitcoin.js', () => ({
   getBitcoinBalance: vi.fn(),
 }));
 
-import { getSpotPrices } from '../src/coinbase/client.js';
 import { getBitcoinBalance } from '../src/chains/bitcoin.js';
+import { getSpotPrices } from '../src/coinbase/client.js';
 
 const mockedGetSpotPrices = vi.mocked(getSpotPrices);
 const mockedGetBitcoinBalance = vi.mocked(getBitcoinBalance);
