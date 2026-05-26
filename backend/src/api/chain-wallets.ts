@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { getBitcoinBalance } from '../chains/bitcoin.js';
+import { getStellarBalance } from '../chains/stellar.js';
 import { getXrpBalance } from '../chains/xrp.js';
 import { getSpotPrices } from '../coinbase/client.js';
 import { db } from '../db/client.js';
@@ -27,7 +28,8 @@ export async function fetchNativeBalance(chain: string, address: string): Promis
       return getBitcoinBalance(address);
     case 'xrp':
       return getXrpBalance(address);
-    // stellar: added in feat/chain-stellar
+    case 'stellar':
+      return getStellarBalance(address);
     // doge, ltc, bch: added in feat/chain-blockcypher
     // cosmos, osmosis: added in feat/chain-cosmos
     default:
