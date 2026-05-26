@@ -17,3 +17,5 @@ export PAYPAL_CLIENT_ID=$(security find-generic-password -a "$USER" -s "coiny-pa
 export PAYPAL_SECRET=$(security find-generic-password -a "$USER" -s "coiny-paypal-sandbox-secret" -w)
 export PAYPAL_ENV=sandbox
 export SPINWHEEL_SECRET_KEY=$(security find-generic-password -a "$USER" -s "coiny-spinwheel-sandbox-secret-key" -w)
+export SNAPTRADE_CLIENT_ID=$(security find-generic-password -a coiny -s coiny-snaptrade-client-id -w)
+export SNAPTRADE_CONSUMER_KEY=$(security find-generic-password -a coiny -s coiny-snaptrade-consumer-key -w)
