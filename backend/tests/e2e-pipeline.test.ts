@@ -41,11 +41,10 @@ let originalDispatcher: Dispatcher;
 let mockAgent: MockAgent;
 
 beforeAll(async () => {
-  const keypair = (await webcrypto.subtle.generateKey(
-    { name: 'ECDSA', namedCurve: 'P-256' },
-    true,
-    ['sign', 'verify'],
-  )) as { privateKey: unknown; publicKey: unknown };
+  const keypair = (await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, [
+    'sign',
+    'verify',
+  ])) as { privateKey: unknown; publicKey: unknown };
   privateKey = keypair.privateKey as Key;
   // biome-ignore lint/suspicious/noExplicitAny: exportJWK requires CryptoKey
   publicJwk = (await exportJWK(keypair.publicKey as any)) as JWK & Record<string, unknown>;
