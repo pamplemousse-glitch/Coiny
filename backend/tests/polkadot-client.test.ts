@@ -26,9 +26,7 @@ describe('getPolkadotBalance', () => {
   });
 
   it('returns DOT balance from data.account.balance', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      makeResponse({ code: 0, data: { account: { balance: '12.5' } } }),
-    );
+    vi.mocked(fetch).mockResolvedValue(makeResponse({ code: 0, data: { account: { balance: '12.5' } } }));
 
     const { getPolkadotBalance } = await import('../src/chains/polkadot.js');
     const balance = await getPolkadotBalance('1abc');
@@ -36,9 +34,7 @@ describe('getPolkadotBalance', () => {
   });
 
   it('posts to Subscan search endpoint with address in body', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      makeResponse({ code: 0, data: { account: { balance: '0' } } }),
-    );
+    vi.mocked(fetch).mockResolvedValue(makeResponse({ code: 0, data: { account: { balance: '0' } } }));
 
     const { getPolkadotBalance } = await import('../src/chains/polkadot.js');
     await getPolkadotBalance('1dotaddress');
@@ -49,9 +45,7 @@ describe('getPolkadotBalance', () => {
   });
 
   it('returns 0 when API response code != 0', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      makeResponse({ code: 10004, data: null }),
-    );
+    vi.mocked(fetch).mockResolvedValue(makeResponse({ code: 10004, data: null }));
 
     const { getPolkadotBalance } = await import('../src/chains/polkadot.js');
     const balance = await getPolkadotBalance('1bad');

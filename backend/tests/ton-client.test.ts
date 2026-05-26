@@ -26,9 +26,7 @@ describe('getTonBalance', () => {
   });
 
   it('returns TON balance converted from nanoTON (÷ 1e9)', async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      makeResponse({ ok: true, result: '7500000000' }),
-    );
+    vi.mocked(fetch).mockResolvedValue(makeResponse({ ok: true, result: '7500000000' }));
 
     const { getTonBalance } = await import('../src/chains/ton.js');
     const balance = await getTonBalance('EQtest');
