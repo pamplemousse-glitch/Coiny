@@ -186,7 +186,20 @@ describe('POST /api/chain-wallets', () => {
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
-    const chains = ['bitcoin', 'xrp', 'stellar', 'doge', 'ltc', 'bch', 'cosmos', 'osmosis', 'near', 'aptos', 'sui', 'hedera'];
+    const chains = [
+      'bitcoin',
+      'xrp',
+      'stellar',
+      'doge',
+      'ltc',
+      'bch',
+      'cosmos',
+      'osmosis',
+      'near',
+      'aptos',
+      'sui',
+      'hedera',
+    ];
     for (const chain of chains) {
       const res = await app.inject({
         method: 'POST',
