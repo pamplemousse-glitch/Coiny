@@ -1,4 +1,4 @@
-const BASE = 'https://api.ynab.com/v1';
+const BASE = 'https://api.ynab.com/v1'; // milliunits = currency ÷ 1000
 
 async function ynabGet<T>(apiKey: string, path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
