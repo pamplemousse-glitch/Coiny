@@ -42,6 +42,15 @@ const configSchema = z
     SPINWHEEL_SECRET_KEY: z.string().default(''),
     // Standard host. Sandbox: https://sandbox-api.spinwheel.io  Prod: https://api.spinwheel.io
     SPINWHEEL_BASE_URL: z.string().url().default('https://sandbox-api.spinwheel.io'),
+
+    // RentCast AVM — real estate property value estimates.
+    RENTCAST_API_KEY: z.string().default(''),
+
+    // MarketCheck — vehicle value estimates.
+    MARKETCHECK_API_KEY: z.string().default(''),
+
+    // GoldAPI.io — precious metals spot prices.
+    GOLDAPI_API_KEY: z.string().default(''),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {

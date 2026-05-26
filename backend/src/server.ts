@@ -9,13 +9,16 @@ import { registerCoinbaseApi } from './api/coinbase.js';
 import { registerDebugApi, registerDebugSessionApi } from './api/debug.js';
 import { registerDevicesApi } from './api/devices.js';
 import { registerHyperliquidApi } from './api/hyperliquid.js';
+import { registerMetalsApi } from './api/metals.js';
 import { registerNetWorthApi } from './api/net-worth.js';
 import { registerOverridesApi } from './api/overrides.js';
 import { registerPetsApi } from './api/pets.js';
 import { registerPlaidLinkApi } from './api/plaid-link.js';
+import { registerRealEstateApi } from './api/real-estate.js';
 import { registerSpendingApi } from './api/spending.js';
 import { registerSpinwheelApi } from './api/spinwheel.js';
 import { registerSubscriptionsApi } from './api/subscriptions.js';
+import { registerVehiclesApi } from './api/vehicles.js';
 import { registerZerionApi } from './api/zerion.js';
 import { config } from './config.js';
 import { initDb } from './db/client.js';
@@ -92,6 +95,9 @@ async function buildApp() {
     registerSpinwheelApi(scope);
     registerChainWalletsApi(scope);
     registerHyperliquidApi(scope);
+    registerRealEstateApi(scope);
+    registerVehiclesApi(scope);
+    registerMetalsApi(scope);
     registerNetWorthApi(scope);
   });
 

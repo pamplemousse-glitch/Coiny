@@ -198,6 +198,57 @@ export const hyperliquidAccounts = pgTable(
   (t) => [uniqueIndex('hyperliquid_accounts_user_address_idx').on(t.userId, t.address)],
 );
 
+// Real estate assets — many per user, one row per (user, address).
+// lastValueUsd is updated by POST /api/real-estate/sync using RentCast AVM.
+export const realEstateAssets = pgTable(
+  'real_estate_assets',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    address: text('address').notNull(),
+    label: text('label'),
+    lastValueUsd: numeric('last_value_usd'),
+    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('real_estate_assets_user_address_idx').on(t.userId, t.address)],
+);
+
+// Vehicle assets — many per user, one row per (user, vin).
+// lastValueUsd is updated by POST /api/vehicles/sync using MarketCheck.
+export const vehicleAssets = pgTable(
+  'vehicle_assets',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    vin: text('vin').notNull(),
+    label: text('label'),
+    lastValueUsd: numeric('last_value_usd'),
+    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('vehicle_assets_user_vin_idx').on(t.userId, t.vin)],
+);
+
+// Metal holdings — many per user, one row per holding (user can have multiple gold entries at different weights).
+// lastValueUsd is updated by POST /api/metals/sync: price per oz × weight_oz.
+export const metalHoldings = pgTable('metal_holdings', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  metal: text('metal').notNull(),
+  weightOz: numeric('weight_oz').notNull(),
+  label: text('label'),
+  lastValueUsd: numeric('last_value_usd'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Temporary storage for the Spinwheel userId returned by the SMS OTP send step.
 // Needed because the verify call requires the spinwheelUserId in the URL path.
 // Cleared on successful verify or replaced on new OTP request.

@@ -6,8 +6,11 @@ import {
   chainWallets,
   coinbaseConnections,
   hyperliquidAccounts,
+  metalHoldings,
   petState,
+  realEstateAssets,
   spinwheelConnections,
+  vehicleAssets,
   zerionWallets,
 } from '../db/schema.js';
 import { accountsBalanceGet, investmentsHoldingsGet, liabilitiesGet } from '../plaid/client.js';
@@ -203,6 +206,39 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // table not yet populated
     }
 
+    // --- Real estate ---
+    let realEstateTotal = 0;
+    try {
+      const rows = await db().select().from(realEstateAssets).where(eq(realEstateAssets.userId, userId));
+      for (const r of rows) {
+        if (r.lastValueUsd !== null) realEstateTotal += parseFloat(r.lastValueUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
+    // --- Vehicles ---
+    let vehiclesTotal = 0;
+    try {
+      const rows = await db().select().from(vehicleAssets).where(eq(vehicleAssets.userId, userId));
+      for (const r of rows) {
+        if (r.lastValueUsd !== null) vehiclesTotal += parseFloat(r.lastValueUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
+    // --- Metals ---
+    let metalsTotal = 0;
+    try {
+      const rows = await db().select().from(metalHoldings).where(eq(metalHoldings.userId, userId));
+      for (const r of rows) {
+        if (r.lastValueUsd !== null) metalsTotal += parseFloat(r.lastValueUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
     // --- Debts (Spinwheel) ---
     let debtsTotal = 0;
     const debtItems: Array<{ id: string; type: string; balance: number; monthlyPayment: number }> = [];
@@ -230,7 +266,16 @@ export function registerNetWorthApi(app: FastifyInstance): void {
     }
 
     const total =
-      bankTotal + investmentsTotal + cryptoTotal + defiTotal + chainWalletsTotal + hyperliquidTotal - debtsTotal;
+      bankTotal +
+      investmentsTotal +
+      cryptoTotal +
+      defiTotal +
+      chainWalletsTotal +
+      hyperliquidTotal +
+      realEstateTotal +
+      vehiclesTotal +
+      metalsTotal -
+      debtsTotal;
 
     // --- Net worth milestone reaction ---
     try {
@@ -279,6 +324,9 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       defi: defiTotal,
       chainWallets: chainWalletsTotal,
       hyperliquid: hyperliquidTotal,
+      realEstate: realEstateTotal,
+      vehicles: vehiclesTotal,
+      metals: metalsTotal,
       debts: -debtsTotal,
       liquidCashMonths,
       accounts: {
