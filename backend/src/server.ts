@@ -20,6 +20,7 @@ import { registerSpendingApi } from './api/spending.js';
 import { registerSpinwheelApi } from './api/spinwheel.js';
 import { registerSubscriptionsApi } from './api/subscriptions.js';
 import { registerVehiclesApi } from './api/vehicles.js';
+import { registerYnabApi } from './api/ynab.js';
 import { registerZerionApi } from './api/zerion.js';
 import { config } from './config.js';
 import { initDb } from './db/client.js';
@@ -100,6 +101,7 @@ async function buildApp() {
     registerRealEstateApi(scope);
     registerVehiclesApi(scope);
     registerMetalsApi(scope);
+    registerYnabApi(scope);
     registerNetWorthApi(scope);
   });
 
