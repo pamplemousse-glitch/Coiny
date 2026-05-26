@@ -106,10 +106,12 @@ describe('GET /api/zerion/pnl', () => {
   it('aggregates PnL across wallets', async () => {
     const { db } = await import('../src/db/client.js');
     const { zerionWallets } = await import('../src/db/schema.js');
-    await db().insert(zerionWallets).values([
-      { userId: testUserId, address: '0xwlt1', label: 'Hot' },
-      { userId: testUserId, address: '0xwlt2', label: null },
-    ]);
+    await db()
+      .insert(zerionWallets)
+      .values([
+        { userId: testUserId, address: '0xwlt1', label: 'Hot' },
+        { userId: testUserId, address: '0xwlt2', label: null },
+      ]);
 
     mockedGetPnl
       .mockResolvedValueOnce({ unrealized_gain: 100, realized_gain: 200, total_gain: 300 })
@@ -124,7 +126,13 @@ describe('GET /api/zerion/pnl', () => {
       unrealizedGain: number;
       realizedGain: number;
       totalGain: number;
-      wallets: Array<{ address: string; label: string | null; unrealizedGain: number; realizedGain: number; totalGain: number }>;
+      wallets: Array<{
+        address: string;
+        label: string | null;
+        unrealizedGain: number;
+        realizedGain: number;
+        totalGain: number;
+      }>;
     }>();
     expect(body.unrealizedGain).toBe(150);
     expect(body.realizedGain).toBe(200);
@@ -178,15 +186,15 @@ describe('GET /api/zerion/defi-positions', () => {
   it('returns combined positions from multiple wallets', async () => {
     const { db } = await import('../src/db/client.js');
     const { zerionWallets } = await import('../src/db/schema.js');
-    await db().insert(zerionWallets).values([
-      { userId: testUserId, address: '0xdefi1', label: null },
-      { userId: testUserId, address: '0xdefi2', label: null },
-    ]);
+    await db()
+      .insert(zerionWallets)
+      .values([
+        { userId: testUserId, address: '0xdefi1', label: null },
+        { userId: testUserId, address: '0xdefi2', label: null },
+      ]);
 
     mockedGetDeFiPositions
-      .mockResolvedValueOnce([
-        { id: 'pos-1', symbol: 'ETH', name: 'Ethereum', quantity: 1.5, value_usd: 3000 },
-      ])
+      .mockResolvedValueOnce([{ id: 'pos-1', symbol: 'ETH', name: 'Ethereum', quantity: 1.5, value_usd: 3000 }])
       .mockResolvedValueOnce([
         { id: 'pos-2', symbol: 'USDC', name: 'USD Coin', quantity: 500, value_usd: 500 },
         { id: 'pos-3', symbol: 'BTC', name: 'Bitcoin', quantity: 0.01, value_usd: 600 },
@@ -198,7 +206,14 @@ describe('GET /api/zerion/defi-positions', () => {
     const res = await app.inject({ method: 'GET', url: '/api/zerion/defi-positions', headers: authHeader() });
     expect(res.statusCode).toBe(200);
     const body = res.json<{
-      positions: Array<{ id: string; symbol: string; name: string; quantity: number; valueUsd: number; walletAddress: string }>;
+      positions: Array<{
+        id: string;
+        symbol: string;
+        name: string;
+        quantity: number;
+        valueUsd: number;
+        walletAddress: string;
+      }>;
     }>();
     expect(body.positions).toHaveLength(3);
     expect(body.positions[0]?.id).toBe('pos-1');
