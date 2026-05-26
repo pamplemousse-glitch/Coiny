@@ -6,6 +6,7 @@ struct NetWorthView: View {
     @State private var zerionVM = ZerionViewModel()
     @State private var spinwheelVM = SpinwheelViewModel()
     @State private var performanceVM = PerformanceViewModel()
+    @State private var hyperliquidVM = HyperliquidViewModel()
 
     var body: some View {
         NavigationStack {
@@ -17,6 +18,7 @@ struct NetWorthView: View {
         .environment(coinbaseVM)
         .environment(zerionVM)
         .environment(performanceVM)
+        .environment(hyperliquidVM)
     }
 
     private func reload() async {
@@ -25,7 +27,8 @@ struct NetWorthView: View {
         async let zerion: () = zerionVM.loadWallets()
         async let spinwheel: () = spinwheelVM.loadStatus()
         async let performance: () = performanceVM.load()
-        _ = await (netWorth, coinbase, zerion, spinwheel, performance)
+        async let hyperliquid: () = hyperliquidVM.loadAccounts()
+        _ = await (netWorth, coinbase, zerion, spinwheel, performance, hyperliquid)
     }
 
     @ViewBuilder
@@ -42,6 +45,7 @@ struct NetWorthView: View {
                     bankSection(data)
                     cryptoSection(data)
                     defiSection(data)
+                    hyperliquidSection(data)
                     debtsSection(data)
                     performanceSection()
                     Spacer(minLength: 32)
@@ -144,6 +148,16 @@ struct NetWorthView: View {
                 sectionHeader(title: "DeFi", total: data.defi, icon: "link.circle.fill", color: .purple)
                 Divider().padding(.vertical, 6)
                 ZerionView()
+            }
+        }
+    }
+
+    private func hyperliquidSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Hyperliquid", total: data.hyperliquid, icon: "chart.line.uptrend.xyaxis", color: .indigo)
+                Divider().padding(.vertical, 6)
+                HyperliquidView()
             }
         }
     }

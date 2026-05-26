@@ -8,6 +8,8 @@ struct NetWorthResponse: Decodable {
     let investments: Double
     let crypto: Double
     let defi: Double
+    let chainWallets: Double
+    let hyperliquid: Double
     let debts: Double
     let liquidCashMonths: Double?
     let accounts: NetWorthAccounts

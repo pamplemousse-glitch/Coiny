@@ -45,7 +45,7 @@ actor API {
     private let http: HTTPClient
     private let sessionStore: SessionStore
     private let decoder: JSONDecoder
-    private var sessionToken: String?
+    var sessionToken: String?
 
     init(baseURL: URL, http: HTTPClient, sessionStore: SessionStore) {
         self.baseURL = baseURL
@@ -254,28 +254,28 @@ actor API {
 
     // MARK: - Internals
 
-    private func get<T: Decodable>(_ path: String) async throws -> T {
+    func get<T: Decodable>(_ path: String) async throws -> T {
         try await request(method: "GET", path: path, body: Optional<Empty>.none, requiresAuth: true)
     }
 
-    private func put<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T {
+    func put<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T {
         try await request(method: "PUT", path: path, body: body, requiresAuth: true)
     }
 
-    private func post<T: Decodable>(_ path: String) async throws -> T {
+    func post<T: Decodable>(_ path: String) async throws -> T {
         try await request(method: "POST", path: path, body: Optional<Empty>.none, requiresAuth: true)
     }
 
-    private func post<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T {
+    func post<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T {
         try await request(method: "POST", path: path, body: body, requiresAuth: true)
     }
 
-    private func delete<T: Decodable>(_ path: String) async throws -> T {
+    func delete<T: Decodable>(_ path: String) async throws -> T {
         try await request(method: "DELETE", path: path, body: Optional<Empty>.none, requiresAuth: true)
     }
 
     /// DELETE for endpoints that return 204 No Content.
-    private func deleteVoid(_ path: String) async throws {
+    func deleteVoid(_ path: String) async throws {
         guard let url = URL(string: path, relativeTo: baseURL) else {
             throw APIError.invalidURL
         }
@@ -307,7 +307,7 @@ actor API {
         }
     }
 
-    private func request<T: Decodable, B: Encodable>(
+    func request<T: Decodable, B: Encodable>(
         method: String,
         path: String,
         body: B?,
@@ -477,32 +477,3 @@ struct SpendingSummaryResponse: Decodable {
     let savingsRate: Int?
 }
 
-
-#if DEBUG
-struct DebugTransaction: Decodable, Identifiable {
-    let id: String
-    let date: String
-    let merchant: String?
-    let amount: String
-    let category: String?
-    let ruleMatched: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id, date, merchant, amount, category
-        case ruleMatched = "rule_matched"
-    }
-}
-
-struct DebugTransactionsResponse: Decodable { let transactions: [DebugTransaction] }
-
-struct ResetCursorResponse: Decodable {
-    let ok: Bool
-    let itemsReset: Int
-    let eventsCleared: Int
-    enum CodingKeys: String, CodingKey {
-        case ok
-        case itemsReset = "items_reset"
-        case eventsCleared = "events_cleared"
-    }
-}
-#endif

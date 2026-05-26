@@ -11,8 +11,11 @@ struct CoinyApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var petStore = PetStore()
 
+    private static let isUITesting = CommandLine.arguments.contains("--ui-testing")
+
     // Auth state — seeded synchronously from Keychain on launch.
-    @State private var isSignedIn: Bool = KeychainSessionStore().load() != nil
+    // In UITest mode the Keychain is unavailable; bypass to land on RootView directly.
+    @State private var isSignedIn: Bool = CoinyApp.isUITesting || KeychainSessionStore().load() != nil
     @AppStorage("onboardingComplete") private var onboardingComplete: Bool = false
     /// Name from Apple Sign In on first login; carried into OnboardingView's name step.
     @State private var pendingDisplayName: String = ""
@@ -25,7 +28,7 @@ struct CoinyApp: App {
                         pendingDisplayName = name
                         isSignedIn = true
                     }
-                } else if !onboardingComplete {
+                } else if !onboardingComplete && !CoinyApp.isUITesting {
                     OnboardingView(onboardingComplete: $onboardingComplete, appleDisplayName: pendingDisplayName)
                 } else {
                     RootView()

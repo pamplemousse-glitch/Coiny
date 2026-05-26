@@ -53,6 +53,7 @@ export const petState = pgTable('pet_state', {
   savingsGoal: integer('savings_goal').notNull().default(1000),
   paycheckMinAmount: integer('paycheck_min_amount').notNull().default(500),
   largePurchaseThreshold: integer('large_purchase_threshold').notNull().default(200),
+  lastNetWorthUsd: numeric('last_net_worth_usd'),
 });
 
 // `reaction` holds an AES-256-GCM-encrypted JSON blob (envelope format from
@@ -156,6 +157,7 @@ export const spinwheelConnections = pgTable('spinwheel_connections', {
     .primaryKey()
     .references(() => users.id, { onDelete: 'cascade' }),
   spinwheelUserId: text('spinwheel_user_id').notNull(),
+  lastCreditScore: integer('last_credit_score'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -177,6 +179,99 @@ export const chainWallets = pgTable(
   },
   (t) => [uniqueIndex('chain_wallets_user_chain_address_idx').on(t.userId, t.chain, t.address)],
 );
+
+// Hyperliquid perp accounts — many per user, one row per EVM address.
+// lastAccountValueUsd is updated by POST /api/hyperliquid/sync (already USD-denominated).
+export const hyperliquidAccounts = pgTable(
+  'hyperliquid_accounts',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    address: text('address').notNull(),
+    label: text('label'),
+    lastAccountValueUsd: numeric('last_account_value_usd'),
+    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('hyperliquid_accounts_user_address_idx').on(t.userId, t.address)],
+);
+
+// Real estate assets — many per user, one row per (user, address).
+// lastValueUsd is updated by POST /api/real-estate/sync using RentCast AVM.
+export const realEstateAssets = pgTable(
+  'real_estate_assets',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    address: text('address').notNull(),
+    label: text('label'),
+    lastValueUsd: numeric('last_value_usd'),
+    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('real_estate_assets_user_address_idx').on(t.userId, t.address)],
+);
+
+// Vehicle assets — many per user, one row per (user, vin).
+// lastValueUsd is updated by POST /api/vehicles/sync using MarketCheck.
+export const vehicleAssets = pgTable(
+  'vehicle_assets',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    vin: text('vin').notNull(),
+    label: text('label'),
+    lastValueUsd: numeric('last_value_usd'),
+    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('vehicle_assets_user_vin_idx').on(t.userId, t.vin)],
+);
+
+// Metal holdings — many per user, one row per holding (user can have multiple gold entries at different weights).
+// lastValueUsd is updated by POST /api/metals/sync: price per oz × weight_oz.
+export const metalHoldings = pgTable('metal_holdings', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  metal: text('metal').notNull(),
+  weightOz: numeric('weight_oz').notNull(),
+  label: text('label'),
+  lastValueUsd: numeric('last_value_usd'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// SnapTrade connections — one per user; snaptradeUserSecret is AES-256-GCM encrypted.
+// snapUserId is a copy of the Coiny user ID registered with SnapTrade.
+export const snaptradeConnections = pgTable('snaptrade_connections', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  snapUserId: text('snap_user_id').notNull(),
+  snapUserSecret: text('snap_user_secret').notNull(),
+  lastBrokerageTotal: numeric('last_brokerage_total'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// YNAB connections — one per user; apiKey is AES-256-GCM encrypted personal access token.
+export const ynabConnections = pgTable('ynab_connections', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  apiKey: text('api_key').notNull(),
+  lastNetWorthUsd: numeric('last_net_worth_usd'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 // Temporary storage for the Spinwheel userId returned by the SMS OTP send step.
 // Needed because the verify call requires the spinwheelUserId in the URL path.

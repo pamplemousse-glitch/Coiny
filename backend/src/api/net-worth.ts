@@ -2,12 +2,37 @@ import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { getAccounts, getSpotPrices } from '../coinbase/client.js';
 import { db } from '../db/client.js';
-import { chainWallets, coinbaseConnections, spinwheelConnections, zerionWallets } from '../db/schema.js';
+import {
+  chainWallets,
+  coinbaseConnections,
+  hyperliquidAccounts,
+  metalHoldings,
+  petState,
+  realEstateAssets,
+  snaptradeConnections,
+  spinwheelConnections,
+  vehicleAssets,
+  ynabConnections,
+  zerionWallets,
+} from '../db/schema.js';
 import { accountsBalanceGet, investmentsHoldingsGet, liabilitiesGet } from '../plaid/client.js';
+import { dispatchReaction } from '../reactions/dispatch.js';
+import { evaluateExternalEvent } from '../reactions/external.js';
 import { getDebtProfile } from '../spinwheel/client.js';
 import { getItemsByUser } from '../store/items.js';
+import { recordReaction } from '../store/pet.js';
 import { getRecentOutflows } from '../store/transactions.js';
 import { getPortfolio } from '../zerion/client.js';
+
+const NET_WORTH_MILESTONES = [10_000, 25_000, 50_000, 100_000, 250_000, 500_000, 1_000_000];
+
+function crossedMilestone(prev: number, current: number): number | null {
+  for (let i = NET_WORTH_MILESTONES.length - 1; i >= 0; i--) {
+    const m = NET_WORTH_MILESTONES[i]!;
+    if (prev < m && current >= m) return m;
+  }
+  return null;
+}
 
 export function registerNetWorthApi(app: FastifyInstance): void {
   app.get('/api/net-worth', async (req, _reply) => {
@@ -172,6 +197,76 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // table not yet populated
     }
 
+    // --- Hyperliquid perp accounts (pre-synced account values) ---
+    let hyperliquidTotal = 0;
+    try {
+      const hlRows = await db().select().from(hyperliquidAccounts).where(eq(hyperliquidAccounts.userId, userId));
+      for (const r of hlRows) {
+        if (r.lastAccountValueUsd !== null) hyperliquidTotal += parseFloat(r.lastAccountValueUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
+    // --- Real estate ---
+    let realEstateTotal = 0;
+    try {
+      const rows = await db().select().from(realEstateAssets).where(eq(realEstateAssets.userId, userId));
+      for (const r of rows) {
+        if (r.lastValueUsd !== null) realEstateTotal += parseFloat(r.lastValueUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
+    // --- Vehicles ---
+    let vehiclesTotal = 0;
+    try {
+      const rows = await db().select().from(vehicleAssets).where(eq(vehicleAssets.userId, userId));
+      for (const r of rows) {
+        if (r.lastValueUsd !== null) vehiclesTotal += parseFloat(r.lastValueUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
+    // --- Metals ---
+    let metalsTotal = 0;
+    try {
+      const rows = await db().select().from(metalHoldings).where(eq(metalHoldings.userId, userId));
+      for (const r of rows) {
+        if (r.lastValueUsd !== null) metalsTotal += parseFloat(r.lastValueUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
+    // --- YNAB budgets (pre-synced total) ---
+    let ynabTotal = 0;
+    let ynabConnected = false;
+    try {
+      const [ynab] = await db().select().from(ynabConnections).where(eq(ynabConnections.userId, userId));
+      if (ynab) {
+        ynabConnected = true;
+        if (ynab.lastNetWorthUsd !== null) ynabTotal += parseFloat(ynab.lastNetWorthUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
+    // --- SnapTrade brokerage (pre-synced total) ---
+    let snaptradeTotal = 0;
+    let snaptradeConnected = false;
+    try {
+      const [snap] = await db().select().from(snaptradeConnections).where(eq(snaptradeConnections.userId, userId));
+      if (snap) {
+        snaptradeConnected = true;
+        if (snap.lastBrokerageTotal !== null) snaptradeTotal += parseFloat(snap.lastBrokerageTotal);
+      }
+    } catch {
+      // table not yet populated
+    }
+
     // --- Debts (Spinwheel) ---
     let debtsTotal = 0;
     const debtItems: Array<{ id: string; type: string; balance: number; monthlyPayment: number }> = [];
@@ -198,7 +293,45 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // spinwheel not connected or error
     }
 
-    const total = bankTotal + investmentsTotal + cryptoTotal + defiTotal + chainWalletsTotal - debtsTotal;
+    const total =
+      bankTotal +
+      investmentsTotal +
+      cryptoTotal +
+      defiTotal +
+      chainWalletsTotal +
+      hyperliquidTotal +
+      realEstateTotal +
+      vehiclesTotal +
+      metalsTotal +
+      snaptradeTotal +
+      ynabTotal -
+      debtsTotal;
+
+    // --- Net worth milestone reaction ---
+    try {
+      const [pet] = await db().select().from(petState).where(eq(petState.userId, userId));
+      const prev =
+        pet?.lastNetWorthUsd !== null && pet?.lastNetWorthUsd !== undefined ? parseFloat(pet.lastNetWorthUsd) : null;
+      const milestone = prev !== null ? crossedMilestone(prev, total) : null;
+      if (milestone !== null) {
+        const reaction = evaluateExternalEvent({
+          id: `nw-milestone-${userId}-${milestone}`,
+          userId,
+          type: 'net_worth_milestone',
+          amountUsd: milestone,
+          source: 'zerion',
+        });
+        if (reaction) {
+          await recordReaction(userId, 'net_worth_milestone', reaction);
+          dispatchReaction(userId, reaction);
+        }
+      }
+      if (prev === null || Math.abs(total - prev) > 0.01) {
+        await db().update(petState).set({ lastNetWorthUsd: total.toString() }).where(eq(petState.userId, userId));
+      }
+    } catch {
+      // pet row may not exist yet; skip milestone check
+    }
 
     // --- Emergency fund coverage (C4) ---
     let liquidCashMonths: number | null = null;
@@ -220,6 +353,12 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       crypto: cryptoTotal,
       defi: defiTotal,
       chainWallets: chainWalletsTotal,
+      hyperliquid: hyperliquidTotal,
+      realEstate: realEstateTotal,
+      vehicles: vehiclesTotal,
+      metals: metalsTotal,
+      snaptrade: snaptradeTotal,
+      ynab: ynabTotal,
       debts: -debtsTotal,
       liquidCashMonths,
       accounts: {
@@ -233,6 +372,8 @@ export function registerNetWorthApi(app: FastifyInstance): void {
         coinbase: coinbaseConnected,
         zerion: zerionConnected,
         spinwheel: spinwheelConnected,
+        snaptrade: snaptradeConnected,
+        ynab: ynabConnected,
       },
     };
   });
