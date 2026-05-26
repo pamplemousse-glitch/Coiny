@@ -21,6 +21,18 @@ vi.mock('../src/chains/blockcypher.js', () => ({
 vi.mock('../src/chains/cosmos.js', () => ({
   getCosmosBalance: vi.fn(),
 }));
+vi.mock('../src/chains/near.js', () => ({
+  getNearBalance: vi.fn(),
+}));
+vi.mock('../src/chains/aptos.js', () => ({
+  getAptosBalance: vi.fn(),
+}));
+vi.mock('../src/chains/sui.js', () => ({
+  getSuiBalance: vi.fn(),
+}));
+vi.mock('../src/chains/hedera.js', () => ({
+  getHederaBalance: vi.fn(),
+}));
 
 import { getBitcoinBalance } from '../src/chains/bitcoin.js';
 import { getBlockcypherBalance } from '../src/chains/blockcypher.js';
@@ -174,7 +186,20 @@ describe('POST /api/chain-wallets', () => {
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
-    const chains = ['bitcoin', 'xrp', 'stellar', 'doge', 'ltc', 'bch', 'cosmos', 'osmosis'];
+    const chains = [
+      'bitcoin',
+      'xrp',
+      'stellar',
+      'doge',
+      'ltc',
+      'bch',
+      'cosmos',
+      'osmosis',
+      'near',
+      'aptos',
+      'sui',
+      'hedera',
+    ];
     for (const chain of chains) {
       const res = await app.inject({
         method: 'POST',
