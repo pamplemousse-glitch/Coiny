@@ -1,21 +1,18 @@
-import { eq } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { getAccounts, getSpotPrices, getTransactions } from '../coinbase/client.js';
 import { config } from '../config.js';
-import { db } from '../db/client.js';
-import { coinbaseConnections } from '../db/schema.js';
 import { dispatchReaction } from '../reactions/dispatch.js';
 import { evaluateExternalEvent } from '../reactions/external.js';
+import { deleteCoinbaseConnection, getCoinbaseConnection, upsertCoinbaseDevKey } from '../store/coinbase.js';
 import { claimEvent } from '../store/events.js';
 import { recordReaction } from '../store/pet.js';
 
 export function registerCoinbaseApi(app: FastifyInstance): void {
   // GET /api/coinbase/status
   app.get('/api/coinbase/status', async (req: FastifyRequest) => {
-    const rows = await db().select().from(coinbaseConnections).where(eq(coinbaseConnections.userId, req.user!.id));
-    const row = rows[0];
-    if (!row) return { connected: false, mode: null };
-    return { connected: true, mode: row.mode as 'dev_key' | 'oauth' };
+    const conn = await getCoinbaseConnection(req.user!.id);
+    if (!conn) return { connected: false, mode: null };
+    return { connected: true, mode: conn.mode as 'dev_key' | 'oauth' };
   });
 
   // POST /api/coinbase/connect/dev-key
@@ -24,21 +21,14 @@ export function registerCoinbaseApi(app: FastifyInstance): void {
       return reply.status(409).send({ error: 'COINBASE_API_KEY_ID is not configured on this server' });
     }
 
-    await db()
-      .insert(coinbaseConnections)
-      .values({ userId: req.user!.id, mode: 'dev_key' })
-      .onConflictDoUpdate({
-        target: coinbaseConnections.userId,
-        set: { mode: 'dev_key', accessToken: null, refreshToken: null, tokenExpiresAt: null },
-      });
-
+    await upsertCoinbaseDevKey(req.user!.id);
     req.log.info({ userId: req.user!.id }, 'coinbase dev-key connection created');
     return { ok: true };
   });
 
   // DELETE /api/coinbase/connect
   app.delete('/api/coinbase/connect', async (req: FastifyRequest, reply: FastifyReply) => {
-    await db().delete(coinbaseConnections).where(eq(coinbaseConnections.userId, req.user!.id));
+    await deleteCoinbaseConnection(req.user!.id);
     req.log.info({ userId: req.user!.id }, 'coinbase connection removed');
     return reply.status(204).send();
   });
@@ -47,8 +37,8 @@ export function registerCoinbaseApi(app: FastifyInstance): void {
   app.post('/api/coinbase/sync', async (req: FastifyRequest, reply: FastifyReply) => {
     const userId = req.user!.id;
 
-    const rows = await db().select().from(coinbaseConnections).where(eq(coinbaseConnections.userId, userId));
-    if (!rows[0]) {
+    const conn = await getCoinbaseConnection(userId);
+    if (!conn) {
       return reply.status(409).send({ error: 'No Coinbase connection found. Connect first.' });
     }
 
