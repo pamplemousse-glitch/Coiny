@@ -6,6 +6,7 @@ import {
   chainWallets,
   coinbaseConnections,
   hyperliquidAccounts,
+  krakenConnections,
   metalHoldings,
   petState,
   realEstateAssets,
@@ -254,6 +255,19 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // table not yet populated
     }
 
+    // --- Kraken CEX (pre-synced total) ---
+    let krakenTotal = 0;
+    let krakenConnected = false;
+    try {
+      const [kraken] = await db().select().from(krakenConnections).where(eq(krakenConnections.userId, userId));
+      if (kraken) {
+        krakenConnected = true;
+        if (kraken.lastTotalUsd !== null) krakenTotal += parseFloat(kraken.lastTotalUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
     // --- SnapTrade brokerage (pre-synced total) ---
     let snaptradeTotal = 0;
     let snaptradeConnected = false;
@@ -300,6 +314,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       defiTotal +
       chainWalletsTotal +
       hyperliquidTotal +
+      krakenTotal +
       realEstateTotal +
       vehiclesTotal +
       metalsTotal +
@@ -357,6 +372,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       realEstate: realEstateTotal,
       vehicles: vehiclesTotal,
       metals: metalsTotal,
+      kraken: krakenTotal,
       snaptrade: snaptradeTotal,
       ynab: ynabTotal,
       debts: -debtsTotal,
@@ -370,10 +386,11 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       },
       connections: {
         coinbase: coinbaseConnected,
-        zerion: zerionConnected,
-        spinwheel: spinwheelConnected,
+        kraken: krakenConnected,
         snaptrade: snaptradeConnected,
+        spinwheel: spinwheelConnected,
         ynab: ynabConnected,
+        zerion: zerionConnected,
       },
     };
   });

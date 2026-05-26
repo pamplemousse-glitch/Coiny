@@ -9,6 +9,7 @@ import { registerCoinbaseApi } from './api/coinbase.js';
 import { registerDebugApi, registerDebugSessionApi } from './api/debug.js';
 import { registerDevicesApi } from './api/devices.js';
 import { registerHyperliquidApi } from './api/hyperliquid.js';
+import { registerKrakenApi } from './api/kraken.js';
 import { registerMetalsApi } from './api/metals.js';
 import { registerNetWorthApi } from './api/net-worth.js';
 import { registerOverridesApi } from './api/overrides.js';
@@ -98,6 +99,7 @@ async function buildApp() {
     registerSnaptradeApi(scope);
     registerChainWalletsApi(scope);
     registerHyperliquidApi(scope);
+    registerKrakenApi(scope);
     registerRealEstateApi(scope);
     registerVehiclesApi(scope);
     registerMetalsApi(scope);
