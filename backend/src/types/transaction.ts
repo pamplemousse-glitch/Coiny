@@ -24,5 +24,6 @@ export type Transaction = {
       type?: string;
     };
     processing_status?: string;
+    logo_url?: string | null;
   } | null;
 };

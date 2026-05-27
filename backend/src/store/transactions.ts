@@ -19,6 +19,33 @@ export async function persistTransactions(userId: string, txs: Transaction[]): P
   await db().insert(transactions).values(rows).onConflictDoNothing();
 }
 
+// Updates existing transaction rows for pending→posted flips and amount corrections.
+// Uses onConflictDoUpdate so that rows already stored get their mutable fields refreshed.
+export async function upsertModifiedTransactions(userId: string, txs: Transaction[]): Promise<void> {
+  if (txs.length === 0) return;
+  const rows = txs.map((tx) => ({
+    transactionId: tx.id,
+    userId,
+    accountId: tx.account_id,
+    merchantName: tx.details?.counterparty?.name ?? null,
+    amount: tx.amount,
+    date: tx.date,
+    category: tx.details?.category ?? null,
+  }));
+  await db()
+    .insert(transactions)
+    .values(rows)
+    .onConflictDoUpdate({
+      target: transactions.transactionId,
+      set: {
+        amount: sql`excluded.amount`,
+        date: sql`excluded.date`,
+        merchantName: sql`excluded.merchant_name`,
+        category: sql`excluded.category`,
+      },
+    });
+}
+
 // Returns total debit spend per category for the rolling 7-day window ending today.
 // Call BEFORE persisting the current transaction batch so the snapshot excludes it.
 export async function getWeeklySpendByCategory(userId: string): Promise<Record<string, number>> {

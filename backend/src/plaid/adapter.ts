@@ -137,6 +137,8 @@ export async function plaidTxToInternal(
   const category =
     override ?? mapCategory(plaidTx.personal_finance_category?.detailed) ?? mapLegacyCategory(plaidTx.category);
 
+  const logoUrl = plaidTx.logo_url ?? plaidTx.counterparties?.find((c) => c.logo_url)?.logo_url ?? null;
+
   return {
     id: plaidTx.transaction_id,
     account_id: plaidTx.account_id,
@@ -149,6 +151,7 @@ export async function plaidTxToInternal(
     details: {
       category,
       ...(counterparty ? { counterparty: { name: counterparty, type: 'organization' } } : {}),
+      ...(logoUrl ? { logo_url: logoUrl } : {}),
     },
   };
 }

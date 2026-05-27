@@ -134,6 +134,13 @@
       "when": 1748736000000,
       "tag": "0018_kraken",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1748822400000,
+      "tag": "0019_plaid_extraction",
+      "breakpoints": true
     }
   ]
 }

@@ -100,3 +100,61 @@ describe('DELETE /api/account', () => {
     await app.close();
   });
 });
+
+describe('PATCH /api/account', () => {
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  it('updates display name and returns ok', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/account',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      body: JSON.stringify({ display_name: 'Coiny Test' }),
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json<{ ok: boolean }>().ok).toBe(true);
+
+    await app.close();
+  });
+
+  it('returns 400 for missing display_name', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/account',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    expect(res.statusCode).toBe(400);
+
+    await app.close();
+  });
+});
+
+describe('POST /api/auth/logout', () => {
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  it('invalidates the session token', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'POST', url: '/api/auth/logout', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+    expect(res.json<{ ok: boolean }>().ok).toBe(true);
+
+    // After logout the token should be revoked.
+    const followup = await app.inject({ method: 'GET', url: '/api/pets', headers: authHeader() });
+    expect(followup.statusCode).toBe(401);
+
+    await app.close();
+  });
+});
