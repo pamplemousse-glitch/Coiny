@@ -262,12 +262,16 @@ export const snaptradeConnections = pgTable('snaptrade_connections', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-// YNAB connections — one per user; apiKey is AES-256-GCM encrypted personal access token.
+// YNAB connections — one per user. Migrated to OAuth 2.0 PKCE; apiKey kept nullable for legacy PAT users.
+// accessToken / refreshToken are AES-256-GCM encrypted. tokenExpiresAt drives auto-refresh (5-min buffer).
 export const ynabConnections = pgTable('ynab_connections', {
   userId: text('user_id')
     .primaryKey()
     .references(() => users.id, { onDelete: 'cascade' }),
-  apiKey: text('api_key').notNull(),
+  apiKey: text('api_key'), // legacy personal access token (nullable after OAuth migration)
+  accessToken: text('access_token'), // AES-256-GCM encrypted OAuth access token
+  refreshToken: text('refresh_token'), // AES-256-GCM encrypted OAuth refresh token
+  tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true }),
   lastNetWorthUsd: numeric('last_net_worth_usd'),
   lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

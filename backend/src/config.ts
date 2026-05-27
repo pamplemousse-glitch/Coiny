@@ -69,6 +69,10 @@ const configSchema = z
     // Discogs OAuth 1.0a — vinyl collection valuation.
     DISCOGS_CONSUMER_KEY: z.string().default(''),
     DISCOGS_CONSUMER_SECRET: z.string().default(''),
+
+    // YNAB OAuth 2.0 client ID (PKCE public client — no client secret needed).
+    // Register at app.ynab.com/settings/developer to get a client ID.
+    YNAB_CLIENT_ID: z.string().default(''),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {

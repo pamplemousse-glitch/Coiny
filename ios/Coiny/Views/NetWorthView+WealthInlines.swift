@@ -1,3 +1,4 @@
+import Security
 import SwiftUI
 
 // MARK: - Kraken inline
@@ -5,9 +6,7 @@ import SwiftUI
 struct KrakenInlineView: View {
     let vm: KrakenViewModel
     let isConnected: Bool
-    @State private var showingConnect = false
-    @State private var apiKey = ""
-    @State private var privateKey = ""
+    let onConnect: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,16 +23,15 @@ struct KrakenInlineView: View {
                 Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
             }
         }
-        .sheet(isPresented: $showingConnect) { connectSheet }
     }
 
     private var disconnectedView: some View {
         HStack {
-            Text("Connect Kraken exchange")
+            Text("Link Kraken via SnapTrade")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
-            Button("Connect") { showingConnect = true }
+            Button("Connect") { onConnect() }
                 .font(.caption)
                 .buttonStyle(.bordered)
         }
@@ -50,43 +48,6 @@ struct KrakenInlineView: View {
                 .font(.caption)
         }
         .padding(.top, 4)
-    }
-
-    private var connectSheet: some View {
-        NavigationStack {
-            Form {
-                Section("API Key") {
-                    TextField("API Key", text: $apiKey)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                }
-                Section("Private Key") {
-                    SecureField("Private Key", text: $privateKey)
-                }
-            }
-            .navigationTitle("Connect Kraken")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        showingConnect = false
-                        apiKey = ""
-                        privateKey = ""
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Connect") {
-                        let k = apiKey; let p = privateKey
-                        showingConnect = false
-                        apiKey = ""
-                        privateKey = ""
-                        Task { await vm.connect(apiKey: k, privateKey: p) }
-                    }
-                    .disabled(apiKey.isEmpty || privateKey.isEmpty)
-                }
-            }
-        }
-        .presentationDetents([.medium])
     }
 }
 
@@ -149,8 +110,6 @@ struct SnapTradeInlineView: View {
 struct YnabInlineView: View {
     let vm: YnabViewModel
     let isConnected: Bool
-    @State private var showingConnect = false
-    @State private var apiKey = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -167,7 +126,6 @@ struct YnabInlineView: View {
                 Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
             }
         }
-        .sheet(isPresented: $showingConnect) { connectSheet }
     }
 
     private var disconnectedView: some View {
@@ -176,7 +134,7 @@ struct YnabInlineView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
-            Button("Connect") { showingConnect = true }
+            Button("Connect") { Task { await vm.startOAuth() } }
                 .font(.caption)
                 .buttonStyle(.bordered)
         }
@@ -194,43 +152,6 @@ struct YnabInlineView: View {
         }
         .padding(.top, 4)
     }
-
-    private var connectSheet: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    SecureField("Personal access token", text: $apiKey)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                } header: {
-                    Text("YNAB API Key")
-                } footer: {
-                    Text("Find your token at app.ynab.com → Account Settings → Developer Settings")
-                        .font(.caption2)
-                }
-            }
-            .navigationTitle("Connect YNAB")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        showingConnect = false
-                        apiKey = ""
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Connect") {
-                        let k = apiKey
-                        showingConnect = false
-                        apiKey = ""
-                        Task { await vm.connect(apiKey: k) }
-                    }
-                    .disabled(apiKey.isEmpty)
-                }
-            }
-        }
-        .presentationDetents([.medium])
-    }
 }
 
 // MARK: - Kalshi inline
@@ -238,9 +159,9 @@ struct YnabInlineView: View {
 struct KalshiInlineView: View {
     let vm: KalshiViewModel
     let isConnected: Bool
-    @State private var showingConnect = false
+    @State private var showingSetup = false
+    @State private var generatedPair: KalshiKeyGen.KeyPair?
     @State private var keyId = ""
-    @State private var privateKeyBase64 = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -257,7 +178,7 @@ struct KalshiInlineView: View {
                 Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
             }
         }
-        .sheet(isPresented: $showingConnect) { connectSheet }
+        .sheet(isPresented: $showingSetup) { setupSheet }
     }
 
     private var disconnectedView: some View {
@@ -266,9 +187,12 @@ struct KalshiInlineView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
-            Button("Connect") { showingConnect = true }
-                .font(.caption)
-                .buttonStyle(.bordered)
+            Button("Connect") {
+                generatedPair = KalshiKeyGen.generate()
+                showingSetup = true
+            }
+            .font(.caption)
+            .buttonStyle(.bordered)
         }
         .padding(.top, 4)
     }
@@ -285,16 +209,28 @@ struct KalshiInlineView: View {
         .padding(.top, 4)
     }
 
-    private var connectSheet: some View {
+    private var setupSheet: some View {
         NavigationStack {
             Form {
-                Section("Key ID") {
-                    TextField("Key ID", text: $keyId)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
+                Section {
+                    if let pem = generatedPair?.publicKeyPem {
+                        Text(pem)
+                            .font(.system(.caption2, design: .monospaced))
+                            .textSelection(.enabled)
+                    } else {
+                        Text("Key generation failed").font(.caption).foregroundStyle(.red)
+                    }
+                } header: {
+                    Text("Step 1 — Your Public Key")
+                } footer: {
+                    Text(
+                        "Copy this key, open Kalshi → Settings → API Keys → Add Key, paste it, " +
+                        "and copy the Key ID you receive back."
+                    )
+                    .font(.caption2)
                 }
-                Section("Private Key (Base64)") {
-                    SecureField("Base64-encoded private key", text: $privateKeyBase64)
+                Section("Step 2 — Key ID from Kalshi") {
+                    TextField("Key ID", text: $keyId)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                 }
@@ -304,20 +240,21 @@ struct KalshiInlineView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        showingConnect = false
+                        showingSetup = false
                         keyId = ""
-                        privateKeyBase64 = ""
+                        generatedPair = nil
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Connect") {
-                        let k = keyId; let p = privateKeyBase64
-                        showingConnect = false
+                        guard let pair = generatedPair else { return }
+                        let k = keyId; let p = pair.privateKeyBase64
+                        showingSetup = false
                         keyId = ""
-                        privateKeyBase64 = ""
+                        generatedPair = nil
                         Task { await vm.connect(keyId: k, privateKeyBase64: p) }
                     }
-                    .disabled(keyId.isEmpty || privateKeyBase64.isEmpty)
+                    .disabled(keyId.isEmpty || generatedPair == nil)
                 }
             }
         }
@@ -410,4 +347,58 @@ struct DiscogsInlineView: View {
         }
         .padding(.top, 4)
     }
+}
+
+// MARK: - RSA key generation for Kalshi
+
+enum KalshiKeyGen {
+    struct KeyPair {
+        let publicKeyPem: String
+        let privateKeyBase64: String
+    }
+
+    static func generate() -> KeyPair? {
+        let attrs: [CFString: Any] = [
+            kSecAttrKeyType: kSecAttrKeyTypeRSA,
+            kSecAttrKeySizeInBits: 2048,
+        ]
+        var genError: Unmanaged<CFError>?
+        guard let privKey = SecKeyCreateRandomKey(attrs as CFDictionary, &genError),
+              let pubKey = SecKeyCopyPublicKey(privKey) else { return nil }
+
+        var exportError: Unmanaged<CFError>?
+        guard let privDer = SecKeyCopyExternalRepresentation(privKey, &exportError) as Data?,
+              let pubDer = SecKeyCopyExternalRepresentation(pubKey, &exportError) as Data? else { return nil }
+
+        // Private key: PKCS#1 DER → PEM → base64-encode the PEM string (backend decodes via Buffer.from(b64,'base64').toString())
+        let privPem = wrapPem("RSA PRIVATE KEY", privDer)
+        let privateKeyBase64 = Data(privPem.utf8).base64EncodedString()
+
+        // Public key: PKCS#1 DER → SPKI DER → PEM (user pastes into Kalshi dashboard)
+        let publicKeyPem = wrapPem("PUBLIC KEY", pkcs1ToSpki(pubDer))
+
+        return KeyPair(publicKeyPem: publicKeyPem, privateKeyBase64: privateKeyBase64)
+    }
+
+    private static func wrapPem(_ label: String, _ der: Data) -> String {
+        let b64 = der.base64EncodedString(options: .lineLength64Characters)
+        return "-----BEGIN \(label)-----\n\(b64)\n-----END \(label)-----"
+    }
+
+    // Wrap PKCS#1 RSA public key DER in SubjectPublicKeyInfo (SPKI) envelope.
+    private static func pkcs1ToSpki(_ pkcs1: Data) -> Data {
+        let oid = Data([0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x01, 0x05, 0x00])
+        let algSeq = derSeq(oid)
+        let bitStr = derTag(0x03, Data([0x00]) + pkcs1)
+        return derSeq(algSeq + bitStr)
+    }
+
+    private static func derLen(_ n: Int) -> Data {
+        if n < 0x80 { return Data([UInt8(n)]) }
+        if n < 0x100 { return Data([0x81, UInt8(n)]) }
+        return Data([0x82, UInt8(n >> 8), UInt8(n & 0xFF)])
+    }
+
+    private static func derSeq(_ c: Data) -> Data { Data([0x30]) + derLen(c.count) + c }
+    private static func derTag(_ t: UInt8, _ c: Data) -> Data { Data([t]) + derLen(c.count) + c }
 }
