@@ -1,7 +1,7 @@
 # Net Worth Coverage Plan
 
 _Quick-reference: what we cover, what the gaps are, what to build next._
-_Last updated 2026-05-26. Full research detail in `docs/api-expansion-plan.md`._
+_Last updated 2026-05-27. Full research detail in `docs/api-expansion-plan.md`._
 
 ---
 
@@ -59,6 +59,9 @@ Other notable comps:
 | Brokerage aggregator (Fidelity, Vanguard, Schwab, etc.) | SnapTrade | snaptrade_connections table — needs SNAPTRADE_CLIENT_ID + SNAPTRADE_CONSUMER_KEY |
 | Kraken exchange (spot balances) | Kraken REST API | kraken_connections table — HMAC-SHA512 auth, encrypted per-user keys |
 | Budget / spending tracking | YNAB API | ynab_connections table — user-supplied personal access token |
+| Sneaker collection (StockX + GOAT prices) | KicksDB (`kicks.dev`) | sneaker_holdings table — SKU + size + quantity; sync prices on demand; needs KICKSDB_API_KEY |
+| Vinyl records collection | Discogs OAuth | discogs_connections table — full OAuth 1.0a; syncs lastCollectionUsd from marketplace stats |
+| Prediction markets — Kalshi | Kalshi REST API | kalshi_connections table — RSA-PSS auth; encrypted per-user key pair; portfolioUsd in cents |
 
 ---
 
@@ -68,9 +71,6 @@ Other notable comps:
 |---|---|---|---|
 | Solana staking rewards | Helius | Low | **[ACTION]** `helius.dev` signup |
 | NFT portfolio (Solana + multi-chain) | Alchemy NFT API | Medium | **[ACTION]** `alchemy.com` signup |
-| Sneakers (StockX + GOAT prices) | KicksDB (`kicks.dev`) | Low | 50K req/month free; 175K+ products; no signup/approval needed |
-| Vinyl records collection | Discogs API | Low | Completely free; OAuth; full marketplace pricing + collection tracking |
-| Prediction markets — Kalshi | Kalshi REST API | Low | CFTC-regulated; `GET /portfolio/balance` → `portfolio_value`; free for verified users; RSA-PSS auth |
 | Prediction markets — Polymarket | Polymarket REST API | Low | Free read-only; no key needed; requires user's Polygon wallet address; EIP-712 auth for writes |
 | Airline miles / loyalty points | AwardWallet API | Medium | "Plaid for points" — 700+ loyalty programs; OAuth; free base tier Business account |
 
@@ -200,17 +200,17 @@ Categories: life insurance cash value, art, luxury handbags, aircraft, collector
 
 ## Build Sequence
 
-| Sprint | Focus | Requires |
+| Sprint | Focus | Status |
 |---|---|---|
-| **A** | Reactions from existing data (no new endpoints) | Nothing — just schema expansion |
-| **B** | New data surfaces on existing vendors | Nothing |
-| **C** | Free chain clients ✅ + RentCast + MarketCheck + GoldAPI + SnapTrade ✅ | Antoine signups: RentCast, MarketCheck, GoldAPI, Blockfrost, TonCenter, Helius |
-| **D** | Brokerage/retirement depth (Akoya, Empower, TIAA, Gemini, Kraken ✅, YNAB ✅, Alpaca) | Antoine signups + form approvals |
-| **E** | DeFi gaps: Hyperliquid ✅, Solana staking (Helius), Alchemy NFTs, Zerion webhooks, QuickBooks | Antoine signups |
-| **F** | Alt assets Tier 1: KicksDB (sneakers), Discogs (vinyl), GoDaddy (domains), TCG API (cards), Kalshi (prediction markets), Polymarket (prediction markets), AwardWallet (miles/points) | Low-friction signups |
-| **G** | Alt assets Tier 2: WatchCharts (watches), Wine-Searcher, SportsCardsPro, PriceCharting, Hagerty (collector cars), PCGS CoinFacts (coins), GoCollect (comics), CS2 skins (Steam + SteamAnalyst), Yahoo Fantasy Sports, Fundrise, Betfair Exchange | Antoine signups |
-| **H** | Alt assets Tier 3: YouTube creator revenue, NREL solar, USDA agricultural, Prosper, EIA/USDA commodities | Low friction |
-| **I** | Long-tail CEX: Binance US, OKX US, eToro, tastytrade, Webull, Crypto.com, KuCoin, Bitget | Per-exchange signups |
+| **A** | Reactions from existing data | ✅ Done |
+| **B** | New data surfaces on existing vendors | ✅ Done |
+| **C** | Free chain clients + RentCast + MarketCheck + GoldAPI + SnapTrade | ✅ Done (chains, real estate, vehicles, metals, SnapTrade all live) |
+| **D** | Kraken, YNAB, brokerage depth | ✅ Done (Kraken + YNAB live; Akoya/Empower/TIAA deferred) |
+| **E** | Hyperliquid, Solana staking, Alchemy NFTs | ✅ Hyperliquid done; Helius + Alchemy still need signups |
+| **F** | Alt assets Tier 1: KicksDB, Discogs, Kalshi, Polymarket, AwardWallet | ✅ KicksDB + Discogs + Kalshi live; Polymarket + AwardWallet still next |
+| **G** | Alt assets Tier 2: WatchCharts, Wine-Searcher, SportsCardsPro, PriceCharting, Hagerty, PCGS, GoCollect, CS2 skins, Yahoo Fantasy Sports, Fundrise, Betfair | ⏳ Next up |
+| **H** | Alt assets Tier 3: YouTube creator revenue, NREL solar, USDA agricultural, Prosper, EIA/USDA commodities | ⏳ Later |
+| **I** | Long-tail CEX: Binance US, OKX US, eToro, tastytrade, Webull, Crypto.com, KuCoin, Bitget | ⏳ Later |
 
 ---
 
