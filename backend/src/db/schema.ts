@@ -331,3 +331,20 @@ export const spinwheelPending = pgTable('spinwheel_pending', {
   spinwheelUserId: text('spinwheel_user_id').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Sneaker holdings — valued via KicksDB (StockX + GOAT pricing).
+// SKU identifies the model (e.g. "DZ5485-612"). Size is optional — if set,
+// sync will fetch the specific size's lowest ask; otherwise uses the product min_price.
+export const sneakerHoldings = pgTable('sneaker_holdings', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  sku: text('sku').notNull(),
+  description: text('description'),
+  size: text('size'),
+  quantity: integer('quantity').notNull().default(1),
+  lastPriceUsd: numeric('last_price_usd'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});

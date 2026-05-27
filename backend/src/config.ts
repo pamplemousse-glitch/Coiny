@@ -62,6 +62,9 @@ const configSchema = z
     BLOCKFROST_PROJECT_ID: z.string().default(''),
     // TonCenter API key for TON balance queries.
     TONCENTER_API_KEY: z.string().default(''),
+
+    // KicksDB — sneaker pricing API (StockX + GOAT + others). kicks.dev
+    KICKSDB_API_KEY: z.string().default(''),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {
