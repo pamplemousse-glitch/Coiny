@@ -105,7 +105,11 @@ describe('GET /api/plaid/recurring', () => {
     };
 
     await upsertRecurringStreams(testUserId, [stream], []);
-    await upsertRecurringStreams(testUserId, [{ ...stream, last_date: '2026-05-24', last_amount: { amount: 1300 } }], []);
+    await upsertRecurringStreams(
+      testUserId,
+      [{ ...stream, last_date: '2026-05-24', last_amount: { amount: 1300 } }],
+      [],
+    );
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();

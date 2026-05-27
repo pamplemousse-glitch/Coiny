@@ -9,9 +9,9 @@ import type { RuleContext } from '../rules/engine.js';
 import { evaluate } from '../rules/engine.js';
 import { claimEvent } from '../store/events.js';
 import { disableItem, getItem, markInitialSyncComplete, setCursor } from '../store/items.js';
+import { applyHealthDelta, getGoals, recordReaction } from '../store/pet.js';
 import { cacheLiabilities } from '../store/plaid-liabilities.js';
 import { upsertRecurringStreams } from '../store/plaid-recurring.js';
-import { applyHealthDelta, getGoals, recordReaction } from '../store/pet.js';
 import { getWeeklySpendByCategory, persistTransactions, upsertModifiedTransactions } from '../store/transactions.js';
 
 const SYNC_TRIGGERS = new Set(['SYNC_UPDATES_AVAILABLE', 'DEFAULT_UPDATE']);
