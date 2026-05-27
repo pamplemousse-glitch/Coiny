@@ -15,7 +15,7 @@ vi.mock('node:crypto', async (importOriginal) => {
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-import { KalshiError, decodePrivateKey, getPortfolioBalance } from '../src/kalshi/client.js';
+import { decodePrivateKey, getPortfolioBalance, KalshiError } from '../src/kalshi/client.js';
 
 beforeEach(() => {
   mockFetch.mockReset();
@@ -40,9 +40,9 @@ describe('decodePrivateKey', () => {
 
 describe('getPortfolioBalance', () => {
   const KEY_ID = 'test-key-id';
-  const FAKE_PEM_B64 = Buffer.from(
-    '-----BEGIN RSA PRIVATE KEY-----\nFAKE\n-----END RSA PRIVATE KEY-----\n',
-  ).toString('base64');
+  const FAKE_PEM_B64 = Buffer.from('-----BEGIN RSA PRIVATE KEY-----\nFAKE\n-----END RSA PRIVATE KEY-----\n').toString(
+    'base64',
+  );
 
   it('returns portfolio_value in USD (cents → dollars)', async () => {
     mockFetch.mockResolvedValue({
