@@ -9,8 +9,10 @@ import type { RuleContext } from '../rules/engine.js';
 import { evaluate } from '../rules/engine.js';
 import { claimEvent } from '../store/events.js';
 import { disableItem, getItem, markInitialSyncComplete, setCursor } from '../store/items.js';
+import { cacheLiabilities } from '../store/plaid-liabilities.js';
+import { upsertRecurringStreams } from '../store/plaid-recurring.js';
 import { applyHealthDelta, getGoals, recordReaction } from '../store/pet.js';
-import { getWeeklySpendByCategory, persistTransactions } from '../store/transactions.js';
+import { getWeeklySpendByCategory, persistTransactions, upsertModifiedTransactions } from '../store/transactions.js';
 
 const SYNC_TRIGGERS = new Set(['SYNC_UPDATES_AVAILABLE', 'DEFAULT_UPDATE']);
 
@@ -88,14 +90,29 @@ async function dispatch(app: FastifyInstance, envelope: PlaidWebhookEnvelope): P
       return;
     }
     const liabilities = await liabilitiesGet(item.accessToken);
+    await cacheLiabilities(item.userId, liabilities);
     app.log.info(
       {
         item_id,
         credit_count: liabilities.liabilities.credit?.length ?? 0,
         student_count: liabilities.liabilities.student?.length ?? 0,
       },
-      'plaid liabilities updated',
+      'plaid liabilities cached',
     );
+    // Fire overdue reaction if any credit account is past-due.
+    const overdueAccounts = liabilities.liabilities.credit?.filter((c) => c.is_overdue === true) ?? [];
+    if (overdueAccounts.length > 0) {
+      const overdueReaction = {
+        animation: 'concerned' as const,
+        sound: 'warning' as const,
+        led: 'red' as const,
+        duration: 2000,
+        reason: 'overdue_payment',
+      };
+      await applyHealthDelta(item.userId, -5);
+      await recordReaction(item.userId, 'overdue_payment', overdueReaction);
+      dispatchReaction(item.userId, overdueReaction);
+    }
     return;
   }
 
@@ -111,9 +128,10 @@ async function dispatch(app: FastifyInstance, envelope: PlaidWebhookEnvelope): P
       return;
     }
     const recurring = await recurringTransactionsGet(item.accessToken);
+    await upsertRecurringStreams(item.userId, recurring.inflow_streams, recurring.outflow_streams);
     app.log.info(
       { item_id, inflow: recurring.inflow_streams.length, outflow: recurring.outflow_streams.length },
-      'plaid recurring transactions updated',
+      'plaid recurring transactions stored',
     );
     return;
   }
@@ -174,11 +192,18 @@ async function syncItem(
     allAdded.push(...res.added);
     cursor = res.next_cursor;
 
-    if (res.modified.length > 0 || res.removed.length > 0) {
-      app.log.info(
-        { item_id: item.itemId, modified: res.modified.length, removed: res.removed.length },
-        'plaid sync delta — ignoring modified/removed in phase 1',
+    if (res.modified.length > 0) {
+      const adaptedModified = await Promise.all(
+        res.modified.map((plaidTx) =>
+          plaidTxToInternal(plaidTx, accountBalances.get(plaidTx.account_id) ?? null, userId),
+        ),
       );
+      await upsertModifiedTransactions(userId, adaptedModified);
+      app.log.info({ item_id: item.itemId, modified: res.modified.length }, 'plaid modified transactions updated');
+    }
+
+    if (res.removed.length > 0) {
+      app.log.info({ item_id: item.itemId, removed: res.removed.length }, 'plaid removed transactions — no-op phase 1');
     }
 
     if (!res.has_more) break;

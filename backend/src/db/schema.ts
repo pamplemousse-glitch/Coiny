@@ -285,6 +285,42 @@ export const krakenConnections = pgTable('kraken_connections', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Plaid recurring streams — upserted on RECURRING_TRANSACTIONS_UPDATE webhook.
+export const plaidRecurringStreams = pgTable('plaid_recurring_streams', {
+  streamId: text('stream_id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  accountId: text('account_id').notNull(),
+  direction: text('direction').notNull(), // 'inflow' | 'outflow'
+  merchantName: text('merchant_name'),
+  description: text('description').notNull(),
+  frequency: text('frequency').notNull(),
+  averageAmount: numeric('average_amount'),
+  lastAmount: numeric('last_amount'),
+  lastDate: text('last_date'),
+  isActive: boolean('is_active').notNull().default(true),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Plaid liability cache — upserted on LIABILITIES/DEFAULT_UPDATE webhook.
+// Net-worth reads from here instead of making a live Plaid call on every request.
+export const plaidLiabilityCache = pgTable('plaid_liability_cache', {
+  accountId: text('account_id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  accountType: text('account_type').notNull(), // 'credit' | 'mortgage' | 'student'
+  minPayment: numeric('min_payment'),
+  nextDueDate: text('next_due_date'),
+  lastStatementBalance: numeric('last_statement_balance'),
+  isOverdue: boolean('is_overdue'),
+  primaryApr: numeric('primary_apr'),
+  expectedPayoffDate: text('expected_payoff_date'),
+  repaymentPlanType: text('repayment_plan_type'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Temporary storage for the Spinwheel userId returned by the SMS OTP send step.
 // Needed because the verify call requires the spinwheelUserId in the URL path.
 // Cleared on successful verify or replaced on new OTP request.

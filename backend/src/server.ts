@@ -15,6 +15,7 @@ import { registerNetWorthApi } from './api/net-worth.js';
 import { registerOverridesApi } from './api/overrides.js';
 import { registerPetsApi } from './api/pets.js';
 import { registerPlaidLinkApi } from './api/plaid-link.js';
+import { registerPlaidRecurringApi } from './api/plaid-recurring.js';
 import { registerRealEstateApi } from './api/real-estate.js';
 import { registerSnaptradeApi } from './api/snaptrade.js';
 import { registerSpendingApi } from './api/spending.js';
@@ -86,6 +87,7 @@ async function buildApp() {
     await registerAuthPlugin(scope);
 
     registerPlaidLinkApi(scope);
+    registerPlaidRecurringApi(scope);
     if (config.PLAID_ENV === 'sandbox') registerDebugApi(scope);
     registerAccountApi(scope);
     registerPetsApi(scope);

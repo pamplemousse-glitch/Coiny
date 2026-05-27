@@ -12,6 +12,7 @@ export type PlaidCounterparty = {
   name?: string;
   type?: string;
   entity_id?: string;
+  logo_url?: string | null;
 };
 
 export type PlaidTransaction = {
@@ -29,6 +30,7 @@ export type PlaidTransaction = {
   personal_finance_category: PlaidPfc | null;
   counterparties?: PlaidCounterparty[];
   category?: string[] | null; // legacy taxonomy fallback
+  logo_url?: string | null; // top-level merchant logo (PFCv2)
 };
 
 export type PlaidAccountBalance = {
@@ -154,6 +156,9 @@ export type PlaidStudentLoan = {
   account_id: string;
   minimum_payment_amount: number | null;
   next_payment_due_date: string | null;
+  expected_payoff_date: string | null;
+  repayment_plan: { type: string } | null;
+  pslf_status: { estimated_eligibility_date: string | null } | null;
 };
 
 export type LiabilitiesGetResponse = {
@@ -173,7 +178,10 @@ export type RecurringStream = {
   description: string;
   frequency: string;
   average_amount: { amount: number } | null;
+  last_amount: { amount: number } | null;
+  last_date: string | null;
   is_user_modified: boolean;
+  status: string | null; // 'MATURE' | 'EARLY_DETECTION' | 'TOMBSTONED'
 };
 
 export type RecurringTransactionsResponse = {

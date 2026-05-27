@@ -87,7 +87,11 @@ export function transactionsSync(args: {
   cursor?: string;
   count?: number;
 }): Promise<TransactionsSyncResponse> {
-  const body: Record<string, unknown> = { access_token: args.access_token, count: args.count ?? 100 };
+  const body: Record<string, unknown> = {
+    access_token: args.access_token,
+    count: args.count ?? 100,
+    options: { include_personal_finance_category: true },
+  };
   if (args.cursor) body.cursor = args.cursor;
   return plaidPost('/transactions/sync', body);
 }
