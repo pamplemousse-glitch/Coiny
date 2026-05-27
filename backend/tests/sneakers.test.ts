@@ -39,7 +39,9 @@ describe('GET /api/sneakers', () => {
   it('returns holdings with null price before first sync', async () => {
     const { db } = await import('../src/db/client.js');
     const { sneakerHoldings } = await import('../src/db/schema.js');
-    await db().insert(sneakerHoldings).values({ userId: testUserId, sku: 'DZ5485-612', description: 'Jordan 1 Chicago', size: '10.5', quantity: 1 });
+    await db()
+      .insert(sneakerHoldings)
+      .values({ userId: testUserId, sku: 'DZ5485-612', description: 'Jordan 1 Chicago', size: '10.5', quantity: 1 });
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
@@ -70,7 +72,12 @@ describe('POST /api/sneakers', () => {
       method: 'POST',
       url: '/api/sneakers',
       headers: { ...authHeader(), 'content-type': 'application/json' },
-      body: JSON.stringify({ sku: 'DZ5485-612', description: 'Jordan 1 High OG Chicago Lost & Found', size: '10', quantity: 1 }),
+      body: JSON.stringify({
+        sku: 'DZ5485-612',
+        description: 'Jordan 1 High OG Chicago Lost & Found',
+        size: '10',
+        quantity: 1,
+      }),
     });
     expect(res.statusCode).toBe(201);
     expect(res.json()).toMatchObject({ ok: true, sku: 'DZ5485-612', quantity: 1 });
@@ -258,11 +265,13 @@ describe('GET /api/net-worth — sneakers field', () => {
   it('sums lastPriceUsd × quantity into sneakers total', async () => {
     const { db } = await import('../src/db/client.js');
     const { sneakerHoldings } = await import('../src/db/schema.js');
-    await db().insert(sneakerHoldings).values([
-      { userId: testUserId, sku: 'DZ5485-612', quantity: 2, lastPriceUsd: '450.00' },
-      { userId: testUserId, sku: 'FD4449-105', quantity: 1, lastPriceUsd: '180.00' },
-      { userId: testUserId, sku: 'UNKNOWN', quantity: 3, lastPriceUsd: null },
-    ]);
+    await db()
+      .insert(sneakerHoldings)
+      .values([
+        { userId: testUserId, sku: 'DZ5485-612', quantity: 2, lastPriceUsd: '450.00' },
+        { userId: testUserId, sku: 'FD4449-105', quantity: 1, lastPriceUsd: '180.00' },
+        { userId: testUserId, sku: 'UNKNOWN', quantity: 3, lastPriceUsd: null },
+      ]);
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
