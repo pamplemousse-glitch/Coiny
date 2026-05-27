@@ -512,7 +512,6 @@ private struct OtpInlineView: View {
     }
 }
 
-
 #Preview {
     NetWorthView()
         .environment(NetWorthViewModel())
