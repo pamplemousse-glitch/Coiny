@@ -66,10 +66,7 @@ export async function upsertRecurringStreams(
 export async function getRecurringStreams(
   userId: string,
 ): Promise<{ inflow: StoredStream[]; outflow: StoredStream[] }> {
-  const rows = await db()
-    .select()
-    .from(plaidRecurringStreams)
-    .where(eq(plaidRecurringStreams.userId, userId));
+  const rows = await db().select().from(plaidRecurringStreams).where(eq(plaidRecurringStreams.userId, userId));
 
   const inflow = rows.filter((r) => r.direction === 'inflow');
   const outflow = rows.filter((r) => r.direction === 'outflow');

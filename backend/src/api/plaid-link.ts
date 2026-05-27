@@ -1,9 +1,15 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { liabilitiesGet, recurringTransactionsGet, itemPublicTokenExchange, itemRemove, linkTokenCreate } from '../plaid/client.js';
+import {
+  itemPublicTokenExchange,
+  itemRemove,
+  liabilitiesGet,
+  linkTokenCreate,
+  recurringTransactionsGet,
+} from '../plaid/client.js';
+import { disableItem, getItemsByUser, upsertItem } from '../store/items.js';
 import { cacheLiabilities } from '../store/plaid-liabilities.js';
 import { upsertRecurringStreams } from '../store/plaid-recurring.js';
-import { disableItem, getItemsByUser, upsertItem } from '../store/items.js';
 
 const ExchangeBodySchema = z.object({
   public_token: z.string().min(1),

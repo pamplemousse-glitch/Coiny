@@ -21,8 +21,8 @@ import { dispatchReaction } from '../reactions/dispatch.js';
 import { evaluateExternalEvent } from '../reactions/external.js';
 import { getDebtProfile } from '../spinwheel/client.js';
 import { getItemsByUser } from '../store/items.js';
-import { getCachedLiabilities } from '../store/plaid-liabilities.js';
 import { recordReaction } from '../store/pet.js';
+import { getCachedLiabilities } from '../store/plaid-liabilities.js';
 import { getRecentOutflows } from '../store/transactions.js';
 import { getPortfolio } from '../zerion/client.js';
 
@@ -91,9 +91,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
         }
       } else {
         // Cache empty — fall back to live Plaid calls.
-        const liabilityResults = await Promise.allSettled(
-          items.map((item) => liabilitiesGet(item.accessToken)),
-        );
+        const liabilityResults = await Promise.allSettled(items.map((item) => liabilitiesGet(item.accessToken)));
         for (const res of liabilityResults) {
           if (res.status === 'rejected') continue;
           for (const c of res.value.liabilities.credit ?? []) {
