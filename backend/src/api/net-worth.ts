@@ -5,6 +5,7 @@ import { db } from '../db/client.js';
 import {
   chainWallets,
   coinbaseConnections,
+  discogsConnections,
   hyperliquidAccounts,
   krakenConnections,
   metalHoldings,
@@ -325,6 +326,19 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // table not yet populated
     }
 
+    // --- Vinyl collection (Discogs) ---
+    let vinylTotal = 0;
+    let discogsConnected = false;
+    try {
+      const [discogs] = await db().select().from(discogsConnections).where(eq(discogsConnections.userId, userId));
+      if (discogs) {
+        discogsConnected = true;
+        if (discogs.lastCollectionUsd !== null) vinylTotal += parseFloat(discogs.lastCollectionUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
     // --- Debts (Spinwheel) ---
     let debtsTotal = 0;
     const debtItems: Array<{ id: string; type: string; balance: number; monthlyPayment: number }> = [];
@@ -364,7 +378,8 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       metalsTotal +
       sneakersTotal +
       snaptradeTotal +
-      ynabTotal -
+      ynabTotal +
+      vinylTotal -
       debtsTotal;
 
     // --- Net worth milestone reaction ---
@@ -421,6 +436,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       kraken: krakenTotal,
       snaptrade: snaptradeTotal,
       ynab: ynabTotal,
+      vinyl: vinylTotal,
       debts: -debtsTotal,
       liquidCashMonths,
       accounts: {
@@ -432,6 +448,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       },
       connections: {
         coinbase: coinbaseConnected,
+        discogs: discogsConnected,
         kraken: krakenConnected,
         snaptrade: snaptradeConnected,
         spinwheel: spinwheelConnected,
