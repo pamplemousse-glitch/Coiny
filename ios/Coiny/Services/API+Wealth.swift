@@ -150,7 +150,10 @@ extension API {
 
     func addSneaker(sku: String, size: String?, description: String?, quantity: Int) async throws {
         struct Body: Encodable { let sku: String; let size: String?; let description: String?; let quantity: Int }
-        let _: EmptyResponse = try await post("/api/sneakers", body: Body(sku: sku, size: size, description: description, quantity: quantity))
+        let _: EmptyResponse = try await post(
+            "/api/sneakers",
+            body: Body(sku: sku, size: size, description: description, quantity: quantity)
+        )
     }
 
     func removeSneaker(id: Int) async throws {
@@ -288,7 +291,10 @@ extension API {
 
     func verifyDiscogsToken(oauthToken: String, oauthVerifier: String) async throws {
         struct Body: Encodable { let oauthToken: String; let oauthVerifier: String }
-        let _: EmptyResponse = try await post("/api/discogs/connect/verify", body: Body(oauthToken: oauthToken, oauthVerifier: oauthVerifier))
+        let _: EmptyResponse = try await post(
+            "/api/discogs/connect/verify",
+            body: Body(oauthToken: oauthToken, oauthVerifier: oauthVerifier)
+        )
     }
 
     func syncDiscogs() async throws {

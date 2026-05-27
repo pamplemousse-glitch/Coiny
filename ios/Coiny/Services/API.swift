@@ -395,7 +395,6 @@ extension API {
     }
 }
 
-
 // MARK: - DTOs
 
 struct Empty: Encodable {}
