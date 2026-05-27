@@ -117,10 +117,7 @@ describe('syncCollection', () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          releases: [
-            { basic_information: { id: 101 } },
-            { basic_information: { id: 102 } },
-          ],
+          releases: [{ basic_information: { id: 101 } }, { basic_information: { id: 102 } }],
         }),
       })
       .mockResolvedValueOnce({
