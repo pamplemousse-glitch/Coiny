@@ -10,6 +10,7 @@ import { registerDebugApi, registerDebugSessionApi } from './api/debug.js';
 import { registerDevicesApi } from './api/devices.js';
 import { registerDiscogsApi } from './api/discogs.js';
 import { registerHyperliquidApi } from './api/hyperliquid.js';
+import { registerKalshiConnectApi } from './api/kalshi-connect.js';
 import { registerKrakenApi } from './api/kraken.js';
 import { registerMetalsApi } from './api/metals.js';
 import { registerNetWorthApi } from './api/net-worth.js';
@@ -105,6 +106,7 @@ async function buildApp() {
     registerSneakersApi(scope);
     registerChainWalletsApi(scope);
     registerHyperliquidApi(scope);
+    registerKalshiConnectApi(scope);
     registerKrakenApi(scope);
     registerRealEstateApi(scope);
     registerVehiclesApi(scope);

@@ -7,6 +7,7 @@ import {
   coinbaseConnections,
   discogsConnections,
   hyperliquidAccounts,
+  kalshiConnections,
   krakenConnections,
   metalHoldings,
   petState,
@@ -339,6 +340,19 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // table not yet populated
     }
 
+    // --- Prediction markets (Kalshi) ---
+    let kalshiTotal = 0;
+    let kalshiConnected = false;
+    try {
+      const [kalshi] = await db().select().from(kalshiConnections).where(eq(kalshiConnections.userId, userId));
+      if (kalshi) {
+        kalshiConnected = true;
+        if (kalshi.lastPortfolioUsd !== null) kalshiTotal += parseFloat(kalshi.lastPortfolioUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
     // --- Debts (Spinwheel) ---
     let debtsTotal = 0;
     const debtItems: Array<{ id: string; type: string; balance: number; monthlyPayment: number }> = [];
@@ -379,7 +393,8 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       sneakersTotal +
       snaptradeTotal +
       ynabTotal +
-      vinylTotal -
+      vinylTotal +
+      kalshiTotal -
       debtsTotal;
 
     // --- Net worth milestone reaction ---
@@ -433,6 +448,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       vehicles: vehiclesTotal,
       metals: metalsTotal,
       sneakers: sneakersTotal,
+      kalshi: kalshiTotal,
       kraken: krakenTotal,
       snaptrade: snaptradeTotal,
       ynab: ynabTotal,
@@ -449,6 +465,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       connections: {
         coinbase: coinbaseConnected,
         discogs: discogsConnected,
+        kalshi: kalshiConnected,
         kraken: krakenConnected,
         snaptrade: snaptradeConnected,
         spinwheel: spinwheelConnected,
