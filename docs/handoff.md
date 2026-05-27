@@ -1,6 +1,6 @@
 # Coiny — Project Handoff
 
-**Last updated: 2026-05-25 (session 7)**
+**Last updated: 2026-05-27 (session 8)**
 
 Read this first. Then read `docs/tech-stack.md` and `docs/implementation-plan.md`.
 
@@ -60,13 +60,19 @@ Coiny/
 │   └── project.yml    # XcodeGen project definition — edit this, never .xcodeproj directly
 ├── android/           # Native Kotlin + Jetpack Compose — scaffolded, not started
 ├── backend/           # Node.js / TypeScript / Fastify — active, hosted on Fly.io
-│   ├── src/api/       # Route handlers (auth, pets, plaid, coinbase, zerion, spinwheel, account, net-worth)
+│   ├── src/api/       # Route handlers — 23 API modules covering all integrations
 │   ├── src/store/     # DB queries (users, sessions, items, pets, transactions, events)
 │   ├── src/plaid/     # Plaid API client + webhook verifier + category adapter
 │   ├── src/coinbase/  # Coinbase Advanced Trade client (JWT ES256) + public spot prices
 │   ├── src/zerion/    # Zerion DeFi portfolio client (Basic auth)
 │   ├── src/spinwheel/ # Spinwheel debt client (Bearer + SMS OTP)
-│   └── tests/         # 259 Vitest tests, all passing
+│   ├── src/chains/    # Per-chain balance clients: bitcoin, xrp, stellar, blockcypher, cosmos, near, aptos, sui, hedera, polkadot, cardano, ton
+│   ├── src/hyperliquid/ # Hyperliquid perps (no auth)
+│   ├── src/kraken/    # Kraken CEX (HMAC-SHA512, encrypted per-user keys)
+│   ├── src/kicksdb/   # KicksDB sneaker price lookup
+│   ├── src/discogs/   # Discogs vinyl collection (OAuth 1.0a)
+│   ├── src/kalshi/    # Kalshi prediction markets (RSA-PSS, encrypted per-user key)
+│   └── tests/         # 542 Vitest tests, all passing
 ├── firmware/          # nRF52840 + Zephyr — scaffolded, not started
 ├── mobile/            # Expo React Native — legacy prototype, superseded by ios/
 ├── shared/            # Cross-package TS types — BLE schema, pet state
@@ -128,41 +134,53 @@ Bank / Crypto / DeFi / Debt APIs
 - ✅ Backend deployed on Fly.io (`coiny-backend.fly.dev`)
 - ✅ Postgres via Neon (prod + dev connection strings in Fly secrets)
 
-### Backend (Node + Fastify + Drizzle, Fly.io) — 259 Vitest tests, all passing
+### Backend (Node + Fastify + Drizzle, Fly.io) — 542 Vitest tests, all passing
 
-- ✅ Plaid webhooks with HMAC-SHA256 + JWT signature verification + replay protection (PR #2, enhanced in #60)
+- ✅ Plaid webhooks with HMAC-SHA256 + JWT signature verification + replay protection
 - ✅ Plaid `/transactions/sync` + paginated sync, idempotent via `processed_events` table
-- ✅ Plaid Investments (`/investments/holdings/get`) and Liabilities (`/liabilities/get`) — both active and requested in every Link token
-- ✅ Paycheck detection via PFC category mapping in `plaid/adapter.ts` (`INCOME_WAGES` → `paycheck`, `Income/Payroll` → `paycheck`, etc.) — no Plaid Income product needed
-- ✅ Rule engine: paycheck, overspend, savings milestone, bill paid, large purchase, subscription detection, decay
-- ✅ Persistent Postgres via Neon: `pet_state`, `reaction_history`, `plaid_items`, `transactions`, `category_overrides`, `device_tokens`
-- ✅ Multi-user schema: `users`, `sessions`, `coinbaseConnections`, `zerionWallets`, `spinwheelConnections` + per-user FK on all tables (PR #60, migrations 0005–0007)
-- ✅ Auth plugin: Apple Sign In → session token (SHA-256 hash stored, 30-day sliding TTL)
+- ✅ Plaid Investments + Liabilities — active, returned by `/api/net-worth`
+- ✅ Plaid recurring streams cached (`plaid_recurring_streams` table); liability payment metadata cached (`plaid_liabilities_cache` table) with live fallback
+- ✅ Paycheck detection via PFC category mapping (`INCOME_WAGES` → `paycheck`, etc.)
+- ✅ Rule engine: paycheck, overspend, savings milestone, bill paid, large purchase, subscription detection, decay, net worth milestone, credit score change
+- ✅ Multi-user schema with per-user FK on all tables; AES-256-GCM encryption for all stored tokens/keys
+- ✅ Auth plugin: Apple Sign In → session token (SHA-256 hash, 30-day sliding TTL)
 - ✅ APNs push dispatch via background notifications + `registerDeviceToken`
-- ✅ REST API: `/api/auth/apple`, `/api/pets`, `/api/plaid/*`, `/api/devices/*`, `/api/spending`, `/api/account`, `/api/coinbase/*`, `/api/zerion/*`, `/api/spinwheel/*`, `/api/net-worth`, `/api/debug/*`
 - ✅ Rate limiting: per-user (SHA-256 of bearer token) with IP fallback
-- ✅ `GET /api/net-worth` aggregates: bank balances (Plaid) + investment holdings (Plaid) + crypto (Coinbase + public spot prices) + DeFi (Zerion) + debts (Spinwheel), per-source try/catch so one failure doesn't block others (PR #81)
-- ✅ CoinGecko removed (PR #107) — replaced with Coinbase's public `/v2/prices/{sym}-USD/spot` endpoint (no auth, no extra dependency). Price-surge/drop reactions removed (no 24h delta from spot API).
-- ✅ Coinbase JWT `typ: "JWT"` header fix — required by Coinbase docs, was missing from protected header
-- ✅ **E2E pipeline proven** (PR #101): Vitest test fires a Plaid sandbox webhook → verifies `paycheck_received` reaction is persisted and returned by `GET /api/pets`
+- ✅ **`GET /api/net-worth`** aggregates 14 data sources: bank + investments (Plaid) + crypto (Coinbase) + DeFi (Zerion) + on-chain wallets (12 chain clients) + Hyperliquid perps + Kraken CEX + SnapTrade brokerage + YNAB budgets + real estate (RentCast) + vehicles (MarketCheck) + metals (GoldAPI) + sneakers (KicksDB) + debts (Spinwheel) — plus pending: vinyl (Discogs) + prediction markets (Kalshi)
+- ✅ **Portfolio performance analytics**: `GET /api/coinbase/performance`, `GET /api/zerion/pnl`, `GET /api/zerion/positions`
+- ✅ **Credit score + utilization**: Spinwheel VantageScore 3.0 + per-card utilization calc
+- ✅ **Emergency fund runway**: `liquidCashMonths` in net-worth (depository balance ÷ 90-day avg burn)
+- ✅ **Chain wallets** (12 chains): Bitcoin (Blockstream Esplora), XRP (XRPL), Stellar (Horizon), DOGE/LTC/BCH (BlockCypher), ATOM/OSMO (Cosmos LCD), NEAR/Aptos/Sui/Hedera (public RPC), Polkadot/Cardano/TON (API-keyed, keys optional)
+- ✅ **Hyperliquid**: perp account state, unrealized PnL, position list
+- ✅ **Real estate**: `real_estate_assets` table — address + last_value_usd via RentCast AVM (needs `RENTCAST_API_KEY`)
+- ✅ **Vehicles**: `vehicle_assets` table — VIN + last_value_usd via MarketCheck (needs `MARKETCHECK_API_KEY`)
+- ✅ **Metals**: `metal_holdings` table — metal + oz + last_value_usd via GoldAPI (needs `GOLDAPI_API_KEY`)
+- ✅ **SnapTrade**: brokerage aggregator — OAuth account link → holdings sync → `snaptrade_connections.lastBrokerageTotal`
+- ✅ **YNAB**: personal access token → budgets sync → `ynab_connections.lastNetWorthUsd`
+- ✅ **Kraken**: HMAC-SHA512 NONCE auth, encrypted per-user keys → spot balance sync
+- ✅ **KicksDB (sneakers)**: `sneaker_holdings` table (SKU + size + qty) → price sync via KicksDB StockX endpoint
+- ✅ **Discogs (vinyl)**: OAuth 1.0a — connect/verify flow → collection sync → marketplace pricing → `discogsConnections.lastCollectionUsd` (PR #138, auto-merging)
+- ✅ **Kalshi (prediction markets)**: RSA-PSS auth — connect + sync + net-worth rollup (PR #139, auto-merging)
+- ✅ **`GET /api/plaid/recurring`**: subscription detection, stream list, spending summary
+- ✅ **E2E pipeline proven**: Vitest fires Plaid sandbox webhook → `paycheck_received` reaction persisted
 
-### iOS App (Swift + SwiftUI) — 148 unit tests passing, 1 UI smoke test passing
+### iOS App (Swift + SwiftUI) — 148+ unit tests passing
 
-- ✅ XcodeGen project definition (`ios/project.yml`) with LinkKit SPM package
-- ✅ `CoinyApp` with three-state routing: SignInView → OnboardingView → RootView
+- ✅ XcodeGen project definition (`ios/project.yml`) with LinkKit SPM
+- ✅ `CoinyApp`: SignInView → OnboardingView → RootView (3-tab)
 - ✅ `HTTPClient` / `SessionStore` / `Keychain` protocol injection — full testability
-- ✅ `API` actor with Bearer auth, auto-signout on 401, all 20+ endpoints (PR #81)
+- ✅ `API` actor with Bearer auth, auto-signout on 401
 - ✅ Sign In with Apple → backend JWT → Keychain session token
-- ✅ **OnboardingView**: Plaid Link flow (create token → open Link → exchange public token → `bankLinked = true`)
-- ✅ **PetView**: breathing animation, celebrate bounce, sad droop, WaitingForFirstReactionView with tip carousel, debug fire-transaction button
+- ✅ **OnboardingView**: Plaid Link flow end-to-end
+- ✅ **PetView**: breathing animation, celebrate bounce, sad droop, empty state with tip carousel, debug fire-transaction button
 - ✅ **SpendingView** (Activity tab): reaction history feed
-- ✅ **SettingsView**: bank status + unlink, goals display, sign-out, Delete Account (destructive alert → `DELETE /api/account`)
-- ✅ **CryptoView**: Coinbase section (connect dev key, sync, disconnect) + Zerion section (add/remove wallets, portfolio total)
-- ✅ **SpinwheelView**: SMS OTP flow (phone + DOB → OTP entry → connected), debt list, disconnect
-- ✅ **NetWorthView**: net worth total (green/red), bank / crypto / DeFi / debts sections, pull-to-refresh, not-connected prompts
-- ✅ **RootView**: **3 tabs — Pet, Activity, Wealth** (PR #103). Settings moved to gear-button sheet on Pet. Crypto + Debt folded into Wealth as inline sections.
-- ✅ 148 iOS unit tests: APIEndpointTests (22), APITests (15), CoinbaseViewModelTests (15), KeychainTests (8), NetWorthViewModelTests (11), PetStateDecodingTests (18), PetStoreTests (9), SessionStoreTests (4), SpendingViewModelTests (5), SpinwheelViewModelTests (16), ViewSmokeTests (9), ZerionViewModelTests (16) — all passing
-- ✅ 1 UI smoke test (`AppLaunchSmokeTests`) — checks cold-launch SignIn screen
+- ✅ **SettingsView**: bank status + unlink, goals, sign-out, Delete Account
+- ✅ **NetWorthView** (Wealth tab): total, bank, crypto (Coinbase), DeFi (Zerion), on-chain wallets, Hyperliquid, debts (Spinwheel + credit score + utilization), emergency runway, performance section
+- ✅ **RootView**: 3 tabs — Pet, Activity, Wealth. Settings as gear-button sheet.
+- ✅ **ChainWalletsView**: add/remove wallets per chain, balances, sync
+- ✅ **HyperliquidView**: add accounts by wallet address, PnL, sync
+- ✅ **PerformanceView**: Coinbase unrealized PnL + Zerion PnL + DeFi positions
+- ❌ **Not yet surfaced in iOS**: Kraken, SnapTrade, YNAB, Real estate, Vehicles, Metals, Sneakers, Discogs, Kalshi — all live on backend, `NetWorthResponse` model + `NetWorthView` need updating
 
 ---
 
@@ -170,305 +188,145 @@ Bank / Crypto / DeFi / Debt APIs
 
 | PR | Branch | Status | Action |
 |---|---|---|---|
-| **#108** | `fix/vendor-client-bugs` | **Open** | 3 vendor client bug fixes (see Known Integration Bugs below). 259 tests pass. Merge when ready. |
+| **#138** | `feat/discogs` | **Auto-merging** | Discogs vinyl OAuth integration — all checks green, squash-merge pending |
+| **#139** | `feat/kalshi` | **Auto-merging** | Kalshi prediction market integration — all checks green, squash-merge pending |
 
-PRs #81, #91–#99, #101, #103, #104, #105, #107 merged. PR #102 closed (superseded by #103).
-
----
-
-## Known Integration Bugs
-
-### ✅ All three confirmed bugs fixed in PR #108 (`fix/vendor-client-bugs`) — merge when ready
-
-### 1. Spinwheel — `getCreditScore` always returns null ✅ FIXED in PR #108
-**Was:** Reading `vantageScore3/creditScore/score` from `GET /v1/users/{id}` — that field doesn't exist on the user profile.
-**Fix:** `fetchRawDebtProfile` helper passes required body params (`creditReportType: '1_BUREAU.FULL'`, `sourceBureau: 'Equifax'`, `creditScoreModel: 'VANTAGE_SCORE_3_0'`). `getCreditScore` reads from `creditReports[0].profile.creditScore` and makes one API call instead of two.
-
-### 2. Spinwheel — `getDebtProfile` sends empty body ✅ FIXED in PR #108
-**Was:** Sending `{}` body — Spinwheel returns incomplete/errored data without the required params.
-**Fix:** Body now always includes the three required fields (same shared helper as above).
-
-### 3. Coinbase — `getTransactions` pagination cursor never advanced ✅ FIXED in PR #108
-**Was:** Reading `pagination.starting_after` as the next cursor — this reflects the cursor sent in the *current* request (null on page 1). Sync was silently capped at 25 transactions per account.
-**Fix:** Now reads `pagination.next_uri` and extracts `starting_after` from it.
-
-### 4. Zerion — `transfers[].value` ✅ confirmed correct
-Docs (`docs/context/zerion.md`) explicitly state `transfers[].value` is the USD value field. Nullable — `?? 0` fallback is correct. Not a bug.
+All previously open PRs (#108, #116–#137) merged. No blockers.
 
 ---
 
-## Known iOS UI Test Issues
+## Known Issues
 
-### Bug 1 — App crash cascade (historical, files deleted)
+No known backend bugs. Previously-tracked Spinwheel + Coinbase bugs all fixed (PR #108, merged).
 
-**Status:** The UITest files that had this bug (`PetTabUITests.swift`, `ActivityTabUITests.swift`, etc.) were deleted from main when PR #102 was cleaned up. The root cause is documented here for future reference.
-
-**Root cause:** Calling `freshApp.launch()` on a new `XCUIApplication` with the same bundle ID kills the class-level app. After `freshApp.terminate()`, the class-level app is dead — every subsequent test using it fails.
-
-**Fix when re-adding these tests:** After `freshApp.terminate()` in the defer block, call `Self.app.launch()` to re-launch the class-level app.
-
-### Bug 2 — Debt/Settings tabs not found (21 tests) — ✅ FIXED in PR #103
-
-**Root cause:** iOS tab bar shows only 4 tabs + a "More" button when there are 5+ tabs. With 6 tabs, Debt (tab 5) and Settings (tab 6) were hidden.
-
-**Fix:** PR #103 collapses to 3 tabs. Debt is now a section in the Wealth tab. Settings is a gear-button sheet on the Pet tab.
+**iOS gap:** `NetWorthResponse` Swift model is behind the backend. Backend returns `realEstate`, `vehicles`, `metals`, `kraken`, `snaptrade`, `ynab`, `sneakers` (and soon `vinyl`, `kalshi`) — none of these fields are decoded by the iOS model, and none have sections in `NetWorthView`. This is the primary iOS work item for next session.
 
 ---
 
 ## What Has NOT Been Done
 
-### iOS
+### iOS — Primary Gap (next work item)
+
+The Wealth tab model and view are behind the backend. The following integrations are live in `GET /api/net-worth` but not rendered in iOS:
+
+| Integration | Backend field | iOS status |
+|---|---|---|
+| Investments (Plaid holdings) | `investments` | Model has field, no section in view |
+| Real estate | `realEstate` | Not in model, no section |
+| Vehicles | `vehicles` | Not in model, no section |
+| Metals | `metals` | Not in model, no section |
+| Kraken | `kraken` | Not in model, no section |
+| SnapTrade | `snaptrade` | Not in model, no section |
+| YNAB | `ynab` | Not in model, no section |
+| Sneakers | `sneakers` | Not in model, no section |
+| Vinyl (Discogs) | `vinyl` (pending PR #138) | Not in model, no section |
+| Kalshi | `kalshi` (pending PR #139) | Not in model, no section |
+
+Fix: update `NetWorthResponse` + `NetWorthConnections` in `ios/Coiny/Services/API+Performance.swift`, add sections to `NetWorthView.swift`. Pattern is already established — each section is a `GroupBox` with a `sectionHeader` + connect/sync inline flow.
+
+### iOS — Other Missing
 
 - ❌ Metal-rendered sprite animations at 120fps (currently SF Symbols placeholders)
 - ❌ Widgets (home screen, lock screen, StandBy)
-- ❌ Live Activities + Dynamic Island (paycheck celebration in notification banner)
+- ❌ Live Activities + Dynamic Island
 - ❌ Apple Watch companion app
 - ❌ Pet customization (species selection, commissioned art)
 - ❌ Sound packs
-- ❌ Cash flow forecast UI
-- ❌ SwiftData local persistence (all state is fetched live from backend)
+- ❌ Cash flow forecast UI (`GET /api/spending/summary` exists on backend)
+- ❌ SwiftData local persistence (all state fetched live)
 
 ### Backend
 
-- ❌ Credit score endpoint (Spinwheel has it; we only call `getDebtProfile` today)
-- ❌ `GET /api/spending/summary` — savings rate, income total, category breakdown
-- ❌ Emergency fund calculation (liquid cash ÷ monthly burn)
-- ❌ Credit utilization % in debt response
-- ❌ Go rewrite (target is `docs/implementation-plan.md` M2)
-- ❌ AWS infrastructure (target is M1 — ECS Fargate + Aurora + CloudFront + WAF)
+- ❌ `GET /api/spending/summary` — savings rate, income total, category breakdown (transactions exist, endpoint not built)
+- ❌ Go rewrite (deferred)
+- ❌ AWS infrastructure (ECS Fargate + Aurora + CloudFront + WAF)
 - ❌ Datadog observability
-- ❌ WorkOS authentication (currently Apple Sign In only)
+- ❌ WorkOS authentication (Apple Sign In only today)
 - ❌ Audit logging (`audit_log` table)
-- ❌ LaunchDarkly feature flags
 
 ### Integrations
 
-- ✅ Plaid sandbox — `sandboxPublicTokenCreate` + `investmentsHoldingsGet` + `liabilitiesGet` (3/3 pass)
-- ✅ Zerion — `getPortfolio` + `getTransactions` against Vitalik's wallet (2/2 pass). No sandbox — Zerion has none; Vitalik's public wallet is the standard test approach.
-- ✅ Coinbase — Advanced Trade sandbox (`api-sandbox.coinbase.com`) validates endpoint shape. Auth path untested (sandbox ignores JWT). No official TS SDK for Advanced Trade — hand-rolled client is correct.
-- ⚠️ Spinwheel — test written; **needs `SPINWHEEL_TEST_PHONE`**. Also has two production bugs (see Known Integration Bugs above).
-- ❌ CoinGecko — **removed entirely** (PR #107). Replaced with Coinbase public spot price API.
+- ✅ Plaid sandbox — 3/3 endpoints pass
+- ✅ Zerion — Vitalik's wallet used for testing (no sandbox)
+- ✅ Coinbase — Advanced Trade sandbox validates shape
+- ✅ Spinwheel — sandbox exists; integration tests in `tests/integration/`
+- ✅ Chain wallets — 9 chains live, 3 keyed (Polkadot/Cardano/TON) need API keys from Antoine
+- ⏳ KicksDB — needs `KICKSDB_API_KEY` from kicks.dev (backend live, key optional — returns 402 without it)
+- ⏳ RentCast — needs `RENTCAST_API_KEY` (real estate AVM)
+- ⏳ MarketCheck — needs `MARKETCHECK_API_KEY` (vehicle values)
+- ⏳ GoldAPI — needs `GOLDAPI_API_KEY` (metals pricing)
+- ⏳ Helius — needs signup at `helius.dev` (Solana staking)
+- ⏳ Alchemy — needs signup at `alchemy.com` (NFTs)
 
 Run integration tests: `source bin/load-secrets.sh && INTEGRATION_TEST=1 pnpm --filter coiny-backend test tests/integration/`
 
 ### Hardware & Firmware
 
-- ❌ Firmware project not initialized (`firmware/` is empty scaffold)
+- ❌ Firmware not started (`firmware/` is empty scaffold)
 - ❌ BLE scanning / pairing / relay
-- ❌ Hardware prototyping (M5StickS3 + DRV2605L ordered 2026-05-19, ETA ~2026-05-26)
+- ❌ Hardware: M5StickS3 + DRV2605L (ordered 2026-05-19, arrived ~2026-05-26)
 - ❌ Custom PCB (nRF54L15 + Sharp Memory LCD + LRA + APA102 + MAX77654)
 
 ### Business / Legal
 
-- ❌ App ID registration — **blocks TestFlight** (see below)
+- ❌ App ID registration — **blocks TestFlight** (see below — 10-minute step)
 - ❌ LLC formation — needed before Plaid production + Apple Developer Org account
 - ❌ Plaid production access — apply after sandbox validated end-to-end
 - ❌ GLBA compliance review
 
 ---
 
-## Next Session — Four Workstreams
+## Next Session
 
-Execute in order: **A → B → C → D**. C and D can be parallelized once A+B are done.
+### Priority 1 — Surface all integrations in iOS (`feat/ios-wealth-expansion`)
 
----
-
-### Workstream A — UI Reform ✅ IN PR
-
-**Branch:** `feat/ui-reform`  
-**PR:** [#103](https://github.com/pamplemousse-glitch/Coiny/pull/103) — open, build compiles clean, awaiting test run + merge
-
-**PR title:** `feat(ios): reform tab structure from 6 to 3 tabs`
-
-**Why:** iOS tab bar on iPhone hides tabs 5+ behind a "More" button. The current 6-tab layout makes Debt and Settings unreachable. All financial data belongs in one Wealth view — this is how Mint, Monarch, and Copilot organize it. Net worth = assets (bank + investments + crypto + DeFi) minus liabilities (debt).
-
-**New tab structure:**
-1. **Pet** — pet face, health/mood bars, last reaction card, fire-transaction debug button. Navigation bar has a gear (⚙) button that presents SettingsView as a `.sheet`.
-2. **Activity** — reaction history feed. Unchanged.
-3. **Wealth** — net worth total at top (green/red). Sections: Bank Accounts (Plaid), Investments (Plaid), Crypto (Coinbase), DeFi Wallets (Zerion), Liabilities (Spinwheel debt + credit score). Each section shows "Connect" prompt if not linked, with connect flow as a modal sheet.
+The Wealth tab model and view are behind the backend. One PR covers all of it:
 
 **Files to change:**
-- `ios/Coiny/Views/RootView.swift` — 3 tabs only; add `.toolbar` gear button on Pet tab
-- `ios/Coiny/Views/NetWorthView.swift` — add Coinbase, Zerion, and Spinwheel sections
-- `ios/Coiny/ViewModels/NetWorthViewModel.swift` — absorb CoinbaseViewModel, ZerionViewModel, SpinwheelViewModel state (or inject them as environment objects)
-- `ios/Coiny/Views/CryptoView.swift`, `SpinwheelView.swift` — demote from tabs to reusable sub-views embedded in NetWorthView
-- `ios/CoinyUITests/TabNavigationTests.swift` — rewrite for 3 tabs
-- `ios/CoinyUITests/DebtAndSettingsUITests.swift` — rewrite: Spinwheel tests navigate via Wealth tab; Settings tests navigate via gear sheet
-- All other UITest launch helpers that call `buttons["Debt"]` or `buttons["Settings"]` — update to new navigation paths
+- `ios/Coiny/Services/API+Performance.swift` — add missing fields to `NetWorthResponse` and `NetWorthConnections`
+- `ios/Coiny/Views/NetWorthView.swift` — add `investmentsSection`, `realEstateSection`, `vehiclesSection`, `metalsSection`, `krakenSection`, `snaptradeSection`, `ynabSection`, `sneakersSection`, `vinylSection`, `kalshiSection`
+- `ios/CoinyTests/NetWorthViewModelTests.swift` — update decode tests for new fields
 
-**GitHub moves:**
-```bash
-git checkout main && git pull
-git checkout -b feat/ui-reform
-# ... make changes ...
-git add ios/Coiny/Views/RootView.swift ios/Coiny/Views/NetWorthView.swift \
-        ios/Coiny/ViewModels/NetWorthViewModel.swift \
-        ios/Coiny/Views/CryptoView.swift ios/Coiny/Views/SpinwheelView.swift \
-        ios/CoinyUITests/TabNavigationTests.swift \
-        ios/CoinyUITests/DebtAndSettingsUITests.swift
-git commit -m "feat(ios): collapse to 3-tab UI — Wealth absorbs Crypto + Debt, Settings as sheet"
-gh pr create --title "feat(ios): collapse to 3-tab UI — Wealth absorbs Crypto + Debt, Settings as sheet"
-# Also close the superseded PR:
-gh pr close 102 --comment "Superseded by feat/ui-reform — tab structure is being redesigned"
-```
+**Pattern for each new section** (all follow the same GroupBox structure already used by chainWalletsSection):
+- If connected and value > 0: show total + "Sync" button
+- If not connected: show "Connect" prompt with deep-link or in-sheet flow
+- Manual-entry assets (real estate, vehicles, metals, sneakers): show list + "Add" button → POST to `/api/{asset}`
 
----
-
-### Workstream B — Fix UI Test Bugs
-
-**Branch:** `fix/ios-uitest-bugs` (branch off `feat/ui-reform` after it merges, or include in the same PR)
-**PR title:** `fix(ios): fix app crash cascade in PetTab + ActivityTab UITests`
-
-**Bug 1 fix — re-launch class-level app after freshApp.terminate():**
-
-In `PetTabUITests.swift`, `testPetTabFireTransactionButtonTappable` and `testPetTabShowsWaitingViewWhenNoHistory` both call `freshApp.launch()`. Add this to their `defer` blocks:
-
+**New fields to add to `NetWorthResponse`:**
 ```swift
-defer {
-    freshApp.terminate()
-    // freshApp.launch() killed the class-level app (same bundle ID).
-    // Re-launch it so subsequent tests in this class are not orphaned.
-    Self.app.launch()
-    _ = Self.app.tabBars.firstMatch.waitForExistence(timeout: 20)
-}
+let investments: Double      // already in model, just needs a section
+let realEstate: Double
+let vehicles: Double
+let metals: Double
+let kraken: Double
+let snaptrade: Double
+let ynab: Double
+let sneakers: Double
+let vinyl: Double            // after PR #138 merges
+let kalshi: Double           // after PR #139 merges
 ```
 
-Same fix in `ActivityTabUITests.swift` for `testActivityTabShowsProgressViewWhilePetNil` and `testActivityTabShowsReactionWhenHistoryNonEmpty`.
-
-**Bug 2** is resolved by Workstream A (tab restructure eliminates the unreachable tabs).
-
-**Verify after each fix:**
-```bash
-cd /Users/antoinewiley/Tamogatchi/ios && xcodegen generate
-xcrun simctl boot A445C692-84CF-4D18-9CE1-ADD92174D731 2>/dev/null || true
-xcrun simctl bootstatus A445C692-84CF-4D18-9CE1-ADD92174D731
-rm -rf /tmp/coiny-ui.xcresult
-xcodebuild test \
-  -scheme Coiny \
-  -project /Users/antoinewiley/Tamogatchi/ios/Coiny.xcodeproj \
-  -destination 'platform=iOS Simulator,id=A445C692-84CF-4D18-9CE1-ADD92174D731' \
-  -only-testing:CoinyUITests \
-  -resultBundlePath /tmp/coiny-ui.xcresult \
-  2>&1 | xcbeautify
+**New fields to add to `NetWorthConnections`:**
+```swift
+let kraken: Bool
+let snaptrade: Bool
+let ynab: Bool
+let kalshi: Bool
 ```
 
-**Target:** 54/54 UI tests pass. Also run unit tests to confirm no regressions:
-```bash
-rm -rf /tmp/coiny-unit.xcresult
-xcodebuild test \
-  -scheme Coiny \
-  -project /Users/antoinewiley/Tamogatchi/ios/Coiny.xcodeproj \
-  -destination 'platform=iOS Simulator,id=A445C692-84CF-4D18-9CE1-ADD92174D731' \
-  -only-testing:CoinyTests \
-  -resultBundlePath /tmp/coiny-unit.xcresult \
-  2>&1 | xcbeautify
-```
-
-**GitHub moves:**
-```bash
-git add ios/CoinyUITests/PetTabUITests.swift ios/CoinyUITests/ActivityTabUITests.swift
-git commit -m "fix(ios): re-launch class-level app after freshApp.terminate() in UITests"
-gh pr create --title "fix(ios): fix app crash cascade in PetTab + ActivityTab UITests"
-```
+Connect/sync API endpoints already exist for all of these. Use `API.swift` pattern already established for Coinbase/Zerion/Kraken.
 
 ---
 
-### Workstream C — New Financial Metrics
+### Priority 2 — TestFlight (Antoine, 10 minutes)
 
-**Branch:** `feat/financial-metrics`
-**PR title:** `feat: add credit score, credit utilization, savings rate, emergency fund`
-
-All use existing vendor connections. No new vendors, no new credentials, no new Plaid products.
-
-#### C1 — Credit Score (ref: `docs/spinwheel-catalog.md`)
-
-- **Backend:** Add `GET /api/spinwheel/credit-score` → call Spinwheel credit score endpoint for the connected user's `spinwheelUserId`
-- **iOS:** Add credit score display to Wealth tab Liabilities section
-- **Pet reaction:** Score drops since last check → worried; score up → celebrate
-- **Test:** Vitest test for the new endpoint (mocked Spinwheel response)
-
-#### C2 — Credit Utilization % (ref: `docs/spinwheel-catalog.md`)
-
-- **Backend:** Spinwheel `getDebtProfile` already returns `balance` and `creditLimit` per credit card. Compute `creditUtilizationPct = totalCCBalance / totalCCLimit * 100` and include in `/api/spinwheel/debts` response.
-- **iOS:** Show utilization % bar in Wealth → Liabilities section
-- **Pet reaction:** Utilization crosses 30% threshold → nervous animation; drops below 10% → happy
-
-#### C3 — Savings Rate (ref: `docs/plaid-catalog.md`, `docs/plaid-integration.md`)
-
-- **Backend:** Add `GET /api/spending/summary` — scans last 30 days of transactions, computes income total (transactions categorized as `paycheck` or `income`), spend total, savings rate `(income - spend) / income * 100`, and top spend categories
-- **iOS:** Summary card in Activity tab header
-- **Pet reaction:** Month ends with negative savings rate → sad; three consecutive positive months → proud
-
-#### C4 — Emergency Fund Coverage (ref: `docs/plaid-catalog.md`)
-
-- **Backend:** Add `liquidCashMonths` to `GET /api/net-worth` response — sum of depository account balances divided by average monthly spend (from last 3 months of transactions)
-- **iOS:** "X months runway" label in Wealth → Bank Accounts section
-- **Pet reaction:** < 1 month → stressed; ≥ 6 months → secure/proud
-
-**UI tests required (write alongside the code — not after):** Each new metric needs a `CoinyUITests` test that stubs the relevant endpoint via `MOCK_STUBS` and asserts the value appears in the Wealth or Activity tab. Add these to the same PR as the backend + iOS changes.
-
-**GitHub moves:**
-```bash
-git checkout main && git pull
-git checkout -b feat/financial-metrics
-# ... backend changes ...
-git add backend/src/api/spinwheel.ts backend/src/api/net-worth.ts \
-        backend/src/spinwheel/client.ts backend/tests/
-git commit -m "feat(backend): add credit score, credit utilization, savings rate, emergency fund endpoints"
-# ... iOS changes ...
-git add ios/Coiny/Views/NetWorthView.swift ios/Coiny/ViewModels/NetWorthViewModel.swift \
-        ios/Coiny/Views/ ios/CoinyTests/
-git commit -m "feat(ios): surface credit score, utilization, savings rate, emergency fund in Wealth"
-gh pr create --title "feat: add credit score, credit utilization, savings rate, emergency fund"
-```
+App ID registration in Apple Developer Portal — see TestFlight section below. Unblocks distribution to Jack for first human test.
 
 ---
 
-### Workstream D — Integration Testing
+### Priority 3 — Next backend integrations (Sprint G)
 
-**Branch:** `test/integration-vendors`
-**PR title:** `test: vendor integration tests — Plaid, Spinwheel, Zerion, CoinGecko`
-
-Goal: prove each vendor connection works against its real sandbox/live environment. All tests are Vitest, live in `backend/tests/integration/`.
-
-#### D1 — Plaid (ref: `docs/plaid-integration.md`, `docs/plaid-catalog.md`)
-
-- Transactions E2E already proven (PR #101). Remaining gaps:
-  - Does `investmentsHoldingsGet` return data for a sandbox Item? (sandbox bank `user_good/pass_good` may have mock holdings)
-  - Does `liabilitiesGet` return credit card data for sandbox user?
-- Write two Vitest tests: link a sandbox item → call each endpoint → assert shape of response
-- Sandbox: `user_good` / `pass_good`, any sandbox institution
-
-#### D2 — Spinwheel (ref: `docs/spinwheel-catalog.md`)
-
-- Sandbox base URL: `https://sandbox-api.spinwheel.io`
-- Test users: **Christy Jenoval** (DOB `1967-06-08`), **Aldo Cherry** (DOB `1990-01-01`)
-- Get sandbox API key: register at developer.spinwheel.io → store in Keychain as `coiny-spinwheel-sandbox-key`
-- Write Vitest integration test: `sendSmsOtp` → `verifySmsOtp` → `getDebtProfile` → `getUser` (credit score) → `deleteUser`
-- Assert: debt profile returns at least one liability for the test user
-
-#### D3 — Coinbase (ref: `docs/coinbase-catalog.md`)
-
-- No sandbox — dev key hits a real Coinbase account
-- Manual smoke test only: `source bin/load-secrets.sh && curl -s localhost:3000/api/coinbase/status` (requires Coinbase dev key in Keychain)
-- Write a Vitest test for `getAccounts()` that skips if `COINBASE_API_KEY_ID` is not set (`it.skipIf(...)`)
-
-#### D4 — Zerion (ref: `docs/zerion-catalog.md`)
-
-- No sandbox — dev key hits live chain data
-- Known public wallet for testing: `0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045` (vitalik.eth — publicly known, stable non-zero balance)
-- Write Vitest test: `getPortfolio(vitalikAddress)` → assert `total_usd > 0`
-- Skip if `ZERION_API_KEY` not set
-
-**GitHub moves:**
-```bash
-git checkout main && git pull
-git checkout -b test/integration-vendors
-# ... write tests in backend/tests/integration/ ...
-git add backend/tests/integration/
-git commit -m "test(backend): vendor integration tests — Plaid investments/liabilities, Spinwheel, Zerion, CoinGecko"
-gh pr create --title "test: vendor integration tests — Plaid, Spinwheel, Zerion, CoinGecko"
-```
+See `docs/net-worth-coverage-plan.md` § Medium Priority. Highest-value next targets: WatchCharts (watches), SportsCardsPro (graded cards), CS2/Steam skins, Yahoo Fantasy Sports.
 
 ---
 
