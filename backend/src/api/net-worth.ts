@@ -11,6 +11,7 @@ import {
   petState,
   realEstateAssets,
   snaptradeConnections,
+  sneakerHoldings,
   spinwheelConnections,
   vehicleAssets,
   ynabConnections,
@@ -274,6 +275,17 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // table not yet populated
     }
 
+    // --- Sneakers (KicksDB-priced) ---
+    let sneakersTotal = 0;
+    try {
+      const rows = await db().select().from(sneakerHoldings).where(eq(sneakerHoldings.userId, userId));
+      for (const r of rows) {
+        if (r.lastPriceUsd !== null) sneakersTotal += parseFloat(r.lastPriceUsd) * r.quantity;
+      }
+    } catch {
+      // table not yet populated
+    }
+
     // --- YNAB budgets (pre-synced total) ---
     let ynabTotal = 0;
     let ynabConnected = false;
@@ -350,6 +362,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       realEstateTotal +
       vehiclesTotal +
       metalsTotal +
+      sneakersTotal +
       snaptradeTotal +
       ynabTotal -
       debtsTotal;
@@ -404,6 +417,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       realEstate: realEstateTotal,
       vehicles: vehiclesTotal,
       metals: metalsTotal,
+      sneakers: sneakersTotal,
       kraken: krakenTotal,
       snaptrade: snaptradeTotal,
       ynab: ynabTotal,
