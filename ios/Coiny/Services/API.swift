@@ -395,34 +395,6 @@ extension API {
     }
 }
 
-#if DEBUG
-// MARK: - Debug API
-extension API {
-    @discardableResult
-    func fireTestTransaction() async throws -> EmptyResponse {
-        try await post("/api/debug/fire-transaction")
-    }
-
-    func debugTransactions() async throws -> DebugTransactionsResponse {
-        try await get("/api/debug/transactions")
-    }
-
-    @discardableResult
-    func resetCursor() async throws -> ResetCursorResponse {
-        try await post("/api/debug/reset-cursor")
-    }
-
-    func injectDebugSession() async throws {
-        struct DebugSessionResponse: Decodable { let token: String }
-        let response: DebugSessionResponse = try await request(
-            method: "POST", path: "/api/debug/session",
-            body: Optional<String>.none, requiresAuth: false
-        )
-        sessionToken = response.token
-    }
-}
-#endif
-
 // MARK: - DTOs
 
 struct Empty: Encodable {}
