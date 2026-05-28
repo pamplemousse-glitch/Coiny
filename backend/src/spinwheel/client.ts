@@ -127,11 +127,10 @@ export const SpinwheelDebtSchema = z.object({
 
 export type SpinwheelDebt = z.infer<typeof SpinwheelDebtSchema>;
 
-// Spinwheel docs require these fields in every debtProfile request body.
+// Spinwheel docs require nested creditReport + creditScore objects in the debtProfile body.
 const DEBT_PROFILE_BODY = {
-  creditReportType: '1_BUREAU.FULL',
-  sourceBureau: 'Equifax',
-  creditScoreModel: 'VANTAGE_SCORE_3_0',
+  creditReport: { type: '1_BUREAU.FULL', sourceBureau: 'Equifax' },
+  creditScore: { model: 'VANTAGE_SCORE_3_0', sourceBureau: 'Equifax' },
 } as const;
 
 const DEBT_LIABILITY_KEYS = [
@@ -210,7 +209,18 @@ export async function subscribeMonthly(spinwheelUserId: string): Promise<void> {
   const schema = envelopeSchema(z.object({}).passthrough());
   await spinwheelPost(
     `/v1/users/${encodeURIComponent(spinwheelUserId)}/subscriptions`,
-    { type: 'CREDIT_PROFILE', frequency: 'MONTHLY' },
+    {
+      subscriptions: [
+        {
+          subscriptionType: 'DEBT_PROFILE.REFRESH',
+          configuration: {
+            refreshFrequency: 'MONTHLY',
+            creditReport: { type: '1_BUREAU.FULL', sourceBureau: 'Equifax' },
+            creditScore: { model: 'VANTAGE_SCORE_3_0', sourceBureau: 'Equifax' },
+          },
+        },
+      ],
+    },
     schema,
   );
 }
