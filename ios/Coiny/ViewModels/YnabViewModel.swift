@@ -39,9 +39,13 @@ extension API: YnabViewModelAPI {}
 
             let callback = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<URL, Error>) in
                 let session = ASWebAuthenticationSession(url: url, callbackURLScheme: "coiny") { cbURL, err in
-                    if let err { cont.resume(throwing: err) }
-                    else if let cbURL { cont.resume(returning: cbURL) }
-                    else { cont.resume(throwing: URLError(.cancelled)) }
+                    if let err {
+                        cont.resume(throwing: err)
+                    } else if let cbURL {
+                        cont.resume(returning: cbURL)
+                    } else {
+                        cont.resume(throwing: URLError(.cancelled))
+                    }
                 }
                 session.presentationContextProvider = presentationProvider
                 session.prefersEphemeralWebBrowserSession = false
