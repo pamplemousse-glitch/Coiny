@@ -13,8 +13,10 @@ export class BlockcypherError extends Error {
   }
 }
 
+// `balance` = confirmed satoshis only; `final_balance` also includes unconfirmed.
+// Use `balance` for net worth to avoid counting pending inbound transactions.
 const BalanceSchema = z.object({
-  final_balance: z.number(),
+  balance: z.number(),
 });
 
 const CHAIN_PATHS: Record<string, string> = {
@@ -38,5 +40,5 @@ export async function getBlockcypherBalance(chain: string, address: string): Pro
   const parsed = BalanceSchema.safeParse(raw);
   if (!parsed.success) return 0;
 
-  return parsed.data.final_balance / 1e8;
+  return parsed.data.balance / 1e8;
 }

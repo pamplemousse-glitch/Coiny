@@ -19,7 +19,7 @@ describe('getBlockcypherBalance', () => {
   });
 
   it('returns DOGE balance converted from satoshis (÷ 1e8)', async () => {
-    vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ final_balance: 500_000_000 }));
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ balance: 500_000_000 }));
 
     const { getBlockcypherBalance } = await import('../src/chains/blockcypher.js');
     const balance = await getBlockcypherBalance('doge', 'DTestAddr');
@@ -27,7 +27,7 @@ describe('getBlockcypherBalance', () => {
   });
 
   it('fetches from correct BlockCypher URL for DOGE', async () => {
-    vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ final_balance: 0 }));
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ balance: 0 }));
 
     const { getBlockcypherBalance } = await import('../src/chains/blockcypher.js');
     await getBlockcypherBalance('doge', 'DMyAddr');
@@ -36,7 +36,7 @@ describe('getBlockcypherBalance', () => {
   });
 
   it('fetches from correct BlockCypher URL for LTC', async () => {
-    vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ final_balance: 0 }));
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ balance: 0 }));
 
     const { getBlockcypherBalance } = await import('../src/chains/blockcypher.js');
     await getBlockcypherBalance('ltc', 'LTestAddr');
@@ -45,7 +45,7 @@ describe('getBlockcypherBalance', () => {
   });
 
   it('fetches from correct BlockCypher URL for BCH', async () => {
-    vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ final_balance: 0 }));
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ balance: 0 }));
 
     const { getBlockcypherBalance } = await import('../src/chains/blockcypher.js');
     await getBlockcypherBalance('bch', 'qTestAddr');
