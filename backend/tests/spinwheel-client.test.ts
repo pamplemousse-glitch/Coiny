@@ -115,9 +115,8 @@ describe('spinwheel getDebtProfile', () => {
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
-          creditReportType: '1_BUREAU.FULL',
-          sourceBureau: 'Equifax',
-          creditScoreModel: 'VANTAGE_SCORE_3_0',
+          creditReport: { type: '1_BUREAU.FULL', sourceBureau: 'Equifax' },
+          creditScore: { model: 'VANTAGE_SCORE_3_0', sourceBureau: 'Equifax' },
         }),
       }),
     );
@@ -213,7 +212,18 @@ describe('spinwheel subscribeMonthly', () => {
       expect.stringContaining('/v1/users/sw-user-1/subscriptions'),
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ type: 'CREDIT_PROFILE', frequency: 'MONTHLY' }),
+        body: JSON.stringify({
+          subscriptions: [
+            {
+              subscriptionType: 'DEBT_PROFILE.REFRESH',
+              configuration: {
+                refreshFrequency: 'MONTHLY',
+                creditReport: { type: '1_BUREAU.FULL', sourceBureau: 'Equifax' },
+                creditScore: { model: 'VANTAGE_SCORE_3_0', sourceBureau: 'Equifax' },
+              },
+            },
+          ],
+        }),
       }),
     );
   });
