@@ -257,44 +257,6 @@ actor API {
         s.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? s
     }
 
-    // MARK: - Spending
-
-    func getSpendingSummary() async throws -> SpendingSummaryResponse {
-        try await get("/api/spending/summary")
-    }
-
-    func getSpendingOverrides() async throws -> [SpendingOverride] {
-        try await get("/api/spending/overrides")
-    }
-
-    @discardableResult
-    func setSpendingOverride(merchantName: String, category: String) async throws -> EmptyResponse {
-        struct Body: Encodable { let merchant_name: String; let category: String }
-        return try await put("/api/spending/overrides", body: Body(merchant_name: merchantName, category: category))
-    }
-
-    func deleteSpendingOverride(merchantName: String) async throws {
-        struct Body: Encodable { let merchant_name: String }
-        let _: EmptyResponse = try await request(
-            method: "DELETE",
-            path: "/api/spending/overrides",
-            body: Body(merchant_name: merchantName),
-            requiresAuth: true
-        )
-    }
-
-    // MARK: - Subscriptions
-
-    func getSubscriptions() async throws -> [DetectedSubscription] {
-        try await get("/api/subscriptions")
-    }
-
-    // MARK: - Net Worth
-
-    func getNetWorth() async throws -> NetWorthResponse {
-        try await get("/api/net-worth")
-    }
-
     // MARK: - Misc
 
     func health() async throws -> HealthResponse {
@@ -403,6 +365,41 @@ actor API {
         } catch {
             throw APIError.decode(underlying: error)
         }
+    }
+}
+
+// MARK: - Spending + Subscriptions + Net Worth
+extension API {
+    func getSpendingSummary() async throws -> SpendingSummaryResponse {
+        try await get("/api/spending/summary")
+    }
+
+    func getSpendingOverrides() async throws -> [SpendingOverride] {
+        try await get("/api/spending/overrides")
+    }
+
+    @discardableResult
+    func setSpendingOverride(merchantName: String, category: String) async throws -> EmptyResponse {
+        struct Body: Encodable { let merchant_name: String; let category: String }
+        return try await put("/api/spending/overrides", body: Body(merchant_name: merchantName, category: category))
+    }
+
+    func deleteSpendingOverride(merchantName: String) async throws {
+        struct Body: Encodable { let merchant_name: String }
+        let _: EmptyResponse = try await request(
+            method: "DELETE",
+            path: "/api/spending/overrides",
+            body: Body(merchant_name: merchantName),
+            requiresAuth: true
+        )
+    }
+
+    func getSubscriptions() async throws -> [DetectedSubscription] {
+        try await get("/api/subscriptions")
+    }
+
+    func getNetWorth() async throws -> NetWorthResponse {
+        try await get("/api/net-worth")
     }
 }
 
