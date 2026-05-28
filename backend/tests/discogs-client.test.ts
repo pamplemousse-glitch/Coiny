@@ -193,4 +193,22 @@ describe('syncCollection', () => {
     expect(result.pricedCount).toBe(0);
     expect(result.totalUsd).toBe(0);
   });
+
+  it('omits query params from Authorization header and includes them in base string only', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ releases: [] }),
+      });
+
+    await syncCollection('vinyl_fan', 'tok', 'sec');
+
+    const [collectionCallUrl, collectionCallInit] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(collectionCallUrl).toContain('?per_page=100&page=1');
+    const authHeader = (collectionCallInit.headers as Record<string, string>)['Authorization'];
+    // Authorization header must not leak query params — only oauth_* keys
+    expect(authHeader).toMatch(/^OAuth /);
+    expect(authHeader).not.toContain('per_page');
+    expect(authHeader).not.toContain('page=');
+  });
 });
