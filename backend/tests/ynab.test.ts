@@ -14,7 +14,7 @@ import { exchangeCodeForTokens, getAccounts, getBudgets, getTotalNetWorth } from
 const mockedGetBudgets = vi.mocked(getBudgets);
 const mockedGetAccounts = vi.mocked(getAccounts);
 const mockedGetTotalNetWorth = vi.mocked(getTotalNetWorth);
-const _mockedExchangeCodeForTokens = vi.mocked(exchangeCodeForTokens);
+const mockedExchangeCodeForTokens = vi.mocked(exchangeCodeForTokens);
 
 const fakeBudget = { id: 'budget-1', name: 'My Budget', currency_format: { iso_code: 'USD' } };
 const fakeAccount = {
@@ -117,6 +117,55 @@ describe('POST /api/ynab/connect/oauth/callback', () => {
       payload: { code: 'c', codeVerifier: 'v' },
     });
     expect(res.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it('stores tokens on successful exchange', async () => {
+    const fakeTokens = {
+      accessToken: 'access-abc',
+      refreshToken: 'refresh-xyz',
+      expiresAt: new Date(Date.now() + 7200 * 1000),
+    };
+    mockedExchangeCodeForTokens.mockResolvedValue(fakeTokens);
+
+    const { config } = await import('../src/config.js');
+    const cfg = config as unknown as Record<string, unknown>;
+    const orig = cfg.YNAB_CLIENT_ID;
+    cfg.YNAB_CLIENT_ID = 'test-client-id';
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/ynab/connect/oauth/callback',
+      headers: authHeader(),
+      payload: { code: 'auth-code', codeVerifier: 'verifier123' },
+    });
+    cfg.YNAB_CLIENT_ID = orig;
+    expect(res.statusCode).toBe(200);
+    expect(res.json<{ ok: boolean }>().ok).toBe(true);
+    await app.close();
+  });
+});
+
+describe('GET /api/ynab/budgets (legacy PAT)', () => {
+  beforeEach(async () => {
+    vi.resetAllMocks();
+    await resetDatabase();
+  });
+
+  it('uses legacy apiKey when accessToken is absent', async () => {
+    mockedGetBudgets.mockResolvedValue([fakeBudget]);
+    const { db } = await import('../src/db/client.js');
+    const { ynabConnections } = await import('../src/db/schema.js');
+    await db().insert(ynabConnections).values({ userId: testUserId, apiKey: 'legacy-pat' });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/ynab/budgets', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+    expect(mockedGetBudgets).toHaveBeenCalledWith('legacy-pat');
     await app.close();
   });
 });
