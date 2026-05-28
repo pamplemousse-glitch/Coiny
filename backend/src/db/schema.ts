@@ -262,12 +262,16 @@ export const snaptradeConnections = pgTable('snaptrade_connections', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-// YNAB connections — one per user; apiKey is AES-256-GCM encrypted personal access token.
+// YNAB connections — one per user. Migrated to OAuth 2.0 PKCE; apiKey kept nullable for legacy PAT users.
+// accessToken / refreshToken are AES-256-GCM encrypted. tokenExpiresAt drives auto-refresh (5-min buffer).
 export const ynabConnections = pgTable('ynab_connections', {
   userId: text('user_id')
     .primaryKey()
     .references(() => users.id, { onDelete: 'cascade' }),
-  apiKey: text('api_key').notNull(),
+  apiKey: text('api_key'), // legacy personal access token (nullable after OAuth migration)
+  accessToken: text('access_token'), // AES-256-GCM encrypted OAuth access token
+  refreshToken: text('refresh_token'), // AES-256-GCM encrypted OAuth refresh token
+  tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true }),
   lastNetWorthUsd: numeric('last_net_worth_usd'),
   lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -285,6 +289,77 @@ export const krakenConnections = pgTable('kraken_connections', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Discogs connections — one per user; accessToken and accessTokenSecret are AES-256-GCM encrypted.
+export const discogsConnections = pgTable('discogs_connections', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  username: text('username').notNull(),
+  accessToken: text('access_token').notNull(), // encrypted
+  accessTokenSecret: text('access_token_secret').notNull(), // encrypted
+  lastCollectionUsd: numeric('last_collection_usd'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Kalshi prediction market connections — one per user; privateKeyBase64 is AES-256-GCM encrypted.
+export const kalshiConnections = pgTable('kalshi_connections', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  keyId: text('key_id').notNull(),
+  privateKeyBase64: text('private_key_base64').notNull(), // encrypted
+  lastPortfolioUsd: numeric('last_portfolio_usd'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Temporary storage for the Discogs OAuth request token secret while awaiting user authorization.
+export const discogsPending = pgTable('discogs_pending', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  oauthToken: text('oauth_token').notNull(),
+  oauthTokenSecret: text('oauth_token_secret').notNull(), // encrypted
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Plaid recurring streams — upserted on RECURRING_TRANSACTIONS_UPDATE webhook.
+export const plaidRecurringStreams = pgTable('plaid_recurring_streams', {
+  streamId: text('stream_id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  accountId: text('account_id').notNull(),
+  direction: text('direction').notNull(), // 'inflow' | 'outflow'
+  merchantName: text('merchant_name'),
+  description: text('description').notNull(),
+  frequency: text('frequency').notNull(),
+  averageAmount: numeric('average_amount'),
+  lastAmount: numeric('last_amount'),
+  lastDate: text('last_date'),
+  isActive: boolean('is_active').notNull().default(true),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Plaid liability cache — upserted on LIABILITIES/DEFAULT_UPDATE webhook.
+// Net-worth reads from here instead of making a live Plaid call on every request.
+export const plaidLiabilityCache = pgTable('plaid_liability_cache', {
+  accountId: text('account_id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  accountType: text('account_type').notNull(), // 'credit' | 'mortgage' | 'student'
+  minPayment: numeric('min_payment'),
+  nextDueDate: text('next_due_date'),
+  lastStatementBalance: numeric('last_statement_balance'),
+  isOverdue: boolean('is_overdue'),
+  primaryApr: numeric('primary_apr'),
+  expectedPayoffDate: text('expected_payoff_date'),
+  repaymentPlanType: text('repayment_plan_type'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Temporary storage for the Spinwheel userId returned by the SMS OTP send step.
 // Needed because the verify call requires the spinwheelUserId in the URL path.
 // Cleared on successful verify or replaced on new OTP request.
@@ -293,5 +368,22 @@ export const spinwheelPending = pgTable('spinwheel_pending', {
     .primaryKey()
     .references(() => users.id, { onDelete: 'cascade' }),
   spinwheelUserId: text('spinwheel_user_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Sneaker holdings — valued via KicksDB (StockX + GOAT pricing).
+// SKU identifies the model (e.g. "DZ5485-612"). Size is optional — if set,
+// sync will fetch the specific size's lowest ask; otherwise uses the product min_price.
+export const sneakerHoldings = pgTable('sneaker_holdings', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  sku: text('sku').notNull(),
+  description: text('description'),
+  size: text('size'),
+  quantity: integer('quantity').notNull().default(1),
+  lastPriceUsd: numeric('last_price_usd'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

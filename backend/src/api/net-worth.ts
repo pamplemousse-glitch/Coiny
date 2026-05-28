@@ -5,12 +5,15 @@ import { db } from '../db/client.js';
 import {
   chainWallets,
   coinbaseConnections,
+  discogsConnections,
   hyperliquidAccounts,
+  kalshiConnections,
   krakenConnections,
   metalHoldings,
   petState,
   realEstateAssets,
   snaptradeConnections,
+  sneakerHoldings,
   spinwheelConnections,
   vehicleAssets,
   ynabConnections,
@@ -22,6 +25,7 @@ import { evaluateExternalEvent } from '../reactions/external.js';
 import { getDebtProfile } from '../spinwheel/client.js';
 import { getItemsByUser } from '../store/items.js';
 import { recordReaction } from '../store/pet.js';
+import { getCachedLiabilities } from '../store/plaid-liabilities.js';
 import { getRecentOutflows } from '../store/transactions.js';
 import { getPortfolio } from '../zerion/client.js';
 
@@ -50,6 +54,8 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       balance: number;
       minPayment: number | null;
       nextDueDate: string | null;
+      isOverdue: boolean | null;
+      primaryApr: number | null;
     }> = [];
     const investmentHoldings: Array<{
       securityId: string;
@@ -61,34 +67,61 @@ export function registerNetWorthApi(app: FastifyInstance): void {
     try {
       const items = await getItemsByUser(userId);
 
-      // Fetch balances, investment holdings, and liability details in parallel per item.
-      const [balanceResults, holdingsResults, liabilityResults] = await Promise.all([
+      // Fetch balances and investment holdings in parallel; liabilities read from cache.
+      const [balanceResults, holdingsResults] = await Promise.all([
         Promise.allSettled(items.map((item) => accountsBalanceGet(item.accessToken))),
         Promise.allSettled(items.map((item) => investmentsHoldingsGet(item.accessToken))),
-        Promise.allSettled(items.map((item) => liabilitiesGet(item.accessToken))),
       ]);
 
-      // Build liability payment metadata map: accountId → { minPayment, nextDueDate }
-      const liabilityMeta = new Map<string, { minPayment: number | null; nextDueDate: string | null }>();
-      for (const res of liabilityResults) {
-        if (res.status === 'rejected') continue;
-        for (const c of res.value.liabilities.credit ?? []) {
-          liabilityMeta.set(c.account_id, {
-            minPayment: c.minimum_payment_amount,
-            nextDueDate: c.next_payment_due_date,
+      // Build liability payment metadata map from cache; fall back to live API if cache is empty.
+      type LiabilityMeta = {
+        minPayment: number | null;
+        nextDueDate: string | null;
+        isOverdue: boolean | null;
+        primaryApr: number | null;
+      };
+      const liabilityMeta = new Map<string, LiabilityMeta>();
+
+      const cachedRows = await getCachedLiabilities(userId);
+      if (cachedRows.length > 0) {
+        for (const row of cachedRows) {
+          liabilityMeta.set(row.accountId, {
+            minPayment: row.minPayment != null ? parseFloat(row.minPayment) : null,
+            nextDueDate: row.nextDueDate ?? null,
+            isOverdue: row.isOverdue ?? null,
+            primaryApr: row.primaryApr != null ? parseFloat(row.primaryApr) : null,
           });
         }
-        for (const m of res.value.liabilities.mortgage ?? []) {
-          liabilityMeta.set(m.account_id, {
-            minPayment: m.next_monthly_payment,
-            nextDueDate: m.next_payment_due_date,
-          });
-        }
-        for (const s of res.value.liabilities.student ?? []) {
-          liabilityMeta.set(s.account_id, {
-            minPayment: s.minimum_payment_amount,
-            nextDueDate: s.next_payment_due_date,
-          });
+      } else {
+        // Cache empty — fall back to live Plaid calls.
+        const liabilityResults = await Promise.allSettled(items.map((item) => liabilitiesGet(item.accessToken)));
+        for (const res of liabilityResults) {
+          if (res.status === 'rejected') continue;
+          for (const c of res.value.liabilities.credit ?? []) {
+            const purchaseApr = c.aprs?.find((a) => a.apr_type === 'purchase_apr') ?? c.aprs?.[0] ?? null;
+            liabilityMeta.set(c.account_id, {
+              minPayment: c.minimum_payment_amount,
+              nextDueDate: c.next_payment_due_date,
+              isOverdue: c.is_overdue ?? null,
+              primaryApr: purchaseApr?.apr_percentage ?? null,
+            });
+          }
+          for (const m of res.value.liabilities.mortgage ?? []) {
+            liabilityMeta.set(m.account_id, {
+              minPayment: m.next_monthly_payment,
+              nextDueDate: m.next_payment_due_date,
+              isOverdue: null,
+              primaryApr: null,
+            });
+          }
+          for (const s of res.value.liabilities.student ?? []) {
+            liabilityMeta.set(s.account_id, {
+              minPayment: s.minimum_payment_amount,
+              nextDueDate: s.next_payment_due_date,
+              isOverdue: null,
+              primaryApr: null,
+            });
+          }
         }
       }
 
@@ -112,6 +145,8 @@ export function registerNetWorthApi(app: FastifyInstance): void {
             balance,
             minPayment: meta?.minPayment ?? null,
             nextDueDate: meta?.nextDueDate ?? null,
+            isOverdue: meta?.isOverdue ?? null,
+            primaryApr: meta?.primaryApr ?? null,
           });
         }
       }
@@ -242,6 +277,17 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // table not yet populated
     }
 
+    // --- Sneakers (KicksDB-priced) ---
+    let sneakersTotal = 0;
+    try {
+      const rows = await db().select().from(sneakerHoldings).where(eq(sneakerHoldings.userId, userId));
+      for (const r of rows) {
+        if (r.lastPriceUsd !== null) sneakersTotal += parseFloat(r.lastPriceUsd) * r.quantity;
+      }
+    } catch {
+      // table not yet populated
+    }
+
     // --- YNAB budgets (pre-synced total) ---
     let ynabTotal = 0;
     let ynabConnected = false;
@@ -276,6 +322,32 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       if (snap) {
         snaptradeConnected = true;
         if (snap.lastBrokerageTotal !== null) snaptradeTotal += parseFloat(snap.lastBrokerageTotal);
+      }
+    } catch {
+      // table not yet populated
+    }
+
+    // --- Vinyl collection (Discogs) ---
+    let vinylTotal = 0;
+    let discogsConnected = false;
+    try {
+      const [discogs] = await db().select().from(discogsConnections).where(eq(discogsConnections.userId, userId));
+      if (discogs) {
+        discogsConnected = true;
+        if (discogs.lastCollectionUsd !== null) vinylTotal += parseFloat(discogs.lastCollectionUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
+    // --- Prediction markets (Kalshi) ---
+    let kalshiTotal = 0;
+    let kalshiConnected = false;
+    try {
+      const [kalshi] = await db().select().from(kalshiConnections).where(eq(kalshiConnections.userId, userId));
+      if (kalshi) {
+        kalshiConnected = true;
+        if (kalshi.lastPortfolioUsd !== null) kalshiTotal += parseFloat(kalshi.lastPortfolioUsd);
       }
     } catch {
       // table not yet populated
@@ -318,8 +390,11 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       realEstateTotal +
       vehiclesTotal +
       metalsTotal +
+      sneakersTotal +
       snaptradeTotal +
-      ynabTotal -
+      ynabTotal +
+      vinylTotal +
+      kalshiTotal -
       debtsTotal;
 
     // --- Net worth milestone reaction ---
@@ -372,9 +447,12 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       realEstate: realEstateTotal,
       vehicles: vehiclesTotal,
       metals: metalsTotal,
+      sneakers: sneakersTotal,
+      kalshi: kalshiTotal,
       kraken: krakenTotal,
       snaptrade: snaptradeTotal,
       ynab: ynabTotal,
+      vinyl: vinylTotal,
       debts: -debtsTotal,
       liquidCashMonths,
       accounts: {
@@ -386,6 +464,8 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       },
       connections: {
         coinbase: coinbaseConnected,
+        discogs: discogsConnected,
+        kalshi: kalshiConnected,
         kraken: krakenConnected,
         snaptrade: snaptradeConnected,
         spinwheel: spinwheelConnected,

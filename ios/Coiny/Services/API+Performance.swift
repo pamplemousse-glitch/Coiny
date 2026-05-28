@@ -10,6 +10,15 @@ struct NetWorthResponse: Decodable {
     let defi: Double
     let chainWallets: Double
     let hyperliquid: Double
+    let realEstate: Double
+    let vehicles: Double
+    let metals: Double
+    let sneakers: Double
+    let kraken: Double
+    let snaptrade: Double
+    let ynab: Double
+    let vinyl: Double?
+    let kalshi: Double?
     let debts: Double
     let liquidCashMonths: Double?
     let accounts: NetWorthAccounts
@@ -28,6 +37,10 @@ struct NetWorthConnections: Decodable {
     let coinbase: Bool
     let zerion: Bool
     let spinwheel: Bool
+    let kraken: Bool
+    let snaptrade: Bool
+    let ynab: Bool
+    let kalshi: Bool?
 }
 
 struct BankAccount: Decodable, Identifiable {

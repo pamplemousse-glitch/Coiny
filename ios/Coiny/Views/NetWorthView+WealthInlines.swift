@@ -1,0 +1,404 @@
+import Security
+import SwiftUI
+
+// MARK: - Kraken inline
+
+struct KrakenInlineView: View {
+    let vm: KrakenViewModel
+    let isConnected: Bool
+    let onConnect: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if vm.isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+            } else if isConnected {
+                connectedView
+            } else {
+                disconnectedView
+            }
+            if let error = vm.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+            }
+        }
+    }
+
+    private var disconnectedView: some View {
+        HStack {
+            Text("Link Kraken via SnapTrade")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("Connect") { onConnect() }
+                .font(.caption)
+                .buttonStyle(.bordered)
+        }
+        .padding(.top, 4)
+    }
+
+    private var connectedView: some View {
+        HStack {
+            Button("Sync") { Task { await vm.sync() } }
+                .font(.caption)
+                .buttonStyle(.bordered)
+            Spacer()
+            Button("Disconnect", role: .destructive) { Task { await vm.disconnect() } }
+                .font(.caption)
+        }
+        .padding(.top, 4)
+    }
+}
+
+// MARK: - SnapTrade inline
+
+struct SnapTradeInlineView: View {
+    let vm: SnapTradeViewModel
+    let isConnected: Bool
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if vm.isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+            } else if isConnected {
+                connectedView
+            } else {
+                disconnectedView
+            }
+            if let error = vm.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+            }
+        }
+        .onChange(of: vm.redirectUrl) { _, url in
+            guard let url, let u = URL(string: url) else { return }
+            openURL(u)
+        }
+    }
+
+    private var disconnectedView: some View {
+        HStack {
+            Text("Link your brokerages")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("Connect") { Task { await vm.connect() } }
+                .font(.caption)
+                .buttonStyle(.bordered)
+        }
+        .padding(.top, 4)
+    }
+
+    private var connectedView: some View {
+        HStack {
+            Button("Sync") { Task { await vm.sync() } }
+                .font(.caption)
+                .buttonStyle(.bordered)
+            Spacer()
+            Button("Disconnect", role: .destructive) { Task { await vm.disconnect() } }
+                .font(.caption)
+        }
+        .padding(.top, 4)
+    }
+}
+
+// MARK: - YNAB inline
+
+struct YnabInlineView: View {
+    let vm: YnabViewModel
+    let isConnected: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if vm.isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+            } else if isConnected {
+                connectedView
+            } else {
+                disconnectedView
+            }
+            if let error = vm.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+            }
+        }
+    }
+
+    private var disconnectedView: some View {
+        HStack {
+            Text("Connect YNAB budgeting")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("Connect") { Task { await vm.startOAuth() } }
+                .font(.caption)
+                .buttonStyle(.bordered)
+        }
+        .padding(.top, 4)
+    }
+
+    private var connectedView: some View {
+        HStack {
+            Button("Sync") { Task { await vm.sync() } }
+                .font(.caption)
+                .buttonStyle(.bordered)
+            Spacer()
+            Button("Disconnect", role: .destructive) { Task { await vm.disconnect() } }
+                .font(.caption)
+        }
+        .padding(.top, 4)
+    }
+}
+
+// MARK: - Kalshi inline
+
+struct KalshiInlineView: View {
+    let vm: KalshiViewModel
+    let isConnected: Bool
+    @State private var showingSetup = false
+    @State private var generatedPair: KalshiKeyGen.KeyPair?
+    @State private var keyId = ""
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if vm.isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+            } else if isConnected {
+                connectedView
+            } else {
+                disconnectedView
+            }
+            if let error = vm.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+            }
+        }
+        .sheet(isPresented: $showingSetup) { setupSheet }
+    }
+
+    private var disconnectedView: some View {
+        HStack {
+            Text("Connect Kalshi prediction markets")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("Connect") {
+                generatedPair = KalshiKeyGen.generate()
+                showingSetup = true
+            }
+            .font(.caption)
+            .buttonStyle(.bordered)
+        }
+        .padding(.top, 4)
+    }
+
+    private var connectedView: some View {
+        HStack {
+            Button("Sync") { Task { await vm.sync() } }
+                .font(.caption)
+                .buttonStyle(.bordered)
+            Spacer()
+            Button("Disconnect", role: .destructive) { Task { await vm.disconnect() } }
+                .font(.caption)
+        }
+        .padding(.top, 4)
+    }
+
+    private var setupSheet: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    if let pem = generatedPair?.publicKeyPem {
+                        Text(pem)
+                            .font(.system(.caption2, design: .monospaced))
+                            .textSelection(.enabled)
+                    } else {
+                        Text("Key generation failed").font(.caption).foregroundStyle(.red)
+                    }
+                } header: {
+                    Text("Step 1 — Your Public Key")
+                } footer: {
+                    Text(
+                        "Copy this key, open Kalshi → Settings → API Keys → Add Key, paste it, " +
+                        "and copy the Key ID you receive back."
+                    )
+                    .font(.caption2)
+                }
+                Section("Step 2 — Key ID from Kalshi") {
+                    TextField("Key ID", text: $keyId)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                }
+            }
+            .navigationTitle("Connect Kalshi")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        showingSetup = false
+                        keyId = ""
+                        generatedPair = nil
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Connect") {
+                        guard let pair = generatedPair else { return }
+                        let k = keyId; let p = pair.privateKeyBase64
+                        showingSetup = false
+                        keyId = ""
+                        generatedPair = nil
+                        Task { await vm.connect(keyId: k, privateKeyBase64: p) }
+                    }
+                    .disabled(keyId.isEmpty || generatedPair == nil)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+}
+
+// MARK: - Discogs inline (OAuth OOB)
+
+struct DiscogsInlineView: View {
+    let vm: DiscogsViewModel
+    @State private var pin = ""
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if vm.isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+            } else if vm.isConnected {
+                connectedView
+            } else if vm.authorizeUrl != nil {
+                pinEntryView
+            } else {
+                disconnectedView
+            }
+            if let error = vm.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+            }
+        }
+        .onChange(of: vm.authorizeUrl) { _, url in
+            guard let url, let u = URL(string: url) else { return }
+            openURL(u)
+        }
+    }
+
+    private var disconnectedView: some View {
+        HStack {
+            Text("Connect Discogs vinyl collection")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("Connect") { Task { await vm.requestToken() } }
+                .font(.caption)
+                .buttonStyle(.bordered)
+        }
+        .padding(.top, 4)
+    }
+
+    private var pinEntryView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Authorize in Discogs, then enter the PIN")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack {
+                TextField("PIN", text: $pin)
+                    .keyboardType(.numberPad)
+                    .textFieldStyle(.roundedBorder)
+                Button("Verify") {
+                    let p = pin
+                    pin = ""
+                    Task { await vm.verifyPin(p) }
+                }
+                .buttonStyle(.bordered)
+                .disabled(pin.isEmpty)
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    private var connectedView: some View {
+        VStack(spacing: 6) {
+            if let username = vm.username {
+                HStack {
+                    Label(username, systemImage: "person.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+            }
+            HStack {
+                Button("Sync") { Task { await vm.sync() } }
+                    .font(.caption)
+                    .buttonStyle(.bordered)
+                Spacer()
+                Button("Disconnect", role: .destructive) { Task { await vm.disconnect() } }
+                    .font(.caption)
+            }
+        }
+        .padding(.top, 4)
+    }
+}
+
+// MARK: - RSA key generation for Kalshi
+
+enum KalshiKeyGen {
+    struct KeyPair {
+        let publicKeyPem: String
+        let privateKeyBase64: String
+    }
+
+    static func generate() -> KeyPair? {
+        let attrs: [CFString: Any] = [
+            kSecAttrKeyType: kSecAttrKeyTypeRSA,
+            kSecAttrKeySizeInBits: 2048,
+        ]
+        var genError: Unmanaged<CFError>?
+        guard let privKey = SecKeyCreateRandomKey(attrs as CFDictionary, &genError),
+              let pubKey = SecKeyCopyPublicKey(privKey) else { return nil }
+
+        var exportError: Unmanaged<CFError>?
+        guard let privDer = SecKeyCopyExternalRepresentation(privKey, &exportError) as Data?,
+              let pubDer = SecKeyCopyExternalRepresentation(pubKey, &exportError) as Data? else { return nil }
+
+        // Private key: PKCS#1 DER → PEM → base64-encode the PEM string (backend decodes via Buffer.from(b64,'base64').toString())
+        let privPem = wrapPem("RSA PRIVATE KEY", privDer)
+        let privateKeyBase64 = Data(privPem.utf8).base64EncodedString()
+
+        // Public key: PKCS#1 DER → SPKI DER → PEM (user pastes into Kalshi dashboard)
+        let publicKeyPem = wrapPem("PUBLIC KEY", pkcs1ToSpki(pubDer))
+
+        return KeyPair(publicKeyPem: publicKeyPem, privateKeyBase64: privateKeyBase64)
+    }
+
+    private static func wrapPem(_ label: String, _ der: Data) -> String {
+        let b64 = der.base64EncodedString(options: .lineLength64Characters)
+        return "-----BEGIN \(label)-----\n\(b64)\n-----END \(label)-----"
+    }
+
+    // Wrap PKCS#1 RSA public key DER in SubjectPublicKeyInfo (SPKI) envelope.
+    private static func pkcs1ToSpki(_ pkcs1: Data) -> Data {
+        let oid = Data([0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x01, 0x05, 0x00])
+        let algSeq = derSeq(oid)
+        let bitStr = derTag(0x03, Data([0x00]) + pkcs1)
+        return derSeq(algSeq + bitStr)
+    }
+
+    private static func derLen(_ n: Int) -> Data {
+        if n < 0x80 { return Data([UInt8(n)]) }
+        if n < 0x100 { return Data([0x81, UInt8(n)]) }
+        return Data([0x82, UInt8(n >> 8), UInt8(n & 0xFF)])
+    }
+
+    private static func derSeq(_ c: Data) -> Data { Data([0x30]) + derLen(c.count) + c }
+    private static func derTag(_ t: UInt8, _ c: Data) -> Data { Data([t]) + derLen(c.count) + c }
+}

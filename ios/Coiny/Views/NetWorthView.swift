@@ -8,6 +8,15 @@ struct NetWorthView: View {
     @State private var performanceVM = PerformanceViewModel()
     @State private var chainWalletsVM = ChainWalletsViewModel()
     @State private var hyperliquidVM = HyperliquidViewModel()
+    @State private var metalsVM = MetalsViewModel()
+    @State private var sneakersVM = SneakersViewModel()
+    @State private var realEstateVM = RealEstateViewModel()
+    @State private var vehiclesVM = VehiclesViewModel()
+    @State private var krakenVM = KrakenViewModel()
+    @State private var snaptradeVM = SnapTradeViewModel()
+    @State private var ynabVM = YnabViewModel()
+    @State private var kalshiVM = KalshiViewModel()
+    @State private var discogsVM = DiscogsViewModel()
 
     var body: some View {
         NavigationStack {
@@ -21,6 +30,10 @@ struct NetWorthView: View {
         .environment(performanceVM)
         .environment(chainWalletsVM)
         .environment(hyperliquidVM)
+        .environment(metalsVM)
+        .environment(sneakersVM)
+        .environment(realEstateVM)
+        .environment(vehiclesVM)
     }
 
     private func reload() async {
@@ -31,7 +44,14 @@ struct NetWorthView: View {
         async let performance: () = performanceVM.load()
         async let chainWallets: () = chainWalletsVM.loadWallets()
         async let hyperliquid: () = hyperliquidVM.loadAccounts()
-        _ = await (netWorth, coinbase, zerion, spinwheel, performance, chainWallets, hyperliquid)
+        async let metals: () = metalsVM.loadHoldings()
+        async let sneakers: () = sneakersVM.loadHoldings()
+        async let realEstate: () = realEstateVM.loadAssets()
+        async let vehicles: () = vehiclesVM.loadAssets()
+        async let kalshi: () = kalshiVM.loadStatus()
+        async let discogs: () = discogsVM.loadStatus()
+        _ = await (netWorth, coinbase, zerion, spinwheel, performance, chainWallets,
+                   hyperliquid, metals, sneakers, realEstate, vehicles, kalshi, discogs)
     }
 
     @ViewBuilder
@@ -46,10 +66,20 @@ struct NetWorthView: View {
                 VStack(spacing: 24) {
                     netWorthHeader(data)
                     bankSection(data)
+                    investmentsSection(data)
                     cryptoSection(data)
                     defiSection(data)
                     chainWalletsSection(data)
                     hyperliquidSection(data)
+                    metalsSection(data)
+                    realEstateSection(data)
+                    vehiclesSection(data)
+                    sneakersSection(data)
+                    discogsSection(data)
+                    krakenSection(data)
+                    snaptradeSection(data)
+                    ynabSection(data)
+                    kalshiSection(data)
                     debtsSection(data)
                     performanceSection()
                     Spacer(minLength: 32)
@@ -70,6 +100,8 @@ struct NetWorthView: View {
         }
     }
 
+    // MARK: - Header
+
     private func netWorthHeader(_ data: NetWorthResponse) -> some View {
         VStack(spacing: 4) {
             Text("Net Worth")
@@ -81,6 +113,13 @@ struct NetWorthView: View {
         }
         .padding(.vertical, 16)
     }
+}
+
+// MARK: - Section builders
+
+extension NetWorthView {
+
+    // MARK: - Plaid sections
 
     private func bankSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
@@ -120,6 +159,37 @@ struct NetWorthView: View {
             }
         }
     }
+
+    private func investmentsSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Investments", total: data.investments, icon: "chart.bar.fill", color: .green)
+                if data.accounts.investments.isEmpty {
+                    Text("No investment accounts linked")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 8)
+                } else {
+                    ForEach(data.accounts.investments) { holding in
+                        Divider().padding(.vertical, 6)
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(holding.name ?? holding.ticker ?? "Holding").font(.subheadline)
+                                if let ticker = holding.ticker {
+                                    Text(ticker).font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                            Text(holding.value, format: .currency(code: "USD"))
+                                .font(.subheadline.monospacedDigit())
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Crypto sections
 
     private func cryptoSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
@@ -176,6 +246,104 @@ struct NetWorthView: View {
         }
     }
 
+    // MARK: - Add-your-own asset sections
+
+    private func metalsSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Precious Metals", total: data.metals, icon: "sparkles", color: .yellow)
+                Divider().padding(.vertical, 6)
+                MetalsView()
+            }
+        }
+    }
+
+    private func realEstateSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Real Estate", total: data.realEstate, icon: "house.fill", color: .brown)
+                Divider().padding(.vertical, 6)
+                RealEstateView()
+            }
+        }
+    }
+
+    private func vehiclesSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Vehicles", total: data.vehicles, icon: "car.fill", color: .teal)
+                Divider().padding(.vertical, 6)
+                VehiclesView()
+            }
+        }
+    }
+
+    private func sneakersSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Sneakers", total: data.sneakers, icon: "figure.walk", color: .pink)
+                Divider().padding(.vertical, 6)
+                SneakersView()
+            }
+        }
+    }
+
+    // MARK: - Connect-style sections
+
+    private func discogsSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Vinyl", total: data.vinyl ?? 0, icon: "music.note", color: .purple)
+                Divider().padding(.vertical, 6)
+                DiscogsInlineView(vm: discogsVM)
+            }
+        }
+    }
+
+    private func krakenSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Kraken", total: data.kraken, icon: "chart.line.uptrend.xyaxis.circle.fill", color: .cyan)
+                Divider().padding(.vertical, 6)
+                KrakenInlineView(vm: krakenVM, isConnected: data.connections.kraken, onConnect: {
+                    Task { await snaptradeVM.connect() }
+                })
+            }
+        }
+    }
+
+    private func snaptradeSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Brokerage", total: data.snaptrade, icon: "building.2.fill", color: .mint)
+                Divider().padding(.vertical, 6)
+                SnapTradeInlineView(vm: snaptradeVM, isConnected: data.connections.snaptrade)
+            }
+        }
+    }
+
+    private func ynabSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "YNAB", total: data.ynab, icon: "dollarsign.circle.fill", color: .green)
+                Divider().padding(.vertical, 6)
+                YnabInlineView(vm: ynabVM, isConnected: data.connections.ynab)
+            }
+        }
+    }
+
+    private func kalshiSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Kalshi", total: data.kalshi ?? 0, icon: "chart.pie.fill", color: .indigo)
+                Divider().padding(.vertical, 6)
+                KalshiInlineView(vm: kalshiVM, isConnected: kalshiVM.isConnected || (data.connections.kalshi ?? false))
+            }
+        }
+    }
+
+    // MARK: - Debts + Performance
+
     private func debtsSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
@@ -220,6 +388,8 @@ struct NetWorthView: View {
         PerformanceView()
     }
 
+    // MARK: - Shared header helper
+
     private func sectionHeader(title: String, total: Double, icon: String, color: Color) -> some View {
         HStack {
             Label(title, systemImage: icon)
@@ -232,6 +402,8 @@ struct NetWorthView: View {
         }
     }
 }
+
+// MARK: - Spinwheel inline (existing, unchanged)
 
 private struct SpinwheelInlineView: View {
     let vm: SpinwheelViewModel

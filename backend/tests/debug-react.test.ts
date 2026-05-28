@@ -103,6 +103,7 @@ describe('GET /api/debug/transactions', () => {
   it('returns ingested transactions with category and rule_matched fields', async () => {
     const { db } = await import('../src/db/client.js');
     const { transactions } = await import('../src/db/schema.js');
+    const today = new Date().toISOString().slice(0, 10);
     await db()
       .insert(transactions)
       .values([
@@ -112,7 +113,7 @@ describe('GET /api/debug/transactions', () => {
           accountId: 'acc1',
           merchantName: 'Whole Foods',
           amount: '-185.00',
-          date: '2026-05-20',
+          date: today,
           category: 'groceries',
         },
         {
@@ -121,7 +122,7 @@ describe('GET /api/debug/transactions', () => {
           accountId: 'acc1',
           merchantName: 'Employer Inc',
           amount: '2400.00',
-          date: '2026-05-21',
+          date: today,
           category: 'paycheck',
         },
       ]);
