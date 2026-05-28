@@ -91,4 +91,15 @@ describe('getSneakerPrice', () => {
     const { getSneakerPrice, KicksDbError } = await import('../src/kicksdb/client.js');
     await expect(getSneakerPrice('DZ5485-612')).rejects.toBeInstanceOf(KicksDbError);
   });
+
+  it('sends market=US not market=USD', async () => {
+    vi.mocked(fetch).mockResolvedValue(makeResponse({ data: [] }));
+
+    const { getSneakerPrice } = await import('../src/kicksdb/client.js');
+    await getSneakerPrice('DZ5485-612');
+
+    const calledUrl = (vi.mocked(fetch).mock.calls[0] as [string])[0];
+    expect(calledUrl).toContain('market=US');
+    expect(calledUrl).not.toContain('market=USD');
+  });
 });
