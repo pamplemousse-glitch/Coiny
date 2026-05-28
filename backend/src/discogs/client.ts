@@ -13,6 +13,11 @@ function buildAuthHeader(
   tokenSecret: string,
   extraOAuth: Record<string, string> = {},
 ): string {
+  // RFC 5849 §3.4.1: base string URI must NOT include query string;
+  // query params are merged into the normalized parameter set.
+  const parsed = new URL(url);
+  const baseUrl = `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
+
   const params: Record<string, string> = {
     oauth_consumer_key: config.DISCOGS_CONSUMER_KEY,
     oauth_nonce: randomBytes(12).toString('hex'),
@@ -22,17 +27,24 @@ function buildAuthHeader(
     ...extraOAuth,
   };
 
+  // Merge URL query params into the parameter set for signing
+  parsed.searchParams.forEach((value, key) => {
+    params[key] = value;
+  });
+
   // Sort all params, percent-encode, join for base string
   const paramStr = Object.keys(params)
     .sort()
     .map((k) => `${pct(k)}=${pct(params[k]!)}`)
     .join('&');
 
-  const base = `${method.toUpperCase()}&${pct(url)}&${pct(paramStr)}`;
+  const base = `${method.toUpperCase()}&${pct(baseUrl)}&${pct(paramStr)}`;
   const key = `${pct(consumerSecret)}&${pct(tokenSecret)}`;
   params.oauth_signature = createHmac('sha1', key).update(base).digest('base64');
 
+  // Authorization header contains only oauth_* params (not query params)
   const header = Object.keys(params)
+    .filter((k) => k.startsWith('oauth_'))
     .map((k) => `${pct(k)}="${pct(params[k]!)}"`)
     .join(', ');
 
