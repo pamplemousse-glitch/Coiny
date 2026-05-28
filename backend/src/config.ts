@@ -65,6 +65,10 @@ const configSchema = z
 
     // KicksDB — sneaker pricing API (StockX + GOAT + others). kicks.dev
     KICKSDB_API_KEY: z.string().default(''),
+
+    // Discogs OAuth 1.0a — vinyl collection valuation.
+    DISCOGS_CONSUMER_KEY: z.string().default(''),
+    DISCOGS_CONSUMER_SECRET: z.string().default(''),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {

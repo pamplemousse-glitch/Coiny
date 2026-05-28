@@ -285,6 +285,29 @@ export const krakenConnections = pgTable('kraken_connections', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Discogs connections — one per user; accessToken and accessTokenSecret are AES-256-GCM encrypted.
+export const discogsConnections = pgTable('discogs_connections', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  username: text('username').notNull(),
+  accessToken: text('access_token').notNull(), // encrypted
+  accessTokenSecret: text('access_token_secret').notNull(), // encrypted
+  lastCollectionUsd: numeric('last_collection_usd'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Temporary storage for the Discogs OAuth request token secret while awaiting user authorization.
+export const discogsPending = pgTable('discogs_pending', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  oauthToken: text('oauth_token').notNull(),
+  oauthTokenSecret: text('oauth_token_secret').notNull(), // encrypted
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Plaid recurring streams — upserted on RECURRING_TRANSACTIONS_UPDATE webhook.
 export const plaidRecurringStreams = pgTable('plaid_recurring_streams', {
   streamId: text('stream_id').primaryKey(),

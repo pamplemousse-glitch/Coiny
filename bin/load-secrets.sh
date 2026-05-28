@@ -20,3 +20,5 @@ export SPINWHEEL_SECRET_KEY=$(security find-generic-password -a "$USER" -s "coin
 export SNAPTRADE_CLIENT_ID=$(security find-generic-password -a coiny -s coiny-snaptrade-client-id -w)
 export SNAPTRADE_CONSUMER_KEY=$(security find-generic-password -a coiny -s coiny-snaptrade-consumer-key -w)
 export KICKSDB_API_KEY=$(security find-generic-password -a coiny -s coiny-kicksdb-api-key -w 2>/dev/null || true)
+export DISCOGS_CONSUMER_KEY=$(security find-generic-password -a coiny -s coiny-discogs-consumer-key -w 2>/dev/null || true)
+export DISCOGS_CONSUMER_SECRET=$(security find-generic-password -a coiny -s coiny-discogs-consumer-secret -w 2>/dev/null || true)
