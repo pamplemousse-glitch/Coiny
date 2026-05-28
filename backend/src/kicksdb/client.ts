@@ -36,7 +36,7 @@ type StockXProductsResponse = {
 export async function getSneakerPrice(sku: string, size?: string): Promise<number | null> {
   if (!config.KICKSDB_API_KEY) return null;
 
-  const url = `${BASE_URL}/v3/stockx/products?query=${encodeURIComponent(sku)}&display[variants]=true&market=USD`;
+  const url = `${BASE_URL}/v3/stockx/products?query=${encodeURIComponent(sku)}&display[variants]=true&market=US`;
   const res = await fetchWithRetry(url, {
     headers: {
       Authorization: config.KICKSDB_API_KEY,
