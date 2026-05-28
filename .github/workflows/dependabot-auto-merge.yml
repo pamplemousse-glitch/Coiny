@@ -33,11 +33,11 @@ jobs:
       - name: Update lockfile if out of sync
         id: lockfile
         run: |
-          if pnpm install --frozen-lockfile 2>&1 | grep -q ERR_PNPM_OUTDATED_LOCKFILE; then
-            pnpm install
-            echo "updated=true" >> "$GITHUB_OUTPUT"
-          else
+          pnpm install --no-frozen-lockfile
+          if git diff --quiet pnpm-lock.yaml; then
             echo "updated=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "updated=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Commit updated lockfile
