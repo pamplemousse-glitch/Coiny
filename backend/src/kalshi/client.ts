@@ -1,6 +1,6 @@
 import { constants, createSign } from 'node:crypto';
 
-const BASE_URL = 'https://api.elections.kalshi.com/trade-api/v2';
+const BASE_URL = 'https://external-api.kalshi.com/trade-api/v2';
 
 export class KalshiError extends Error {
   constructor(
