@@ -57,6 +57,18 @@ extension API {
         )
         sessionToken = response.token
     }
+
+    /// Triggers a pet reaction by animation preset without a real transaction.
+    /// Uses query param: POST /api/debug/react?animation=celebrate
+    @discardableResult
+    func debugReact(animation: String) async throws -> EmptyResponse {
+        try await request(
+            method: "POST",
+            path: "/api/debug/react?animation=\(animation)",
+            body: Optional<Empty>.none,
+            requiresAuth: true
+        )
+    }
 }
 
 #endif
