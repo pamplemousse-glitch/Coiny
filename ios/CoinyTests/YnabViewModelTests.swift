@@ -7,16 +7,22 @@ final class YnabViewModelTests: XCTestCase {
 
     private final class FakeAPI: YnabViewModelAPI, @unchecked Sendable {
         private let lock = NSLock()
-        private var connectError: Error?
+        private var oauthUrlResult: Result<YnabOAuthUrlResponse, Error> = .success(YnabOAuthUrlResponse(url: "https://app.ynab.com/oauth/authorize?test=1"))
+        private var callbackError: Error?
         private var disconnectError: Error?
         private var syncResult: Result<YnabSyncResult, Error> = .success(YnabSyncResult(total: 0))
 
-        func setConnectError(_ e: Error?) { lock.lock(); connectError = e; lock.unlock() }
+        func setOAuthUrlResult(_ r: Result<YnabOAuthUrlResponse, Error>) { lock.lock(); oauthUrlResult = r; lock.unlock() }
+        func setCallbackError(_ e: Error?) { lock.lock(); callbackError = e; lock.unlock() }
         func setDisconnectError(_ e: Error?) { lock.lock(); disconnectError = e; lock.unlock() }
         func setSyncResult(_ r: Result<YnabSyncResult, Error>) { lock.lock(); syncResult = r; lock.unlock() }
 
-        func connectYnab(apiKey: String) async throws {
-            lock.lock(); let e = connectError; lock.unlock()
+        func ynabOAuthUrl(codeChallenge: String) async throws -> YnabOAuthUrlResponse {
+            lock.lock(); let r = oauthUrlResult; lock.unlock()
+            return try r.get()
+        }
+        func ynabOAuthCallback(code: String, codeVerifier: String) async throws {
+            lock.lock(); let e = callbackError; lock.unlock()
             if let e { throw e }
         }
         func disconnectYnab() async throws {
@@ -36,39 +42,6 @@ final class YnabViewModelTests: XCTestCase {
         XCTAssertFalse(vm.isLoading)
         XCTAssertNil(vm.errorMessage)
         XCTAssertNil(vm.lastTotal)
-    }
-
-    // MARK: - Connect
-
-    func testConnectWithEmptyKeyDoesNothing() async {
-        let fake = FakeAPI()
-        let vm = YnabViewModel(api: fake)
-
-        await vm.connect(apiKey: "")
-
-        XCTAssertNil(vm.errorMessage)
-        XCTAssertFalse(vm.isLoading)
-    }
-
-    func testConnectSucceeds() async {
-        let fake = FakeAPI()
-        let vm = YnabViewModel(api: fake)
-
-        await vm.connect(apiKey: "my-ynab-token")
-
-        XCTAssertNil(vm.errorMessage)
-        XCTAssertFalse(vm.isLoading)
-    }
-
-    func testConnectOnErrorSetsMessage() async {
-        struct Boom: LocalizedError { var errorDescription: String? { "connect failed" } }
-        let fake = FakeAPI()
-        fake.setConnectError(Boom())
-        let vm = YnabViewModel(api: fake)
-
-        await vm.connect(apiKey: "my-ynab-token")
-
-        XCTAssertEqual(vm.errorMessage, "connect failed")
     }
 
     // MARK: - Disconnect

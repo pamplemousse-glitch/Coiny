@@ -92,6 +92,10 @@ struct SnapTradeSyncResult: Decodable {
 
 // MARK: - YNAB DTOs
 
+struct YnabOAuthUrlResponse: Decodable {
+    let url: String
+}
+
 struct YnabSyncResult: Decodable {
     let total: Double
 }
@@ -243,9 +247,13 @@ extension API {
 // MARK: - YNAB API
 
 extension API {
-    func connectYnab(apiKey: String) async throws {
-        struct Body: Encodable { let apiKey: String }
-        let _: EmptyResponse = try await post("/api/ynab/connect", body: Body(apiKey: apiKey))
+    func ynabOAuthUrl(codeChallenge: String) async throws -> YnabOAuthUrlResponse {
+        try await get("/api/ynab/connect/oauth/url?codeChallenge=\(codeChallenge)")
+    }
+
+    func ynabOAuthCallback(code: String, codeVerifier: String) async throws {
+        struct Body: Encodable { let code: String; let codeVerifier: String }
+        let _: EmptyResponse = try await post("/api/ynab/connect/oauth/callback", body: Body(code: code, codeVerifier: codeVerifier))
     }
 
     func disconnectYnab() async throws {

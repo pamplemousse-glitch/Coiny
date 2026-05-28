@@ -305,7 +305,9 @@ extension NetWorthView {
             VStack(spacing: 0) {
                 sectionHeader(title: "Kraken", total: data.kraken, icon: "chart.line.uptrend.xyaxis.circle.fill", color: .cyan)
                 Divider().padding(.vertical, 6)
-                KrakenInlineView(vm: krakenVM, isConnected: data.connections.kraken)
+                KrakenInlineView(vm: krakenVM, isConnected: data.connections.kraken, onConnect: {
+                    Task { await snaptradeVM.connect() }
+                })
             }
         }
     }

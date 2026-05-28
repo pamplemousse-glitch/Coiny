@@ -162,6 +162,13 @@
       "when": 1749081600000,
       "tag": "0022_kalshi",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1749168000000,
+      "tag": "0023_ynab_oauth",
+      "breakpoints": true
     }
   ]
 }
