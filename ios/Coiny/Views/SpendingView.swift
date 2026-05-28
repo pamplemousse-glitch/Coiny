@@ -3,18 +3,53 @@ import SwiftUI
 struct SpendingView: View {
     @Environment(PetStore.self) private var store
     @State private var summary: SpendingSummaryResponse?
+    @State private var overrides: [SpendingOverride] = []
+    @State private var showAddOverride = false
+    @State private var newMerchant = ""
+    @State private var newCategory = ""
 
     var body: some View {
         NavigationStack {
             content
                 .navigationTitle("Activity")
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        NavigationLink {
+                            SubscriptionsView()
+                        } label: {
+                            Image(systemName: "arrow.clockwise.circle")
+                        }
+                        .accessibilityLabel("Subscriptions")
+                    }
+                }
                 .refreshable {
                     await store.refresh()
                     summary = try? await API.shared.getSpendingSummary()
+                    overrides = (try? await API.shared.getSpendingOverrides()) ?? []
                 }
         }
         .task {
             summary = try? await API.shared.getSpendingSummary()
+            overrides = (try? await API.shared.getSpendingOverrides()) ?? []
+        }
+        .alert("Add Override", isPresented: $showAddOverride) {
+            TextField("Merchant name", text: $newMerchant)
+            TextField("Category (e.g. groceries)", text: $newCategory)
+            Button("Save") {
+                let m = newMerchant.trimmingCharacters(in: .whitespaces)
+                let c = newCategory.trimmingCharacters(in: .whitespaces)
+                guard !m.isEmpty, !c.isEmpty else { return }
+                Task {
+                    _ = try? await API.shared.setSpendingOverride(merchantName: m, category: c)
+                    overrides = (try? await API.shared.getSpendingOverrides()) ?? []
+                }
+                newMerchant = ""
+                newCategory = ""
+            }
+            Button("Cancel", role: .cancel) {
+                newMerchant = ""
+                newCategory = ""
+            }
         }
     }
 
@@ -51,6 +86,38 @@ struct SpendingView: View {
                                 .foregroundStyle(.secondary)
                         }
                         .padding(.vertical, 4)
+                    }
+
+                    if !overrides.isEmpty {
+                        Section {
+                            ForEach(overrides) { override in
+                                HStack {
+                                    Text(override.merchantName)
+                                        .font(.subheadline)
+                                    Spacer()
+                                    Text(override.category)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .onDelete { indexSet in
+                                let toDelete = indexSet.map { overrides[$0] }
+                                Task {
+                                    for o in toDelete {
+                                        try? await API.shared.deleteSpendingOverride(merchantName: o.merchantName)
+                                    }
+                                    overrides = (try? await API.shared.getSpendingOverrides()) ?? []
+                                }
+                            }
+                            Button {
+                                showAddOverride = true
+                            } label: {
+                                Label("Add override", systemImage: "plus")
+                                    .font(.subheadline)
+                            }
+                        } header: {
+                            Text("Category overrides")
+                        }
                     }
                 }
                 .listStyle(.plain)

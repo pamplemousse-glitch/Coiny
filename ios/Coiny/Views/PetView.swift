@@ -180,6 +180,8 @@ private struct PetLoadedView: View {
     @State private var fireStatus: String?
     @State private var isResetting = false
     @State private var resetStatus: String?
+    @State private var selectedAnimation = "celebrate"
+    @State private var isReacting = false
 
     private var debugControls: some View {
         VStack(spacing: 6) {
@@ -246,6 +248,34 @@ private struct PetLoadedView: View {
                     .foregroundStyle(status.hasPrefix("Fired:") ? .green : .secondary)
                     .multilineTextAlignment(.center)
             }
+
+            Divider()
+
+            Picker("Animation", selection: $selectedAnimation) {
+                ForEach(["celebrate", "happy", "sad", "concerned", "neutral", "sleeping"], id: \.self) {
+                    Text($0).tag($0)
+                }
+            }
+            .pickerStyle(.menu)
+            .font(.caption)
+
+            Button {
+                Task {
+                    isReacting = true
+                    do {
+                        try await API.shared.debugReact(animation: selectedAnimation)
+                        try? await Task.sleep(for: .seconds(1))
+                        await store.refresh()
+                    } catch {}
+                    isReacting = false
+                }
+            } label: {
+                Label(isReacting ? "Reacting…" : "Trigger reaction", systemImage: "face.smiling")
+                    .font(.caption)
+                    .foregroundStyle(.purple)
+            }
+            .buttonStyle(.bordered)
+            .disabled(isReacting)
         }
     }
     #endif
