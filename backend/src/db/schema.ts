@@ -320,7 +320,6 @@ export const discogsPending = pgTable('discogs_pending', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-
 // Plaid recurring streams — upserted on RECURRING_TRANSACTIONS_UPDATE webhook.
 export const plaidRecurringStreams = pgTable('plaid_recurring_streams', {
   streamId: text('stream_id').primaryKey(),
