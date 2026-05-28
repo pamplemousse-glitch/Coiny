@@ -298,6 +298,18 @@ export const discogsConnections = pgTable('discogs_connections', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Kalshi prediction market connections — one per user; privateKeyBase64 is AES-256-GCM encrypted.
+export const kalshiConnections = pgTable('kalshi_connections', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  keyId: text('key_id').notNull(),
+  privateKeyBase64: text('private_key_base64').notNull(), // encrypted
+  lastPortfolioUsd: numeric('last_portfolio_usd'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Temporary storage for the Discogs OAuth request token secret while awaiting user authorization.
 export const discogsPending = pgTable('discogs_pending', {
   userId: text('user_id')

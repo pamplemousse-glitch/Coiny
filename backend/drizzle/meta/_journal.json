@@ -155,6 +155,13 @@
       "when": 1748995200000,
       "tag": "0021_discogs",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1749081600000,
+      "tag": "0022_kalshi",
+      "breakpoints": true
     }
   ]
 }
