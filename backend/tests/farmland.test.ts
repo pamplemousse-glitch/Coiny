@@ -305,10 +305,12 @@ describe('POST /api/farmland/sync', () => {
   it('calls USDA API once per unique state even with multiple parcels in same state', async () => {
     const { db } = await import('../src/db/client.js');
     const { farmlandParcels } = await import('../src/db/schema.js');
-    await db().insert(farmlandParcels).values([
-      { userId: testUserId, stateCode: 'IA', acres: '100' },
-      { userId: testUserId, stateCode: 'IA', acres: '50' },
-    ]);
+    await db()
+      .insert(farmlandParcels)
+      .values([
+        { userId: testUserId, stateCode: 'IA', acres: '100' },
+        { userId: testUserId, stateCode: 'IA', acres: '50' },
+      ]);
 
     mockedGetFarmlandPricePerAcre.mockResolvedValue(8500);
 
@@ -344,11 +346,13 @@ describe('GET /api/net-worth — farmland field', () => {
   it('sums acres × lastPricePerAcreUsd into farmland total', async () => {
     const { db } = await import('../src/db/client.js');
     const { farmlandParcels } = await import('../src/db/schema.js');
-    await db().insert(farmlandParcels).values([
-      { userId: testUserId, stateCode: 'IA', acres: '200', lastPricePerAcreUsd: '8000.00' },
-      { userId: testUserId, stateCode: 'IL', acres: '100', lastPricePerAcreUsd: '9000.00' },
-      { userId: testUserId, stateCode: 'MN', acres: '50', lastPricePerAcreUsd: null },
-    ]);
+    await db()
+      .insert(farmlandParcels)
+      .values([
+        { userId: testUserId, stateCode: 'IA', acres: '200', lastPricePerAcreUsd: '8000.00' },
+        { userId: testUserId, stateCode: 'IL', acres: '100', lastPricePerAcreUsd: '9000.00' },
+        { userId: testUserId, stateCode: 'MN', acres: '50', lastPricePerAcreUsd: null },
+      ]);
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
