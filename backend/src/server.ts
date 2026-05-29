@@ -21,6 +21,7 @@ import { registerOverridesApi } from './api/overrides.js';
 import { registerPetsApi } from './api/pets.js';
 import { registerPlaidLinkApi } from './api/plaid-link.js';
 import { registerPlaidRecurringApi } from './api/plaid-recurring.js';
+import { registerPolymarketApi } from './api/polymarket.js';
 import { registerRealEstateApi } from './api/real-estate.js';
 import { registerSnaptradeApi } from './api/snaptrade.js';
 import { registerSneakersApi } from './api/sneakers.js';
@@ -113,6 +114,7 @@ async function buildApp() {
     registerSteamApi(scope);
     registerChainWalletsApi(scope);
     registerHyperliquidApi(scope);
+    registerPolymarketApi(scope);
     registerKalshiConnectApi(scope);
     registerKrakenApi(scope);
     registerAlpacaApi(scope);

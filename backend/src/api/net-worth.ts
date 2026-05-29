@@ -14,6 +14,7 @@ import {
   metalHoldings,
   nftWallets,
   petState,
+  polymarketAccounts,
   realEstateAssets,
   snaptradeConnections,
   sneakerHoldings,
@@ -249,6 +250,17 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // table not yet populated
     }
 
+    // --- Polymarket prediction market positions (pre-synced values) ---
+    let polymarketTotal = 0;
+    try {
+      const pmRows = await db().select().from(polymarketAccounts).where(eq(polymarketAccounts.userId, userId));
+      for (const r of pmRows) {
+        if (r.lastValueUsd !== null) polymarketTotal += parseFloat(r.lastValueUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
     // --- Real estate ---
     let realEstateTotal = 0;
     try {
@@ -451,6 +463,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       defiTotal +
       chainWalletsTotal +
       hyperliquidTotal +
+      polymarketTotal +
       krakenTotal +
       alpacaTotal +
       realEstateTotal +
@@ -514,6 +527,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       defi: defiTotal,
       chainWallets: chainWalletsTotal,
       hyperliquid: hyperliquidTotal,
+      polymarket: polymarketTotal,
       realEstate: realEstateTotal,
       vehicles: vehiclesTotal,
       metals: metalsTotal,
