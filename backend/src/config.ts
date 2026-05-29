@@ -73,6 +73,15 @@ const configSchema = z
     // YNAB OAuth 2.0 client ID (PKCE public client — no client secret needed).
     // Register at app.ynab.com/settings/developer to get a client ID.
     YNAB_CLIENT_ID: z.string().default(''),
+
+    // Helius — Solana RPC + enhanced APIs (staking, DAS).
+    HELIUS_API_KEY: z.string().default(''),
+
+    // Alchemy — NFT portfolio API (Ethereum, Polygon, Base, etc.)
+    ALCHEMY_API_KEY: z.string().default(''),
+
+    // Kalshi prediction markets. demo = demo-api.kalshi.co, prod = external-api.kalshi.com
+    KALSHI_ENV: z.enum(['demo', 'prod']).default('demo'),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {

@@ -1,6 +1,14 @@
 import { constants, createSign } from 'node:crypto';
+import { config } from '../config.js';
 
-const BASE_URL = 'https://external-api.kalshi.com/trade-api/v2';
+const BASE_URLS = {
+  demo: 'https://demo-api.kalshi.co/trade-api/v2',
+  prod: 'https://external-api.kalshi.com/trade-api/v2',
+} as const;
+
+function baseUrl(): string {
+  return BASE_URLS[config.KALSHI_ENV];
+}
 
 export class KalshiError extends Error {
   constructor(
@@ -40,7 +48,7 @@ export async function getPortfolioBalance(keyId: string, privateKeyBase64: strin
   const pem = decodePrivateKey(privateKeyBase64);
   const headers = buildHeaders('GET', path, keyId, pem);
 
-  const res = await fetch(`${BASE_URL}/portfolio/balance`, { headers });
+  const res = await fetch(`${baseUrl()}/portfolio/balance`, { headers });
   if (!res.ok) {
     const text = await res.text();
     throw new KalshiError(res.status, `Kalshi error ${res.status}: ${text.slice(0, 200)}`);
