@@ -44,22 +44,28 @@ describe('getTradingCardPrice', () => {
   });
 
   it('matches by setName case-insensitively', async () => {
-    vi.stubGlobal('fetch', makeFetch({
-      data: [
-        { name: 'Charizard', set: 'Base Set', market_price: 450.0 },
-        { name: 'Charizard', set: 'Jungle', market_price: 200.0 },
-      ],
-    }));
+    vi.stubGlobal(
+      'fetch',
+      makeFetch({
+        data: [
+          { name: 'Charizard', set: 'Base Set', market_price: 450.0 },
+          { name: 'Charizard', set: 'Jungle', market_price: 200.0 },
+        ],
+      }),
+    );
     expect(await getTradingCardPrice('Charizard', 'pokemon', 'jungle', false, 'key')).toBe(200.0);
   });
 
   it('falls back to first result when setName does not match', async () => {
-    vi.stubGlobal('fetch', makeFetch({
-      data: [
-        { name: 'Charizard', set: 'Base Set', market_price: 450.0 },
-        { name: 'Charizard', set: 'Jungle', market_price: 200.0 },
-      ],
-    }));
+    vi.stubGlobal(
+      'fetch',
+      makeFetch({
+        data: [
+          { name: 'Charizard', set: 'Base Set', market_price: 450.0 },
+          { name: 'Charizard', set: 'Jungle', market_price: 200.0 },
+        ],
+      }),
+    );
     expect(await getTradingCardPrice('Charizard', 'pokemon', 'nonexistent', false, 'key')).toBe(450.0);
   });
 

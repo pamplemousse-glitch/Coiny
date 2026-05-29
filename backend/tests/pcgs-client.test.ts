@@ -35,25 +35,31 @@ describe('getPcgsCoinFacts', () => {
   });
 
   it('returns name and price when data is present', async () => {
-    vi.stubGlobal('fetch', makeFetch({
-      IsValidRequest: true,
-      ServerMessage: 'OK',
-      PCGSNo: 7112,
-      Name: '1881-S Morgan Dollar',
-      PriceGuideValue: 250.0,
-      Grade: 65,
-    }));
+    vi.stubGlobal(
+      'fetch',
+      makeFetch({
+        IsValidRequest: true,
+        ServerMessage: 'OK',
+        PCGSNo: 7112,
+        Name: '1881-S Morgan Dollar',
+        PriceGuideValue: 250.0,
+        Grade: 65,
+      }),
+    );
     const result = await getPcgsCoinFacts(7112, 65, false, 'key');
     expect(result).toEqual({ name: '1881-S Morgan Dollar', priceGuideUsd: 250.0 });
   });
 
   it('returns null priceGuide when PriceGuideValue is null', async () => {
-    vi.stubGlobal('fetch', makeFetch({
-      IsValidRequest: true,
-      ServerMessage: 'OK',
-      Name: 'Rare Coin',
-      PriceGuideValue: null,
-    }));
+    vi.stubGlobal(
+      'fetch',
+      makeFetch({
+        IsValidRequest: true,
+        ServerMessage: 'OK',
+        Name: 'Rare Coin',
+        PriceGuideValue: null,
+      }),
+    );
     const result = await getPcgsCoinFacts(99999, 70, false, 'key');
     expect(result?.priceGuideUsd).toBeNull();
   });
