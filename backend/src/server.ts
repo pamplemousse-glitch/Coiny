@@ -26,6 +26,7 @@ import { registerSnaptradeApi } from './api/snaptrade.js';
 import { registerSneakersApi } from './api/sneakers.js';
 import { registerSpendingApi } from './api/spending.js';
 import { registerSpinwheelApi } from './api/spinwheel.js';
+import { registerSteamApi } from './api/steam.js';
 import { registerSubscriptionsApi } from './api/subscriptions.js';
 import { registerVehiclesApi } from './api/vehicles.js';
 import { registerYnabApi } from './api/ynab.js';
@@ -108,6 +109,7 @@ async function buildApp() {
     registerSnaptradeApi(scope);
     registerSneakersApi(scope);
     registerManualAssetsApi(scope);
+    registerSteamApi(scope);
     registerChainWalletsApi(scope);
     registerHyperliquidApi(scope);
     registerKalshiConnectApi(scope);

@@ -437,3 +437,22 @@ export const sneakerHoldings = pgTable('sneaker_holdings', {
   lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Steam accounts — CS2 skin portfolio via Steam community inventory API.
+// No API key required; inventory endpoint is public for public profiles.
+// lastPortfolioUsd is the sum of all CS2 item market prices in USD.
+export const steamAccounts = pgTable(
+  'steam_accounts',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    steamId64: text('steam_id64').notNull(),
+    label: text('label'),
+    lastPortfolioUsd: numeric('last_portfolio_usd'),
+    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('steam_accounts_user_steam_idx').on(t.userId, t.steamId64)],
+);
