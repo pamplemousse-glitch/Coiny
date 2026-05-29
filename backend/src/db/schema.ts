@@ -386,6 +386,24 @@ export const alpacaConnections = pgTable('alpaca_connections', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// NFT wallets — many per user, one row per Ethereum wallet address.
+// lastValueUsd is updated by POST /api/nft/sync using Alchemy NFT API v3 floor prices + ETH-USD spot price.
+export const nftWallets = pgTable(
+  'nft_wallets',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    address: text('address').notNull(),
+    label: text('label'),
+    lastValueUsd: numeric('last_value_usd'),
+    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('nft_wallets_user_address_idx').on(t.userId, t.address)],
+);
+
 // Sneaker holdings — valued via KicksDB (StockX + GOAT pricing).
 // SKU identifies the model (e.g. "DZ5485-612"). Size is optional — if set,
 // sync will fetch the specific size's lowest ask; otherwise uses the product min_price.

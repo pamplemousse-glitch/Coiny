@@ -15,6 +15,7 @@ import { registerKalshiConnectApi } from './api/kalshi-connect.js';
 import { registerKrakenApi } from './api/kraken.js';
 import { registerMetalsApi } from './api/metals.js';
 import { registerNetWorthApi } from './api/net-worth.js';
+import { registerNftApi } from './api/nft.js';
 import { registerOverridesApi } from './api/overrides.js';
 import { registerPetsApi } from './api/pets.js';
 import { registerPlaidLinkApi } from './api/plaid-link.js';
@@ -113,6 +114,7 @@ async function buildApp() {
     registerRealEstateApi(scope);
     registerVehiclesApi(scope);
     registerMetalsApi(scope);
+    registerNftApi(scope);
     registerYnabApi(scope);
     registerNetWorthApi(scope);
   });
