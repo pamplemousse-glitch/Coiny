@@ -11,6 +11,7 @@ import {
   kalshiConnections,
   krakenConnections,
   metalHoldings,
+  nftWallets,
   petState,
   realEstateAssets,
   snaptradeConnections,
@@ -289,6 +290,17 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // table not yet populated
     }
 
+    // --- NFT wallets (Alchemy — pre-synced floor-price values) ---
+    let nftTotal = 0;
+    try {
+      const rows = await db().select().from(nftWallets).where(eq(nftWallets.userId, userId));
+      for (const r of rows) {
+        if (r.lastValueUsd !== null) nftTotal += parseFloat(r.lastValueUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
     // --- YNAB budgets (pre-synced total) ---
     let ynabTotal = 0;
     let ynabConnected = false;
@@ -406,6 +418,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       vehiclesTotal +
       metalsTotal +
       sneakersTotal +
+      nftTotal +
       snaptradeTotal +
       ynabTotal +
       vinylTotal +
@@ -463,6 +476,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       vehicles: vehiclesTotal,
       metals: metalsTotal,
       sneakers: sneakersTotal,
+      nft: nftTotal,
       kalshi: kalshiTotal,
       kraken: krakenTotal,
       alpaca: alpacaTotal,
