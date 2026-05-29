@@ -90,6 +90,14 @@ const configSchema = z
 
     // PokemonPriceTracker — TCGPlayer-sourced Pokémon card prices.
     POKEMONPRICETRACKER_API_KEY: z.string().default(''),
+
+    // EIA Open Data — energy commodity spot prices (WTI crude, natural gas, etc.)
+    // Free key: https://www.eia.gov/opendata/register.php
+    EIA_API_KEY: z.string().default(''),
+
+    // USDA NASS Quick Stats — farmland value per acre by state.
+    // Free key: https://quickstats.nass.usda.gov/api
+    USDA_NASS_API_KEY: z.string().default(''),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {

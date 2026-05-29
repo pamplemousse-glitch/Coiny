@@ -7,6 +7,8 @@ import {
   chainWallets,
   coinbaseConnections,
   discogsConnections,
+  energyPositions,
+  farmlandParcels,
   hyperliquidAccounts,
   kalshiConnections,
   krakenConnections,
@@ -428,6 +430,28 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // table not yet populated
     }
 
+    // --- Energy commodities (EIA spot prices, pre-synced) ---
+    let energyTotal = 0;
+    try {
+      const rows = await db().select().from(energyPositions).where(eq(energyPositions.userId, userId));
+      for (const r of rows) {
+        if (r.lastSpotPriceUsd !== null) energyTotal += parseFloat(r.quantity) * parseFloat(r.lastSpotPriceUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
+    // --- Farmland parcels (USDA NASS land value, pre-synced) ---
+    let farmlandTotal = 0;
+    try {
+      const rows = await db().select().from(farmlandParcels).where(eq(farmlandParcels.userId, userId));
+      for (const r of rows) {
+        if (r.lastPricePerAcreUsd !== null) farmlandTotal += parseFloat(r.acres) * parseFloat(r.lastPricePerAcreUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
     // --- TrueLayer Open Banking (UK/EU banks — pre-synced, already USD-converted) ---
     let truelayerTotal = 0;
     let truelayerConnected = false;
@@ -490,7 +514,9 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       vinylTotal +
       kalshiTotal +
       truelayerTotal +
-      pokemonCardsTotal -
+      pokemonCardsTotal +
+      energyTotal +
+      farmlandTotal -
       debtsTotal;
 
     // --- Net worth milestone reaction ---
@@ -556,6 +582,8 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       ynab: ynabTotal,
       vinyl: vinylTotal,
       truelayer: truelayerTotal,
+      energy: energyTotal,
+      farmland: farmlandTotal,
       debts: -debtsTotal,
       liquidCashMonths,
       accounts: {

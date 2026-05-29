@@ -491,6 +491,38 @@ export const pokemonCardHoldings = pgTable('pokemon_card_holdings', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Energy positions — commodity holdings valued via EIA Open Data spot prices.
+// commodity: 'wti_crude' | 'brent_crude' | 'natural_gas'
+// quantityUnit: 'barrel' | 'mmbtu'
+export const energyPositions = pgTable('energy_positions', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  commodity: text('commodity').notNull(),
+  quantityUnit: text('quantity_unit').notNull(),
+  quantity: numeric('quantity').notNull(),
+  label: text('label'),
+  lastSpotPriceUsd: numeric('last_spot_price_usd'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Farmland parcels — valued via USDA NASS Quick Stats land value surveys.
+// stateCode: 2-letter US state abbreviation (e.g. 'IA', 'KS', 'TX')
+export const farmlandParcels = pgTable('farmland_parcels', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  stateCode: text('state_code').notNull(),
+  acres: numeric('acres').notNull(),
+  label: text('label'),
+  lastPricePerAcreUsd: numeric('last_price_per_acre_usd'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Steam accounts — CS2 skin portfolio via Steam community inventory API.
 // No API key required; inventory endpoint is public for public profiles.
 // lastPortfolioUsd is the sum of all CS2 item market prices in USD.
