@@ -87,6 +87,9 @@ const configSchema = z
     TRUELAYER_CLIENT_ID: z.string().default(''),
     TRUELAYER_CLIENT_SECRET: z.string().default(''),
     TRUELAYER_ENV: z.enum(['sandbox', 'live']).default('sandbox'),
+
+    // PokemonPriceTracker — TCGPlayer-sourced Pokémon card prices.
+    POKEMONPRICETRACKER_API_KEY: z.string().default(''),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {

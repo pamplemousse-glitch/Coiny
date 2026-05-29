@@ -26,3 +26,4 @@ export ALCHEMY_API_KEY=$(security find-generic-password -a coiny -s coiny-alchem
 export KALSHI_KEY_ID=$(security find-generic-password -a coiny -s coiny-kalshi-demo-key-id -w 2>/dev/null || true)
 export KALSHI_PRIVATE_KEY=$(security find-generic-password -a coiny -s coiny-kalshi-demo-private-key -w 2>/dev/null || true)
 export KALSHI_ENV=demo
+export POKEMONPRICETRACKER_API_KEY=$(security find-generic-password -s coiny-pokemonpricetracker-api-key -w 2>/dev/null || true)

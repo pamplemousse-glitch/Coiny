@@ -14,6 +14,7 @@ import {
   metalHoldings,
   nftWallets,
   petState,
+  pokemonCardHoldings,
   polymarketAccounts,
   realEstateAssets,
   snaptradeConnections,
@@ -327,6 +328,17 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // table not yet populated
     }
 
+    // --- Pokémon cards (PokemonPriceTracker-priced) ---
+    let pokemonCardsTotal = 0;
+    try {
+      const rows = await db().select().from(pokemonCardHoldings).where(eq(pokemonCardHoldings.userId, userId));
+      for (const r of rows) {
+        if (r.lastPriceUsd !== null) pokemonCardsTotal += parseFloat(r.lastPriceUsd) * r.quantity;
+      }
+    } catch {
+      // table not yet populated
+    }
+
     // --- CS2/Steam skins (pre-synced total) ---
     let steamTotal = 0;
     try {
@@ -477,7 +489,8 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       ynabTotal +
       vinylTotal +
       kalshiTotal +
-      truelayerTotal -
+      truelayerTotal +
+      pokemonCardsTotal -
       debtsTotal;
 
     // --- Net worth milestone reaction ---
@@ -535,6 +548,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       nft: nftTotal,
       manual: manualTotal,
       steam: steamTotal,
+      pokemonCards: pokemonCardsTotal,
       kalshi: kalshiTotal,
       kraken: krakenTotal,
       alpaca: alpacaTotal,
