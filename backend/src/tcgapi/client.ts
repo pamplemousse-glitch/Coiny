@@ -47,9 +47,7 @@ export async function getTradingCardPrice(
 
   // Prefer set match if provided, otherwise use first result
   const cards = parsed.data.data;
-  const match = setName
-    ? (cards.find((c) => c.set?.toLowerCase() === setName.toLowerCase()) ?? cards[0]!)
-    : cards[0]!;
+  const match = setName ? (cards.find((c) => c.set?.toLowerCase() === setName.toLowerCase()) ?? cards[0]!) : cards[0]!;
 
   const price = isFoil ? (match.foil_price ?? match.market_price) : match.market_price;
   return price ?? null;

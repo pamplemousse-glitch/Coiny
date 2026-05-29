@@ -23,10 +23,7 @@ const UpdateCardBodySchema = z.object({
 export function registerTradingCardsApi(app: FastifyInstance): void {
   // GET /api/trading-cards
   app.get('/api/trading-cards', async (req: FastifyRequest) => {
-    const rows = await db()
-      .select()
-      .from(tradingCardHoldings)
-      .where(eq(tradingCardHoldings.userId, req.user!.id));
+    const rows = await db().select().from(tradingCardHoldings).where(eq(tradingCardHoldings.userId, req.user!.id));
     return rows.map((r) => ({
       id: r.id,
       game: r.game,
@@ -68,54 +65,45 @@ export function registerTradingCardsApi(app: FastifyInstance): void {
   });
 
   // PATCH /api/trading-cards/:id
-  app.patch(
-    '/api/trading-cards/:id',
-    async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const id = parseInt(req.params.id, 10);
-      if (isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
+  app.patch('/api/trading-cards/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
 
-      const parsed = UpdateCardBodySchema.safeParse(req.body);
-      if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
+    const parsed = UpdateCardBodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
-      const userId = req.user!.id;
-      const updates: Record<string, string | number | null> = {};
-      if (parsed.data.quantity !== undefined) updates.quantity = parsed.data.quantity;
-      if (parsed.data.label !== undefined) updates.label = parsed.data.label ?? null;
+    const userId = req.user!.id;
+    const updates: Record<string, string | number | null> = {};
+    if (parsed.data.quantity !== undefined) updates.quantity = parsed.data.quantity;
+    if (parsed.data.label !== undefined) updates.label = parsed.data.label ?? null;
 
-      if (Object.keys(updates).length === 0) return reply.status(400).send({ error: 'no fields to update' });
+    if (Object.keys(updates).length === 0) return reply.status(400).send({ error: 'no fields to update' });
 
-      await db()
-        .update(tradingCardHoldings)
-        .set(updates)
-        .where(and(eq(tradingCardHoldings.userId, userId), eq(tradingCardHoldings.id, id)));
+    await db()
+      .update(tradingCardHoldings)
+      .set(updates)
+      .where(and(eq(tradingCardHoldings.userId, userId), eq(tradingCardHoldings.id, id)));
 
-      return { ok: true };
-    },
-  );
+    return { ok: true };
+  });
 
   // DELETE /api/trading-cards/:id
-  app.delete(
-    '/api/trading-cards/:id',
-    async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const id = parseInt(req.params.id, 10);
-      if (isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
+  app.delete('/api/trading-cards/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
 
-      await db()
-        .delete(tradingCardHoldings)
-        .where(and(eq(tradingCardHoldings.userId, req.user!.id), eq(tradingCardHoldings.id, id)));
+    await db()
+      .delete(tradingCardHoldings)
+      .where(and(eq(tradingCardHoldings.userId, req.user!.id), eq(tradingCardHoldings.id, id)));
 
-      req.log.info({ userId: req.user!.id }, 'trading card holding removed');
-      return reply.status(204).send();
-    },
-  );
+    req.log.info({ userId: req.user!.id }, 'trading card holding removed');
+    return reply.status(204).send();
+  });
 
   // POST /api/trading-cards/sync
   app.post('/api/trading-cards/sync', async (req: FastifyRequest) => {
     const userId = req.user!.id;
-    const rows = await db()
-      .select()
-      .from(tradingCardHoldings)
-      .where(eq(tradingCardHoldings.userId, userId));
+    const rows = await db().select().from(tradingCardHoldings).where(eq(tradingCardHoldings.userId, userId));
 
     if (rows.length === 0) return { updated: 0 };
 

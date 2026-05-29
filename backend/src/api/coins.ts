@@ -22,10 +22,7 @@ const UpdateCoinBodySchema = z.object({
 export function registerCoinsApi(app: FastifyInstance): void {
   // GET /api/coins
   app.get('/api/coins', async (req: FastifyRequest) => {
-    const rows = await db()
-      .select()
-      .from(coinHoldings)
-      .where(eq(coinHoldings.userId, req.user!.id));
+    const rows = await db().select().from(coinHoldings).where(eq(coinHoldings.userId, req.user!.id));
     return rows.map((r) => ({
       id: r.id,
       pcgsNo: r.pcgsNo,
@@ -35,8 +32,7 @@ export function registerCoinsApi(app: FastifyInstance): void {
       coinName: r.coinName ?? null,
       label: r.label ?? null,
       lastPriceGuideUsd: r.lastPriceGuideUsd !== null ? parseFloat(r.lastPriceGuideUsd) : null,
-      valueUsd:
-        r.lastPriceGuideUsd !== null ? parseFloat(r.lastPriceGuideUsd) * r.quantity : null,
+      valueUsd: r.lastPriceGuideUsd !== null ? parseFloat(r.lastPriceGuideUsd) * r.quantity : null,
       lastSyncedAt: r.lastSyncedAt?.toISOString() ?? null,
       createdAt: r.createdAt.toISOString(),
     }));
@@ -60,46 +56,40 @@ export function registerCoinsApi(app: FastifyInstance): void {
   });
 
   // PATCH /api/coins/:id
-  app.patch(
-    '/api/coins/:id',
-    async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const id = parseInt(req.params.id, 10);
-      if (isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
+  app.patch('/api/coins/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
 
-      const parsed = UpdateCoinBodySchema.safeParse(req.body);
-      if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
+    const parsed = UpdateCoinBodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
-      const userId = req.user!.id;
-      const updates: Record<string, string | number | null> = {};
-      if (parsed.data.quantity !== undefined) updates.quantity = parsed.data.quantity;
-      if (parsed.data.label !== undefined) updates.label = parsed.data.label ?? null;
+    const userId = req.user!.id;
+    const updates: Record<string, string | number | null> = {};
+    if (parsed.data.quantity !== undefined) updates.quantity = parsed.data.quantity;
+    if (parsed.data.label !== undefined) updates.label = parsed.data.label ?? null;
 
-      if (Object.keys(updates).length === 0) return reply.status(400).send({ error: 'no fields to update' });
+    if (Object.keys(updates).length === 0) return reply.status(400).send({ error: 'no fields to update' });
 
-      await db()
-        .update(coinHoldings)
-        .set(updates)
-        .where(and(eq(coinHoldings.userId, userId), eq(coinHoldings.id, id)));
+    await db()
+      .update(coinHoldings)
+      .set(updates)
+      .where(and(eq(coinHoldings.userId, userId), eq(coinHoldings.id, id)));
 
-      return { ok: true };
-    },
-  );
+    return { ok: true };
+  });
 
   // DELETE /api/coins/:id
-  app.delete(
-    '/api/coins/:id',
-    async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const id = parseInt(req.params.id, 10);
-      if (isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
+  app.delete('/api/coins/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
 
-      await db()
-        .delete(coinHoldings)
-        .where(and(eq(coinHoldings.userId, req.user!.id), eq(coinHoldings.id, id)));
+    await db()
+      .delete(coinHoldings)
+      .where(and(eq(coinHoldings.userId, req.user!.id), eq(coinHoldings.id, id)));
 
-      req.log.info({ userId: req.user!.id }, 'coin holding removed');
-      return reply.status(204).send();
-    },
-  );
+    req.log.info({ userId: req.user!.id }, 'coin holding removed');
+    return reply.status(204).send();
+  });
 
   // POST /api/coins/sync
   app.post('/api/coins/sync', async (req: FastifyRequest) => {
@@ -113,12 +103,9 @@ export function registerCoinsApi(app: FastifyInstance): void {
     const now = new Date();
 
     for (const row of rows) {
-      const facts = await getPcgsCoinFacts(
-        row.pcgsNo,
-        row.gradeNo,
-        row.plusGrade,
-        config.PCGS_API_KEY,
-      ).catch(() => null);
+      const facts = await getPcgsCoinFacts(row.pcgsNo, row.gradeNo, row.plusGrade, config.PCGS_API_KEY).catch(
+        () => null,
+      );
 
       if (facts === null || facts.priceGuideUsd === null) {
         errors++;

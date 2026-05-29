@@ -5,8 +5,8 @@ import { db } from '../db/client.js';
 import {
   alpacaConnections,
   chainWallets,
-  coinHoldings,
   coinbaseConnections,
+  coinHoldings,
   discogsConnections,
   energyPositions,
   farmlandParcels,

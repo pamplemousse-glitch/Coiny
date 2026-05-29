@@ -245,10 +245,12 @@ describe('POST /api/trading-cards/sync', () => {
   it('updates prices and returns count', async () => {
     const { db } = await import('../src/db/client.js');
     const { tradingCardHoldings } = await import('../src/db/schema.js');
-    await db().insert(tradingCardHoldings).values([
-      { userId: testUserId, game: 'pokemon', cardName: 'Charizard', quantity: 2 },
-      { userId: testUserId, game: 'magic', cardName: 'Black Lotus', quantity: 1 },
-    ]);
+    await db()
+      .insert(tradingCardHoldings)
+      .values([
+        { userId: testUserId, game: 'pokemon', cardName: 'Charizard', quantity: 2 },
+        { userId: testUserId, game: 'magic', cardName: 'Black Lotus', quantity: 1 },
+      ]);
 
     mockedGetTradingCardPrice.mockResolvedValueOnce(450).mockResolvedValueOnce(10000);
 
