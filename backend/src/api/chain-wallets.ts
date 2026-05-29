@@ -9,11 +9,13 @@ import { getCosmosBalance } from '../chains/cosmos.js';
 import { getHederaBalance } from '../chains/hedera.js';
 import { getNearBalance } from '../chains/near.js';
 import { getPolkadotBalance } from '../chains/polkadot.js';
+import { getSolanaBalance } from '../chains/solana.js';
 import { getStellarBalance } from '../chains/stellar.js';
 import { getSuiBalance } from '../chains/sui.js';
 import { getTonBalance } from '../chains/ton.js';
 import { getXrpBalance } from '../chains/xrp.js';
 import { getSpotPrices } from '../coinbase/client.js';
+import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { chainWallets } from '../db/schema.js';
 
@@ -34,6 +36,7 @@ export const CHAIN_SYMBOLS: Record<string, string> = {
   polkadot: 'DOT',
   cardano: 'ADA',
   ton: 'TON',
+  solana: 'SOL',
 };
 
 // Returns native-unit balance for the given chain and address.
@@ -67,6 +70,8 @@ export async function fetchNativeBalance(chain: string, address: string): Promis
       return getCardanoBalance(address);
     case 'ton':
       return getTonBalance(address);
+    case 'solana':
+      return getSolanaBalance(address, config.HELIUS_API_KEY);
     default:
       return null;
   }
@@ -89,6 +94,7 @@ const AddWalletBodySchema = z.object({
     'polkadot',
     'cardano',
     'ton',
+    'solana',
   ]),
   address: z.string().min(1).max(200),
   label: z.string().max(100).optional(),
