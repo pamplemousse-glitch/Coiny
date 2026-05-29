@@ -18,6 +18,7 @@ import {
   snaptradeConnections,
   sneakerHoldings,
   spinwheelConnections,
+  steamAccounts,
   vehicleAssets,
   ynabConnections,
   zerionWallets,
@@ -313,6 +314,17 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // table not yet populated
     }
 
+    // --- CS2/Steam skins (pre-synced total) ---
+    let steamTotal = 0;
+    try {
+      const rows = await db().select().from(steamAccounts).where(eq(steamAccounts.userId, userId));
+      for (const r of rows) {
+        if (r.lastPortfolioUsd !== null) steamTotal += parseFloat(r.lastPortfolioUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
     // --- YNAB budgets (pre-synced total) ---
     let ynabTotal = 0;
     let ynabConnected = false;
@@ -432,6 +444,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       sneakersTotal +
       nftTotal +
       manualTotal +
+      steamTotal +
       snaptradeTotal +
       ynabTotal +
       vinylTotal +
@@ -491,6 +504,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       sneakers: sneakersTotal,
       nft: nftTotal,
       manual: manualTotal,
+      steam: steamTotal,
       kalshi: kalshiTotal,
       kraken: krakenTotal,
       alpaca: alpacaTotal,

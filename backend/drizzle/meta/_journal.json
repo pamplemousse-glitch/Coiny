@@ -178,6 +178,13 @@
       "breakpoints": true
     },
     {
+      "idx": 25,
+      "version": "7",
+      "when": 1749340800000,
+      "tag": "0025_steam_cs2",
+      "breakpoints": true
+    },
+    {
       "idx": 26,
       "version": "7",
       "when": 1749427200000,
