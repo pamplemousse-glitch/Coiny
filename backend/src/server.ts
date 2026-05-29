@@ -10,6 +10,8 @@ import { registerCoinbaseApi } from './api/coinbase.js';
 import { registerDebugApi, registerDebugSessionApi } from './api/debug.js';
 import { registerDevicesApi } from './api/devices.js';
 import { registerDiscogsApi } from './api/discogs.js';
+import { registerEnergyApi } from './api/energy.js';
+import { registerFarmlandApi } from './api/farmland.js';
 import { registerHyperliquidApi } from './api/hyperliquid.js';
 import { registerKalshiConnectApi } from './api/kalshi-connect.js';
 import { registerKrakenApi } from './api/kraken.js';
@@ -126,6 +128,8 @@ async function buildApp() {
     registerYnabApi(scope);
     registerTruelayerApi(scope);
     registerPokemonCardsApi(scope);
+    registerEnergyApi(scope);
+    registerFarmlandApi(scope);
     registerNetWorthApi(scope);
   });
 

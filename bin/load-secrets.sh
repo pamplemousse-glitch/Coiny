@@ -27,3 +27,5 @@ export KALSHI_KEY_ID=$(security find-generic-password -a coiny -s coiny-kalshi-d
 export KALSHI_PRIVATE_KEY=$(security find-generic-password -a coiny -s coiny-kalshi-demo-private-key -w 2>/dev/null || true)
 export KALSHI_ENV=demo
 export POKEMONPRICETRACKER_API_KEY=$(security find-generic-password -s coiny-pokemonpricetracker-api-key -w 2>/dev/null || true)
+export EIA_API_KEY=$(security find-generic-password -a coiny -s coiny-eia-api-key -w 2>/dev/null || true)
+export USDA_NASS_API_KEY=$(security find-generic-password -a coiny -s coiny-usda-api-key -w 2>/dev/null || true)
