@@ -31,7 +31,10 @@ extension API {
             let selfReportedValueUsd: Double
             let notes: String?
         }
-        return try await post("/api/manual-assets", body: Body(name: name, category: category, selfReportedValueUsd: valueUsd, notes: notes))
+        return try await post(
+            "/api/manual-assets",
+            body: Body(name: name, category: category, selfReportedValueUsd: valueUsd, notes: notes)
+        )
     }
 
     func updateManualAsset(id: Int, name: String?, category: String?, valueUsd: Double?, notes: String?) async throws {
@@ -41,7 +44,10 @@ extension API {
             let selfReportedValueUsd: Double?
             let notes: String?
         }
-        let _: EmptyResponse = try await patch("/api/manual-assets/\(id)", body: Body(name: name, category: category, selfReportedValueUsd: valueUsd, notes: notes))
+        let _: EmptyResponse = try await patch(
+            "/api/manual-assets/\(id)",
+            body: Body(name: name, category: category, selfReportedValueUsd: valueUsd, notes: notes)
+        )
     }
 
     func deleteManualAsset(id: Int) async throws {

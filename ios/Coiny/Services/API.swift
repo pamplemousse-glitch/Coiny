@@ -114,8 +114,17 @@ actor API {
     }
 
     func signOut() {
+        let token = sessionToken
+        let logoutURL = URL(string: "/api/auth/logout", relativeTo: baseURL)!
         sessionStore.clear()
         sessionToken = nil
+        // Fire-and-forget: invalidate the server session so the bearer token cannot be reused.
+        Task {
+            var req = URLRequest(url: logoutURL)
+            req.httpMethod = "POST"
+            if let t = token { req.addValue("Bearer \(t)", forHTTPHeaderField: "Authorization") }
+            _ = try? await http.data(for: req)
+        }
     }
 
     // MARK: - Pet
