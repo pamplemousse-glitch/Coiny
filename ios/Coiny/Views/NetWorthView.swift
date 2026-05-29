@@ -18,6 +18,10 @@ struct NetWorthView: View {
     @State private var kalshiVM = KalshiViewModel()
     @State private var discogsVM = DiscogsViewModel()
     @State private var polymarketVM = PolymarketViewModel()
+    @State private var alpacaVM = AlpacaViewModel()
+    @State private var steamVM = SteamViewModel()
+    @State private var nftVM = NftViewModel()
+    @State private var manualAssetsVM = ManualAssetsViewModel()
 
     var body: some View {
         NavigationStack {
@@ -35,6 +39,10 @@ struct NetWorthView: View {
         .environment(sneakersVM)
         .environment(realEstateVM)
         .environment(vehiclesVM)
+        .environment(alpacaVM)
+        .environment(steamVM)
+        .environment(nftVM)
+        .environment(manualAssetsVM)
     }
 
     private func reload() async {
@@ -52,8 +60,13 @@ struct NetWorthView: View {
         async let kalshi: () = kalshiVM.loadStatus()
         async let discogs: () = discogsVM.loadStatus()
         async let polymarket: () = polymarketVM.loadAccounts()
+        async let alpaca: () = alpacaVM.loadStatus()
+        async let steam: () = steamVM.loadAccounts()
+        async let nft: () = nftVM.loadWallets()
+        async let manualAssets: () = manualAssetsVM.loadAssets()
         _ = await (netWorth, coinbase, zerion, spinwheel, performance, chainWallets,
-                   hyperliquid, metals, sneakers, realEstate, vehicles, kalshi, discogs, polymarket)
+                   hyperliquid, metals, sneakers, realEstate, vehicles, kalshi, discogs,
+                   polymarket, alpaca, steam, nft, manualAssets)
     }
 
     @ViewBuilder
@@ -73,6 +86,10 @@ struct NetWorthView: View {
                     defiSection(data)
                     chainWalletsSection(data)
                     hyperliquidSection(data)
+                    nftSection(data)
+                    steamSection(data)
+                    alpacaSection(data)
+                    manualAssetsSection(data)
                     metalsSection(data)
                     realEstateSection(data)
                     vehiclesSection(data)
@@ -245,6 +262,46 @@ extension NetWorthView {
                 sectionHeader(title: "Hyperliquid", total: data.hyperliquid, icon: "chart.line.uptrend.xyaxis", color: .indigo)
                 Divider().padding(.vertical, 6)
                 HyperliquidView()
+            }
+        }
+    }
+
+    private func nftSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "NFT Wallets", total: data.nft ?? 0, icon: "photo.stack", color: .purple)
+                Divider().padding(.vertical, 6)
+                NftView()
+            }
+        }
+    }
+
+    private func steamSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "CS2 Skins", total: data.steam ?? 0, icon: "gamecontroller.fill", color: .cyan)
+                Divider().padding(.vertical, 6)
+                SteamView()
+            }
+        }
+    }
+
+    private func alpacaSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Alpaca", total: data.alpaca ?? 0, icon: "chart.bar.xaxis", color: .green)
+                Divider().padding(.vertical, 6)
+                AlpacaView()
+            }
+        }
+    }
+
+    private func manualAssetsSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Other Assets", total: data.manual ?? 0, icon: "archivebox.fill", color: .brown)
+                Divider().padding(.vertical, 6)
+                ManualAssetsView()
             }
         }
     }

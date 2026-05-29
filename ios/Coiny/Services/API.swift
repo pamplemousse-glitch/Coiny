@@ -281,6 +281,10 @@ actor API {
         try await request(method: "POST", path: path, body: body, requiresAuth: true)
     }
 
+    func patch<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T {
+        try await request(method: "PATCH", path: path, body: body, requiresAuth: true)
+    }
+
     func delete<T: Decodable>(_ path: String) async throws -> T {
         try await request(method: "DELETE", path: path, body: Optional<Empty>.none, requiresAuth: true)
     }

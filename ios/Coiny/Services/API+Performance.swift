@@ -14,6 +14,11 @@ struct NetWorthResponse: Decodable {
     let vehicles: Double
     let metals: Double
     let sneakers: Double
+    let nft: Double?
+    let manual: Double?
+    let steam: Double?
+    let alpaca: Double?
+    let truelayer: Double?
     let kraken: Double
     let snaptrade: Double
     let ynab: Double
@@ -42,6 +47,8 @@ struct NetWorthConnections: Decodable {
     let snaptrade: Bool
     let ynab: Bool
     let kalshi: Bool?
+    let alpaca: Bool?
+    let truelayer: Bool?
 }
 
 struct BankAccount: Decodable, Identifiable {
