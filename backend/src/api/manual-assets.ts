@@ -74,45 +74,39 @@ export function registerManualAssetsApi(app: FastifyInstance): void {
   });
 
   // PATCH /api/manual-assets/:id
-  app.patch(
-    '/api/manual-assets/:id',
-    async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const parsed = UpdateBodySchema.safeParse(req.body);
-      if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
+  app.patch('/api/manual-assets/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const parsed = UpdateBodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
-      const id = parseInt(req.params.id, 10);
-      const userId = req.user!.id;
-      const { name, category, selfReportedValueUsd, notes } = parsed.data;
+    const id = parseInt(req.params.id, 10);
+    const userId = req.user!.id;
+    const { name, category, selfReportedValueUsd, notes } = parsed.data;
 
-      const updates: Record<string, unknown> = { lastUpdatedAt: new Date() };
-      if (name !== undefined) updates.name = name;
-      if (category !== undefined) updates.category = category;
-      if (selfReportedValueUsd !== undefined) updates.selfReportedValueUsd = selfReportedValueUsd.toString();
-      if (notes !== undefined) updates.notes = notes;
+    const updates: Record<string, unknown> = { lastUpdatedAt: new Date() };
+    if (name !== undefined) updates.name = name;
+    if (category !== undefined) updates.category = category;
+    if (selfReportedValueUsd !== undefined) updates.selfReportedValueUsd = selfReportedValueUsd.toString();
+    if (notes !== undefined) updates.notes = notes;
 
-      await db()
-        .update(manualAssets)
-        .set(updates)
-        .where(and(eq(manualAssets.userId, userId), eq(manualAssets.id, id)));
+    await db()
+      .update(manualAssets)
+      .set(updates)
+      .where(and(eq(manualAssets.userId, userId), eq(manualAssets.id, id)));
 
-      req.log.info({ userId, id }, 'manual asset updated');
-      return { ok: true };
-    },
-  );
+    req.log.info({ userId, id }, 'manual asset updated');
+    return { ok: true };
+  });
 
   // DELETE /api/manual-assets/:id
-  app.delete(
-    '/api/manual-assets/:id',
-    async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const id = parseInt(req.params.id, 10);
-      const userId = req.user!.id;
+  app.delete('/api/manual-assets/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const id = parseInt(req.params.id, 10);
+    const userId = req.user!.id;
 
-      await db()
-        .delete(manualAssets)
-        .where(and(eq(manualAssets.userId, userId), eq(manualAssets.id, id)));
+    await db()
+      .delete(manualAssets)
+      .where(and(eq(manualAssets.userId, userId), eq(manualAssets.id, id)));
 
-      req.log.info({ userId, id }, 'manual asset removed');
-      return reply.status(204).send();
-    },
-  );
+    req.log.info({ userId, id }, 'manual asset removed');
+    return reply.status(204).send();
+  });
 }
