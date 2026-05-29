@@ -129,7 +129,7 @@ export async function priceInventory(inventory: Map<string, number>): Promise<nu
     if (i > 0) {
       await new Promise<void>((resolve) => setTimeout(resolve, 1500));
     }
-    const name = uniqueNames[i];
+    const name = uniqueNames[i]!;
     const price = await getItemPriceUsd(name);
     if (price !== null) {
       prices.set(name, price);
