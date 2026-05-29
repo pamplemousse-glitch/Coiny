@@ -125,14 +125,29 @@ Other notable comps:
 
 ### 🟠 Medium Priority — Requires Signup/Form (Approval-Gated)
 
+> **Blocker for all of these: LLC formation.** Akoya, Empower, TIAA, Carta, and QuickBooks all require a business entity + signed data agreement before sandbox access is granted. Apply after LLC is formed.
+
+#### Retirement vehicle coverage — what Plaid already handles vs. what's gated
+
+Plaid Investments already covers the **majority** of retirement accounts: Vanguard, Schwab, Fidelity self-directed IRAs, Robinhood, TD Ameritrade, and most brokerage-held IRA/Roth IRA/401k rollovers. The gap is specifically **employer-administered workplace plans** — your company 401k through Fidelity NetBenefits, Empower, or TIAA. Those require separate API applications as a business.
+
+| Vehicle | Coverage | Notes |
+|---|---|---|
+| IRA / Roth IRA / 401k rollover / HSA | ✅ Plaid Investments | Covers Vanguard, Schwab, Fidelity self-directed, Robinhood, TD Ameritrade |
+| Employer 401k via Fidelity NetBenefits | ❌ Akoya | Requires LLC + form application |
+| Employer 401k via Empower (largest US provider) | ❌ Empower API | Requires LLC + form application |
+| TIAA 403b (universities, nonprofits) | ❌ TIAA API | Requires LLC + form application |
+| TSP (federal employees) | ❌ Ruled out | ToS prohibits credential sharing |
+| Pension / defined benefit / annuity | ❌ Ruled out | No API exists anywhere |
+
 | Asset | API | Effort | Action Required |
 |---|---|---|---|
 | Robinhood | Robinhood Crypto API | Medium | Apply for read-only API access |
-| Fidelity workplace 401k | Akoya | Medium | Form-based sandbox: `docs.akoya.com` |
-| Empower retirement (largest 401k) | Empower API | Medium | Form: `developer.empower-retirement.com` |
-| TIAA (403b) | TIAA API | Medium | Form: `developer.tiaa.org` |
-| Business net income | QuickBooks | Medium | OAuth — `developer.intuit.com` |
-| Private equity / startup equity / cap table | Carta API | High | Invite-only partner program — apply at `carta.com/api` |
+| Fidelity workplace 401k | Akoya | Medium | Form-based sandbox: `docs.akoya.com` — needs LLC |
+| Empower retirement (largest 401k) | Empower API | Medium | Form: `developer.empower-retirement.com` — needs LLC |
+| TIAA (403b) | TIAA API | Medium | Form: `developer.tiaa.org` — needs LLC |
+| Business net income | QuickBooks | Medium | OAuth — `developer.intuit.com` — needs LLC |
+| Private equity / startup equity / cap table | Carta API | High | Invite-only partner program — apply at `carta.com/api` — needs LLC |
 | Fine art (secondary market pricing) | Artsy Partner API | Medium | Public API covers public domain only; contact for auction data |
 
 ---
