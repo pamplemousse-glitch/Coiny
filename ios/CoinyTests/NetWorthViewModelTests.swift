@@ -40,6 +40,7 @@ final class NetWorthViewModelTests: XCTestCase {
             ynab: 0,
             vinyl: nil,
             kalshi: nil,
+            polymarket: nil,
             debts: 0,
             liquidCashMonths: nil,
             accounts: NetWorthAccounts(
@@ -92,6 +93,7 @@ final class NetWorthViewModelTests: XCTestCase {
             ynab: 0,
             vinyl: nil,
             kalshi: nil,
+            polymarket: nil,
             debts: 0,
             liquidCashMonths: 3.5,
             accounts: NetWorthAccounts(
@@ -151,6 +153,7 @@ final class NetWorthViewModelTests: XCTestCase {
             ynab: 0,
             vinyl: nil,
             kalshi: nil,
+            polymarket: nil,
             debts: -2000,
             liquidCashMonths: nil,
             accounts: NetWorthAccounts(
@@ -191,6 +194,7 @@ final class NetWorthViewModelTests: XCTestCase {
             ynab: 0,
             vinyl: 200,
             kalshi: 50,
+            polymarket: 125,
             debts: -1250,
             liquidCashMonths: nil,
             accounts: NetWorthAccounts(bank: [], investments: [], crypto: [], defi: DefiTotal(totalUSD: 0), debts: []),
@@ -206,6 +210,7 @@ final class NetWorthViewModelTests: XCTestCase {
         XCTAssertEqual(vm.netWorth?.sneakers, 1000)
         XCTAssertEqual(vm.netWorth?.vinyl, 200)
         XCTAssertEqual(vm.netWorth?.kalshi, 50)
+        XCTAssertEqual(vm.netWorth?.polymarket, 125)
         XCTAssertTrue(vm.netWorth?.connections.kraken == true)
         XCTAssertTrue(vm.netWorth?.connections.snaptrade == true)
         XCTAssertTrue(vm.netWorth?.connections.kalshi == true)
