@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { getAccounts, getSpotPrices } from '../coinbase/client.js';
 import { db } from '../db/client.js';
 import {
+  alpacaConnections,
   chainWallets,
   coinbaseConnections,
   discogsConnections,
@@ -314,6 +315,19 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // table not yet populated
     }
 
+    // --- Alpaca brokerage (pre-synced equity) ---
+    let alpacaTotal = 0;
+    let alpacaConnected = false;
+    try {
+      const [alpaca] = await db().select().from(alpacaConnections).where(eq(alpacaConnections.userId, userId));
+      if (alpaca) {
+        alpacaConnected = true;
+        if (alpaca.lastEquityUsd !== null) alpacaTotal += parseFloat(alpaca.lastEquityUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
     // --- SnapTrade brokerage (pre-synced total) ---
     let snaptradeTotal = 0;
     let snaptradeConnected = false;
@@ -387,6 +401,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       chainWalletsTotal +
       hyperliquidTotal +
       krakenTotal +
+      alpacaTotal +
       realEstateTotal +
       vehiclesTotal +
       metalsTotal +
@@ -450,6 +465,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       sneakers: sneakersTotal,
       kalshi: kalshiTotal,
       kraken: krakenTotal,
+      alpaca: alpacaTotal,
       snaptrade: snaptradeTotal,
       ynab: ynabTotal,
       vinyl: vinylTotal,
@@ -467,6 +483,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
         discogs: discogsConnected,
         kalshi: kalshiConnected,
         kraken: krakenConnected,
+        alpaca: alpacaConnected,
         snaptrade: snaptradeConnected,
         spinwheel: spinwheelConnected,
         ynab: ynabConnected,
