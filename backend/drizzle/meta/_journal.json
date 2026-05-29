@@ -176,6 +176,13 @@
       "when": 1749254400000,
       "tag": "0024_alpaca",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1749600000000,
+      "tag": "0028_truelayer",
+      "breakpoints": true
     }
   ]
 }

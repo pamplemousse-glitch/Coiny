@@ -16,6 +16,7 @@ import {
   snaptradeConnections,
   sneakerHoldings,
   spinwheelConnections,
+  truelayerConnections,
   vehicleAssets,
   ynabConnections,
   zerionWallets,
@@ -367,6 +368,20 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // table not yet populated
     }
 
+    // --- TrueLayer Open Banking — UK/EU bank accounts (pre-synced GBP total) ---
+    // NOTE: stored as GBP; currency conversion deferred — treated as 1:1 with USD for now.
+    let truelayerTotal = 0;
+    let truelayerConnected = false;
+    try {
+      const [tl] = await db().select().from(truelayerConnections).where(eq(truelayerConnections.userId, userId));
+      if (tl) {
+        truelayerConnected = true;
+        if (tl.lastBalanceGbp !== null) truelayerTotal += parseFloat(tl.lastBalanceGbp);
+      }
+    } catch {
+      // table not yet populated
+    }
+
     // --- Debts (Spinwheel) ---
     let debtsTotal = 0;
     const debtItems: Array<{ id: string; type: string; balance: number; monthlyPayment: number }> = [];
@@ -409,7 +424,8 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       snaptradeTotal +
       ynabTotal +
       vinylTotal +
-      kalshiTotal -
+      kalshiTotal +
+      truelayerTotal -
       debtsTotal;
 
     // --- Net worth milestone reaction ---
@@ -468,6 +484,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       alpaca: alpacaTotal,
       snaptrade: snaptradeTotal,
       ynab: ynabTotal,
+      truelayer: truelayerTotal,
       vinyl: vinylTotal,
       debts: -debtsTotal,
       liquidCashMonths,
@@ -486,6 +503,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
         alpaca: alpacaConnected,
         snaptrade: snaptradeConnected,
         spinwheel: spinwheelConnected,
+        truelayer: truelayerConnected,
         ynab: ynabConnected,
         zerion: zerionConnected,
       },

@@ -82,6 +82,12 @@ const configSchema = z
 
     // Kalshi prediction markets. demo = demo-api.kalshi.co, prod = external-api.kalshi.com
     KALSHI_ENV: z.enum(['demo', 'prod']).default('demo'),
+
+    // TrueLayer Open Banking — UK + EU bank connections.
+    // Register at console.truelayer.com to get client credentials.
+    TRUELAYER_CLIENT_ID: z.string().default(''),
+    TRUELAYER_CLIENT_SECRET: z.string().default(''),
+    TRUELAYER_ENV: z.enum(['sandbox', 'live']).default('sandbox'),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {

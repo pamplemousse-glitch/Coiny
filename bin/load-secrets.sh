@@ -26,3 +26,6 @@ export ALCHEMY_API_KEY=$(security find-generic-password -a coiny -s coiny-alchem
 export KALSHI_KEY_ID=$(security find-generic-password -a coiny -s coiny-kalshi-demo-key-id -w 2>/dev/null || true)
 export KALSHI_PRIVATE_KEY=$(security find-generic-password -a coiny -s coiny-kalshi-demo-private-key -w 2>/dev/null || true)
 export KALSHI_ENV=demo
+export TRUELAYER_CLIENT_ID=$(security find-generic-password -a coiny -s coiny-truelayer-client-id -w 2>/dev/null || true)
+export TRUELAYER_CLIENT_SECRET=$(security find-generic-password -a coiny -s coiny-truelayer-client-secret -w 2>/dev/null || true)
+export TRUELAYER_ENV=sandbox

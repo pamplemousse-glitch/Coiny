@@ -386,6 +386,22 @@ export const alpacaConnections = pgTable('alpaca_connections', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// TrueLayer Open Banking connections — one per user; covers UK + EU banks.
+// accessToken / refreshToken are AES-256-GCM encrypted.
+// lastBalanceGbp caches the most-recently synced total balance (GBP).
+export const truelayerConnections = pgTable('truelayer_connections', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' })
+    .unique(),
+  accessToken: text('access_token').notNull(), // AES-256-GCM encrypted
+  refreshToken: text('refresh_token').notNull(), // AES-256-GCM encrypted
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  lastBalanceGbp: numeric('last_balance_gbp'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Sneaker holdings — valued via KicksDB (StockX + GOAT pricing).
 // SKU identifies the model (e.g. "DZ5485-612"). Size is optional — if set,
 // sync will fetch the specific size's lowest ask; otherwise uses the product min_price.
