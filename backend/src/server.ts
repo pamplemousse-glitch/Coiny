@@ -13,6 +13,7 @@ import { registerDiscogsApi } from './api/discogs.js';
 import { registerHyperliquidApi } from './api/hyperliquid.js';
 import { registerKalshiConnectApi } from './api/kalshi-connect.js';
 import { registerKrakenApi } from './api/kraken.js';
+import { registerManualAssetsApi } from './api/manual-assets.js';
 import { registerMetalsApi } from './api/metals.js';
 import { registerNetWorthApi } from './api/net-worth.js';
 import { registerNftApi } from './api/nft.js';
@@ -106,6 +107,7 @@ async function buildApp() {
     registerSpinwheelApi(scope);
     registerSnaptradeApi(scope);
     registerSneakersApi(scope);
+    registerManualAssetsApi(scope);
     registerChainWalletsApi(scope);
     registerHyperliquidApi(scope);
     registerKalshiConnectApi(scope);
