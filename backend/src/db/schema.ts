@@ -459,6 +459,38 @@ export const polymarketAccounts = pgTable(
 // Sneaker holdings — valued via KicksDB (StockX + GOAT pricing).
 // SKU identifies the model (e.g. "DZ5485-612"). Size is optional — if set,
 // sync will fetch the specific size's lowest ask; otherwise uses the product min_price.
+export const tradingCardHoldings = pgTable('trading_card_holdings', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  game: text('game').notNull(), // e.g. 'pokemon', 'magic', 'yugioh'
+  cardName: text('card_name').notNull(),
+  setName: text('set_name'),
+  isFoil: boolean('is_foil').notNull().default(false),
+  quantity: integer('quantity').notNull().default(1),
+  label: text('label'),
+  lastPriceUsd: numeric('last_price_usd'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const coinHoldings = pgTable('coin_holdings', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  pcgsNo: integer('pcgs_no').notNull(),
+  gradeNo: integer('grade_no').notNull(),
+  plusGrade: boolean('plus_grade').notNull().default(false),
+  quantity: integer('quantity').notNull().default(1),
+  coinName: text('coin_name'),
+  label: text('label'),
+  lastPriceGuideUsd: numeric('last_price_guide_usd'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const sneakerHoldings = pgTable('sneaker_holdings', {
   id: serial('id').primaryKey(),
   userId: text('user_id')

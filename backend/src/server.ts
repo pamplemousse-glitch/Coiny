@@ -7,6 +7,7 @@ import { registerAlpacaApi } from './api/alpaca.js';
 import { registerAuthApi } from './api/auth.js';
 import { registerChainWalletsApi } from './api/chain-wallets.js';
 import { registerCoinbaseApi } from './api/coinbase.js';
+import { registerCoinsApi } from './api/coins.js';
 import { registerDebugApi, registerDebugSessionApi } from './api/debug.js';
 import { registerDevicesApi } from './api/devices.js';
 import { registerDiscogsApi } from './api/discogs.js';
@@ -32,6 +33,7 @@ import { registerSpendingApi } from './api/spending.js';
 import { registerSpinwheelApi } from './api/spinwheel.js';
 import { registerSteamApi } from './api/steam.js';
 import { registerSubscriptionsApi } from './api/subscriptions.js';
+import { registerTradingCardsApi } from './api/trading-cards.js';
 import { registerTruelayerApi } from './api/truelayer.js';
 import { registerVehiclesApi } from './api/vehicles.js';
 import { registerYnabApi } from './api/ynab.js';
@@ -130,6 +132,8 @@ async function buildApp() {
     registerPokemonCardsApi(scope);
     registerEnergyApi(scope);
     registerFarmlandApi(scope);
+    registerTradingCardsApi(scope);
+    registerCoinsApi(scope);
     registerNetWorthApi(scope);
   });
 

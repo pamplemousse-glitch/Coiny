@@ -98,6 +98,12 @@ const configSchema = z
     // USDA NASS Quick Stats — farmland value per acre by state.
     // Free key: https://quickstats.nass.usda.gov/api
     USDA_NASS_API_KEY: z.string().default(''),
+
+    // TCGapi — trading card market prices (tcgapi.dev). Free tier: 100 req/day.
+    TCGAPI_KEY: z.string().default(''),
+
+    // PCGS Public API — graded coin price guide (pcgs.com/publicapi). Bearer token from website.
+    PCGS_API_KEY: z.string().default(''),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {

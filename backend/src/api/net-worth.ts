@@ -6,6 +6,7 @@ import {
   alpacaConnections,
   chainWallets,
   coinbaseConnections,
+  coinHoldings,
   discogsConnections,
   energyPositions,
   farmlandParcels,
@@ -23,6 +24,7 @@ import {
   sneakerHoldings,
   spinwheelConnections,
   steamAccounts,
+  tradingCardHoldings,
   truelayerConnections,
   vehicleAssets,
   ynabConnections,
@@ -452,6 +454,28 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // table not yet populated
     }
 
+    // --- Trading cards (TCGapi market prices, pre-synced) ---
+    let tradingCardsTotal = 0;
+    try {
+      const rows = await db().select().from(tradingCardHoldings).where(eq(tradingCardHoldings.userId, userId));
+      for (const r of rows) {
+        if (r.lastPriceUsd !== null) tradingCardsTotal += parseFloat(r.lastPriceUsd) * r.quantity;
+      }
+    } catch {
+      // table not yet populated
+    }
+
+    // --- Graded coins (PCGS price guide, pre-synced) ---
+    let coinsTotal = 0;
+    try {
+      const rows = await db().select().from(coinHoldings).where(eq(coinHoldings.userId, userId));
+      for (const r of rows) {
+        if (r.lastPriceGuideUsd !== null) coinsTotal += parseFloat(r.lastPriceGuideUsd) * r.quantity;
+      }
+    } catch {
+      // table not yet populated
+    }
+
     // --- TrueLayer Open Banking (UK/EU banks — pre-synced, already USD-converted) ---
     let truelayerTotal = 0;
     let truelayerConnected = false;
@@ -516,7 +540,9 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       truelayerTotal +
       pokemonCardsTotal +
       energyTotal +
-      farmlandTotal -
+      farmlandTotal +
+      tradingCardsTotal +
+      coinsTotal -
       debtsTotal;
 
     // --- Net worth milestone reaction ---
@@ -584,6 +610,8 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       truelayer: truelayerTotal,
       energy: energyTotal,
       farmland: farmlandTotal,
+      tradingCards: tradingCardsTotal,
+      coins: coinsTotal,
       debts: -debtsTotal,
       liquidCashMonths,
       accounts: {
