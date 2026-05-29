@@ -473,6 +473,24 @@ export const sneakerHoldings = pgTable('sneaker_holdings', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Pokémon card holdings — valued via PokemonPriceTracker (TCGPlayer-sourced).
+// variant matches a printing type (e.g. "Holofoil", "Reverse Holofoil", "Normal").
+// lastPriceUsd is the market price for one card; valueUsd = lastPriceUsd × quantity.
+export const pokemonCardHoldings = pgTable('pokemon_card_holdings', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  cardName: text('card_name').notNull(),
+  setName: text('set_name'),
+  variant: text('variant'),
+  quantity: integer('quantity').notNull().default(1),
+  label: text('label'),
+  lastPriceUsd: numeric('last_price_usd'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Steam accounts — CS2 skin portfolio via Steam community inventory API.
 // No API key required; inventory endpoint is public for public profiles.
 // lastPortfolioUsd is the sum of all CS2 item market prices in USD.

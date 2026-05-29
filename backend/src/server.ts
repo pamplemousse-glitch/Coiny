@@ -21,6 +21,7 @@ import { registerOverridesApi } from './api/overrides.js';
 import { registerPetsApi } from './api/pets.js';
 import { registerPlaidLinkApi } from './api/plaid-link.js';
 import { registerPlaidRecurringApi } from './api/plaid-recurring.js';
+import { registerPokemonCardsApi } from './api/pokemon-cards.js';
 import { registerPolymarketApi } from './api/polymarket.js';
 import { registerRealEstateApi } from './api/real-estate.js';
 import { registerSnaptradeApi } from './api/snaptrade.js';
@@ -124,6 +125,7 @@ async function buildApp() {
     registerNftApi(scope);
     registerYnabApi(scope);
     registerTruelayerApi(scope);
+    registerPokemonCardsApi(scope);
     registerNetWorthApi(scope);
   });
 
