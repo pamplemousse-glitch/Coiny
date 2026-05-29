@@ -28,6 +28,7 @@ import { registerSpendingApi } from './api/spending.js';
 import { registerSpinwheelApi } from './api/spinwheel.js';
 import { registerSteamApi } from './api/steam.js';
 import { registerSubscriptionsApi } from './api/subscriptions.js';
+import { registerTruelayerApi } from './api/truelayer.js';
 import { registerVehiclesApi } from './api/vehicles.js';
 import { registerYnabApi } from './api/ynab.js';
 import { registerZerionApi } from './api/zerion.js';
@@ -120,6 +121,7 @@ async function buildApp() {
     registerMetalsApi(scope);
     registerNftApi(scope);
     registerYnabApi(scope);
+    registerTruelayerApi(scope);
     registerNetWorthApi(scope);
   });
 
