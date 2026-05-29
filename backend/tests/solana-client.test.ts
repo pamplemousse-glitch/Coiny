@@ -156,8 +156,8 @@ describe('getSolanaStakedBalance', () => {
       params: [string, { filters: Array<{ memcmp: { offset: number; bytes: string } }> }];
     };
     expect(body.method).toBe('getProgramAccounts');
-    expect(body.params[1].filters[0].memcmp.offset).toBe(12);
-    expect(body.params[1].filters[0].memcmp.bytes).toBe('MyWalletAddr');
+    expect(body.params[1]!.filters[0]!.memcmp.offset).toBe(12);
+    expect(body.params[1]!.filters[0]!.memcmp.bytes).toBe('MyWalletAddr');
   });
 });
 
