@@ -85,3 +85,108 @@ describe('getSolanaBalance', () => {
     expect(balance).toBe(0);
   });
 });
+
+function makeStakeAccountsResponse(lamportsList: number[]): unknown {
+  return {
+    jsonrpc: '2.0',
+    id: 1,
+    result: lamportsList.map((lamports, i) => ({
+      pubkey: `StakeAccount${i}`,
+      account: { lamports, owner: 'Stake11111111111111111111111111111111111111112', executable: false, rentEpoch: 0 },
+    })),
+  };
+}
+
+describe('getSolanaStakedBalance', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('sums lamports across all stake accounts and converts to SOL', async () => {
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse(makeStakeAccountsResponse([1_000_000_000, 2_000_000_000])));
+
+    const { getSolanaStakedBalance } = await import('../src/chains/solana.js');
+    const balance = await getSolanaStakedBalance('MyWallet', 'test-key');
+    expect(balance).toBeCloseTo(3, 9);
+  });
+
+  it('returns 0 when no stake accounts found', async () => {
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse(makeStakeAccountsResponse([])));
+
+    const { getSolanaStakedBalance } = await import('../src/chains/solana.js');
+    const balance = await getSolanaStakedBalance('MyWallet', 'test-key');
+    expect(balance).toBe(0);
+  });
+
+  it('returns 0 when API key is empty', async () => {
+    const { getSolanaStakedBalance } = await import('../src/chains/solana.js');
+    const balance = await getSolanaStakedBalance('MyWallet', '');
+    expect(balance).toBe(0);
+  });
+
+  it('returns 0 on non-2xx response', async () => {
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse(null, 500));
+
+    const { getSolanaStakedBalance } = await import('../src/chains/solana.js');
+    const balance = await getSolanaStakedBalance('MyWallet', 'test-key');
+    expect(balance).toBe(0);
+  });
+
+  it('returns 0 on unexpected response shape', async () => {
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ unexpected: true }));
+
+    const { getSolanaStakedBalance } = await import('../src/chains/solana.js');
+    const balance = await getSolanaStakedBalance('MyWallet', 'test-key');
+    expect(balance).toBe(0);
+  });
+
+  it('sends getProgramAccounts with staker memcmp filter at offset 12', async () => {
+    vi.mocked(fetch).mockResolvedValue(makeFetchResponse(makeStakeAccountsResponse([])));
+
+    const { getSolanaStakedBalance } = await import('../src/chains/solana.js');
+    await getSolanaStakedBalance('MyWalletAddr', 'test-key');
+
+    const [, init] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as {
+      method: string;
+      params: [string, { filters: Array<{ memcmp: { offset: number; bytes: string } }> }];
+    };
+    expect(body.method).toBe('getProgramAccounts');
+    expect(body.params[1]!.filters[0]!.memcmp.offset).toBe(12);
+    expect(body.params[1]!.filters[0]!.memcmp.bytes).toBe('MyWalletAddr');
+  });
+});
+
+describe('getSolanaTotalBalance', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('sums liquid + staked balance', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(makeFetchResponse(makeBalanceResponse(3_000_000_000))) // liquid
+      .mockResolvedValueOnce(makeFetchResponse(makeStakeAccountsResponse([2_000_000_000]))); // staked
+
+    const { getSolanaTotalBalance } = await import('../src/chains/solana.js');
+    const total = await getSolanaTotalBalance('MyWallet', 'test-key');
+    expect(total).toBeCloseTo(5, 9);
+  });
+
+  it('returns only liquid balance if staking call fails', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(makeFetchResponse(makeBalanceResponse(4_000_000_000)))
+      .mockRejectedValueOnce(new Error('network error'));
+
+    const { getSolanaTotalBalance } = await import('../src/chains/solana.js');
+    const total = await getSolanaTotalBalance('MyWallet', 'test-key');
+    expect(total).toBeCloseTo(4, 9);
+  });
+});

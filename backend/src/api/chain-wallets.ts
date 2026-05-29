@@ -9,7 +9,7 @@ import { getCosmosBalance } from '../chains/cosmos.js';
 import { getHederaBalance } from '../chains/hedera.js';
 import { getNearBalance } from '../chains/near.js';
 import { getPolkadotBalance } from '../chains/polkadot.js';
-import { getSolanaBalance } from '../chains/solana.js';
+import { getSolanaTotalBalance } from '../chains/solana.js';
 import { getStellarBalance } from '../chains/stellar.js';
 import { getSuiBalance } from '../chains/sui.js';
 import { getTonBalance } from '../chains/ton.js';
@@ -71,7 +71,7 @@ export async function fetchNativeBalance(chain: string, address: string): Promis
     case 'ton':
       return getTonBalance(address);
     case 'solana':
-      return getSolanaBalance(address, config.HELIUS_API_KEY);
+      return getSolanaTotalBalance(address, config.HELIUS_API_KEY);
     default:
       return null;
   }
