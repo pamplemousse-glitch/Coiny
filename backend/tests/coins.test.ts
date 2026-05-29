@@ -260,10 +260,12 @@ describe('POST /api/coins/sync', () => {
   it('counts errors when facts unavailable', async () => {
     const { db } = await import('../src/db/client.js');
     const { coinHoldings } = await import('../src/db/schema.js');
-    await db().insert(coinHoldings).values([
-      { userId: testUserId, pcgsNo: 98836, gradeNo: 66, quantity: 1 },
-      { userId: testUserId, pcgsNo: 7112, gradeNo: 65, quantity: 1 },
-    ]);
+    await db()
+      .insert(coinHoldings)
+      .values([
+        { userId: testUserId, pcgsNo: 98836, gradeNo: 66, quantity: 1 },
+        { userId: testUserId, pcgsNo: 7112, gradeNo: 65, quantity: 1 },
+      ]);
 
     mockedGetPcgsCoinFacts
       .mockResolvedValueOnce(null)
@@ -314,11 +316,13 @@ describe('GET /api/net-worth — coins field', () => {
   it('sums priceGuide × quantity into coins total', async () => {
     const { db } = await import('../src/db/client.js');
     const { coinHoldings } = await import('../src/db/schema.js');
-    await db().insert(coinHoldings).values([
-      { userId: testUserId, pcgsNo: 98836, gradeNo: 66, quantity: 2, lastPriceGuideUsd: '250.00' },
-      { userId: testUserId, pcgsNo: 7112, gradeNo: 65, quantity: 1, lastPriceGuideUsd: '180.00' },
-      { userId: testUserId, pcgsNo: 12345, gradeNo: 60, quantity: 3, lastPriceGuideUsd: null },
-    ]);
+    await db()
+      .insert(coinHoldings)
+      .values([
+        { userId: testUserId, pcgsNo: 98836, gradeNo: 66, quantity: 2, lastPriceGuideUsd: '250.00' },
+        { userId: testUserId, pcgsNo: 7112, gradeNo: 65, quantity: 1, lastPriceGuideUsd: '180.00' },
+        { userId: testUserId, pcgsNo: 12345, gradeNo: 60, quantity: 3, lastPriceGuideUsd: null },
+      ]);
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();

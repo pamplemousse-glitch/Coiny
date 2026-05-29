@@ -271,10 +271,12 @@ describe('POST /api/trading-cards/sync', () => {
   it('counts errors for cards that fail to fetch', async () => {
     const { db } = await import('../src/db/client.js');
     const { tradingCardHoldings } = await import('../src/db/schema.js');
-    await db().insert(tradingCardHoldings).values([
-      { userId: testUserId, game: 'pokemon', cardName: 'Rare Card', quantity: 1 },
-      { userId: testUserId, game: 'pokemon', cardName: 'Common Card', quantity: 5 },
-    ]);
+    await db()
+      .insert(tradingCardHoldings)
+      .values([
+        { userId: testUserId, game: 'pokemon', cardName: 'Rare Card', quantity: 1 },
+        { userId: testUserId, game: 'pokemon', cardName: 'Common Card', quantity: 5 },
+      ]);
 
     mockedGetTradingCardPrice.mockResolvedValueOnce(null).mockResolvedValueOnce(1.5);
 
@@ -307,11 +309,13 @@ describe('GET /api/net-worth — tradingCards field', () => {
   it('sums price × quantity into tradingCards total', async () => {
     const { db } = await import('../src/db/client.js');
     const { tradingCardHoldings } = await import('../src/db/schema.js');
-    await db().insert(tradingCardHoldings).values([
-      { userId: testUserId, game: 'pokemon', cardName: 'Charizard', quantity: 2, lastPriceUsd: '450.00' },
-      { userId: testUserId, game: 'magic', cardName: 'Black Lotus', quantity: 1, lastPriceUsd: '10000.00' },
-      { userId: testUserId, game: 'yugioh', cardName: 'Blue-Eyes', quantity: 3, lastPriceUsd: null },
-    ]);
+    await db()
+      .insert(tradingCardHoldings)
+      .values([
+        { userId: testUserId, game: 'pokemon', cardName: 'Charizard', quantity: 2, lastPriceUsd: '450.00' },
+        { userId: testUserId, game: 'magic', cardName: 'Black Lotus', quantity: 1, lastPriceUsd: '10000.00' },
+        { userId: testUserId, game: 'yugioh', cardName: 'Blue-Eyes', quantity: 3, lastPriceUsd: null },
+      ]);
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
