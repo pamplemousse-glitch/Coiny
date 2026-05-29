@@ -124,7 +124,7 @@ describe('POST /api/chain-wallets', () => {
       method: 'POST',
       url: '/api/chain-wallets',
       headers: { ...authHeader(), 'content-type': 'application/json' },
-      body: JSON.stringify({ chain: 'solana', address: 'So1anaAddr' }),
+      body: JSON.stringify({ chain: 'unsupported_chain', address: 'SomeAddr' }),
     });
     expect(res.statusCode).toBe(400);
 

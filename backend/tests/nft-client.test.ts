@@ -4,13 +4,17 @@ import { AlchemyError, getNftPortfolioValue } from '../src/nft/client.js';
 const API_KEY = 'test-alchemy-key';
 const ADDRESS = '0xTestWalletAddress';
 
-function makeNftsResponse(nfts: Array<{ floorPrice?: number | null; priceCurrency?: string }>) {
+// Floor price is at contract.openSeaMetadata.floorPrice per Alchemy NFT API v3 docs.
+function makeNftsResponse(nfts: Array<{ floorPrice?: number | null }>) {
   return {
     ownedNfts: nfts.map((n, i) => ({
-      contract: { address: `0xContract${i}`, name: `Collection ${i}` },
+      contract: {
+        address: `0xContract${i}`,
+        name: `Collection ${i}`,
+        openSeaMetadata: { floorPrice: n.floorPrice ?? null },
+      },
       tokenId: String(i),
       tokenType: 'ERC721',
-      floorPrice: n.floorPrice != null ? { floorPrice: n.floorPrice, priceCurrency: n.priceCurrency ?? 'ETH' } : null,
     })),
     totalCount: nfts.length,
   };
@@ -65,21 +69,16 @@ describe('getNftPortfolioValue', () => {
     await expect(getNftPortfolioValue(ADDRESS, '', 3000)).rejects.toMatchObject({ status: 400 });
   });
 
-  it('skips NFTs with non-ETH floor price currency', async () => {
+  it('sums all non-null floor prices (Alchemy v3 returns ETH-denominated values only)', async () => {
     const mockFetch = vi.mocked(fetch);
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () =>
-        makeNftsResponse([
-          { floorPrice: 1.0, priceCurrency: 'ETH' },
-          { floorPrice: 5000, priceCurrency: 'USD' },
-          { floorPrice: 0.5, priceCurrency: 'MATIC' },
-        ]),
+      json: async () => makeNftsResponse([{ floorPrice: 1.0 }, { floorPrice: null }, { floorPrice: 0.5 }]),
     } as Response);
 
-    // Only the 1.0 ETH floor counts; USD and MATIC are skipped.
+    // 1.0 + 0.5 = 1.5 ETH × $2000/ETH = $3000
     const result = await getNftPortfolioValue(ADDRESS, API_KEY, 2000);
-    expect(result).toBeCloseTo(2000, 2);
+    expect(result).toBeCloseTo(3000, 2);
   });
 
   it('returns 0 when wallet holds no NFTs', async () => {

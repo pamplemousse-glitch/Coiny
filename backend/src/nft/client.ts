@@ -10,22 +10,20 @@ export class AlchemyError extends Error {
   }
 }
 
-const AlchemyFloorPriceSchema = z
-  .object({
-    floorPrice: z.number(),
-    priceCurrency: z.string(),
-  })
-  .nullable()
-  .optional();
-
+// Floor price lives at contract.openSeaMetadata.floorPrice per Alchemy NFT API v3 docs.
+// There is no top-level floorPrice field on the NFT object.
 const AlchemyOwnedNftSchema = z.object({
   contract: z.object({
     address: z.string(),
     name: z.string().optional(),
+    openSeaMetadata: z
+      .object({
+        floorPrice: z.number().nullable().optional(),
+      })
+      .optional(),
   }),
   tokenId: z.string(),
   tokenType: z.string(),
-  floorPrice: AlchemyFloorPriceSchema,
 });
 
 const AlchemyNftsResponseSchema = z.object({
@@ -48,7 +46,9 @@ async function fetchNftsForOwner(address: string, apiKey: string): Promise<Alche
   do {
     const url = new URL(`${ALCHEMY_BASE}/${encodeURIComponent(apiKey)}/getNFTsForOwner`);
     url.searchParams.set('owner', address);
-    url.searchParams.set('withFloorPrice', 'true');
+    // withMetadata defaults to true in the API; no extra param needed.
+    // withFloorPrice is not a valid Alchemy v3 parameter — floor price is
+    // returned inside contract.openSeaMetadata.floorPrice when metadata is included.
     if (pageKey) url.searchParams.set('pageKey', pageKey);
 
     const res = await fetch(url.toString());
@@ -71,8 +71,8 @@ async function fetchNftsForOwner(address: string, apiKey: string): Promise<Alche
 
 /**
  * Returns the total USD value of the NFT portfolio for the given Ethereum address.
- * Sums floorPrice for NFTs where priceCurrency === 'ETH', then multiplies by ethPriceUsd.
- * Returns 0 when the wallet holds no NFTs with ETH floor prices.
+ * Sums contract.openSeaMetadata.floorPrice (ETH-denominated) across all NFTs,
+ * then multiplies by ethPriceUsd. Returns 0 when no NFTs have floor price data.
  * Throws immediately if apiKey is empty.
  */
 export async function getNftPortfolioValue(address: string, apiKey: string, ethPriceUsd: number): Promise<number> {
@@ -84,9 +84,11 @@ export async function getNftPortfolioValue(address: string, apiKey: string, ethP
 
   let totalEth = 0;
   for (const nft of nfts) {
-    const fp = nft.floorPrice;
-    if (fp && fp.priceCurrency === 'ETH') {
-      totalEth += fp.floorPrice;
+    // Floor price is ETH-denominated and lives at contract.openSeaMetadata.floorPrice.
+    // Alchemy only provides floor prices on ETH and Polygon mainnet; null means no data.
+    const fp = nft.contract.openSeaMetadata?.floorPrice;
+    if (fp != null && fp > 0) {
+      totalEth += fp;
     }
   }
 
