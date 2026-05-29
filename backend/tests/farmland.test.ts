@@ -279,10 +279,12 @@ describe('POST /api/farmland/sync', () => {
   it('updates price per acre and returns count', async () => {
     const { db } = await import('../src/db/client.js');
     const { farmlandParcels } = await import('../src/db/schema.js');
-    await db().insert(farmlandParcels).values([
-      { userId: testUserId, stateCode: 'IA', acres: '200' },
-      { userId: testUserId, stateCode: 'IL', acres: '100' },
-    ]);
+    await db()
+      .insert(farmlandParcels)
+      .values([
+        { userId: testUserId, stateCode: 'IA', acres: '200' },
+        { userId: testUserId, stateCode: 'IL', acres: '100' },
+      ]);
 
     mockedGetFarmlandPricePerAcre.mockResolvedValueOnce(8500).mockResolvedValueOnce(9200);
 

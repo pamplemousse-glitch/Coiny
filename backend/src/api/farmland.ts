@@ -20,20 +20,14 @@ const UpdateParcelBodySchema = z.object({
 export function registerFarmlandApi(app: FastifyInstance): void {
   // GET /api/farmland
   app.get('/api/farmland', async (req: FastifyRequest) => {
-    const rows = await db()
-      .select()
-      .from(farmlandParcels)
-      .where(eq(farmlandParcels.userId, req.user!.id));
+    const rows = await db().select().from(farmlandParcels).where(eq(farmlandParcels.userId, req.user!.id));
     return rows.map((r) => ({
       id: r.id,
       stateCode: r.stateCode,
       acres: parseFloat(r.acres),
       label: r.label ?? null,
       lastPricePerAcreUsd: r.lastPricePerAcreUsd !== null ? parseFloat(r.lastPricePerAcreUsd) : null,
-      valueUsd:
-        r.lastPricePerAcreUsd !== null
-          ? parseFloat(r.acres) * parseFloat(r.lastPricePerAcreUsd)
-          : null,
+      valueUsd: r.lastPricePerAcreUsd !== null ? parseFloat(r.acres) * parseFloat(r.lastPricePerAcreUsd) : null,
       lastSyncedAt: r.lastSyncedAt?.toISOString() ?? null,
       createdAt: r.createdAt.toISOString(),
     }));
@@ -62,46 +56,40 @@ export function registerFarmlandApi(app: FastifyInstance): void {
   });
 
   // PATCH /api/farmland/:id
-  app.patch(
-    '/api/farmland/:id',
-    async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const id = parseInt(req.params.id, 10);
-      if (isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
+  app.patch('/api/farmland/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
 
-      const parsed = UpdateParcelBodySchema.safeParse(req.body);
-      if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
+    const parsed = UpdateParcelBodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
-      const userId = req.user!.id;
-      const updates: Record<string, string | null> = {};
-      if (parsed.data.acres !== undefined) updates.acres = parsed.data.acres.toString();
-      if (parsed.data.label !== undefined) updates.label = parsed.data.label ?? null;
+    const userId = req.user!.id;
+    const updates: Record<string, string | null> = {};
+    if (parsed.data.acres !== undefined) updates.acres = parsed.data.acres.toString();
+    if (parsed.data.label !== undefined) updates.label = parsed.data.label ?? null;
 
-      if (Object.keys(updates).length === 0) return reply.status(400).send({ error: 'no fields to update' });
+    if (Object.keys(updates).length === 0) return reply.status(400).send({ error: 'no fields to update' });
 
-      await db()
-        .update(farmlandParcels)
-        .set(updates)
-        .where(and(eq(farmlandParcels.userId, userId), eq(farmlandParcels.id, id)));
+    await db()
+      .update(farmlandParcels)
+      .set(updates)
+      .where(and(eq(farmlandParcels.userId, userId), eq(farmlandParcels.id, id)));
 
-      return { ok: true };
-    },
-  );
+    return { ok: true };
+  });
 
   // DELETE /api/farmland/:id
-  app.delete(
-    '/api/farmland/:id',
-    async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const id = parseInt(req.params.id, 10);
-      if (isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
+  app.delete('/api/farmland/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
 
-      await db()
-        .delete(farmlandParcels)
-        .where(and(eq(farmlandParcels.userId, req.user!.id), eq(farmlandParcels.id, id)));
+    await db()
+      .delete(farmlandParcels)
+      .where(and(eq(farmlandParcels.userId, req.user!.id), eq(farmlandParcels.id, id)));
 
-      req.log.info({ userId: req.user!.id }, 'farmland parcel removed');
-      return reply.status(204).send();
-    },
-  );
+    req.log.info({ userId: req.user!.id }, 'farmland parcel removed');
+    return reply.status(204).send();
+  });
 
   // POST /api/farmland/sync
   app.post('/api/farmland/sync', async (req: FastifyRequest) => {

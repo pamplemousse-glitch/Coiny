@@ -295,10 +295,12 @@ describe('POST /api/energy/sync', () => {
   it('updates spot prices and returns count', async () => {
     const { db } = await import('../src/db/client.js');
     const { energyPositions } = await import('../src/db/schema.js');
-    await db().insert(energyPositions).values([
-      { userId: testUserId, commodity: 'wti_crude', quantityUnit: 'barrel', quantity: '50' },
-      { userId: testUserId, commodity: 'natural_gas', quantityUnit: 'mmbtu', quantity: '1000' },
-    ]);
+    await db()
+      .insert(energyPositions)
+      .values([
+        { userId: testUserId, commodity: 'wti_crude', quantityUnit: 'barrel', quantity: '50' },
+        { userId: testUserId, commodity: 'natural_gas', quantityUnit: 'mmbtu', quantity: '1000' },
+      ]);
 
     mockedGetAllEiaSpotPrices.mockResolvedValue(
       new Map([
@@ -344,11 +346,31 @@ describe('GET /api/net-worth — energy field', () => {
   it('sums quantity × lastSpotPriceUsd into energy total', async () => {
     const { db } = await import('../src/db/client.js');
     const { energyPositions } = await import('../src/db/schema.js');
-    await db().insert(energyPositions).values([
-      { userId: testUserId, commodity: 'wti_crude', quantityUnit: 'barrel', quantity: '100', lastSpotPriceUsd: '75.00' },
-      { userId: testUserId, commodity: 'natural_gas', quantityUnit: 'mmbtu', quantity: '500', lastSpotPriceUsd: '3.00' },
-      { userId: testUserId, commodity: 'brent_crude', quantityUnit: 'barrel', quantity: '50', lastSpotPriceUsd: null },
-    ]);
+    await db()
+      .insert(energyPositions)
+      .values([
+        {
+          userId: testUserId,
+          commodity: 'wti_crude',
+          quantityUnit: 'barrel',
+          quantity: '100',
+          lastSpotPriceUsd: '75.00',
+        },
+        {
+          userId: testUserId,
+          commodity: 'natural_gas',
+          quantityUnit: 'mmbtu',
+          quantity: '500',
+          lastSpotPriceUsd: '3.00',
+        },
+        {
+          userId: testUserId,
+          commodity: 'brent_crude',
+          quantityUnit: 'barrel',
+          quantity: '50',
+          lastSpotPriceUsd: null,
+        },
+      ]);
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();

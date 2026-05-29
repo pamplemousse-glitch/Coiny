@@ -74,9 +74,7 @@ export async function getEiaSpotPrice(commodity: EiaCommodity, apiKey: string): 
  * Returns a map of commodity → spot price for all supported commodities.
  * Entries with null prices (API down or key missing) are omitted from the map.
  */
-export async function getAllEiaSpotPrices(
-  apiKey: string,
-): Promise<Map<EiaCommodity, number>> {
+export async function getAllEiaSpotPrices(apiKey: string): Promise<Map<EiaCommodity, number>> {
   const entries = await Promise.all(
     (Object.keys(EIA_COMMODITIES) as EiaCommodity[]).map(async (commodity) => {
       const price = await getEiaSpotPrice(commodity, apiKey).catch(() => null);

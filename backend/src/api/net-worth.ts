@@ -435,8 +435,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
     try {
       const rows = await db().select().from(energyPositions).where(eq(energyPositions.userId, userId));
       for (const r of rows) {
-        if (r.lastSpotPriceUsd !== null)
-          energyTotal += parseFloat(r.quantity) * parseFloat(r.lastSpotPriceUsd);
+        if (r.lastSpotPriceUsd !== null) energyTotal += parseFloat(r.quantity) * parseFloat(r.lastSpotPriceUsd);
       }
     } catch {
       // table not yet populated
@@ -447,8 +446,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
     try {
       const rows = await db().select().from(farmlandParcels).where(eq(farmlandParcels.userId, userId));
       for (const r of rows) {
-        if (r.lastPricePerAcreUsd !== null)
-          farmlandTotal += parseFloat(r.acres) * parseFloat(r.lastPricePerAcreUsd);
+        if (r.lastPricePerAcreUsd !== null) farmlandTotal += parseFloat(r.acres) * parseFloat(r.lastPricePerAcreUsd);
       }
     } catch {
       // table not yet populated

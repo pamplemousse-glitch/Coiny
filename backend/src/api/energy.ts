@@ -22,10 +22,7 @@ const UpdatePositionBodySchema = z.object({
 export function registerEnergyApi(app: FastifyInstance): void {
   // GET /api/energy
   app.get('/api/energy', async (req: FastifyRequest) => {
-    const rows = await db()
-      .select()
-      .from(energyPositions)
-      .where(eq(energyPositions.userId, req.user!.id));
+    const rows = await db().select().from(energyPositions).where(eq(energyPositions.userId, req.user!.id));
     return rows.map((r) => ({
       id: r.id,
       commodity: r.commodity,
@@ -33,8 +30,7 @@ export function registerEnergyApi(app: FastifyInstance): void {
       quantity: parseFloat(r.quantity),
       label: r.label ?? null,
       lastSpotPriceUsd: r.lastSpotPriceUsd !== null ? parseFloat(r.lastSpotPriceUsd) : null,
-      valueUsd:
-        r.lastSpotPriceUsd !== null ? parseFloat(r.quantity) * parseFloat(r.lastSpotPriceUsd) : null,
+      valueUsd: r.lastSpotPriceUsd !== null ? parseFloat(r.quantity) * parseFloat(r.lastSpotPriceUsd) : null,
       lastSyncedAt: r.lastSyncedAt?.toISOString() ?? null,
       createdAt: r.createdAt.toISOString(),
     }));
@@ -59,46 +55,40 @@ export function registerEnergyApi(app: FastifyInstance): void {
   });
 
   // PATCH /api/energy/:id
-  app.patch(
-    '/api/energy/:id',
-    async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const id = parseInt(req.params.id, 10);
-      if (isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
+  app.patch('/api/energy/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
 
-      const parsed = UpdatePositionBodySchema.safeParse(req.body);
-      if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
+    const parsed = UpdatePositionBodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
-      const userId = req.user!.id;
-      const updates: Record<string, string | null> = {};
-      if (parsed.data.quantity !== undefined) updates.quantity = parsed.data.quantity.toString();
-      if (parsed.data.label !== undefined) updates.label = parsed.data.label ?? null;
+    const userId = req.user!.id;
+    const updates: Record<string, string | null> = {};
+    if (parsed.data.quantity !== undefined) updates.quantity = parsed.data.quantity.toString();
+    if (parsed.data.label !== undefined) updates.label = parsed.data.label ?? null;
 
-      if (Object.keys(updates).length === 0) return reply.status(400).send({ error: 'no fields to update' });
+    if (Object.keys(updates).length === 0) return reply.status(400).send({ error: 'no fields to update' });
 
-      await db()
-        .update(energyPositions)
-        .set(updates)
-        .where(and(eq(energyPositions.userId, userId), eq(energyPositions.id, id)));
+    await db()
+      .update(energyPositions)
+      .set(updates)
+      .where(and(eq(energyPositions.userId, userId), eq(energyPositions.id, id)));
 
-      return { ok: true };
-    },
-  );
+    return { ok: true };
+  });
 
   // DELETE /api/energy/:id
-  app.delete(
-    '/api/energy/:id',
-    async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-      const id = parseInt(req.params.id, 10);
-      if (isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
+  app.delete('/api/energy/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
 
-      await db()
-        .delete(energyPositions)
-        .where(and(eq(energyPositions.userId, req.user!.id), eq(energyPositions.id, id)));
+    await db()
+      .delete(energyPositions)
+      .where(and(eq(energyPositions.userId, req.user!.id), eq(energyPositions.id, id)));
 
-      req.log.info({ userId: req.user!.id }, 'energy position removed');
-      return reply.status(204).send();
-    },
-  );
+    req.log.info({ userId: req.user!.id }, 'energy position removed');
+    return reply.status(204).send();
+  });
 
   // POST /api/energy/sync
   app.post('/api/energy/sync', async (req: FastifyRequest) => {
