@@ -11,6 +11,7 @@ import { registerDebugApi, registerDebugSessionApi } from './api/debug.js';
 import { registerDevicesApi } from './api/devices.js';
 import { registerDiscogsApi } from './api/discogs.js';
 import { registerHyperliquidApi } from './api/hyperliquid.js';
+import { registerPolymarketApi } from './api/polymarket.js';
 import { registerKalshiConnectApi } from './api/kalshi-connect.js';
 import { registerKrakenApi } from './api/kraken.js';
 import { registerManualAssetsApi } from './api/manual-assets.js';
@@ -113,6 +114,7 @@ async function buildApp() {
     registerSteamApi(scope);
     registerChainWalletsApi(scope);
     registerHyperliquidApi(scope);
+    registerPolymarketApi(scope);
     registerKalshiConnectApi(scope);
     registerKrakenApi(scope);
     registerAlpacaApi(scope);

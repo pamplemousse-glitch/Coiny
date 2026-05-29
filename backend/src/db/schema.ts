@@ -438,6 +438,24 @@ export const truelayerConnections = pgTable('truelayer_connections', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Polymarket prediction market accounts — many per user, one row per Polygon wallet address.
+// lastValueUsd is updated by POST /api/polymarket/sync using live currentValue from Data API.
+export const polymarketAccounts = pgTable(
+  'polymarket_accounts',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    walletAddress: text('wallet_address').notNull(),
+    label: text('label'),
+    lastValueUsd: numeric('last_value_usd'),
+    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('polymarket_accounts_user_address_idx').on(t.userId, t.walletAddress)],
+);
+
 // Sneaker holdings — valued via KicksDB (StockX + GOAT pricing).
 // SKU identifies the model (e.g. "DZ5485-612"). Size is optional — if set,
 // sync will fetch the specific size's lowest ask; otherwise uses the product min_price.
