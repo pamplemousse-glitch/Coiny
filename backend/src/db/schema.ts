@@ -371,6 +371,21 @@ export const spinwheelPending = pgTable('spinwheel_pending', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Alpaca brokerage — one per user; stores encrypted user-supplied API key + secret.
+// env: 'paper' | 'live' controls which Alpaca base URL to use.
+// lastEquityUsd is total account equity (cash + long positions - short exposure).
+export const alpacaConnections = pgTable('alpaca_connections', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  apiKeyId: text('api_key_id').notNull(),
+  apiSecretKey: text('api_secret_key').notNull(),
+  env: text('env').notNull().default('paper'), // 'paper' | 'live'
+  lastEquityUsd: numeric('last_equity_usd'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Sneaker holdings — valued via KicksDB (StockX + GOAT pricing).
 // SKU identifies the model (e.g. "DZ5485-612"). Size is optional — if set,
 // sync will fetch the specific size's lowest ask; otherwise uses the product min_price.

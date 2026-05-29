@@ -1,0 +1,94 @@
+import { eq } from 'drizzle-orm';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { z } from 'zod';
+import type { AlpacaEnv } from '../alpaca/client.js';
+import { AlpacaError, getEquityUsd } from '../alpaca/client.js';
+import { db } from '../db/client.js';
+import { alpacaConnections } from '../db/schema.js';
+import { decryptString, encryptString } from '../util/crypto.js';
+
+const ConnectBodySchema = z.object({
+  apiKeyId: z.string().min(1),
+  apiSecretKey: z.string().min(1),
+  env: z.enum(['paper', 'live']).default('paper'),
+});
+
+export function registerAlpacaApi(app: FastifyInstance): void {
+  // POST /api/alpaca/connect — store encrypted credentials
+  app.post('/api/alpaca/connect', async (req: FastifyRequest, reply: FastifyReply) => {
+    const parsed = ConnectBodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
+
+    const { apiKeyId, apiSecretKey, env } = parsed.data;
+    const userId = req.user!.id;
+
+    await db()
+      .insert(alpacaConnections)
+      .values({
+        userId,
+        apiKeyId: encryptString(apiKeyId),
+        apiSecretKey: encryptString(apiSecretKey),
+        env,
+      })
+      .onConflictDoUpdate({
+        target: alpacaConnections.userId,
+        set: {
+          apiKeyId: encryptString(apiKeyId),
+          apiSecretKey: encryptString(apiSecretKey),
+          env,
+        },
+      });
+
+    req.log.info({ userId, env }, 'alpaca connected');
+    return { ok: true };
+  });
+
+  // GET /api/alpaca/status — check connection + return cached equity
+  app.get('/api/alpaca/status', async (req: FastifyRequest, reply: FastifyReply) => {
+    const userId = req.user!.id;
+    const [conn] = await db().select().from(alpacaConnections).where(eq(alpacaConnections.userId, userId));
+    if (!conn) return reply.status(404).send({ error: 'not connected' });
+
+    return {
+      env: conn.env,
+      lastEquityUsd: conn.lastEquityUsd !== null ? parseFloat(conn.lastEquityUsd) : null,
+      lastSyncedAt: conn.lastSyncedAt?.toISOString() ?? null,
+    };
+  });
+
+  // POST /api/alpaca/sync — fetch live equity from Alpaca and cache it
+  app.post('/api/alpaca/sync', async (req: FastifyRequest, reply: FastifyReply) => {
+    const userId = req.user!.id;
+    const [conn] = await db().select().from(alpacaConnections).where(eq(alpacaConnections.userId, userId));
+    if (!conn) return reply.status(404).send({ error: 'not connected' });
+
+    try {
+      const equity = await getEquityUsd(
+        decryptString(conn.apiKeyId),
+        decryptString(conn.apiSecretKey),
+        conn.env as AlpacaEnv,
+      );
+
+      await db()
+        .update(alpacaConnections)
+        .set({ lastEquityUsd: equity.toString(), lastSyncedAt: new Date() })
+        .where(eq(alpacaConnections.userId, userId));
+
+      req.log.info({ userId, equity }, 'alpaca sync complete');
+      return { equity };
+    } catch (err) {
+      if (err instanceof AlpacaError && (err.status === 401 || err.status === 403)) {
+        return reply.status(401).send({ error: 'Invalid Alpaca API credentials' });
+      }
+      throw err;
+    }
+  });
+
+  // DELETE /api/alpaca/connect — remove connection
+  app.delete('/api/alpaca/connect', async (req: FastifyRequest, reply: FastifyReply) => {
+    const userId = req.user!.id;
+    await db().delete(alpacaConnections).where(eq(alpacaConnections.userId, userId));
+    req.log.info({ userId }, 'alpaca disconnected');
+    return reply.status(204).send();
+  });
+}
