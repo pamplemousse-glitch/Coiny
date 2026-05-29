@@ -225,6 +225,13 @@
       "when": 1748908800000,
       "tag": "0031_energy_farmland",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1749859200000,
+      "tag": "0032_trading_cards_coins",
+      "breakpoints": true
     }
   ]
 }
