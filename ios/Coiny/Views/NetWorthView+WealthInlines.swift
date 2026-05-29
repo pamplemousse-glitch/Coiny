@@ -349,6 +349,109 @@ struct DiscogsInlineView: View {
     }
 }
 
+// MARK: - Polymarket inline
+
+struct PolymarketInlineView: View {
+    let vm: PolymarketViewModel
+    @State private var newAddress = ""
+    @State private var newLabel = ""
+    @State private var isAdding = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if vm.isLoading {
+                ProgressView().frame(maxWidth: .infinity).padding(.vertical, 8)
+            } else if vm.accounts.isEmpty {
+                emptyView
+            } else {
+                accountsList
+            }
+            if let error = vm.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+            }
+        }
+    }
+
+    private var emptyView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Add your Polygon wallet address to track Polymarket positions.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            addForm
+        }
+        .padding(.top, 4)
+    }
+
+    private var accountsList: some View {
+        VStack(spacing: 4) {
+            ForEach(vm.accounts) { account in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(account.label ?? "Polymarket Wallet")
+                            .font(.subheadline)
+                        Text(String(account.walletAddress.prefix(10)) + "…")
+                            .font(.caption2.monospaced())
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if let value = account.lastValueUsd {
+                        Text(value, format: .currency(code: "USD"))
+                            .font(.subheadline.monospacedDigit())
+                    }
+                    Button {
+                        Task { await vm.removeAccount(address: account.walletAddress) }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.vertical, 2)
+            }
+            Divider().padding(.vertical, 4)
+            HStack {
+                Button(vm.isSyncing ? "Syncing…" : "Sync") {
+                    Task { await vm.sync() }
+                }
+                .font(.caption)
+                .buttonStyle(.bordered)
+                .disabled(vm.isSyncing)
+                Spacer()
+                Button("Add wallet") { isAdding.toggle() }
+                    .font(.caption)
+            }
+            if isAdding {
+                addForm
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    private var addForm: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            TextField("Polygon address (0x…)", text: $newAddress)
+                .font(.caption.monospaced())
+                .textFieldStyle(.roundedBorder)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+            TextField("Label (optional)", text: $newLabel)
+                .font(.caption)
+                .textFieldStyle(.roundedBorder)
+            Button("Add") {
+                let addr = newAddress; let lbl = newLabel.isEmpty ? nil : newLabel
+                Task {
+                    await vm.addAccount(walletAddress: addr, label: lbl)
+                    newAddress = ""; newLabel = ""; isAdding = false
+                }
+            }
+            .font(.caption)
+            .buttonStyle(.borderedProminent)
+            .disabled(newAddress.isEmpty)
+        }
+        .padding(.top, 4)
+    }
+}
+
 // MARK: - RSA key generation for Kalshi
 
 enum KalshiKeyGen {

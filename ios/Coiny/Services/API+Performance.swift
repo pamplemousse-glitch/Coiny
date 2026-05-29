@@ -19,6 +19,7 @@ struct NetWorthResponse: Decodable {
     let ynab: Double
     let vinyl: Double?
     let kalshi: Double?
+    let polymarket: Double?
     let debts: Double
     let liquidCashMonths: Double?
     let accounts: NetWorthAccounts

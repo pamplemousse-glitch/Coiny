@@ -17,6 +17,7 @@ struct NetWorthView: View {
     @State private var ynabVM = YnabViewModel()
     @State private var kalshiVM = KalshiViewModel()
     @State private var discogsVM = DiscogsViewModel()
+    @State private var polymarketVM = PolymarketViewModel()
 
     var body: some View {
         NavigationStack {
@@ -50,8 +51,9 @@ struct NetWorthView: View {
         async let vehicles: () = vehiclesVM.loadAssets()
         async let kalshi: () = kalshiVM.loadStatus()
         async let discogs: () = discogsVM.loadStatus()
+        async let polymarket: () = polymarketVM.loadAccounts()
         _ = await (netWorth, coinbase, zerion, spinwheel, performance, chainWallets,
-                   hyperliquid, metals, sneakers, realEstate, vehicles, kalshi, discogs)
+                   hyperliquid, metals, sneakers, realEstate, vehicles, kalshi, discogs, polymarket)
     }
 
     @ViewBuilder
@@ -80,6 +82,7 @@ struct NetWorthView: View {
                     snaptradeSection(data)
                     ynabSection(data)
                     kalshiSection(data)
+                    polymarketSection(data)
                     debtsSection(data)
                     performanceSection()
                     Spacer(minLength: 32)
@@ -338,6 +341,16 @@ extension NetWorthView {
                 sectionHeader(title: "Kalshi", total: data.kalshi ?? 0, icon: "chart.pie.fill", color: .indigo)
                 Divider().padding(.vertical, 6)
                 KalshiInlineView(vm: kalshiVM, isConnected: kalshiVM.isConnected || (data.connections.kalshi ?? false))
+            }
+        }
+    }
+
+    private func polymarketSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Polymarket", total: data.polymarket ?? 0, icon: "chart.xyaxis.line", color: .purple)
+                Divider().padding(.vertical, 6)
+                PolymarketInlineView(vm: polymarketVM)
             }
         }
     }
