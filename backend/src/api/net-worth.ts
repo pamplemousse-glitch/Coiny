@@ -10,6 +10,7 @@ import {
   hyperliquidAccounts,
   kalshiConnections,
   krakenConnections,
+  manualAssets,
   metalHoldings,
   nftWallets,
   petState,
@@ -301,6 +302,17 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // table not yet populated
     }
 
+    // --- Manual assets (self-reported values) ---
+    let manualTotal = 0;
+    try {
+      const rows = await db().select().from(manualAssets).where(eq(manualAssets.userId, userId));
+      for (const r of rows) {
+        manualTotal += parseFloat(r.selfReportedValueUsd);
+      }
+    } catch {
+      // table not yet populated
+    }
+
     // --- YNAB budgets (pre-synced total) ---
     let ynabTotal = 0;
     let ynabConnected = false;
@@ -419,6 +431,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       metalsTotal +
       sneakersTotal +
       nftTotal +
+      manualTotal +
       snaptradeTotal +
       ynabTotal +
       vinylTotal +
@@ -477,6 +490,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       metals: metalsTotal,
       sneakers: sneakersTotal,
       nft: nftTotal,
+      manual: manualTotal,
       kalshi: kalshiTotal,
       kraken: krakenTotal,
       alpaca: alpacaTotal,

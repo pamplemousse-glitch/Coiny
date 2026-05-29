@@ -404,6 +404,23 @@ export const nftWallets = pgTable(
   (t) => [uniqueIndex('nft_wallets_user_address_idx').on(t.userId, t.address)],
 );
 
+// Manual assets — self-reported value for assets with no automated pricing API.
+// Categories: art, life_insurance, luxury_handbags, watches, wine, annuities,
+// pension, mineral_rights, intellectual_property, fractional_collectibles,
+// crowdfunded_equity, timeshare, aircraft, other.
+export const manualAssets = pgTable('manual_assets', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  category: text('category').notNull(),
+  selfReportedValueUsd: numeric('self_reported_value_usd').notNull(),
+  notes: text('notes'),
+  lastUpdatedAt: timestamp('last_updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Sneaker holdings — valued via KicksDB (StockX + GOAT pricing).
 // SKU identifies the model (e.g. "DZ5485-612"). Size is optional — if set,
 // sync will fetch the specific size's lowest ask; otherwise uses the product min_price.

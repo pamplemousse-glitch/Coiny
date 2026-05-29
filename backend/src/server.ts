@@ -4,6 +4,7 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify from 'fastify';
 import { registerAccountApi } from './api/account.js';
 import { registerAlpacaApi } from './api/alpaca.js';
+import { registerManualAssetsApi } from './api/manual-assets.js';
 import { registerAuthApi } from './api/auth.js';
 import { registerChainWalletsApi } from './api/chain-wallets.js';
 import { registerCoinbaseApi } from './api/coinbase.js';
@@ -106,6 +107,7 @@ async function buildApp() {
     registerSpinwheelApi(scope);
     registerSnaptradeApi(scope);
     registerSneakersApi(scope);
+    registerManualAssetsApi(scope);
     registerChainWalletsApi(scope);
     registerHyperliquidApi(scope);
     registerKalshiConnectApi(scope);
