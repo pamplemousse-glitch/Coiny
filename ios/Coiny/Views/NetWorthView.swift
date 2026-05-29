@@ -18,6 +18,10 @@ struct NetWorthView: View {
     @State private var kalshiVM = KalshiViewModel()
     @State private var discogsVM = DiscogsViewModel()
     @State private var polymarketVM = PolymarketViewModel()
+    @State private var alpacaVM = AlpacaViewModel()
+    @State private var steamVM = SteamViewModel()
+    @State private var nftVM = NftViewModel()
+    @State private var manualAssetsVM = ManualAssetsViewModel()
 
     var body: some View {
         NavigationStack {
@@ -35,6 +39,10 @@ struct NetWorthView: View {
         .environment(sneakersVM)
         .environment(realEstateVM)
         .environment(vehiclesVM)
+        .environment(alpacaVM)
+        .environment(steamVM)
+        .environment(nftVM)
+        .environment(manualAssetsVM)
     }
 
     private func reload() async {
@@ -52,8 +60,13 @@ struct NetWorthView: View {
         async let kalshi: () = kalshiVM.loadStatus()
         async let discogs: () = discogsVM.loadStatus()
         async let polymarket: () = polymarketVM.loadAccounts()
+        async let alpaca: () = alpacaVM.loadStatus()
+        async let steam: () = steamVM.loadAccounts()
+        async let nft: () = nftVM.loadWallets()
+        async let manualAssets: () = manualAssetsVM.loadAssets()
         _ = await (netWorth, coinbase, zerion, spinwheel, performance, chainWallets,
-                   hyperliquid, metals, sneakers, realEstate, vehicles, kalshi, discogs, polymarket)
+                   hyperliquid, metals, sneakers, realEstate, vehicles, kalshi, discogs,
+                   polymarket, alpaca, steam, nft, manualAssets)
     }
 
     @ViewBuilder
@@ -73,6 +86,10 @@ struct NetWorthView: View {
                     defiSection(data)
                     chainWalletsSection(data)
                     hyperliquidSection(data)
+                    nftSection(data)
+                    steamSection(data)
+                    alpacaSection(data)
+                    manualAssetsSection(data)
                     metalsSection(data)
                     realEstateSection(data)
                     vehiclesSection(data)
@@ -249,6 +266,46 @@ extension NetWorthView {
         }
     }
 
+    private func nftSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "NFT Wallets", total: data.nft ?? 0, icon: "photo.stack", color: .purple)
+                Divider().padding(.vertical, 6)
+                NftView()
+            }
+        }
+    }
+
+    private func steamSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "CS2 Skins", total: data.steam ?? 0, icon: "gamecontroller.fill", color: .cyan)
+                Divider().padding(.vertical, 6)
+                SteamView()
+            }
+        }
+    }
+
+    private func alpacaSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Alpaca", total: data.alpaca ?? 0, icon: "chart.bar.xaxis", color: .green)
+                Divider().padding(.vertical, 6)
+                AlpacaView()
+            }
+        }
+    }
+
+    private func manualAssetsSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Other Assets", total: data.manual ?? 0, icon: "archivebox.fill", color: .brown)
+                Divider().padding(.vertical, 6)
+                ManualAssetsView()
+            }
+        }
+    }
+
     // MARK: - Add-your-own asset sections
 
     private func metalsSection(_ data: NetWorthResponse) -> some View {
@@ -413,117 +470,6 @@ extension NetWorthView {
                 .font(.headline.monospacedDigit())
                 .foregroundStyle(total < 0 ? .red : .primary)
         }
-    }
-}
-
-// MARK: - Spinwheel inline (existing, unchanged)
-
-private struct SpinwheelInlineView: View {
-    let vm: SpinwheelViewModel
-
-    var body: some View {
-        if vm.isLoading {
-            ProgressView("Checking status…")
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-        } else if vm.isConnected {
-            connectedContent
-        } else if vm.showOtpEntry {
-            OtpInlineView(vm: vm)
-        } else {
-            PhoneInlineView(vm: vm)
-        }
-    }
-
-    @ViewBuilder
-    private var connectedContent: some View {
-        if vm.debts.isEmpty {
-            Text("No debts found")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.top, 4)
-        } else {
-            ForEach(vm.debts) { debt in
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(debt.debtType?.capitalized ?? "Debt").font(.subheadline)
-                        if let monthly = debt.monthlyPayment {
-                            Text("\(monthly, format: .currency(code: "USD"))/mo")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    Spacer()
-                    if let balance = debt.balance {
-                        Text(-balance, format: .currency(code: "USD"))
-                            .font(.subheadline.monospacedDigit())
-                            .foregroundStyle(.red)
-                    }
-                }
-                .padding(.vertical, 2)
-            }
-        }
-        Button("Disconnect Spinwheel", role: .destructive) {
-            Task { await vm.disconnect() }
-        }
-        .font(.caption)
-        .padding(.top, 4)
-    }
-}
-
-private struct PhoneInlineView: View {
-    let vm: SpinwheelViewModel
-    @State private var phone = ""
-    @State private var dob = ""
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Connect debt tracker")
-                .font(.subheadline.weight(.semibold))
-            TextField("Phone (+1…)", text: $phone)
-                .keyboardType(.phonePad)
-                .textContentType(.telephoneNumber)
-                .textFieldStyle(.roundedBorder)
-            TextField("Date of birth (YYYY-MM-DD)", text: $dob)
-                .keyboardType(.numbersAndPunctuation)
-                .textFieldStyle(.roundedBorder)
-            if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red)
-            }
-            Button("Send code") {
-                let p = phone; let d = dob
-                Task { await vm.sendOtp(phone: p, dateOfBirth: d) }
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(phone.isEmpty || dob.isEmpty)
-        }
-        .padding(.top, 4)
-    }
-}
-
-private struct OtpInlineView: View {
-    let vm: SpinwheelViewModel
-    @State private var code = ""
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Enter the code sent to \(vm.pendingPhone)")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-            TextField("6-digit code", text: $code)
-                .keyboardType(.numberPad)
-                .textContentType(.oneTimeCode)
-                .textFieldStyle(.roundedBorder)
-            if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red)
-            }
-            Button("Verify") {
-                let c = code
-                Task { await vm.verifyOtp(code: c) }
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(code.isEmpty)
-        }
-        .padding(.top, 4)
     }
 }
 

@@ -114,8 +114,17 @@ actor API {
     }
 
     func signOut() {
+        let token = sessionToken
+        let logoutURL = URL(string: "/api/auth/logout", relativeTo: baseURL)!
         sessionStore.clear()
         sessionToken = nil
+        // Fire-and-forget: invalidate the server session so the bearer token cannot be reused.
+        Task {
+            var req = URLRequest(url: logoutURL)
+            req.httpMethod = "POST"
+            if let t = token { req.addValue("Bearer \(t)", forHTTPHeaderField: "Authorization") }
+            _ = try? await http.data(for: req)
+        }
     }
 
     // MARK: - Pet
@@ -279,6 +288,10 @@ actor API {
 
     func post<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T {
         try await request(method: "POST", path: path, body: body, requiresAuth: true)
+    }
+
+    func patch<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T {
+        try await request(method: "PATCH", path: path, body: body, requiresAuth: true)
     }
 
     func delete<T: Decodable>(_ path: String) async throws -> T {
