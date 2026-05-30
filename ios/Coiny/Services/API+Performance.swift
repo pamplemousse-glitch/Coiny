@@ -25,6 +25,16 @@ struct NetWorthResponse: Decodable {
     let vinyl: Double?
     let kalshi: Double?
     let polymarket: Double?
+    let nft: Double?
+    let manual: Double?
+    let steam: Double?
+    let alpaca: Double?
+    let truelayer: Double?
+    let pokemonCards: Double?
+    let energy: Double?
+    let farmland: Double?
+    let tradingCards: Double?
+    let coins: Double?
     let debts: Double
     let liquidCashMonths: Double?
     let accounts: NetWorthAccounts

@@ -1,86 +1,50 @@
 import { z } from 'zod';
+import { config } from '../config.js';
 
-// EIA Open Data API v2 — https://www.eia.gov/opendata/
-// Free key: https://www.eia.gov/opendata/register.php
+// EIA v2 API — weekly spot prices for energy commodities.
+// Series IDs: WTI crude = RWTC, Brent = RBRTE, Henry Hub natural gas = RNGWHHD
+const COMMODITY_SERIES: Record<string, { route: string; series: string }> = {
+  wti_crude: { route: 'petroleum/pri/spt', series: 'RWTC' },
+  brent: { route: 'petroleum/pri/spt', series: 'RBRTE' },
+  natural_gas: { route: 'natural-gas/pri/fut', series: 'RNGWHHD' },
+};
 
-const EIA_BASE = 'https://api.eia.gov/v2';
-
-// Supported commodity identifiers → { route, seriesId, unit }
-// WTI and Brent spot prices from EIA petroleum spot prices dataset.
-// Henry Hub from natural gas spot prices dataset.
-export const EIA_COMMODITIES = {
-  wti_crude: {
-    route: '/petroleum/pri/spt/data/',
-    facets: { series: 'RWTC' },
-    unit: 'barrel',
-    displayName: 'WTI Crude Oil',
-  },
-  brent_crude: {
-    route: '/petroleum/pri/spt/data/',
-    facets: { series: 'RBRTE' },
-    unit: 'barrel',
-    displayName: 'Brent Crude Oil',
-  },
-  natural_gas: {
-    route: '/natural-gas/pri/fut/data/',
-    facets: { series: 'RNGWHHD' },
-    unit: 'mmbtu',
-    displayName: 'Natural Gas (Henry Hub)',
-  },
-} as const;
-
-export type EiaCommodity = keyof typeof EIA_COMMODITIES;
-
-const EiaDataResponseSchema = z.object({
+const EiaResponseSchema = z.object({
   response: z.object({
     data: z.array(
       z.object({
         period: z.string(),
-        value: z.number().nullable(),
+        value: z.union([z.number(), z.string()]).nullable(),
       }),
     ),
   }),
 });
 
-/**
- * Fetches the latest spot price (USD per unit) for the given commodity.
- * Returns null if the key is absent, the API errors, or no data is returned.
- */
-export async function getEiaSpotPrice(commodity: EiaCommodity, apiKey: string): Promise<number | null> {
-  if (!apiKey) return null;
+export async function getEnergySpotPrice(commodity: string): Promise<number | null> {
+  if (!config.EIA_API_KEY) return null;
 
-  const meta = EIA_COMMODITIES[commodity];
-  const url = new URL(`${EIA_BASE}${meta.route}`);
-  url.searchParams.set('api_key', apiKey);
-  url.searchParams.set('frequency', 'daily');
-  url.searchParams.set('data[0]', 'value');
-  url.searchParams.set('facets[series][]', meta.facets.series);
-  url.searchParams.set('sort[0][column]', 'period');
-  url.searchParams.set('sort[0][direction]', 'desc');
-  url.searchParams.set('length', '1');
+  const meta = COMMODITY_SERIES[commodity];
+  if (!meta) return null;
 
-  const res = await fetch(url.toString());
+  const params = new URLSearchParams({
+    api_key: config.EIA_API_KEY,
+    'facets[series][]': meta.series,
+    'data[0]': 'value',
+    'sort[0][column]': 'period',
+    'sort[0][direction]': 'desc',
+    offset: '0',
+    length: '1',
+  });
+
+  const res = await fetch(`https://api.eia.gov/v2/${meta.route}/data/?${params}`);
   if (!res.ok) return null;
 
-  const raw: unknown = await res.json();
-  const parsed = EiaDataResponseSchema.safeParse(raw);
+  const parsed = EiaResponseSchema.safeParse(await res.json());
   if (!parsed.success) return null;
 
-  const row = parsed.data.response.data[0];
-  return row?.value ?? null;
-}
+  const point = parsed.data.response.data[0];
+  if (!point?.value) return null;
 
-/**
- * Returns a map of commodity → spot price for all supported commodities.
- * Entries with null prices (API down or key missing) are omitted from the map.
- */
-export async function getAllEiaSpotPrices(apiKey: string): Promise<Map<EiaCommodity, number>> {
-  const entries = await Promise.all(
-    (Object.keys(EIA_COMMODITIES) as EiaCommodity[]).map(async (commodity) => {
-      const price = await getEiaSpotPrice(commodity, apiKey).catch(() => null);
-      return [commodity, price] as const;
-    }),
-  );
-
-  return new Map(entries.filter((e): e is [EiaCommodity, number] => e[1] !== null));
+  const price = typeof point.value === 'string' ? parseFloat(point.value) : point.value;
+  return isNaN(price) ? null : price;
 }

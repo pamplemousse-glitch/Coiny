@@ -12,8 +12,8 @@ extension API: SteamViewModelAPI {}
 @Observable @MainActor final class SteamViewModel {
     private(set) var accounts: [SteamAccount] = []
     private(set) var isLoading = false
+    private(set) var isSyncing = false
     private(set) var errorMessage: String?
-    private(set) var lastSynced: Int?
 
     private let api: any SteamViewModelAPI
 
@@ -44,23 +44,24 @@ extension API: SteamViewModelAPI {}
     }
 
     func removeAccount(_ account: SteamAccount) async {
-        accounts.removeAll { $0.id == account.id }
+        errorMessage = nil
         do {
             try await api.removeSteamAccount(id: account.id)
+            accounts.removeAll { $0.id == account.id }
         } catch {
             errorMessage = error.localizedDescription
-            await loadAccounts()
         }
     }
 
     func sync() async {
+        isSyncing = true
         errorMessage = nil
         do {
-            let result = try await api.syncSteam()
-            lastSynced = result.synced
+            _ = try await api.syncSteam()
             await loadAccounts()
         } catch {
             errorMessage = error.localizedDescription
         }
+        isSyncing = false
     }
 }

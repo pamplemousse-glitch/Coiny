@@ -452,6 +452,903 @@ struct PolymarketInlineView: View {
     }
 }
 
+// MARK: - NFT Wallets inline
+
+struct NftInlineView: View {
+    let vm: NftViewModel
+    @State private var newAddress = ""
+    @State private var newLabel = ""
+    @State private var isAdding = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if vm.isLoading {
+                ProgressView().frame(maxWidth: .infinity).padding(.vertical, 8)
+            } else if vm.wallets.isEmpty {
+                emptyView
+            } else {
+                walletsList
+            }
+            if let error = vm.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+            }
+        }
+    }
+
+    private var emptyView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Add an Ethereum wallet to track NFT floor prices.")
+                .font(.caption).foregroundStyle(.secondary)
+            addForm
+        }
+        .padding(.top, 4)
+    }
+
+    private var walletsList: some View {
+        VStack(spacing: 4) {
+            ForEach(vm.wallets) { wallet in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(wallet.label ?? "NFT Wallet").font(.subheadline)
+                        Text(String(wallet.address.prefix(10)) + "…")
+                            .font(.caption2.monospaced()).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if let value = wallet.lastValueUsd {
+                        Text(value, format: .currency(code: "USD"))
+                            .font(.subheadline.monospacedDigit())
+                    }
+                    Button { Task { await vm.removeWallet(address: wallet.address) } } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.vertical, 2)
+            }
+            Divider().padding(.vertical, 4)
+            HStack {
+                Button(vm.isSyncing ? "Syncing…" : "Sync") { Task { await vm.sync() } }
+                    .font(.caption).buttonStyle(.bordered).disabled(vm.isSyncing)
+                Spacer()
+                Button("Add wallet") { isAdding.toggle() }.font(.caption)
+            }
+            if isAdding { addForm }
+        }
+        .padding(.top, 4)
+    }
+
+    private var addForm: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            TextField("0x… address", text: $newAddress)
+                .font(.caption.monospaced()).textFieldStyle(.roundedBorder)
+                .autocorrectionDisabled().textInputAutocapitalization(.never)
+            TextField("Label (optional)", text: $newLabel)
+                .font(.caption).textFieldStyle(.roundedBorder)
+            Button("Add") {
+                let addr = newAddress; let lbl = newLabel.isEmpty ? nil : newLabel
+                Task {
+                    await vm.addWallet(address: addr, label: lbl)
+                    newAddress = ""; newLabel = ""; isAdding = false
+                }
+            }
+            .font(.caption).buttonStyle(.borderedProminent).disabled(newAddress.isEmpty)
+        }
+        .padding(.top, 4)
+    }
+}
+
+// MARK: - Steam / CS2 Skins inline
+
+struct SteamInlineView: View {
+    let vm: SteamViewModel
+    @State private var newSteamId = ""
+    @State private var newLabel = ""
+    @State private var isAdding = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if vm.isLoading {
+                ProgressView().frame(maxWidth: .infinity).padding(.vertical, 8)
+            } else if vm.accounts.isEmpty {
+                emptyView
+            } else {
+                accountsList
+            }
+            if let error = vm.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+            }
+        }
+    }
+
+    private var emptyView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Add your Steam ID to track CS2 skin values.")
+                .font(.caption).foregroundStyle(.secondary)
+            addForm
+        }
+        .padding(.top, 4)
+    }
+
+    private var accountsList: some View {
+        VStack(spacing: 4) {
+            ForEach(vm.accounts) { account in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(account.label ?? "Steam Account").font(.subheadline)
+                        Text(account.steamId64)
+                            .font(.caption2.monospaced()).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if let value = account.lastPortfolioUsd {
+                        Text(value, format: .currency(code: "USD"))
+                            .font(.subheadline.monospacedDigit())
+                    }
+                    Button { Task { await vm.removeAccount(account) } } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.vertical, 2)
+            }
+            Divider().padding(.vertical, 4)
+            HStack {
+                Button(vm.isSyncing ? "Syncing…" : "Sync") { Task { await vm.sync() } }
+                    .font(.caption).buttonStyle(.bordered).disabled(vm.isSyncing)
+                Spacer()
+                Button("Add account") { isAdding.toggle() }.font(.caption)
+            }
+            if isAdding { addForm }
+        }
+        .padding(.top, 4)
+    }
+
+    private var addForm: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            TextField("Steam ID64 (17 digits)", text: $newSteamId)
+                .font(.caption.monospaced()).textFieldStyle(.roundedBorder)
+                .keyboardType(.numberPad)
+            TextField("Label (optional)", text: $newLabel)
+                .font(.caption).textFieldStyle(.roundedBorder)
+            Button("Add") {
+                let id = newSteamId; let lbl = newLabel.isEmpty ? nil : newLabel
+                Task {
+                    await vm.addAccount(steamId64: id, label: lbl)
+                    newSteamId = ""; newLabel = ""; isAdding = false
+                }
+            }
+            .font(.caption).buttonStyle(.borderedProminent).disabled(newSteamId.count != 17)
+        }
+        .padding(.top, 4)
+    }
+}
+
+// MARK: - Alpaca inline
+
+struct AlpacaInlineView: View {
+    let vm: AlpacaViewModel
+    @State private var showingSetup = false
+    @State private var apiKeyId = ""
+    @State private var apiSecretKey = ""
+    @State private var env = "paper"
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if vm.isLoading {
+                ProgressView().frame(maxWidth: .infinity).padding(.vertical, 8)
+            } else if vm.isConnected {
+                connectedView
+            } else {
+                disconnectedView
+            }
+            if let error = vm.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+            }
+        }
+        .sheet(isPresented: $showingSetup) { setupSheet }
+    }
+
+    private var disconnectedView: some View {
+        HStack {
+            Text("Connect Alpaca brokerage").font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            Button("Connect") { showingSetup = true }.font(.caption).buttonStyle(.bordered)
+        }
+        .padding(.top, 4)
+    }
+
+    private var connectedView: some View {
+        HStack {
+            if let status = vm.status {
+                Text(status.env == "live" ? "Live" : "Paper").font(.caption).foregroundStyle(.secondary)
+            }
+            Button("Sync") { Task { await vm.sync() } }.font(.caption).buttonStyle(.bordered)
+            Spacer()
+            Button("Disconnect", role: .destructive) { Task { await vm.disconnect() } }.font(.caption)
+        }
+        .padding(.top, 4)
+    }
+
+    private var setupSheet: some View {
+        NavigationStack {
+            Form {
+                Section("API Key ID") {
+                    TextField("e.g. PKXXXXXXXXXX", text: $apiKeyId).autocorrectionDisabled().textInputAutocapitalization(.never)
+                }
+                Section("Secret Key") {
+                    SecureField("Secret key", text: $apiSecretKey)
+                }
+                Section("Environment") {
+                    Picker("Env", selection: $env) {
+                        Text("Paper (sandbox)").tag("paper")
+                        Text("Live").tag("live")
+                    }
+                    .pickerStyle(.segmented)
+                }
+            }
+            .navigationTitle("Connect Alpaca")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showingSetup = false; reset() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Connect") {
+                        let k = apiKeyId; let s = apiSecretKey; let e = env
+                        showingSetup = false; reset()
+                        Task { await vm.connect(apiKeyId: k, apiSecretKey: s, env: e) }
+                    }
+                    .disabled(apiKeyId.isEmpty || apiSecretKey.isEmpty)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    private func reset() { apiKeyId = ""; apiSecretKey = ""; env = "paper" }
+}
+
+// MARK: - Manual Assets inline
+
+struct ManualAssetsInlineView: View {
+    let vm: ManualAssetsViewModel
+    @State private var showingAdd = false
+    @State private var newName = ""
+    @State private var newCategory = "Other"
+    @State private var newValue = ""
+
+    private let categories = ["Art", "Collectibles", "Jewelry", "Wine", "Watches", "Sports", "Other"]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if vm.isLoading {
+                ProgressView().frame(maxWidth: .infinity).padding(.vertical, 8)
+            } else if vm.assets.isEmpty {
+                emptyView
+            } else {
+                assetsList
+            }
+            if let error = vm.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+            }
+        }
+        .sheet(isPresented: $showingAdd) { addSheet }
+    }
+
+    private var emptyView: some View {
+        HStack {
+            Text("No manual assets added").font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            Button { showingAdd = true } label: {
+                Label("Add", systemImage: "plus.circle").font(.caption)
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    private var assetsList: some View {
+        VStack(spacing: 0) {
+            ForEach(vm.assets) { asset in
+                Divider().padding(.vertical, 6)
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(asset.name).font(.subheadline).lineLimit(1)
+                        Text(asset.category).font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Text(asset.selfReportedValueUsd, format: .currency(code: "USD"))
+                        .font(.subheadline.monospacedDigit())
+                }
+                .swipeActions {
+                    Button(role: .destructive) { Task { await vm.removeAsset(asset) } } label: {
+                        Label("Remove", systemImage: "trash")
+                    }
+                }
+            }
+            HStack {
+                Button { showingAdd = true } label: {
+                    Label("Add", systemImage: "plus.circle").font(.caption)
+                }
+                Spacer()
+            }
+            .padding(.top, 6)
+        }
+    }
+
+    private var addSheet: some View {
+        NavigationStack {
+            Form {
+                Section("Name") { TextField("e.g. Rolex Submariner", text: $newName) }
+                Section("Category") {
+                    Picker("Category", selection: $newCategory) {
+                        ForEach(categories, id: \.self) { Text($0).tag($0) }
+                    }
+                }
+                Section("Estimated value (USD)") {
+                    TextField("0.00", text: $newValue).keyboardType(.decimalPad)
+                }
+            }
+            .navigationTitle("Add Asset")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showingAdd = false; resetForm() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") {
+                        let n = newName; let c = newCategory; let v = Double(newValue) ?? 0
+                        showingAdd = false; resetForm()
+                        Task { await vm.addAsset(name: n, category: c, value: v, notes: nil) }
+                    }
+                    .disabled(newName.isEmpty || Double(newValue) == nil)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    private func resetForm() { newName = ""; newCategory = "Other"; newValue = "" }
+}
+
+// MARK: - TrueLayer inline
+
+struct TruelayerInlineView: View {
+    let vm: TruelayerViewModel
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if vm.isLoading {
+                ProgressView().frame(maxWidth: .infinity).padding(.vertical, 8)
+            } else if vm.isConnected {
+                connectedView
+            } else {
+                disconnectedView
+            }
+            if let error = vm.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+            }
+        }
+    }
+
+    private var disconnectedView: some View {
+        HStack {
+            Text("Connect UK/EU bank account").font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            Text("Via TrueLayer").font(.caption2).foregroundStyle(.tertiary)
+        }
+        .padding(.top, 4)
+    }
+
+    private var connectedView: some View {
+        HStack {
+            Button("Sync") { Task { await vm.sync() } }.font(.caption).buttonStyle(.bordered)
+            Spacer()
+            Button("Disconnect", role: .destructive) { Task { await vm.disconnect() } }.font(.caption)
+        }
+        .padding(.top, 4)
+    }
+}
+
+// MARK: - Pokemon Cards inline
+
+struct PokemonCardsInlineView: View {
+    let vm: PokemonCardsViewModel
+    @State private var showingAdd = false
+    @State private var newCardName = ""
+    @State private var newSetName = ""
+    @State private var newVariant = ""
+    @State private var newQuantity = "1"
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if vm.isLoading {
+                ProgressView().frame(maxWidth: .infinity).padding(.vertical, 8)
+            } else if vm.holdings.isEmpty {
+                emptyView
+            } else {
+                holdingsList
+            }
+            if let error = vm.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+            }
+        }
+        .sheet(isPresented: $showingAdd) { addSheet }
+    }
+
+    private var emptyView: some View {
+        HStack {
+            Text("No cards added").font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            Button { showingAdd = true } label: { Label("Add", systemImage: "plus.circle").font(.caption) }
+        }
+        .padding(.top, 4)
+    }
+
+    private var holdingsList: some View {
+        VStack(spacing: 0) {
+            ForEach(vm.holdings) { holding in
+                Divider().padding(.vertical, 6)
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(holding.label ?? holding.cardName).font(.subheadline).lineLimit(1)
+                        HStack(spacing: 4) {
+                            if let set = holding.setName { Text(set).font(.caption).foregroundStyle(.secondary) }
+                            if let v = holding.variant { Text(v).font(.caption).foregroundStyle(.secondary) }
+                            if holding.quantity > 1 { Text("×\(holding.quantity)").font(.caption).foregroundStyle(.secondary) }
+                        }
+                    }
+                    Spacer()
+                    if let value = holding.valueUsd {
+                        Text(value, format: .currency(code: "USD")).font(.subheadline.monospacedDigit())
+                    } else {
+                        Text("—").font(.subheadline).foregroundStyle(.secondary)
+                    }
+                }
+                .swipeActions {
+                    Button(role: .destructive) { Task { await vm.removeHolding(holding) } } label: { Label("Remove", systemImage: "trash") }
+                }
+            }
+            HStack {
+                Button { showingAdd = true } label: { Label("Add", systemImage: "plus.circle").font(.caption) }
+                Spacer()
+                Button { Task { await vm.sync() } } label: {
+                    if let n = vm.lastSynced { Label("Synced \(n)", systemImage: "checkmark.circle").font(.caption) }
+                    else { Label("Sync", systemImage: "arrow.clockwise").font(.caption) }
+                }
+            }
+            .padding(.top, 6)
+        }
+    }
+
+    private var addSheet: some View {
+        NavigationStack {
+            Form {
+                Section("Card Name") { TextField("e.g. Charizard", text: $newCardName) }
+                Section("Set (optional)") { TextField("e.g. Base Set", text: $newSetName) }
+                Section("Variant (optional)") { TextField("e.g. Holofoil", text: $newVariant) }
+                Section("Quantity") { TextField("1", text: $newQuantity).keyboardType(.numberPad) }
+            }
+            .navigationTitle("Add Pokemon Card")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showingAdd = false; resetForm() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") {
+                        let cn = newCardName
+                        let sn = newSetName.isEmpty ? nil : newSetName
+                        let vr = newVariant.isEmpty ? nil : newVariant
+                        let qty = Int(newQuantity) ?? 1
+                        showingAdd = false; resetForm()
+                        Task { await vm.addHolding(cardName: cn, setName: sn, variant: vr, quantity: qty, label: nil) }
+                    }
+                    .disabled(newCardName.isEmpty)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    private func resetForm() { newCardName = ""; newSetName = ""; newVariant = ""; newQuantity = "1" }
+}
+
+// MARK: - Energy Positions inline
+
+struct EnergyInlineView: View {
+    let vm: EnergyViewModel
+    @State private var showingAdd = false
+    @State private var newCommodity = "wti_crude"
+    @State private var newQuantity = ""
+    @State private var newLabel = ""
+
+    private let commodities = [("wti_crude", "WTI Crude Oil"), ("brent", "Brent Crude"), ("natural_gas", "Natural Gas")]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if vm.isLoading {
+                ProgressView().frame(maxWidth: .infinity).padding(.vertical, 8)
+            } else if vm.positions.isEmpty {
+                emptyView
+            } else {
+                positionsList
+            }
+            if let error = vm.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+            }
+        }
+        .sheet(isPresented: $showingAdd) { addSheet }
+    }
+
+    private var emptyView: some View {
+        HStack {
+            Text("No energy positions added").font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            Button { showingAdd = true } label: { Label("Add", systemImage: "plus.circle").font(.caption) }
+        }
+        .padding(.top, 4)
+    }
+
+    private var positionsList: some View {
+        VStack(spacing: 0) {
+            ForEach(vm.positions) { pos in
+                Divider().padding(.vertical, 6)
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(pos.label ?? commodityName(pos.commodity)).font(.subheadline).lineLimit(1)
+                        Text("\(pos.quantity, specifier: "%.2f") \(pos.quantityUnit)").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if let value = pos.valueUsd {
+                        Text(value, format: .currency(code: "USD")).font(.subheadline.monospacedDigit())
+                    } else {
+                        Text("—").font(.subheadline).foregroundStyle(.secondary)
+                    }
+                }
+                .swipeActions {
+                    Button(role: .destructive) { Task { await vm.removePosition(pos) } } label: { Label("Remove", systemImage: "trash") }
+                }
+            }
+            HStack {
+                Button { showingAdd = true } label: { Label("Add", systemImage: "plus.circle").font(.caption) }
+                Spacer()
+                Button { Task { await vm.sync() } } label: {
+                    if let n = vm.lastUpdated { Label("Synced \(n)", systemImage: "checkmark.circle").font(.caption) }
+                    else { Label("Sync", systemImage: "arrow.clockwise").font(.caption) }
+                }
+            }
+            .padding(.top, 6)
+        }
+    }
+
+    private var addSheet: some View {
+        NavigationStack {
+            Form {
+                Section("Commodity") {
+                    Picker("Commodity", selection: $newCommodity) {
+                        ForEach(commodities, id: \.0) { Text($1).tag($0) }
+                    }
+                }
+                Section("Quantity") { TextField("e.g. 100", text: $newQuantity).keyboardType(.decimalPad) }
+                Section("Label (optional)") { TextField("e.g. Futures position", text: $newLabel) }
+            }
+            .navigationTitle("Add Energy Position")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showingAdd = false; resetForm() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") {
+                        let c = newCommodity; let q = Double(newQuantity) ?? 0; let l = newLabel.isEmpty ? nil : newLabel
+                        showingAdd = false; resetForm()
+                        Task { await vm.addPosition(commodity: c, quantity: q, label: l) }
+                    }
+                    .disabled(Double(newQuantity) == nil || (Double(newQuantity) ?? 0) <= 0)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    private func commodityName(_ key: String) -> String {
+        commodities.first { $0.0 == key }?.1 ?? key
+    }
+    private func resetForm() { newCommodity = "wti_crude"; newQuantity = ""; newLabel = "" }
+}
+
+// MARK: - Farmland Parcels inline
+
+struct FarmlandInlineView: View {
+    let vm: FarmlandViewModel
+    @State private var showingAdd = false
+    @State private var newState = ""
+    @State private var newAcres = ""
+    @State private var newLabel = ""
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if vm.isLoading {
+                ProgressView().frame(maxWidth: .infinity).padding(.vertical, 8)
+            } else if vm.parcels.isEmpty {
+                emptyView
+            } else {
+                parcelsList
+            }
+            if let error = vm.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+            }
+        }
+        .sheet(isPresented: $showingAdd) { addSheet }
+    }
+
+    private var emptyView: some View {
+        HStack {
+            Text("No farmland parcels added").font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            Button { showingAdd = true } label: { Label("Add", systemImage: "plus.circle").font(.caption) }
+        }
+        .padding(.top, 4)
+    }
+
+    private var parcelsList: some View {
+        VStack(spacing: 0) {
+            ForEach(vm.parcels) { parcel in
+                Divider().padding(.vertical, 6)
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(parcel.label ?? String(format: "%.1f ac, %@", parcel.acres, parcel.stateCode))
+                            .font(.subheadline).lineLimit(1)
+                        Text("\(parcel.acres, specifier: "%.1f") acres in \(parcel.stateCode)")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if let value = parcel.valueUsd {
+                        Text(value, format: .currency(code: "USD")).font(.subheadline.monospacedDigit())
+                    } else {
+                        Text("—").font(.subheadline).foregroundStyle(.secondary)
+                    }
+                }
+                .swipeActions {
+                    Button(role: .destructive) { Task { await vm.removeParcel(parcel) } } label: { Label("Remove", systemImage: "trash") }
+                }
+            }
+            HStack {
+                Button { showingAdd = true } label: { Label("Add", systemImage: "plus.circle").font(.caption) }
+                Spacer()
+                Button { Task { await vm.sync() } } label: {
+                    if let n = vm.lastUpdated { Label("Synced \(n)", systemImage: "checkmark.circle").font(.caption) }
+                    else { Label("Sync", systemImage: "arrow.clockwise").font(.caption) }
+                }
+            }
+            .padding(.top, 6)
+        }
+    }
+
+    private var addSheet: some View {
+        NavigationStack {
+            Form {
+                Section("State (2-letter code)") {
+                    TextField("e.g. IA", text: $newState).autocorrectionDisabled().textInputAutocapitalization(.characters)
+                }
+                Section("Acres") { TextField("e.g. 50", text: $newAcres).keyboardType(.decimalPad) }
+                Section("Label (optional)") { TextField("e.g. Iowa parcel", text: $newLabel) }
+            }
+            .navigationTitle("Add Farmland")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showingAdd = false; resetForm() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") {
+                        let s = newState; let a = Double(newAcres) ?? 0; let l = newLabel.isEmpty ? nil : newLabel
+                        showingAdd = false; resetForm()
+                        Task { await vm.addParcel(stateCode: s, acres: a, label: l) }
+                    }
+                    .disabled(newState.count != 2 || (Double(newAcres) ?? 0) <= 0)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    private func resetForm() { newState = ""; newAcres = ""; newLabel = "" }
+}
+
+// MARK: - Trading Cards inline
+
+struct TradingCardsInlineView: View {
+    let vm: TradingCardsViewModel
+    @State private var showingAdd = false
+    @State private var newGame = ""
+    @State private var newCardName = ""
+    @State private var newSetName = ""
+    @State private var newIsFoil = false
+    @State private var newQuantity = "1"
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if vm.isLoading {
+                ProgressView().frame(maxWidth: .infinity).padding(.vertical, 8)
+            } else if vm.holdings.isEmpty {
+                emptyView
+            } else {
+                holdingsList
+            }
+            if let error = vm.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+            }
+        }
+        .sheet(isPresented: $showingAdd) { addSheet }
+    }
+
+    private var emptyView: some View {
+        HStack {
+            Text("No trading cards added").font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            Button { showingAdd = true } label: { Label("Add", systemImage: "plus.circle").font(.caption) }
+        }
+        .padding(.top, 4)
+    }
+
+    private var holdingsList: some View {
+        VStack(spacing: 0) {
+            ForEach(vm.holdings) { holding in
+                Divider().padding(.vertical, 6)
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(holding.label ?? holding.cardName).font(.subheadline).lineLimit(1)
+                        HStack(spacing: 4) {
+                            Text(holding.game.capitalized).font(.caption).foregroundStyle(.secondary)
+                            if let set = holding.setName { Text(set).font(.caption).foregroundStyle(.secondary) }
+                            if holding.quantity > 1 { Text("×\(holding.quantity)").font(.caption).foregroundStyle(.secondary) }
+                        }
+                    }
+                    Spacer()
+                    if let value = holding.valueUsd {
+                        Text(value, format: .currency(code: "USD")).font(.subheadline.monospacedDigit())
+                    } else {
+                        Text("—").font(.subheadline).foregroundStyle(.secondary)
+                    }
+                }
+                .swipeActions {
+                    Button(role: .destructive) { Task { await vm.removeHolding(holding) } } label: { Label("Remove", systemImage: "trash") }
+                }
+            }
+            HStack {
+                Button { showingAdd = true } label: { Label("Add", systemImage: "plus.circle").font(.caption) }
+                Spacer()
+                Button { Task { await vm.sync() } } label: {
+                    if let n = vm.lastUpdated { Label("Synced \(n)", systemImage: "checkmark.circle").font(.caption) }
+                    else { Label("Sync", systemImage: "arrow.clockwise").font(.caption) }
+                }
+            }
+            .padding(.top, 6)
+        }
+    }
+
+    private var addSheet: some View {
+        NavigationStack {
+            Form {
+                Section("Game") { TextField("e.g. magic, yugioh, sports", text: $newGame).autocorrectionDisabled() }
+                Section("Card Name") { TextField("e.g. Black Lotus", text: $newCardName) }
+                Section("Set (optional)") { TextField("e.g. Alpha", text: $newSetName) }
+                Section("Quantity") { TextField("1", text: $newQuantity).keyboardType(.numberPad) }
+                Section { Toggle("Foil", isOn: $newIsFoil) }
+            }
+            .navigationTitle("Add Trading Card")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showingAdd = false; resetForm() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") {
+                        let g = newGame; let cn = newCardName
+                        let sn = newSetName.isEmpty ? nil : newSetName
+                        let qty = Int(newQuantity) ?? 1
+                        showingAdd = false; resetForm()
+                        Task { await vm.addHolding(game: g, cardName: cn, setName: sn, isFoil: newIsFoil, quantity: qty, label: nil) }
+                    }
+                    .disabled(newGame.isEmpty || newCardName.isEmpty)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    private func resetForm() { newGame = ""; newCardName = ""; newSetName = ""; newIsFoil = false; newQuantity = "1" }
+}
+
+// MARK: - Graded Coins inline
+
+struct CoinsInlineView: View {
+    let vm: CoinsViewModel
+    @State private var showingAdd = false
+    @State private var newPcgsNumber = ""
+    @State private var newGrade = ""
+    @State private var newLabel = ""
+    @State private var newQuantity = "1"
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if vm.isLoading {
+                ProgressView().frame(maxWidth: .infinity).padding(.vertical, 8)
+            } else if vm.holdings.isEmpty {
+                emptyView
+            } else {
+                holdingsList
+            }
+            if let error = vm.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+            }
+        }
+        .sheet(isPresented: $showingAdd) { addSheet }
+    }
+
+    private var emptyView: some View {
+        HStack {
+            Text("No graded coins added").font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            Button { showingAdd = true } label: { Label("Add", systemImage: "plus.circle").font(.caption) }
+        }
+        .padding(.top, 4)
+    }
+
+    private var holdingsList: some View {
+        VStack(spacing: 0) {
+            ForEach(vm.holdings) { holding in
+                Divider().padding(.vertical, 6)
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(holding.label ?? (holding.coinName ?? "PCGS \(holding.pcgsNo)")).font(.subheadline).lineLimit(1)
+                        HStack(spacing: 4) {
+                            Text("MS-\(holding.gradeNo)\(holding.plusGrade ? "+" : "")").font(.caption).foregroundStyle(.secondary)
+                            if holding.quantity > 1 { Text("×\(holding.quantity)").font(.caption).foregroundStyle(.secondary) }
+                        }
+                    }
+                    Spacer()
+                    if let value = holding.valueUsd {
+                        Text(value, format: .currency(code: "USD")).font(.subheadline.monospacedDigit())
+                    } else {
+                        Text("—").font(.subheadline).foregroundStyle(.secondary)
+                    }
+                }
+                .swipeActions {
+                    Button(role: .destructive) { Task { await vm.removeHolding(holding) } } label: { Label("Remove", systemImage: "trash") }
+                }
+            }
+            HStack {
+                Button { showingAdd = true } label: { Label("Add", systemImage: "plus.circle").font(.caption) }
+                Spacer()
+                Button { Task { await vm.sync() } } label: {
+                    if let n = vm.lastUpdated { Label("Synced \(n)", systemImage: "checkmark.circle").font(.caption) }
+                    else { Label("Sync", systemImage: "arrow.clockwise").font(.caption) }
+                }
+            }
+            .padding(.top, 6)
+        }
+    }
+
+    private var addSheet: some View {
+        NavigationStack {
+            Form {
+                Section("PCGS Number") { TextField("e.g. 3870", text: $newPcgsNumber).keyboardType(.numberPad) }
+                Section("Grade (MS number, e.g. 65)") { TextField("e.g. 65", text: $newGrade).keyboardType(.numberPad) }
+                Section("Label (optional)") { TextField("e.g. 1881-S Morgan Dollar", text: $newLabel) }
+                Section("Quantity") { TextField("1", text: $newQuantity).keyboardType(.numberPad) }
+            }
+            .navigationTitle("Add Graded Coin")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showingAdd = false; resetForm() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") {
+                        let pn = Int(newPcgsNumber) ?? 0
+                        let gr = Int(newGrade) ?? 0
+                        let lbl = newLabel.isEmpty ? nil : newLabel
+                        let qty = Int(newQuantity) ?? 1
+                        showingAdd = false; resetForm()
+                        Task { await vm.addHolding(pcgsNo: pn, gradeNo: gr, plusGrade: false, label: lbl, quantity: qty) }
+                    }
+                    .disabled(Int(newPcgsNumber) == nil || Int(newGrade) == nil)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    private func resetForm() { newPcgsNumber = ""; newGrade = ""; newLabel = ""; newQuantity = "1" }
+}
+
 // MARK: - RSA key generation for Kalshi
 
 enum KalshiKeyGen {

@@ -46,6 +46,16 @@ final class NetWorthViewModelTests: XCTestCase {
             vinyl: nil,
             kalshi: nil,
             polymarket: nil,
+            nft: nil,
+            manual: nil,
+            steam: nil,
+            alpaca: nil,
+            truelayer: nil,
+            pokemonCards: nil,
+            energy: nil,
+            farmland: nil,
+            tradingCards: nil,
+            coins: nil,
             debts: 0,
             liquidCashMonths: nil,
             accounts: NetWorthAccounts(
@@ -106,6 +116,16 @@ final class NetWorthViewModelTests: XCTestCase {
             vinyl: nil,
             kalshi: nil,
             polymarket: nil,
+            nft: nil,
+            manual: nil,
+            steam: nil,
+            alpaca: nil,
+            truelayer: nil,
+            pokemonCards: nil,
+            energy: nil,
+            farmland: nil,
+            tradingCards: nil,
+            coins: nil,
             debts: 0,
             liquidCashMonths: 3.5,
             accounts: NetWorthAccounts(
@@ -171,6 +191,16 @@ final class NetWorthViewModelTests: XCTestCase {
             vinyl: nil,
             kalshi: nil,
             polymarket: nil,
+            nft: nil,
+            manual: nil,
+            steam: nil,
+            alpaca: nil,
+            truelayer: nil,
+            pokemonCards: nil,
+            energy: nil,
+            farmland: nil,
+            tradingCards: nil,
+            coins: nil,
             debts: -2000,
             liquidCashMonths: nil,
             accounts: NetWorthAccounts(
@@ -217,6 +247,16 @@ final class NetWorthViewModelTests: XCTestCase {
             vinyl: 200,
             kalshi: 50,
             polymarket: 125,
+            nft: nil,
+            manual: nil,
+            steam: nil,
+            alpaca: nil,
+            truelayer: nil,
+            pokemonCards: nil,
+            energy: nil,
+            farmland: nil,
+            tradingCards: nil,
+            coins: nil,
             debts: -1250,
             liquidCashMonths: nil,
             accounts: NetWorthAccounts(bank: [], investments: [], crypto: [], defi: DefiTotal(totalUSD: 0), debts: []),
@@ -243,5 +283,59 @@ final class NetWorthViewModelTests: XCTestCase {
         XCTAssertTrue(vm.netWorth?.connections.kalshi == true)
         XCTAssertTrue(vm.netWorth?.connections.alpaca == true)
         XCTAssertTrue(vm.netWorth?.connections.truelayer == true)
+    }
+
+    func testLoadWithCollectiblesAndNewAssets() async {
+        let fake = FakeAPI()
+        let response = NetWorthResponse(
+            total: 20_000,
+            bank: 5000,
+            investments: 0,
+            crypto: 0,
+            defi: 0,
+            chainWallets: 0,
+            hyperliquid: 0,
+            realEstate: 0,
+            vehicles: 0,
+            metals: 0,
+            sneakers: 0,
+            kraken: 0,
+            snaptrade: 0,
+            ynab: 0,
+            vinyl: nil,
+            kalshi: nil,
+            polymarket: nil,
+            nft: 2500,
+            manual: 1000,
+            steam: 750,
+            alpaca: 3000,
+            truelayer: 1500,
+            pokemonCards: 800,
+            energy: 2000,
+            farmland: 1500,
+            tradingCards: 900,
+            coins: 1050,
+            debts: 0,
+            liquidCashMonths: nil,
+            accounts: NetWorthAccounts(bank: [], investments: [], crypto: [], defi: DefiTotal(totalUSD: 0), debts: []),
+            connections: NetWorthConnections(coinbase: false, zerion: false, spinwheel: false, kraken: false, snaptrade: false, ynab: false, kalshi: nil)
+        )
+        fake.setResult(.success(response))
+        let vm = NetWorthViewModel(api: fake)
+
+        await vm.load()
+
+        XCTAssertEqual(vm.netWorth?.nft, 2500)
+        XCTAssertEqual(vm.netWorth?.manual, 1000)
+        XCTAssertEqual(vm.netWorth?.steam, 750)
+        XCTAssertEqual(vm.netWorth?.alpaca, 3000)
+        XCTAssertEqual(vm.netWorth?.truelayer, 1500)
+        XCTAssertEqual(vm.netWorth?.pokemonCards, 800)
+        XCTAssertEqual(vm.netWorth?.energy, 2000)
+        XCTAssertEqual(vm.netWorth?.farmland, 1500)
+        XCTAssertEqual(vm.netWorth?.tradingCards, 900)
+        XCTAssertEqual(vm.netWorth?.coins, 1050)
+        XCTAssertEqual(vm.netWorth?.total, 20_000)
+        if case .loaded = vm.state { } else { XCTFail("Expected .loaded") }
     }
 }

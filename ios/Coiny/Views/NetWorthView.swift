@@ -18,10 +18,16 @@ struct NetWorthView: View {
     @State private var kalshiVM = KalshiViewModel()
     @State private var discogsVM = DiscogsViewModel()
     @State private var polymarketVM = PolymarketViewModel()
-    @State private var alpacaVM = AlpacaViewModel()
-    @State private var steamVM = SteamViewModel()
     @State private var nftVM = NftViewModel()
+    @State private var steamVM = SteamViewModel()
+    @State private var alpacaVM = AlpacaViewModel()
     @State private var manualAssetsVM = ManualAssetsViewModel()
+    @State private var truelayerVM = TruelayerViewModel()
+    @State private var pokemonCardsVM = PokemonCardsViewModel()
+    @State private var energyVM = EnergyViewModel()
+    @State private var farmlandVM = FarmlandViewModel()
+    @State private var tradingCardsVM = TradingCardsViewModel()
+    @State private var coinsVM = CoinsViewModel()
 
     var body: some View {
         NavigationStack {
@@ -43,6 +49,12 @@ struct NetWorthView: View {
         .environment(steamVM)
         .environment(nftVM)
         .environment(manualAssetsVM)
+        .environment(truelayerVM)
+        .environment(pokemonCardsVM)
+        .environment(energyVM)
+        .environment(farmlandVM)
+        .environment(tradingCardsVM)
+        .environment(coinsVM)
     }
 
     private func reload() async {
@@ -60,13 +72,20 @@ struct NetWorthView: View {
         async let kalshi: () = kalshiVM.loadStatus()
         async let discogs: () = discogsVM.loadStatus()
         async let polymarket: () = polymarketVM.loadAccounts()
-        async let alpaca: () = alpacaVM.loadStatus()
-        async let steam: () = steamVM.loadAccounts()
         async let nft: () = nftVM.loadWallets()
+        async let steam: () = steamVM.loadAccounts()
+        async let alpaca: () = alpacaVM.loadStatus()
         async let manualAssets: () = manualAssetsVM.loadAssets()
+        async let truelayer: () = truelayerVM.loadStatus()
+        async let pokemonCards: () = pokemonCardsVM.loadHoldings()
+        async let energy: () = energyVM.loadPositions()
+        async let farmland: () = farmlandVM.loadParcels()
+        async let tradingCards: () = tradingCardsVM.loadHoldings()
+        async let coins: () = coinsVM.loadHoldings()
         _ = await (netWorth, coinbase, zerion, spinwheel, performance, chainWallets,
-                   hyperliquid, metals, sneakers, realEstate, vehicles, kalshi, discogs,
-                   polymarket, alpaca, steam, nft, manualAssets)
+                   hyperliquid, metals, sneakers, realEstate, vehicles, kalshi, discogs, polymarket,
+                   nft, steam, alpaca, manualAssets, truelayer, pokemonCards, energy, farmland,
+                   tradingCards, coins)
     }
 
     @ViewBuilder
@@ -100,6 +119,12 @@ struct NetWorthView: View {
                     ynabSection(data)
                     kalshiSection(data)
                     polymarketSection(data)
+                    truelayerSection(data)
+                    pokemonCardsSection(data)
+                    energySection(data)
+                    farmlandSection(data)
+                    tradingCardsSection(data)
+                    coinsSection(data)
                     debtsSection(data)
                     performanceSection()
                     Spacer(minLength: 32)
@@ -413,6 +438,106 @@ extension NetWorthView {
     }
 
     // MARK: - Debts + Performance
+
+    private func nftSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "NFTs", total: data.nft ?? 0, icon: "photo.stack.fill", color: .indigo)
+                Divider().padding(.vertical, 6)
+                NftInlineView(vm: nftVM)
+            }
+        }
+    }
+
+    private func steamSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "CS2 Skins", total: data.steam ?? 0, icon: "gamecontroller.fill", color: .gray)
+                Divider().padding(.vertical, 6)
+                SteamInlineView(vm: steamVM)
+            }
+        }
+    }
+
+    private func alpacaSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Alpaca", total: data.alpaca ?? 0, icon: "chart.line.uptrend.xyaxis.circle", color: .green)
+                Divider().padding(.vertical, 6)
+                AlpacaInlineView(vm: alpacaVM)
+            }
+        }
+    }
+
+    private func manualAssetsSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Manual Assets", total: data.manual ?? 0, icon: "pencil.circle.fill", color: .brown)
+                Divider().padding(.vertical, 6)
+                ManualAssetsInlineView(vm: manualAssetsVM)
+            }
+        }
+    }
+
+    private func truelayerSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "UK/EU Bank", total: data.truelayer ?? 0, icon: "building.columns", color: .blue)
+                Divider().padding(.vertical, 6)
+                TruelayerInlineView(vm: truelayerVM)
+            }
+        }
+    }
+
+    private func pokemonCardsSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Pokemon Cards", total: data.pokemonCards ?? 0, icon: "menucard.fill", color: .yellow)
+                Divider().padding(.vertical, 6)
+                PokemonCardsInlineView(vm: pokemonCardsVM)
+            }
+        }
+    }
+
+    private func energySection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Energy", total: data.energy ?? 0, icon: "bolt.circle.fill", color: .orange)
+                Divider().padding(.vertical, 6)
+                EnergyInlineView(vm: energyVM)
+            }
+        }
+    }
+
+    private func farmlandSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Farmland", total: data.farmland ?? 0, icon: "leaf.fill", color: .green)
+                Divider().padding(.vertical, 6)
+                FarmlandInlineView(vm: farmlandVM)
+            }
+        }
+    }
+
+    private func tradingCardsSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Trading Cards", total: data.tradingCards ?? 0, icon: "rectangle.stack.fill", color: .purple)
+                Divider().padding(.vertical, 6)
+                TradingCardsInlineView(vm: tradingCardsVM)
+            }
+        }
+    }
+
+    private func coinsSection(_ data: NetWorthResponse) -> some View {
+        GroupBox {
+            VStack(spacing: 0) {
+                sectionHeader(title: "Graded Coins", total: data.coins ?? 0, icon: "circle.fill", color: .yellow)
+                Divider().padding(.vertical, 6)
+                CoinsInlineView(vm: coinsVM)
+            }
+        }
+    }
 
     private func debtsSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
