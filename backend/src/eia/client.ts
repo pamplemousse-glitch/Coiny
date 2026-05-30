@@ -46,5 +46,5 @@ export async function getEnergySpotPrice(commodity: string): Promise<number | nu
   if (!point?.value) return null;
 
   const price = typeof point.value === 'string' ? parseFloat(point.value) : point.value;
-  return isNaN(price) ? null : price;
+  return Number.isNaN(price) ? null : price;
 }

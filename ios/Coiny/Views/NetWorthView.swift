@@ -22,12 +22,12 @@ struct NetWorthView: View {
     @State private var steamVM = SteamViewModel()
     @State private var nftVM = NftViewModel()
     @State private var manualAssetsVM = ManualAssetsViewModel()
-    @State private var truelayerVM = TruelayerViewModel()
-    @State private var pokemonCardsVM = PokemonCardsViewModel()
-    @State private var energyVM = EnergyViewModel()
-    @State private var farmlandVM = FarmlandViewModel()
-    @State private var tradingCardsVM = TradingCardsViewModel()
-    @State private var coinsVM = CoinsViewModel()
+    @State var truelayerVM = TruelayerViewModel()
+    @State var pokemonCardsVM = PokemonCardsViewModel()
+    @State var energyVM = EnergyViewModel()
+    @State var farmlandVM = FarmlandViewModel()
+    @State var tradingCardsVM = TradingCardsViewModel()
+    @State var coinsVM = CoinsViewModel()
 
     var body: some View {
         NavigationStack {
@@ -437,68 +437,6 @@ extension NetWorthView {
         }
     }
 
-    // MARK: - New asset classes
-
-    private func truelayerSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "UK/EU Bank", total: data.truelayer ?? 0, icon: "building.columns", color: .blue)
-                Divider().padding(.vertical, 6)
-                TruelayerInlineView(vm: truelayerVM)
-            }
-        }
-    }
-
-    private func pokemonCardsSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Pokemon Cards", total: data.pokemonCards ?? 0, icon: "menucard.fill", color: .yellow)
-                Divider().padding(.vertical, 6)
-                PokemonCardsInlineView(vm: pokemonCardsVM)
-            }
-        }
-    }
-
-    private func energySection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Energy", total: data.energy ?? 0, icon: "bolt.circle.fill", color: .orange)
-                Divider().padding(.vertical, 6)
-                EnergyInlineView(vm: energyVM)
-            }
-        }
-    }
-
-    private func farmlandSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Farmland", total: data.farmland ?? 0, icon: "leaf.fill", color: .green)
-                Divider().padding(.vertical, 6)
-                FarmlandInlineView(vm: farmlandVM)
-            }
-        }
-    }
-
-    private func tradingCardsSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Trading Cards", total: data.tradingCards ?? 0, icon: "rectangle.stack.fill", color: .purple)
-                Divider().padding(.vertical, 6)
-                TradingCardsInlineView(vm: tradingCardsVM)
-            }
-        }
-    }
-
-    private func coinsSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Graded Coins", total: data.coins ?? 0, icon: "circle.fill", color: .yellow)
-                Divider().padding(.vertical, 6)
-                CoinsInlineView(vm: coinsVM)
-            }
-        }
-    }
-
     // MARK: - Debts + Performance
 
     private func debtsSection(_ data: NetWorthResponse) -> some View {
@@ -547,7 +485,7 @@ extension NetWorthView {
 
     // MARK: - Shared header helper
 
-    private func sectionHeader(title: String, total: Double, icon: String, color: Color) -> some View {
+    func sectionHeader(title: String, total: Double, icon: String, color: Color) -> some View {
         HStack {
             Label(title, systemImage: icon)
                 .font(.headline)

@@ -2,6 +2,7 @@ import Foundation
 
 protocol TradingCardsViewModelAPI: Sendable {
     func getTradingCards() async throws -> [TradingCardHolding]
+    // swiftlint:disable:next function_parameter_count
     func addTradingCard(game: String, cardName: String, setName: String?, isFoil: Bool, quantity: Int, label: String?) async throws
     func removeTradingCard(id: Int) async throws
     func syncTradingCards() async throws -> TradingCardsSyncResult
@@ -32,6 +33,7 @@ extension API: TradingCardsViewModelAPI {}
         isLoading = false
     }
 
+    // swiftlint:disable:next function_parameter_count
     func addHolding(game: String, cardName: String, setName: String?, isFoil: Bool, quantity: Int, label: String?) async {
         guard !game.isEmpty, !cardName.isEmpty, quantity > 0 else { return }
         errorMessage = nil

@@ -368,7 +368,8 @@ extension API {
 
     func addPokemonCard(cardName: String, setName: String?, variant: String?, quantity: Int, label: String?) async throws {
         struct Body: Encodable { let cardName: String; let setName: String?; let variant: String?; let quantity: Int; let label: String? }
-        let _: EmptyResponse = try await post("/api/pokemon-cards", body: Body(cardName: cardName, setName: setName, variant: variant, quantity: quantity, label: label))
+        let _: EmptyResponse = try await post("/api/pokemon-cards",
+            body: Body(cardName: cardName, setName: setName, variant: variant, quantity: quantity, label: label))
     }
 
     func removePokemonCard(id: Int) async throws {
@@ -485,9 +486,13 @@ extension API {
         try await get("/api/trading-cards")
     }
 
+    // swiftlint:disable:next function_parameter_count
     func addTradingCard(game: String, cardName: String, setName: String?, isFoil: Bool, quantity: Int, label: String?) async throws {
-        struct Body: Encodable { let game: String; let cardName: String; let setName: String?; let isFoil: Bool; let quantity: Int; let label: String? }
-        let _: EmptyResponse = try await post("/api/trading-cards", body: Body(game: game, cardName: cardName, setName: setName, isFoil: isFoil, quantity: quantity, label: label))
+        struct Body: Encodable {
+            let game: String; let cardName: String; let setName: String?; let isFoil: Bool; let quantity: Int; let label: String?
+        }
+        let _: EmptyResponse = try await post("/api/trading-cards",
+            body: Body(game: game, cardName: cardName, setName: setName, isFoil: isFoil, quantity: quantity, label: label))
     }
 
     func removeTradingCard(id: Int) async throws {
@@ -529,7 +534,8 @@ extension API {
 
     func addCoin(pcgsNo: Int, gradeNo: Int, plusGrade: Bool, label: String?, quantity: Int) async throws {
         struct Body: Encodable { let pcgsNo: Int; let gradeNo: Int; let plusGrade: Bool; let label: String?; let quantity: Int }
-        let _: EmptyResponse = try await post("/api/coins", body: Body(pcgsNo: pcgsNo, gradeNo: gradeNo, plusGrade: plusGrade, label: label, quantity: quantity))
+        let _: EmptyResponse = try await post("/api/coins",
+            body: Body(pcgsNo: pcgsNo, gradeNo: gradeNo, plusGrade: plusGrade, label: label, quantity: quantity))
     }
 
     func removeCoin(id: Int) async throws {

@@ -34,10 +34,10 @@ export async function getFarmlandPricePerAcre(stateCode: string): Promise<number
   if (!parsed.success || parsed.data.data.length === 0) return null;
 
   // Sort descending by year and take most recent
-  const sorted = [...parsed.data.data].sort((a, b) => parseInt(b.year) - parseInt(a.year));
+  const sorted = [...parsed.data.data].sort((a, b) => parseInt(b.year, 10) - parseInt(a.year, 10));
   const raw = sorted[0]?.Value.replace(/,/g, '');
   if (!raw) return null;
 
   const price = parseFloat(raw);
-  return isNaN(price) ? null : price;
+  return Number.isNaN(price) ? null : price;
 }

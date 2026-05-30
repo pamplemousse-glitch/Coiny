@@ -20,10 +20,10 @@ const PriceResponseSchema = z.object({
 });
 
 export async function getTradingCardPrice(
-  game: string,
   cardName: string,
+  game: string,
   setName: string | null,
-  condition: string | null,
+  _isFoil: boolean,
 ): Promise<number | null> {
   if (!config.TCGAPI_KEY) return null;
 
