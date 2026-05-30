@@ -506,6 +506,7 @@ struct SpendingSummaryResponse: Decodable {
     let monthlySpend: Double
     let monthlyIncome: Double
     let savingsRate: Int?
+    let spendByCategory: [String: Double]?
 }
 
 struct ChainWallet: Decodable, Identifiable {

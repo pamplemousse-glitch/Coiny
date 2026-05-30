@@ -130,6 +130,73 @@ describe('GET /api/spending/summary', () => {
     await app.close();
   });
 
+  it('returns spendByCategory breakdown for 30-day outflows', async () => {
+    const { persistTransactions } = await import('../src/store/transactions.js');
+
+    const recent = new Date();
+    recent.setDate(recent.getDate() - 5);
+    const dateStr = recent.toISOString().slice(0, 10);
+
+    await persistTransactions(testUserId, [
+      {
+        id: 'tx-groceries-1',
+        account_id: 'acct-1',
+        amount: '-80',
+        date: dateStr,
+        description: '',
+        status: 'posted',
+        type: 'debit',
+        running_balance: null,
+        details: { category: 'groceries' },
+      },
+      {
+        id: 'tx-groceries-2',
+        account_id: 'acct-1',
+        amount: '-40',
+        date: dateStr,
+        description: '',
+        status: 'posted',
+        type: 'debit',
+        running_balance: null,
+        details: { category: 'groceries' },
+      },
+      {
+        id: 'tx-gas-1',
+        account_id: 'acct-1',
+        amount: '-60',
+        date: dateStr,
+        description: '',
+        status: 'posted',
+        type: 'debit',
+        running_balance: null,
+        details: { category: 'gas' },
+      },
+      {
+        id: 'tx-uncategorized',
+        account_id: 'acct-1',
+        amount: '-25',
+        date: dateStr,
+        description: '',
+        status: 'posted',
+        type: 'debit',
+        running_balance: null,
+      },
+    ]);
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/spending/summary', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json<{ spendByCategory: Record<string, number> }>();
+    expect(body.spendByCategory['groceries']).toBe(120);
+    expect(body.spendByCategory['gas']).toBe(60);
+    expect(body.spendByCategory['uncategorized']).toBeUndefined();
+
+    await app.close();
+  });
+
   it('clamps savingsRate to 0 when spend exceeds income', async () => {
     const { persistTransactions } = await import('../src/store/transactions.js');
 

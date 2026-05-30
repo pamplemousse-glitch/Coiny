@@ -70,6 +70,14 @@ struct SpendingView: View {
                         }
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
+                        let cats = s.spendByCategory ?? [:]
+                        if !cats.isEmpty {
+                            Section {
+                                categoryCard(cats)
+                            }
+                            .listRowInsets(EdgeInsets())
+                            .listRowBackground(Color.clear)
+                        }
                     }
                     ForEach(pet.reactionHistory) { record in
                         VStack(alignment: .leading, spacing: 4) {
@@ -126,6 +134,28 @@ struct SpendingView: View {
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    private func categoryCard(_ cats: [String: Double]) -> some View {
+        let top = cats.sorted { $0.value > $1.value }.prefix(5)
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("Top categories")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            ForEach(Array(top), id: \.key) { cat, amount in
+                HStack {
+                    Text(cat.replacingOccurrences(of: "_", with: " ").capitalized)
+                        .font(.subheadline)
+                    Spacer()
+                    Text(amount, format: .currency(code: "USD"))
+                        .font(.subheadline.monospacedDigit())
+                }
+            }
+        }
+        .padding()
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal)
+        .padding(.vertical, 4)
     }
 
     private func savingsCard(_ s: SpendingSummaryResponse) -> some View {
