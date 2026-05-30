@@ -33,6 +33,7 @@ import { registerSpendingApi } from './api/spending.js';
 import { registerSpinwheelApi } from './api/spinwheel.js';
 import { registerSteamApi } from './api/steam.js';
 import { registerSubscriptionsApi } from './api/subscriptions.js';
+import { registerTradingCardsApi } from './api/trading-cards.js';
 import { registerTruelayerApi } from './api/truelayer.js';
 import { registerVehiclesApi } from './api/vehicles.js';
 import { registerYnabApi } from './api/ynab.js';

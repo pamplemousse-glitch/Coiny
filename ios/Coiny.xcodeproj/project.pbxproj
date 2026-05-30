@@ -55,6 +55,7 @@
 		5F0C355BD02737E6F5D5E1EF /* SpinwheelViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1597BEE9633642B9F378C2E1 /* SpinwheelViewModelTests.swift */; };
 		6373784D303F6045C615C96C /* VehiclesViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C104CD7196BD12428D6AC151 /* VehiclesViewModelTests.swift */; };
 		64A455E73B83DB1FB16A736C /* SessionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B52F2C8D5C291C6BC47B2D5F /* SessionStoreTests.swift */; };
+		65665956BAF079D33681790E /* NetWorthView+NewAssets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C6F512453CA990E88C3A680 /* NetWorthView+NewAssets.swift */; };
 		68F3B1C2F214EEB1C4834777 /* ManualAssetsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0209196E95540DCFD82D423E /* ManualAssetsViewModel.swift */; };
 		6A1F24CC68A861DB4DDC55AA /* APITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1930DD45F63912C82A22D91 /* APITests.swift */; };
 		6AF6260EB0FEC81C27CD7C50 /* FarmlandViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE56B9302E8CAD1CAD254B84 /* FarmlandViewModel.swift */; };
@@ -96,6 +97,7 @@
 		BB667B21F1E742E1B91C44B6 /* SteamViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1045EF85A494957F0B7FD75D /* SteamViewModel.swift */; };
 		BED52206F83EE89B18A6DA91 /* PerformanceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB3F1F9E3C16B6F23900A0B7 /* PerformanceViewModel.swift */; };
 		C35276938C6B206366D2DE1C /* MetalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D8B5B4F86546575B9C283D2 /* MetalsView.swift */; };
+		CAD485F77D89010A3CB34AFF /* NetWorthView+TruelayerInlines.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5BF95FA0B5D7E297B7E2A7D /* NetWorthView+TruelayerInlines.swift */; };
 		CE23ADF6F98689AC05C0F189 /* VehiclesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A701578AD63596DF877CA777 /* VehiclesViewModel.swift */; };
 		DBE346706AEA00CEFC43F53D /* TabNavigationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ABFBF4FEA310EB336444E6C /* TabNavigationUITests.swift */; };
 		DD03B585C6442E311CC91C3F /* API+Hyperliquid.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC280DD9C3B60AF909ACAA9B /* API+Hyperliquid.swift */; };
@@ -107,6 +109,7 @@
 		EFAF67196DAA3990A2B59658 /* NftViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE864FE76E73AB4892D0EFA8 /* NftViewModelTests.swift */; };
 		F2E6476046E44C11561AA329 /* SpinwheelInlineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8A82CF82C3C90B06D0E4C4C /* SpinwheelInlineView.swift */; };
 		F507AEF30B1975F896BDAF76 /* API+ManualAssets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65284E3BE19D29FB121805ED /* API+ManualAssets.swift */; };
+		F9F2B818A2F1E1602720D3E3 /* NetWorthView+CollectibleInlines.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03ABBE17E2D60E545CC0A547 /* NetWorthView+CollectibleInlines.swift */; };
 		FAC96919A888EBFD62B70071 /* WealthTabUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA22C9CCB74F58819DC9960 /* WealthTabUITests.swift */; };
 		FC63E5982E36EFDE0D57E1F0 /* KrakenViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF3AB3B3C4D15F76BFCDEC7E /* KrakenViewModelTests.swift */; };
 		FD5440E3088C2A67895BA668 /* ManualAssetsViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 823FA6E826200014C4EE9D0A /* ManualAssetsViewModelTests.swift */; };
@@ -132,6 +135,7 @@
 
 /* Begin PBXFileReference section */
 		0209196E95540DCFD82D423E /* ManualAssetsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualAssetsViewModel.swift; sourceTree = "<group>"; };
+		03ABBE17E2D60E545CC0A547 /* NetWorthView+CollectibleInlines.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NetWorthView+CollectibleInlines.swift"; sourceTree = "<group>"; };
 		03D03E4BF4F4B05BC31B30C2 /* KalshiViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KalshiViewModelTests.swift; sourceTree = "<group>"; };
 		087F5AB4BAEF11F6C77D4CAF /* KalshiViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KalshiViewModel.swift; sourceTree = "<group>"; };
 		0B9EDD0CD416E89DFFB54761 /* TradingCardsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradingCardsViewModel.swift; sourceTree = "<group>"; };
@@ -181,6 +185,7 @@
 		691F168939803E11E7179DA9 /* MetalsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalsViewModel.swift; sourceTree = "<group>"; };
 		6AF73651E65C599901D32475 /* ChainWalletsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChainWalletsView.swift; sourceTree = "<group>"; };
 		6D32ED5F0B28A5899A6EBA88 /* NftView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NftView.swift; sourceTree = "<group>"; };
+		7C6F512453CA990E88C3A680 /* NetWorthView+NewAssets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NetWorthView+NewAssets.swift"; sourceTree = "<group>"; };
 		81CC75C64283FC4C17486D50 /* API+Wealth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Wealth.swift"; sourceTree = "<group>"; };
 		823FA6E826200014C4EE9D0A /* ManualAssetsViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualAssetsViewModelTests.swift; sourceTree = "<group>"; };
 		851CD4156E2005F77706A82A /* API+Debug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Debug.swift"; sourceTree = "<group>"; };
@@ -197,6 +202,7 @@
 		9ABFBF4FEA310EB336444E6C /* TabNavigationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabNavigationUITests.swift; sourceTree = "<group>"; };
 		9C325B0CE4D4096419D6FB63 /* SneakersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SneakersView.swift; sourceTree = "<group>"; };
 		A06878870CA56FC423814E62 /* PetStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetStore.swift; sourceTree = "<group>"; };
+		A5BF95FA0B5D7E297B7E2A7D /* NetWorthView+TruelayerInlines.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NetWorthView+TruelayerInlines.swift"; sourceTree = "<group>"; };
 		A701578AD63596DF877CA777 /* VehiclesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehiclesViewModel.swift; sourceTree = "<group>"; };
 		A7569F588DE7E9E44FB2B517 /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
 		A8A82CF82C3C90B06D0E4C4C /* SpinwheelInlineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpinwheelInlineView.swift; sourceTree = "<group>"; };
@@ -363,6 +369,9 @@
 				C0845CBE9430D01E8553CC30 /* ManualAssetsView.swift */,
 				0D8B5B4F86546575B9C283D2 /* MetalsView.swift */,
 				8CBA112ED575DC589CB25311 /* NetWorthView.swift */,
+				03ABBE17E2D60E545CC0A547 /* NetWorthView+CollectibleInlines.swift */,
+				7C6F512453CA990E88C3A680 /* NetWorthView+NewAssets.swift */,
+				A5BF95FA0B5D7E297B7E2A7D /* NetWorthView+TruelayerInlines.swift */,
 				1A7BC569B5DF82AA7830B167 /* NetWorthView+WealthInlines.swift */,
 				6D32ED5F0B28A5899A6EBA88 /* NftView.swift */,
 				5E69C409A6001E059800119A /* OnboardingView.swift */,
@@ -607,6 +616,9 @@
 				68F3B1C2F214EEB1C4834777 /* ManualAssetsViewModel.swift in Sources */,
 				C35276938C6B206366D2DE1C /* MetalsView.swift in Sources */,
 				528DD11017726DEE1734B981 /* MetalsViewModel.swift in Sources */,
+				F9F2B818A2F1E1602720D3E3 /* NetWorthView+CollectibleInlines.swift in Sources */,
+				65665956BAF079D33681790E /* NetWorthView+NewAssets.swift in Sources */,
+				CAD485F77D89010A3CB34AFF /* NetWorthView+TruelayerInlines.swift in Sources */,
 				79A6E9C14C5F1D8EFD2101B2 /* NetWorthView+WealthInlines.swift in Sources */,
 				858777DC0C5838F950DA81CF /* NetWorthView.swift in Sources */,
 				34F94A94BD5BB03DCC7E3758 /* NetWorthViewModel.swift in Sources */,
