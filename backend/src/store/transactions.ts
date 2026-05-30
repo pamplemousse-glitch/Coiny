@@ -80,6 +80,7 @@ export interface SpendingSummary {
   monthlySpend: number;
   monthlyIncome: number;
   savingsRate: number | null;
+  spendByCategory: Record<string, number>;
 }
 
 // 30-day income vs spend from the transactions table.
@@ -91,16 +92,25 @@ export async function getSpendingSummary(userId: string): Promise<SpendingSummar
   const cutoffStr = cutoff.toISOString().slice(0, 10);
 
   const rows = await db()
-    .select({ amount: sql<string>`CAST(${transactions.amount} AS TEXT)` })
+    .select({
+      amount: sql<string>`CAST(${transactions.amount} AS TEXT)`,
+      category: transactions.category,
+    })
     .from(transactions)
     .where(and(eq(transactions.userId, userId), sql`${transactions.date} >= ${cutoffStr}`));
 
   let monthlySpend = 0;
   let monthlyIncome = 0;
+  const spendByCategory: Record<string, number> = {};
+
   for (const row of rows) {
     const amount = parseFloat(row.amount ?? '0');
     if (amount < 0) {
-      monthlySpend += Math.abs(amount);
+      const abs = Math.abs(amount);
+      monthlySpend += abs;
+      if (row.category) {
+        spendByCategory[row.category] = (spendByCategory[row.category] ?? 0) + abs;
+      }
     } else if (amount >= 50) {
       monthlyIncome += amount;
     }
@@ -109,7 +119,7 @@ export async function getSpendingSummary(userId: string): Promise<SpendingSummar
   const savingsRate =
     monthlyIncome > 0 ? Math.max(0, Math.min(100, Math.round((1 - monthlySpend / monthlyIncome) * 100))) : null;
 
-  return { monthlySpend, monthlyIncome, savingsRate };
+  return { monthlySpend, monthlyIncome, savingsRate, spendByCategory };
 }
 
 export async function getRecentOutflows(userId: string, days: number): Promise<StoredTransaction[]> {
