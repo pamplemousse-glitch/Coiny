@@ -2,8 +2,8 @@ import Foundation
 
 protocol ManualAssetsViewModelAPI: Sendable {
     func getManualAssets() async throws -> [ManualAsset]
-    func addManualAsset(name: String, category: String, value: Double, notes: String?) async throws
-    func removeManualAsset(id: Int) async throws
+    func createManualAsset(name: String, category: String, valueUsd: Double, notes: String?) async throws -> ManualAssetCreateResult
+    func deleteManualAsset(id: Int) async throws
 }
 
 extension API: ManualAssetsViewModelAPI {}
@@ -30,11 +30,11 @@ extension API: ManualAssetsViewModelAPI {}
         isLoading = false
     }
 
-    func addAsset(name: String, category: String, value: Double, notes: String?) async {
-        guard !name.isEmpty, value >= 0 else { return }
+    func addAsset(name: String, category: String, valueUsd: Double, notes: String?) async {
+        guard !name.isEmpty else { return }
         errorMessage = nil
         do {
-            try await api.addManualAsset(name: name, category: category, value: value, notes: notes)
+            _ = try await api.createManualAsset(name: name, category: category, valueUsd: valueUsd, notes: notes)
             await loadAssets()
         } catch {
             errorMessage = error.localizedDescription
@@ -42,12 +42,12 @@ extension API: ManualAssetsViewModelAPI {}
     }
 
     func removeAsset(_ asset: ManualAsset) async {
-        errorMessage = nil
+        assets.removeAll { $0.id == asset.id }
         do {
-            try await api.removeManualAsset(id: asset.id)
-            assets.removeAll { $0.id == asset.id }
+            try await api.deleteManualAsset(id: asset.id)
         } catch {
             errorMessage = error.localizedDescription
+            await loadAssets()
         }
     }
 }

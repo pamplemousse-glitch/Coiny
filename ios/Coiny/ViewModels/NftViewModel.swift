@@ -12,8 +12,8 @@ extension API: NftViewModelAPI {}
 @Observable @MainActor final class NftViewModel {
     private(set) var wallets: [NftWallet] = []
     private(set) var isLoading = false
-    private(set) var isSyncing = false
     private(set) var errorMessage: String?
+    private(set) var lastSyncUpdated: Int?
 
     private let api: any NftViewModelAPI
 
@@ -43,25 +43,24 @@ extension API: NftViewModelAPI {}
         }
     }
 
-    func removeWallet(address: String) async {
-        errorMessage = nil
+    func removeWallet(_ wallet: NftWallet) async {
+        wallets.removeAll { $0.id == wallet.id }
         do {
-            try await api.removeNftWallet(address: address)
-            wallets.removeAll { $0.address == address }
+            try await api.removeNftWallet(address: wallet.address)
         } catch {
             errorMessage = error.localizedDescription
+            await loadWallets()
         }
     }
 
     func sync() async {
-        isSyncing = true
         errorMessage = nil
         do {
-            _ = try await api.syncNft()
+            let result = try await api.syncNft()
+            lastSyncUpdated = result.updated
             await loadWallets()
         } catch {
             errorMessage = error.localizedDescription
         }
-        isSyncing = false
     }
 }
