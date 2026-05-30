@@ -22,6 +22,12 @@ struct NetWorthView: View {
     @State private var steamVM = SteamViewModel()
     @State private var nftVM = NftViewModel()
     @State private var manualAssetsVM = ManualAssetsViewModel()
+    @State var truelayerVM = TruelayerViewModel()
+    @State var pokemonCardsVM = PokemonCardsViewModel()
+    @State var energyVM = EnergyViewModel()
+    @State var farmlandVM = FarmlandViewModel()
+    @State var tradingCardsVM = TradingCardsViewModel()
+    @State var coinsVM = CoinsViewModel()
 
     var body: some View {
         NavigationStack {
@@ -43,6 +49,12 @@ struct NetWorthView: View {
         .environment(steamVM)
         .environment(nftVM)
         .environment(manualAssetsVM)
+        .environment(truelayerVM)
+        .environment(pokemonCardsVM)
+        .environment(energyVM)
+        .environment(farmlandVM)
+        .environment(tradingCardsVM)
+        .environment(coinsVM)
     }
 
     private func reload() async {
@@ -64,9 +76,16 @@ struct NetWorthView: View {
         async let steam: () = steamVM.loadAccounts()
         async let nft: () = nftVM.loadWallets()
         async let manualAssets: () = manualAssetsVM.loadAssets()
+        async let truelayer: () = truelayerVM.loadStatus()
+        async let pokemonCards: () = pokemonCardsVM.loadHoldings()
+        async let energy: () = energyVM.loadPositions()
+        async let farmland: () = farmlandVM.loadParcels()
+        async let tradingCards: () = tradingCardsVM.loadHoldings()
+        async let coins: () = coinsVM.loadHoldings()
         _ = await (netWorth, coinbase, zerion, spinwheel, performance, chainWallets,
                    hyperliquid, metals, sneakers, realEstate, vehicles, kalshi, discogs,
-                   polymarket, alpaca, steam, nft, manualAssets)
+                   polymarket, alpaca, steam, nft, manualAssets, truelayer, pokemonCards,
+                   energy, farmland, tradingCards, coins)
     }
 
     @ViewBuilder
@@ -100,6 +119,12 @@ struct NetWorthView: View {
                     ynabSection(data)
                     kalshiSection(data)
                     polymarketSection(data)
+                    truelayerSection(data)
+                    pokemonCardsSection(data)
+                    energySection(data)
+                    farmlandSection(data)
+                    tradingCardsSection(data)
+                    coinsSection(data)
                     debtsSection(data)
                     performanceSection()
                     Spacer(minLength: 32)
@@ -460,7 +485,7 @@ extension NetWorthView {
 
     // MARK: - Shared header helper
 
-    private func sectionHeader(title: String, total: Double, icon: String, color: Color) -> some View {
+    func sectionHeader(title: String, total: Double, icon: String, color: Color) -> some View {
         HStack {
             Label(title, systemImage: icon)
                 .font(.headline)

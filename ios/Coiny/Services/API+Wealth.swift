@@ -313,3 +313,236 @@ extension API {
         try await deleteVoid("/api/discogs/connect")
     }
 }
+
+// MARK: - TrueLayer DTOs
+
+struct TruelayerStatus: Decodable {
+    let connected: Bool
+}
+
+struct TruelayerSyncResult: Decodable {
+    let balanceUsd: Double
+}
+
+// MARK: - TrueLayer API
+
+extension API {
+    func getTruelayerStatus() async throws -> TruelayerStatus {
+        try await get("/api/truelayer/status")
+    }
+
+    func syncTruelayer() async throws -> TruelayerSyncResult {
+        try await post("/api/truelayer/sync")
+    }
+
+    func disconnectTruelayer() async throws {
+        try await deleteVoid("/api/truelayer/connect")
+    }
+}
+
+// MARK: - Pokemon Cards DTOs
+
+struct PokemonCardHolding: Decodable, Identifiable {
+    let id: Int
+    let cardName: String
+    let setName: String?
+    let variant: String?
+    let quantity: Int
+    let label: String?
+    let lastPriceUsd: Double?
+    let valueUsd: Double?
+    let lastSyncedAt: String?
+}
+
+struct PokemonCardsSyncResult: Decodable {
+    let updated: Int
+    let errors: Int
+}
+
+// MARK: - Pokemon Cards API
+
+extension API {
+    func getPokemonCards() async throws -> [PokemonCardHolding] {
+        try await get("/api/pokemon-cards")
+    }
+
+    func addPokemonCard(cardName: String, setName: String?, variant: String?, quantity: Int, label: String?) async throws {
+        struct Body: Encodable { let cardName: String; let setName: String?; let variant: String?; let quantity: Int; let label: String? }
+        let _: EmptyResponse = try await post("/api/pokemon-cards",
+            body: Body(cardName: cardName, setName: setName, variant: variant, quantity: quantity, label: label))
+    }
+
+    func removePokemonCard(id: Int) async throws {
+        try await deleteVoid("/api/pokemon-cards/\(id)")
+    }
+
+    func syncPokemonCards() async throws -> PokemonCardsSyncResult {
+        try await post("/api/pokemon-cards/sync")
+    }
+}
+
+// MARK: - Energy Positions DTOs
+
+struct EnergyPosition: Decodable, Identifiable {
+    let id: Int
+    let commodity: String
+    let quantityUnit: String
+    let quantity: Double
+    let label: String?
+    let lastSpotPriceUsd: Double?
+    let valueUsd: Double?
+    let lastSyncedAt: String?
+    let createdAt: String
+}
+
+struct EnergySyncResult: Decodable {
+    let updated: Int
+}
+
+// MARK: - Energy API
+
+extension API {
+    func getEnergy() async throws -> [EnergyPosition] {
+        try await get("/api/energy")
+    }
+
+    func addEnergy(commodity: String, quantity: Double, label: String?) async throws {
+        struct Body: Encodable { let commodity: String; let quantity: Double; let label: String? }
+        let _: EmptyResponse = try await post("/api/energy", body: Body(commodity: commodity, quantity: quantity, label: label))
+    }
+
+    func removeEnergy(id: Int) async throws {
+        try await deleteVoid("/api/energy/\(id)")
+    }
+
+    func syncEnergy() async throws -> EnergySyncResult {
+        try await post("/api/energy/sync")
+    }
+}
+
+// MARK: - Farmland Parcels DTOs
+
+struct FarmlandParcel: Decodable, Identifiable {
+    let id: Int
+    let stateCode: String
+    let acres: Double
+    let label: String?
+    let lastPricePerAcreUsd: Double?
+    let valueUsd: Double?
+    let lastSyncedAt: String?
+    let createdAt: String
+}
+
+struct FarmlandSyncResult: Decodable {
+    let updated: Int
+}
+
+// MARK: - Farmland API
+
+extension API {
+    func getFarmland() async throws -> [FarmlandParcel] {
+        try await get("/api/farmland")
+    }
+
+    func addFarmland(stateCode: String, acres: Double, label: String?) async throws {
+        struct Body: Encodable { let stateCode: String; let acres: Double; let label: String? }
+        let _: EmptyResponse = try await post("/api/farmland", body: Body(stateCode: stateCode, acres: acres, label: label))
+    }
+
+    func removeFarmland(id: Int) async throws {
+        try await deleteVoid("/api/farmland/\(id)")
+    }
+
+    func syncFarmland() async throws -> FarmlandSyncResult {
+        try await post("/api/farmland/sync")
+    }
+}
+
+// MARK: - Trading Card Holdings DTOs
+
+struct TradingCardHolding: Decodable, Identifiable {
+    let id: Int
+    let game: String
+    let cardName: String
+    let setName: String?
+    let isFoil: Bool
+    let quantity: Int
+    let label: String?
+    let lastPriceUsd: Double?
+    let valueUsd: Double?
+    let lastSyncedAt: String?
+    let createdAt: String
+}
+
+struct TradingCardsSyncResult: Decodable {
+    let updated: Int
+    let errors: Int
+}
+
+// MARK: - Trading Cards API
+
+extension API {
+    func getTradingCards() async throws -> [TradingCardHolding] {
+        try await get("/api/trading-cards")
+    }
+
+    // swiftlint:disable:next function_parameter_count
+    func addTradingCard(game: String, cardName: String, setName: String?, isFoil: Bool, quantity: Int, label: String?) async throws {
+        struct Body: Encodable {
+            let game: String; let cardName: String; let setName: String?; let isFoil: Bool; let quantity: Int; let label: String?
+        }
+        let _: EmptyResponse = try await post("/api/trading-cards",
+            body: Body(game: game, cardName: cardName, setName: setName, isFoil: isFoil, quantity: quantity, label: label))
+    }
+
+    func removeTradingCard(id: Int) async throws {
+        try await deleteVoid("/api/trading-cards/\(id)")
+    }
+
+    func syncTradingCards() async throws -> TradingCardsSyncResult {
+        try await post("/api/trading-cards/sync")
+    }
+}
+
+// MARK: - Graded Coin Holdings DTOs
+
+struct CoinHolding: Decodable, Identifiable {
+    let id: Int
+    let pcgsNo: Int
+    let gradeNo: Int
+    let plusGrade: Bool
+    let quantity: Int
+    let coinName: String?
+    let label: String?
+    let lastPriceGuideUsd: Double?
+    let valueUsd: Double?
+    let lastSyncedAt: String?
+    let createdAt: String
+}
+
+struct CoinsSyncResult: Decodable {
+    let updated: Int
+    let errors: Int
+}
+
+// MARK: - Coins API
+
+extension API {
+    func getCoins() async throws -> [CoinHolding] {
+        try await get("/api/coins")
+    }
+
+    func addCoin(pcgsNo: Int, gradeNo: Int, plusGrade: Bool, label: String?, quantity: Int) async throws {
+        struct Body: Encodable { let pcgsNo: Int; let gradeNo: Int; let plusGrade: Bool; let label: String?; let quantity: Int }
+        let _: EmptyResponse = try await post("/api/coins",
+            body: Body(pcgsNo: pcgsNo, gradeNo: gradeNo, plusGrade: plusGrade, label: label, quantity: quantity))
+    }
+
+    func removeCoin(id: Int) async throws {
+        try await deleteVoid("/api/coins/\(id)")
+    }
+
+    func syncCoins() async throws -> CoinsSyncResult {
+        try await post("/api/coins/sync")
+    }
+}
