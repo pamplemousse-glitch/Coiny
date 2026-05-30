@@ -1,6 +1,6 @@
 # Coiny — Project Handoff
 
-**Last updated: 2026-05-27 (session 8)**
+**Last updated: 2026-05-30 (session 9)**
 
 Read this first. Then read `docs/tech-stack.md` and `docs/implementation-plan.md`.
 
@@ -134,7 +134,7 @@ Bank / Crypto / DeFi / Debt APIs
 - ✅ Backend deployed on Fly.io (`coiny-backend.fly.dev`)
 - ✅ Postgres via Neon (prod + dev connection strings in Fly secrets)
 
-### Backend (Node + Fastify + Drizzle, Fly.io) — 542 Vitest tests, all passing
+### Backend (Node + Fastify + Drizzle, Fly.io) — ~830 Vitest tests, all passing (74 test files; 5 skipped = integration tests)
 
 - ✅ Plaid webhooks with HMAC-SHA256 + JWT signature verification + replay protection
 - ✅ Plaid `/transactions/sync` + paginated sync, idempotent via `processed_events` table
@@ -159,8 +159,21 @@ Bank / Crypto / DeFi / Debt APIs
 - ✅ **YNAB**: personal access token → budgets sync → `ynab_connections.lastNetWorthUsd`
 - ✅ **Kraken**: HMAC-SHA512 NONCE auth, encrypted per-user keys → spot balance sync
 - ✅ **KicksDB (sneakers)**: `sneaker_holdings` table (SKU + size + qty) → price sync via KicksDB StockX endpoint
-- ✅ **Discogs (vinyl)**: OAuth 1.0a — connect/verify flow → collection sync → marketplace pricing → `discogsConnections.lastCollectionUsd` (PR #138, auto-merging)
-- ✅ **Kalshi (prediction markets)**: RSA-PSS auth — connect + sync + net-worth rollup (PR #139, auto-merging)
+- ✅ **Discogs (vinyl)**: OAuth 1.0a — connect/verify flow → collection sync → marketplace pricing → `discogsConnections.lastCollectionUsd`
+- ✅ **Kalshi (prediction markets)**: RSA-PSS auth — connect + sync + net-worth rollup
+- ✅ **Alpaca**: user-supplied API key → equity sync → `alpacaConnections.lastEquityUsd`
+- ✅ **Steam / CS2 skins**: Steam community APIs (no key) → portfolio USD → `steamAccounts.lastPortfolioUsd`
+- ✅ **Polymarket**: wallet address → prediction market positions → `polymarketConnections.lastPositionsUsd`
+- ✅ **NFT**: Alchemy NFT API v3 → floor price × quantity → `nftWallets.lastValueUsd`
+- ✅ **Manual assets**: 13 freeform categories (art, watches, wine, etc.) → `manualAssets` with `selfReportedValueUsd`
+- ✅ **TrueLayer**: Open Banking (EU/UK) — OAuth → balance sync → `truelayerConnections.lastBalanceGbp`
+- ✅ **FX**: Frankfurter exchange rate API — wired into TrueLayer sync for GBP→USD conversion
+- ✅ **Solana staking**: Helius `getProgramAccounts` → staked SOL in chain wallet balance (requires `HELIUS_API_KEY`)
+- ✅ **EIA energy positions**: commodity positions (WTI crude, Brent, natural gas) → `energyPositions` table → spot price via EIA Open Data API (requires `EIA_API_KEY`)
+- ✅ **USDA farmland**: acreage by state → `farmlandParcels` table → price per acre via USDA NASS Quick Stats (requires `USDA_NASS_API_KEY`)
+- ✅ **Trading cards (TCGapi)**: card holdings by game/set → `tradingCardHoldings` table → market price via TCGapi (requires `TCGAPI_KEY`)
+- ✅ **Graded coins (PCGS)**: coin holdings by PCGS# + grade → `gradedCoinHoldings` table → price guide via PCGS CoinFacts (requires `PCGS_API_KEY`)
+- ✅ **Pokémon cards (PokemonPriceTracker)**: card holdings → `pokemonCardHoldings` table → price via PokemonPriceTracker API (requires `POKEMONPRICETRACKER_API_KEY`)
 - ✅ **`GET /api/plaid/recurring`**: subscription detection, stream list, spending summary
 - ✅ **E2E pipeline proven**: Vitest fires Plaid sandbox webhook → `paycheck_received` reaction persisted
 
@@ -180,26 +193,26 @@ Bank / Crypto / DeFi / Debt APIs
 - ✅ **ChainWalletsView**: add/remove wallets per chain, balances, sync
 - ✅ **HyperliquidView**: add accounts by wallet address, PnL, sync
 - ✅ **PerformanceView**: Coinbase unrealized PnL + Zerion PnL + DeFi positions
-- ❌ **Not yet surfaced in iOS**: Kraken, SnapTrade, YNAB, Real estate, Vehicles, Metals, Sneakers, Discogs, Kalshi — all live on backend, `NetWorthResponse` model + `NetWorthView` need updating
+- ✅ **All 10 original wealth integrations surfaced** in `NetWorthView` (PR #141): real estate, vehicles, metals, Kraken, SnapTrade, YNAB, sneakers, vinyl, Kalshi, investments
+- ✅ **Alpaca, NFT, Steam, Manual Assets** views + ViewModels added (PR #161)
+- ✅ **PolymarketView**: wallet tracking inline view + ViewModel (PR #162)
+- ✅ **YNAB OAuth PKCE, Kraken via SnapTrade, Kalshi in-app RSA keygen** (PR #142)
+- ✅ **Subscriptions + Overrides UI** wired (PR #149)
+- ❌ **Not yet in iOS model or view**: 5 new backend fields from session 9 — `pokemonCards`, `energy`, `farmland`, `tradingCards`, `coins` — these are returned by `GET /api/net-worth` but `NetWorthResponse` in `API+Performance.swift` doesn't decode them and `NetWorthView` has no sections for them.
 
 ---
 
 ## In-Flight PRs
 
-| PR | Branch | Status | Action |
-|---|---|---|---|
-| **#138** | `feat/discogs` | **Auto-merging** | Discogs vinyl OAuth integration — all checks green, squash-merge pending |
-| **#139** | `feat/kalshi` | **Auto-merging** | Kalshi prediction market integration — all checks green, squash-merge pending |
-
-All previously open PRs (#108, #116–#137) merged. No blockers.
+None. All PRs merged. `main` is clean.
 
 ---
 
 ## Known Issues
 
-No known backend bugs. Previously-tracked Spinwheel + Coinbase bugs all fixed (PR #108, merged).
+No known backend bugs.
 
-**iOS gap:** `NetWorthResponse` Swift model is behind the backend. Backend returns `realEstate`, `vehicles`, `metals`, `kraken`, `snaptrade`, `ynab`, `sneakers` (and soon `vinyl`, `kalshi`) — none of these fields are decoded by the iOS model, and none have sections in `NetWorthView`. This is the primary iOS work item for next session.
+**iOS gap (primary work item):** `NetWorthResponse` in `ios/Coiny/Services/API+Performance.swift` is missing 5 fields that `GET /api/net-worth` now returns: `pokemonCards`, `energy`, `farmland`, `tradingCards`, `coins`. These need to be decoded and rendered in `NetWorthView.swift`. See Next Session → Priority 1.
 
 ---
 
@@ -207,22 +220,17 @@ No known backend bugs. Previously-tracked Spinwheel + Coinbase bugs all fixed (P
 
 ### iOS — Primary Gap (next work item)
 
-The Wealth tab model and view are behind the backend. The following integrations are live in `GET /api/net-worth` but not rendered in iOS:
+Five new backend fields from session 9 are not yet in the iOS model or rendered in the Wealth tab:
 
 | Integration | Backend field | iOS status |
 |---|---|---|
-| Investments (Plaid holdings) | `investments` | Model has field, no section in view |
-| Real estate | `realEstate` | Not in model, no section |
-| Vehicles | `vehicles` | Not in model, no section |
-| Metals | `metals` | Not in model, no section |
-| Kraken | `kraken` | Not in model, no section |
-| SnapTrade | `snaptrade` | Not in model, no section |
-| YNAB | `ynab` | Not in model, no section |
-| Sneakers | `sneakers` | Not in model, no section |
-| Vinyl (Discogs) | `vinyl` (pending PR #138) | Not in model, no section |
-| Kalshi | `kalshi` (pending PR #139) | Not in model, no section |
+| Pokémon cards | `pokemonCards` | Not in model, no section |
+| EIA energy positions | `energy` | Not in model, no section |
+| USDA farmland | `farmland` | Not in model, no section |
+| TCGapi trading cards | `tradingCards` | Not in model, no section |
+| PCGS graded coins | `coins` | Not in model, no section |
 
-Fix: update `NetWorthResponse` + `NetWorthConnections` in `ios/Coiny/Services/API+Performance.swift`, add sections to `NetWorthView.swift`. Pattern is already established — each section is a `GroupBox` with a `sectionHeader` + connect/sync inline flow.
+There are 10 missing sections total. 5 fields (`nft`, `manual`, `steam`, `alpaca`, `truelayer`) are already decoded by `NetWorthResponse` but have no `GroupBox` section in `NetWorthView` and their ViewModels are never instantiated. 5 more (`pokemonCards`, `energy`, `farmland`, `tradingCards`, `coins`) are missing from the model entirely. See Next Session → Priority 1 for the full fix plan.
 
 ### iOS — Other Missing
 
@@ -250,13 +258,25 @@ Fix: update `NetWorthResponse` + `NetWorthConnections` in `ios/Coiny/Services/AP
 - ✅ Zerion — Vitalik's wallet used for testing (no sandbox)
 - ✅ Coinbase — Advanced Trade sandbox validates shape
 - ✅ Spinwheel — sandbox exists; integration tests in `tests/integration/`
-- ✅ Chain wallets — 9 chains live, 3 keyed (Polkadot/Cardano/TON) need API keys from Antoine
-- ⏳ KicksDB — needs `KICKSDB_API_KEY` from kicks.dev (backend live, key optional — returns 402 without it)
+- ✅ Chain wallets — 12 chains live (Bitcoin, XRP, Stellar, DOGE/LTC/BCH, ATOM/OSMO, NEAR, Aptos, Sui, Hedera, Polkadot, Cardano, TON)
+- ✅ Hyperliquid — no auth, public endpoint
+- ✅ Discogs — OAuth 1.0a (live)
+- ✅ Kalshi — RSA-PSS auth (live, URL env-configurable)
+- ✅ Alpaca — user-supplied API key (live)
+- ✅ Steam/CS2 — no auth (live)
+- ✅ Polymarket — no auth (live)
+- ✅ TrueLayer — OAuth (live, EU/UK only)
+- ⏳ KicksDB — needs `KICKSDB_API_KEY` from kicks.dev (backend live, returns 402 without key)
 - ⏳ RentCast — needs `RENTCAST_API_KEY` (real estate AVM)
 - ⏳ MarketCheck — needs `MARKETCHECK_API_KEY` (vehicle values)
 - ⏳ GoldAPI — needs `GOLDAPI_API_KEY` (metals pricing)
-- ⏳ Helius — needs signup at `helius.dev` (Solana staking)
-- ⏳ Alchemy — needs signup at `alchemy.com` (NFTs)
+- ⏳ Helius — needs `HELIUS_API_KEY` (Solana staking via getProgramAccounts)
+- ⏳ Alchemy — needs `ALCHEMY_API_KEY` (NFT floor prices)
+- ⏳ EIA — needs `EIA_API_KEY` (energy commodity spot prices — free at eia.gov/opendata/register.php)
+- ⏳ USDA NASS — needs `USDA_NASS_API_KEY` (farmland price per acre — free at quickstats.nass.usda.gov/api)
+- ⏳ TCGapi — needs `TCGAPI_KEY` (trading card prices — free tier 100 req/day at tcgapi.dev)
+- ⏳ PCGS — needs `PCGS_API_KEY` (graded coin price guide — pcgs.com/coinfacts/api)
+- ⏳ PokemonPriceTracker — needs `POKEMONPRICETRACKER_API_KEY`
 
 Run integration tests: `source bin/load-secrets.sh && INTEGRATION_TEST=1 pnpm --filter coiny-backend test tests/integration/`
 
@@ -276,57 +296,106 @@ Run integration tests: `source bin/load-secrets.sh && INTEGRATION_TEST=1 pnpm --
 
 ---
 
-## Next Session
+## Next Session — Sequenced Work Plan
 
-### Priority 1 — Surface all integrations in iOS (`feat/ios-wealth-expansion`)
+All four work streams are ready to start. Do them in order — each one is a self-contained PR.
 
-The Wealth tab model and view are behind the backend. One PR covers all of it:
+---
+
+### Priority 1 — iOS: surface all 10 missing asset classes (`feat/ios-wealth-all-assets`)
+
+**What:** 10 backend fields are not shown in the Wealth tab. 5 are already in the iOS model but have no view section; 5 are missing from the model entirely.
+
+**Group A — in `NetWorthResponse` model, but no section in `NetWorthView`:**
+| Field | ViewModel (exists) | Backend endpoints |
+|---|---|---|
+| `nft` | `NftViewModel.swift` | `GET /api/nft-wallets`, `POST /api/nft-wallets/sync` |
+| `manual` | `ManualAssetsViewModel.swift` | `GET /api/manual-assets`, `POST /api/manual-assets` |
+| `steam` | `SteamViewModel.swift` | `GET /api/steam-accounts`, `POST /api/steam-accounts/sync` |
+| `alpaca` | `AlpacaViewModel.swift` | `GET /api/alpaca/status`, `POST /api/alpaca/connect`, `POST /api/alpaca/sync` |
+| `truelayer` | (none — create one) | `GET /api/truelayer/status`, `POST /api/truelayer/connect`, `POST /api/truelayer/sync` |
+
+**Group B — not in model, no ViewModel, no section:**
+| Field | ViewModel to create | Backend endpoints |
+|---|---|---|
+| `pokemonCards` | `PokemonCardsViewModel.swift` | `GET /api/pokemon-cards`, `POST /api/pokemon-cards/sync` |
+| `energy` | `EnergyViewModel.swift` | `GET /api/energy`, `POST /api/energy/sync` |
+| `farmland` | `FarmlandViewModel.swift` | `GET /api/farmland`, `POST /api/farmland/sync` |
+| `tradingCards` | `TradingCardsViewModel.swift` | `GET /api/trading-cards`, `POST /api/trading-cards/sync` |
+| `coins` | `CoinsViewModel.swift` | `GET /api/coins`, `POST /api/coins/sync` |
 
 **Files to change:**
-- `ios/Coiny/Services/API+Performance.swift` — add missing fields to `NetWorthResponse` and `NetWorthConnections`
-- `ios/Coiny/Views/NetWorthView.swift` — add `investmentsSection`, `realEstateSection`, `vehiclesSection`, `metalsSection`, `krakenSection`, `snaptradeSection`, `ynabSection`, `sneakersSection`, `vinylSection`, `kalshiSection`
-- `ios/CoinyTests/NetWorthViewModelTests.swift` — update decode tests for new fields
+- `ios/Coiny/Services/API+Performance.swift` — add to `NetWorthResponse`: `let pokemonCards: Double?`, `let energy: Double?`, `let farmland: Double?`, `let tradingCards: Double?`, `let coins: Double?` (the Group A fields are already there)
+- `ios/Coiny/Views/NetWorthView.swift` — add `@State private var` for each of the 10 ViewModels; call `loadHoldings()` / `loadStatus()` for each in the `reload()` async let block
+- `ios/Coiny/Views/NetWorthView+WealthInlines.swift` — add a `GroupBox` section for each of the 10 assets
+- `ios/CoinyTests/NetWorthViewModelTests.swift` — add decode tests for the 5 new model fields
 
-**Pattern for each new section** (all follow the same GroupBox structure already used by chainWalletsSection):
-- If connected and value > 0: show total + "Sync" button
-- If not connected: show "Connect" prompt with deep-link or in-sheet flow
-- Manual-entry assets (real estate, vehicles, metals, sneakers): show list + "Add" button → POST to `/api/{asset}`
+**Pattern:** `SneakersViewModel` / `SneakersView`-inline is the cleanest template for list-of-holdings assets. `KrakenViewModel` / kraken section is the template for connected-account assets (connect → sync → show total). Use whichever fits each asset type.
 
-**New fields to add to `NetWorthResponse`:**
-```swift
-let investments: Double      // already in model, just needs a section
-let realEstate: Double
-let vehicles: Double
-let metals: Double
-let kraken: Double
-let snaptrade: Double
-let ynab: Double
-let sneakers: Double
-let vinyl: Double            // after PR #138 merges
-let kalshi: Double           // after PR #139 merges
-```
-
-**New fields to add to `NetWorthConnections`:**
-```swift
-let kraken: Bool
-let snaptrade: Bool
-let ynab: Bool
-let kalshi: Bool
-```
-
-Connect/sync API endpoints already exist for all of these. Use `API.swift` pattern already established for Coinbase/Zerion/Kraken.
+**After this PR, `GET /api/net-worth` and the iOS Wealth tab will be fully in sync.**
 
 ---
 
-### Priority 2 — TestFlight (Antoine, 10 minutes)
+### Priority 2 — Backend: spending summary endpoint + iOS cash flow card (`feat/spending-summary`)
 
-App ID registration in Apple Developer Portal — see TestFlight section below. Unblocks distribution to Jack for first human test.
+**What:** Build `GET /api/spending/summary` and surface it at the top of the Activity tab.
+
+**Backend (`backend/src/api/spending.ts` — file already exists, add to it):**
+```typescript
+// GET /api/spending/summary
+// Returns: savingsRate, incomeTotal, spendingTotal, categoryBreakdown[], last30dBurn
+```
+Pull from `transactions` table for the last 30 days. Categories already normalized via Plaid PFC taxonomy in `src/plaid/adapter.ts`. Income = `INCOME_*` categories. Spending = everything else except transfers.
+
+**iOS:**
+- Add `SpendingSummaryView` (a summary card at the top of `SpendingView.swift`)
+- Fields: savings rate ring, income vs. spend bar, top 3 category chips
+- Model: `SpendingSummary` struct in `API+Spending.swift` (create file)
 
 ---
 
-### Priority 3 — Next backend integrations (Sprint G)
+### Priority 3 — Fix 27 failing UITests (`feat/fix-uitests`)
 
-See `docs/net-worth-coverage-plan.md` § Medium Priority. Highest-value next targets: WatchCharts (watches), SportsCardsPro (graded cards), CS2/Steam skins, Yahoo Fantasy Sports.
+**What:** Half the UI test suite fails. Fix before TestFlight.
+
+Run the UITests and read failures:
+```bash
+xcrun simctl boot A445C692-84CF-4D18-9CE1-ADD92174D731 2>/dev/null || true
+xcodebuild test \
+  -scheme Coiny \
+  -project ios/Coiny.xcodeproj \
+  -destination 'platform=iOS Simulator,id=A445C692-84CF-4D18-9CE1-ADD92174D731' \
+  -only-testing:CoinyUITests \
+  -resultBundlePath /tmp/coiny-ui.xcresult \
+  2>&1 | xcbeautify
+```
+
+Common failure modes to check: view identifiers missing `.accessibilityIdentifier`, timing issues (add `waitForExistence(timeout:)`), simulator state left over from previous run (erase simulator first).
+
+---
+
+### Priority 4 — Android foundation (`feat/android-auth`)
+
+**What:** Get the Android app to parity with the iOS sign-in + basic Wealth tab.
+
+The `android/` directory has a Kotlin/Jetpack Compose scaffold but nothing implemented. Minimum viable:
+1. Sign In with Apple via WebView (or use Google Sign-In as a parallel auth path — easier on Android)
+2. `WealthScreen` composable — calls `GET /api/net-worth`, shows total + major categories
+3. `ActivityScreen` — calls `GET /api/reactions`, shows feed
+
+Backend auth already accepts the same session token format regardless of platform. No backend changes needed.
+
+---
+
+### Priority 5 — TestFlight (Antoine, 10 minutes — not a coding task)
+
+Register App ID in Apple Developer Portal (see TestFlight section below). Do this anytime — unblocks distributing to a first tester.
+
+---
+
+### Priority 6 — Next backend integrations
+
+Once the above are done, see `docs/net-worth-coverage-plan.md` for the next tier. Highest-value zero-signup targets: WatchCharts (luxury watches), SportsCardsPro (graded sports cards), Yahoo Fantasy Sports portfolio.
 
 ---
 
