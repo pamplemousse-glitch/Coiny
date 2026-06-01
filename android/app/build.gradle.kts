@@ -1,8 +1,23 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+}
+
+// GOOGLE_AUTH_CLIENT_ID — Web OAuth Client ID used as serverClientId by
+// Credential Manager. Empty string disables real Google Sign-In and the app
+// falls back to the debug-session button. Sourced from local.properties or env.
+val googleAuthClientId: String = run {
+    val localProps = Properties().apply {
+        val f = rootProject.file("local.properties")
+        if (f.exists()) f.inputStream().use { load(it) }
+    }
+    localProps.getProperty("GOOGLE_AUTH_CLIENT_ID")
+        ?: System.getenv("GOOGLE_AUTH_CLIENT_ID")
+        ?: ""
 }
 
 android {
@@ -18,6 +33,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+
+        buildConfigField("String", "GOOGLE_AUTH_CLIENT_ID", "\"$googleAuthClientId\"")
     }
 
     buildTypes {
@@ -47,6 +64,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -102,6 +120,14 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.datetime)
+
+    // Credential Manager (Google Sign-In via Android Identity)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
+
+    // DataStore (preferences for session token)
+    implementation(libs.androidx.datastore.preferences)
 
     // Tests
     testImplementation(libs.junit)
