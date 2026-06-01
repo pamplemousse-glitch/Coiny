@@ -39,8 +39,8 @@ class PetStateDecodingTest {
         assertEquals(50, pet.mood)
         assertNull(pet.lastReactionAt)
         assertTrue(pet.reactionHistory.isEmpty())
-        assertEquals(7777, pet.goals.savingsGoal)
-        assertEquals(420, pet.goals.largePurchaseThreshold)
-        assertEquals(150.0, pet.goals.weeklyBudgetByCategory["groceries"]!!, 0.0)
+        assertEquals(7777, pet.goals!!.savingsGoal)
+        assertEquals(420, pet.goals!!.largePurchaseThreshold)
+        assertEquals(150.0, pet.goals!!.weeklyBudgetByCategory["groceries"]!!, 0.0)
     }
 }

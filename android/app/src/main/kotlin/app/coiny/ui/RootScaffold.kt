@@ -4,9 +4,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CreditCard
-import androidx.compose.material.icons.filled.Face
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -19,10 +19,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.lifecycle.viewmodel.compose.viewModel
+import app.coiny.viewmodel.PetViewModel
+import app.coiny.viewmodel.SpendingViewModel
 
 @Composable
 fun RootScaffold() {
     var selectedTab by remember { mutableStateOf(Tab.Pet) }
+
+    val petViewModel: PetViewModel = viewModel()
+    val spendingViewModel: SpendingViewModel = viewModel()
 
     Scaffold(
         bottomBar = {
@@ -40,16 +47,23 @@ fun RootScaffold() {
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
             when (selectedTab) {
-                Tab.Pet -> Text("Pet view (TODO — wire PetViewModel)")
-                Tab.Spending -> Text("Spending view (TODO)")
-                Tab.Settings -> Text("Settings view (TODO)")
+                Tab.Pet -> PetScreen(viewModel = petViewModel)
+                Tab.Activity -> SpendingScreen(petViewModel = petViewModel, spendingViewModel = spendingViewModel)
+                Tab.Wealth -> WealthScreen()
             }
         }
     }
 }
 
-private enum class Tab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    Pet("Pet", Icons.Filled.Face),
-    Spending("Spending", Icons.Filled.CreditCard),
-    Settings("Settings", Icons.Filled.Settings),
+@Composable
+private fun WealthScreen() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text("Wealth — coming soon")
+    }
+}
+
+private enum class Tab(val label: String, val icon: ImageVector) {
+    Pet("Pet", Icons.Filled.Pets),
+    Activity("Activity", Icons.AutoMirrored.Filled.ReceiptLong),
+    Wealth("Wealth", Icons.Filled.AccountBalance),
 }
