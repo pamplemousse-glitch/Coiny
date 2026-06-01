@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.coiny.viewmodel.PetViewModel
 import app.coiny.viewmodel.SpendingViewModel
+import app.coiny.viewmodel.WealthViewModel
 
 @Composable
 fun RootScaffold() {
@@ -30,6 +31,7 @@ fun RootScaffold() {
 
     val petViewModel: PetViewModel = viewModel()
     val spendingViewModel: SpendingViewModel = viewModel()
+    val wealthViewModel: WealthViewModel = viewModel()
 
     Scaffold(
         bottomBar = {
@@ -49,16 +51,9 @@ fun RootScaffold() {
             when (selectedTab) {
                 Tab.Pet -> PetScreen(viewModel = petViewModel)
                 Tab.Activity -> SpendingScreen(petViewModel = petViewModel, spendingViewModel = spendingViewModel)
-                Tab.Wealth -> WealthScreen()
+                Tab.Wealth -> WealthScreen(viewModel = wealthViewModel)
             }
         }
-    }
-}
-
-@Composable
-private fun WealthScreen() {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("Wealth — coming soon")
     }
 }
 

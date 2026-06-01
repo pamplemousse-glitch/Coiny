@@ -50,6 +50,8 @@ class Api private constructor() {
 
     suspend fun getSpendingOverrides(): List<SpendingOverride> = authedGet("/api/spending/overrides")
 
+    suspend fun getNetWorth(): NetWorth = authedGet("/api/net-worth")
+
     suspend fun health(): HealthResponse = client.get(BASE_URL + "/health").body()
 
     private suspend inline fun <reified T> authedGet(path: String): T {
