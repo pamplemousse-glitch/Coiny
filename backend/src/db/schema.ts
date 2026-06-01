@@ -24,10 +24,7 @@ export const users = pgTable(
     displayName: text('display_name'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [
-    uniqueIndex('users_apple_sub_idx').on(t.appleSub),
-    uniqueIndex('users_google_sub_idx').on(t.googleSub),
-  ],
+  (t) => [uniqueIndex('users_apple_sub_idx').on(t.appleSub), uniqueIndex('users_google_sub_idx').on(t.googleSub)],
 );
 
 export const sessions = pgTable(
