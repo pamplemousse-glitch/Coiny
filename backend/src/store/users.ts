@@ -6,20 +6,27 @@ import { decryptString, encryptString } from '../util/crypto.js';
 
 export type UserRow = typeof users.$inferSelect;
 
-export async function findOrCreateUser(args: {
-  appleSub: string;
-  email?: string | null;
-  displayName?: string | null;
-}): Promise<string> {
-  const existing = await db().select({ id: users.id }).from(users).where(eq(users.appleSub, args.appleSub));
+export type FindOrCreateUserArgs =
+  | { appleSub: string; googleSub?: never; email?: string | null; displayName?: string | null }
+  | { appleSub?: never; googleSub: string; email?: string | null; displayName?: string | null };
+
+export async function findOrCreateUser(args: FindOrCreateUserArgs): Promise<string> {
+  const lookupColumn = args.appleSub ? users.appleSub : users.googleSub;
+  const sub = (args.appleSub ?? args.googleSub) as string;
+
+  const existing = await db().select({ id: users.id }).from(users).where(eq(lookupColumn, sub));
   if (existing[0]) return existing[0].id;
 
   const id = randomUUID();
   await db().transaction(async (tx) => {
     const encryptedEmail = args.email ? encryptString(args.email) : null;
-    await tx
-      .insert(users)
-      .values({ id, appleSub: args.appleSub, email: encryptedEmail, displayName: args.displayName ?? null });
+    await tx.insert(users).values({
+      id,
+      appleSub: args.appleSub ?? null,
+      googleSub: args.googleSub ?? null,
+      email: encryptedEmail,
+      displayName: args.displayName ?? null,
+    });
     // Every user gets exactly one pet row, initialized with defaults.
     await tx.insert(petState).values({ userId: id });
   });

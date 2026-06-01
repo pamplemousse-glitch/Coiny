@@ -232,6 +232,13 @@
       "when": 1749859200000,
       "tag": "0032_trading_cards_coins",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1780290476909,
+      "tag": "0033_google_auth",
+      "breakpoints": true
     }
   ]
 }
