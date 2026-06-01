@@ -7,6 +7,8 @@ import { findOrCreateUser } from '../store/users.js';
 
 // Cache the Apple JWKS fetcher (it internally caches with a 15-min TTL).
 const appleJwks = createRemoteJWKSet(new URL('https://appleid.apple.com/auth/keys'));
+// Google's OAuth 2.0 JWKS endpoint. Same caching behavior.
+const googleJwks = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
 
 const AppleSignInSchema = z.object({
   identity_token: z.string().min(1),
@@ -16,6 +18,11 @@ const AppleSignInSchema = z.object({
   email: z.string().email().nullish(),
   // Optional: Apple provides fullName only on first sign-in.
   display_name: z.string().max(100).nullish(),
+});
+
+const GoogleSignInSchema = z.object({
+  // ID token from the Android Credential Manager Google credential.
+  id_token: z.string().min(1),
 });
 
 export function registerAuthApi(app: FastifyInstance): void {
@@ -46,6 +53,38 @@ export function registerAuthApi(app: FastifyInstance): void {
     const { rawToken } = await createSession(userId);
 
     req.log.info({ userId }, 'apple sign-in success');
+    return reply.status(200).send({ token: rawToken, user_id: userId });
+  });
+
+  app.post('/api/auth/google', async (req: FastifyRequest, reply: FastifyReply) => {
+    if (!config.GOOGLE_AUTH_CLIENT_ID) {
+      return reply.status(503).send({ error: 'Google auth not configured' });
+    }
+
+    const parsed = GoogleSignInSchema.safeParse(req.body);
+    if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
+
+    let sub: string;
+    let email: string | null = null;
+    let displayName: string | null = null;
+    try {
+      const { payload } = await jwtVerify(parsed.data.id_token, googleJwks, {
+        // Google's ID tokens use either issuer form; accept both.
+        issuer: ['https://accounts.google.com', 'accounts.google.com'],
+        audience: config.GOOGLE_AUTH_CLIENT_ID,
+      });
+      sub = payload.sub as string;
+      if (typeof payload.email === 'string') email = payload.email;
+      if (typeof payload.name === 'string') displayName = payload.name.slice(0, 100);
+    } catch (err) {
+      req.log.warn({ err }, 'google id token verification failed');
+      return reply.status(401).send({ error: 'Invalid identity token' });
+    }
+
+    const userId = await findOrCreateUser({ googleSub: sub, email, displayName });
+    const { rawToken } = await createSession(userId);
+
+    req.log.info({ userId }, 'google sign-in success');
     return reply.status(200).send({ token: rawToken, user_id: userId });
   });
 

@@ -16,12 +16,15 @@ export const users = pgTable(
   'users',
   {
     id: text('id').primaryKey(),
-    appleSub: text('apple_sub').notNull(),
+    // At least one of appleSub/googleSub must be set. Enforced in application
+    // code (findOrCreateUser) rather than via a DB check constraint.
+    appleSub: text('apple_sub'),
+    googleSub: text('google_sub'),
     email: text('email'),
     displayName: text('display_name'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('users_apple_sub_idx').on(t.appleSub)],
+  (t) => [uniqueIndex('users_apple_sub_idx').on(t.appleSub), uniqueIndex('users_google_sub_idx').on(t.googleSub)],
 );
 
 export const sessions = pgTable(

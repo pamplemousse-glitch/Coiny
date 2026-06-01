@@ -25,6 +25,12 @@ const configSchema = z
     // Apple bundle ID used to verify the `aud` claim in Apple identity tokens.
     APPLE_BUNDLE_ID: z.string().default('app.coiny.ios'),
 
+    // Google OAuth client ID used as the `aud` claim audience when verifying
+    // ID tokens from the Android Credential Manager flow. Should be the WEB
+    // application client ID configured as `serverClientId` in the Android app,
+    // not the Android client ID. When empty, /api/auth/google returns 503.
+    GOOGLE_AUTH_CLIENT_ID: z.string().default(''),
+
     // Rate-limit knobs. Per-key budget for the global limiter (keyed on
     // bearer-token hash, falling back to req.ip for unauthenticated traffic).
     RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
