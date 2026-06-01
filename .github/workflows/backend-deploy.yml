@@ -1,7 +1,13 @@
 name: Backend Deploy
 
+# Triggers on PRs that touched backend paths once they merge into main.
+# We can't use `push: branches: [main]` here because the auto-merge workflow
+# completes merges via GITHUB_TOKEN, and GitHub does not fire downstream
+# workflows from token-driven push events. `pull_request: closed` fires
+# regardless, so we gate on `merged == true` to skip closed-without-merge PRs.
 on:
-  push:
+  pull_request:
+    types: [closed]
     branches: [main]
     paths:
       - 'backend/**'
@@ -18,10 +24,13 @@ permissions:
 
 jobs:
   deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          ref: main
 
       - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1  # v1.6
 
