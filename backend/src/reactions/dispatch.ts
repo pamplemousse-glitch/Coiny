@@ -1,6 +1,13 @@
 import { sendApnsPush } from '../push/apns.js';
 import { listDeviceTokens } from '../store/devices.js';
+import { canSendPush, recordNotification } from '../store/notifications.js';
 import type { Reaction } from './types.js';
+
+// Only these animations may interrupt the user with an alert push. Everything
+// else still updates the pet in-app on next open, silently. `happy` and
+// `neutral` are deliberately absent: they are the most frequent reactions and
+// the least worth a buzz.
+const PUSHABLE_ANIMATIONS = new Set(['celebrate', 'sad', 'concerned']);
 
 const PUSH_TITLES: Record<string, string> = {
   celebrate: '🎉 Coiny is celebrating!',
@@ -11,26 +18,40 @@ const PUSH_TITLES: Record<string, string> = {
   neutral: '🐣 Coiny reacted',
 };
 
-export function dispatchReaction(userId: string, reaction: Reaction): void {
-  const durationLabel = reaction.duration === 0 ? 'hold' : `${reaction.duration}ms`;
-  console.log(`\n🐣 Coiny reacted:`);
-  console.log(`   animation: ${reaction.animation}`);
-  console.log(`   sound:     ${reaction.sound}`);
-  console.log(`   led:       ${reaction.led}`);
-  console.log(`   duration:  ${durationLabel}`);
-  console.log(`   reason:    ${reaction.reason}\n`);
+// Generic bodies. The reaction `reason` carries merchant names and amounts and
+// must never leave the server: a push body renders on the lock screen, which is
+// the least private surface on the device. See .claude/rules/security.md #2.
+const PUSH_BODIES: Record<string, string> = {
+  celebrate: 'Something good happened. Come see.',
+  sad: 'Something needs a look.',
+  concerned: 'Something needs a look.',
+};
 
-  void fanOutPush(userId, reaction);
+export function dispatchReaction(userId: string, reaction: Reaction, eventType = 'reaction'): void {
+  // Log the shape of the reaction, never the reason: it contains merchant names
+  // and amounts (see .claude/rules/security.md #2).
+  console.log(
+    `reaction dispatched animation=${reaction.animation} sound=${reaction.sound} led=${reaction.led} duration=${reaction.duration} event=${eventType}`,
+  );
+
+  void fanOutPush(userId, reaction, eventType);
 }
 
-async function fanOutPush(userId: string, reaction: Reaction): Promise<void> {
+async function fanOutPush(userId: string, reaction: Reaction, eventType: string): Promise<void> {
   try {
+    if (!PUSHABLE_ANIMATIONS.has(reaction.animation)) return;
+    if (!(await canSendPush(userId, eventType))) return;
+
     const tokens = await listDeviceTokens(userId);
     const ios = tokens.filter((t) => t.platform === 'ios');
     if (ios.length === 0) return;
 
     const title = PUSH_TITLES[reaction.animation] ?? '🐣 Coiny reacted';
-    const results = await Promise.allSettled(ios.map((t) => sendApnsPush(t.token, title, reaction.reason)));
+    const body = PUSH_BODIES[reaction.animation] ?? 'Come see.';
+    const results = await Promise.allSettled(ios.map((t) => sendApnsPush(t.token, title, body)));
+
+    const delivered = results.some((r) => r.status === 'fulfilled');
+    if (delivered) await recordNotification(userId, eventType);
 
     for (const r of results) {
       if (r.status === 'rejected') {

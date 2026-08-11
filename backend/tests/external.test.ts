@@ -49,34 +49,14 @@ describe('evaluateExternalEvent', () => {
     expect(result?.reason).toContain('10.00');
   });
 
-  it('crypto_price_surge returns celebrate reaction', () => {
-    const result = evaluateExternalEvent({ ...base, type: 'crypto_price_surge', symbol: 'SOL' });
-    expect(result?.animation).toBe('celebrate');
-    expect(result?.sound).toBe('fanfare');
-    expect(result?.led).toBe('rainbow');
-    expect(result?.duration).toBe(5000);
-    expect(result?.reason).toContain('SOL');
-    expect(result?.reason).toContain('surged');
-  });
-
-  it('crypto_price_surge falls back to "Crypto" when symbol is absent', () => {
-    const result = evaluateExternalEvent({ ...base, type: 'crypto_price_surge' });
-    expect(result?.reason).toContain('Crypto');
-  });
-
-  it('crypto_price_drop returns concerned reaction', () => {
-    const result = evaluateExternalEvent({ ...base, type: 'crypto_price_drop', symbol: 'DOGE' });
-    expect(result?.animation).toBe('concerned');
-    expect(result?.sound).toBe('warning');
-    expect(result?.led).toBe('amber');
-    expect(result?.duration).toBe(3000);
-    expect(result?.reason).toContain('DOGE');
-    expect(result?.reason).toContain('dropped');
-  });
-
-  it('crypto_price_drop falls back to "Crypto" when symbol is absent', () => {
-    const result = evaluateExternalEvent({ ...base, type: 'crypto_price_drop' });
-    expect(result?.reason).toContain('Crypto');
+  // Market-movement events were deliberately removed: the pet must react to
+  // what the user controls, never to price action. These assertions lock that
+  // in, so re-adding the events fails the build rather than shipping quietly.
+  it('does not accept market price-movement event types', () => {
+    // @ts-expect-error crypto_price_surge is intentionally not a valid event type
+    expect(evaluateExternalEvent({ ...base, type: 'crypto_price_surge', symbol: 'SOL' })).toBeNull();
+    // @ts-expect-error crypto_price_drop is intentionally not a valid event type
+    expect(evaluateExternalEvent({ ...base, type: 'crypto_price_drop', symbol: 'DOGE' })).toBeNull();
   });
 
   it('debt_paydown returns celebrate reaction', () => {

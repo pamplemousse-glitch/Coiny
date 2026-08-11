@@ -576,3 +576,22 @@ export const steamAccounts = pgTable(
   },
   (t) => [uniqueIndex('steam_accounts_user_steam_idx').on(t.userId, t.steamId64)],
 );
+
+// Push notification ledger. Exists so the notification budget in
+// reactions/dispatch.ts is enforceable across restarts and instances rather
+// than best-effort in memory. One row per push actually sent.
+//
+// Deliberately stores only the event type, never the reaction reason, which
+// contains merchant names and amounts (see .claude/rules/security.md #2).
+export const notificationLog = pgTable(
+  'notification_log',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    eventType: text('event_type').notNull(),
+    sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('notification_log_user_sent_idx').on(t.userId, t.sentAt)],
+);

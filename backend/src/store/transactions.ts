@@ -83,8 +83,20 @@ export interface SpendingSummary {
   spendByCategory: Record<string, number>;
 }
 
+// Categories that represent genuine income. Everything else that arrives as a
+// credit (refunds, transfers between the user's own accounts, credit card
+// payments, reimbursements) is NOT income and must never inflate the savings
+// rate. See INCOME_CATEGORIES usage in getSpendingSummary.
+const INCOME_CATEGORIES = new Set(['paycheck', 'income']);
+
+// Outflow categories that move money without consuming it. Excluded from spend
+// so that paying a credit card or moving cash to savings does not register as
+// spending on top of the original purchase.
+const NON_SPEND_CATEGORIES = new Set(['transfer']);
+
 // 30-day income vs spend from the transactions table.
-// Inflows < $50 are excluded as petty transfers; outflows are all negative amounts.
+// Income counts only credits categorised as actual income; a positive amount
+// alone is not sufficient, since refunds and self-transfers are also positive.
 // savingsRate is null when there is no recorded income.
 export async function getSpendingSummary(userId: string): Promise<SpendingSummary> {
   const cutoff = new Date();
@@ -105,13 +117,16 @@ export async function getSpendingSummary(userId: string): Promise<SpendingSummar
 
   for (const row of rows) {
     const amount = parseFloat(row.amount ?? '0');
+    const category = row.category ?? null;
+
     if (amount < 0) {
+      if (category !== null && NON_SPEND_CATEGORIES.has(category)) continue;
       const abs = Math.abs(amount);
       monthlySpend += abs;
-      if (row.category) {
-        spendByCategory[row.category] = (spendByCategory[row.category] ?? 0) + abs;
+      if (category) {
+        spendByCategory[category] = (spendByCategory[category] ?? 0) + abs;
       }
-    } else if (amount >= 50) {
+    } else if (category !== null && INCOME_CATEGORIES.has(category)) {
       monthlyIncome += amount;
     }
   }

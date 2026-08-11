@@ -87,12 +87,19 @@ describe('GET /api/subscriptions', () => {
 
   it('returns persisted subscriptions detected from transactions', async () => {
     const { persistTransactions } = await import('../src/store/transactions.js');
+    // Dates are relative: hardcoded 2026 dates aged out of the detector's
+    // lookback window and made this test fail purely with the passage of time.
+    const monthsAgo = (n: number) => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - n);
+      return d.toISOString().slice(0, 10);
+    };
     await persistTransactions(testUserId, [
       {
         id: 't1',
         account_id: 'a1',
         amount: '-10.99',
-        date: '2026-02-01',
+        date: monthsAgo(3),
         description: 'Spotify',
         status: 'posted',
         type: 'card_payment',
@@ -103,7 +110,7 @@ describe('GET /api/subscriptions', () => {
         id: 't2',
         account_id: 'a1',
         amount: '-10.99',
-        date: '2026-03-01',
+        date: monthsAgo(2),
         description: 'Spotify',
         status: 'posted',
         type: 'card_payment',
@@ -114,7 +121,7 @@ describe('GET /api/subscriptions', () => {
         id: 't3',
         account_id: 'a1',
         amount: '-10.99',
-        date: '2026-04-01',
+        date: monthsAgo(1),
         description: 'Spotify',
         status: 'posted',
         type: 'card_payment',

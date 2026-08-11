@@ -48,6 +48,7 @@ describe('GET /api/spending/summary', () => {
         status: 'posted',
         type: 'credit',
         running_balance: null,
+        details: { category: 'paycheck' },
       },
       {
         id: 'tx-spend-1',
@@ -86,14 +87,15 @@ describe('GET /api/spending/summary', () => {
     await app.close();
   });
 
-  it('excludes small deposits from income', async () => {
+  it('excludes non-income credits from income', async () => {
     const { persistTransactions } = await import('../src/store/transactions.js');
 
     const recent = new Date();
     recent.setDate(recent.getDate() - 5);
     const dateStr = recent.toISOString().slice(0, 10);
 
-    // Small deposit ($30) should be excluded; only outflows count
+    // A refund is a credit but is not income. Counting it would overstate the
+    // savings rate, which is the guardrail the pet reacts to.
     await persistTransactions(testUserId, [
       {
         id: 'tx-small-1',
@@ -104,6 +106,7 @@ describe('GET /api/spending/summary', () => {
         status: 'posted',
         type: 'credit',
         running_balance: null,
+        details: { category: 'shopping' },
       },
       {
         id: 'tx-spend-3',
@@ -124,8 +127,79 @@ describe('GET /api/spending/summary', () => {
     expect(res.statusCode).toBe(200);
 
     const body = res.json<{ savingsRate: number | null; monthlyIncome: number }>();
-    expect(body.monthlyIncome).toBe(0); // $30 excluded
+    expect(body.monthlyIncome).toBe(0); // refund excluded
     expect(body.savingsRate).toBeNull(); // no income → null
+
+    await app.close();
+  });
+
+  // Regression: any credit ≥ $50 used to count as income, so a self-transfer,
+  // a refund or a credit card payment inflated income and therefore the
+  // savings rate. Only genuine income categories may count.
+  it('does not count transfers between the user’s own accounts as income', async () => {
+    const { persistTransactions } = await import('../src/store/transactions.js');
+
+    const recent = new Date();
+    recent.setDate(recent.getDate() - 5);
+    const dateStr = recent.toISOString().slice(0, 10);
+
+    await persistTransactions(testUserId, [
+      {
+        id: 'tx-payroll',
+        account_id: 'acct-1',
+        amount: '2000',
+        date: dateStr,
+        description: '',
+        status: 'posted',
+        type: 'credit',
+        running_balance: null,
+        details: { category: 'paycheck' },
+      },
+      {
+        id: 'tx-self-transfer-in',
+        account_id: 'acct-1',
+        amount: '5000',
+        date: dateStr,
+        description: '',
+        status: 'posted',
+        type: 'credit',
+        running_balance: null,
+        details: { category: 'transfer' },
+      },
+      {
+        id: 'tx-self-transfer-out',
+        account_id: 'acct-2',
+        amount: '-5000',
+        date: dateStr,
+        description: '',
+        status: 'posted',
+        type: 'debit',
+        running_balance: null,
+        details: { category: 'transfer' },
+      },
+      {
+        id: 'tx-real-spend',
+        account_id: 'acct-1',
+        amount: '-1000',
+        date: dateStr,
+        description: '',
+        status: 'posted',
+        type: 'debit',
+        running_balance: null,
+        details: { category: 'groceries' },
+      },
+    ]);
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/spending/summary', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json<{ monthlyIncome: number; monthlySpend: number; savingsRate: number | null }>();
+    expect(body.monthlyIncome).toBe(2000); // not 7000
+    expect(body.monthlySpend).toBe(1000); // transfer out excluded
+    expect(body.savingsRate).toBe(50); // round((1 - 1000/2000) * 100)
 
     await app.close();
   });
@@ -214,6 +288,7 @@ describe('GET /api/spending/summary', () => {
         status: 'posted',
         type: 'credit',
         running_balance: null,
+        details: { category: 'paycheck' },
       },
       {
         id: 'tx-big-spend',

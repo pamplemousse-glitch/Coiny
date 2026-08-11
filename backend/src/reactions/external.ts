@@ -1,11 +1,17 @@
 import type { Reaction } from './types.js';
 
 // Generic event from non-Plaid data sources (Coinbase, Zerion, Spinwheel).
+//
+// PRINCIPLE: the pet reacts to what the user CONTROLS, never to the market.
+// Do not add price-movement events here (a coin surging or dumping, a holding
+// up or down N%). A creature that celebrates a pump and sulks at a dip punishes
+// the user for something they did not do, on a day they already feel bad, and
+// trains them to stop opening the app. It is also the mechanic Robinhood was
+// sanctioned over. Market moves belong on the Wealth tab, reported neutrally.
+// `crypto_price_surge` and `crypto_price_drop` were removed for this reason.
 export type ExternalEventType =
   | 'crypto_received'
   | 'crypto_sent'
-  | 'crypto_price_surge' // coin up >10% in 24h
-  | 'crypto_price_drop' // coin down >10% in 24h
   | 'defi_yield'
   | 'wallet_receive'
   | 'debt_paydown'
@@ -54,24 +60,6 @@ export function evaluateExternalEvent(event: ExternalEvent): Reaction | null {
         led: 'green',
         duration: 3000,
         reason: `DeFi yield earned:${symbolStr}${amountStr}`,
-      };
-
-    case 'crypto_price_surge':
-      return {
-        animation: 'celebrate',
-        sound: 'fanfare',
-        led: 'rainbow',
-        duration: 5000,
-        reason: `${event.symbol ?? 'Crypto'} surged >10% in 24h`,
-      };
-
-    case 'crypto_price_drop':
-      return {
-        animation: 'concerned',
-        sound: 'warning',
-        led: 'amber',
-        duration: 3000,
-        reason: `${event.symbol ?? 'Crypto'} dropped >10% in 24h`,
       };
 
     case 'debt_paydown':
@@ -132,9 +120,13 @@ export function evaluateExternalEvent(event: ExternalEvent): Reaction | null {
       return null;
 
     default: {
-      // Exhaustiveness guard — TypeScript should catch unhandled cases at compile time.
+      // Exhaustiveness guard: TypeScript catches unhandled cases at compile time.
+      // Returning null (rather than the value) keeps runtime safe if an unknown
+      // type ever arrives from an untyped caller, since callers branch on
+      // truthiness and a raw string would dispatch a malformed reaction.
       const _exhaustive: never = event.type;
-      return _exhaustive;
+      void _exhaustive;
+      return null;
     }
   }
 }

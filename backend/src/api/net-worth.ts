@@ -56,6 +56,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
 
     // --- Bank, Investments, Liabilities (Plaid) ---
     let bankTotal = 0;
+    let plaidDebtTotal = 0;
     let liquidDeposits = 0;
     let investmentsTotal = 0;
     const bankAccounts: Array<{
@@ -146,7 +147,11 @@ export function registerNetWorthApi(app: FastifyInstance): void {
             bankTotal += balance;
             liquidDeposits += Math.max(0, balance);
           } else if (acct.type === 'credit' || acct.type === 'loan') {
-            bankTotal -= balance;
+            // Accumulated separately, NOT subtracted here. Spinwheel pulls the
+            // same cards and loans from the credit bureau, so subtracting both
+            // double-counts the debt. Reconciled once below, after we know
+            // whether Spinwheel is connected.
+            plaidDebtTotal += balance;
           }
           const meta = liabilityMeta.get(acct.account_id);
           bankAccounts.push({
@@ -514,6 +519,15 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       }
     } catch {
       // spinwheel not connected or error
+    }
+
+    // Reconcile the two debt sources. Spinwheel reads the credit bureau and
+    // Plaid reads the institution, so a user connected to both sees the same
+    // card twice. Prefer the bureau when available (broader: it catches
+    // accounts at institutions the user has not linked), otherwise fall back to
+    // the Plaid-visible liabilities. Never subtract both.
+    if (!spinwheelConnected) {
+      bankTotal -= plaidDebtTotal;
     }
 
     const total =
