@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { getAccounts, getPortfolioSummary, getSpotPrices, getTransactions } from '../coinbase/client.js';
-import { config } from '../config.js';
+import { config, isSharedCoinbaseKeyAllowed } from '../config.js';
 import { dispatchReaction } from '../reactions/dispatch.js';
 import { evaluateExternalEvent } from '../reactions/external.js';
 import { deleteCoinbaseConnection, getCoinbaseConnection, upsertCoinbaseDevKey } from '../store/coinbase.js';
@@ -9,11 +9,18 @@ import { recordReaction } from '../store/pet.js';
 
 export function registerCoinbaseApi(app: FastifyInstance): void {
   // GET /api/coinbase/performance
-  app.get('/api/coinbase/performance', async (_req: FastifyRequest) => {
+  app.get('/api/coinbase/performance', async (req: FastifyRequest) => {
+    const empty = { unrealizedPnl: null, totalCash: null, totalCrypto: null };
+    // Previously this ignored the caller entirely and signed with the server's
+    // shared key, so any authenticated user received the OPERATOR's P&L.
+    const conn = await getCoinbaseConnection(req.user!.id);
+    if (!conn) return empty;
+    if (conn.mode === 'dev_key' && !isSharedCoinbaseKeyAllowed()) return empty;
+
     try {
       const summary = await getPortfolioSummary();
       if (!summary) {
-        return { unrealizedPnl: null, totalCash: null, totalCrypto: null };
+        return empty;
       }
       return {
         unrealizedPnl: summary.unrealizedPnl,
@@ -21,7 +28,7 @@ export function registerCoinbaseApi(app: FastifyInstance): void {
         totalCrypto: summary.totalCrypto,
       };
     } catch {
-      return { unrealizedPnl: null, totalCash: null, totalCrypto: null };
+      return empty;
     }
   });
 
@@ -36,6 +43,12 @@ export function registerCoinbaseApi(app: FastifyInstance): void {
   app.post('/api/coinbase/connect/dev-key', async (req: FastifyRequest, reply: FastifyReply) => {
     if (!config.COINBASE_API_KEY_ID) {
       return reply.status(409).send({ error: 'COINBASE_API_KEY_ID is not configured on this server' });
+    }
+    // dev-key mode signs with the operator's own Coinbase key. Offering it in a
+    // multi-user deployment would attribute the operator's holdings to whoever
+    // connects. Per-user Coinbase needs the unbuilt OAuth path.
+    if (!isSharedCoinbaseKeyAllowed()) {
+      return reply.status(409).send({ error: 'Coinbase dev-key mode is not available in this environment' });
     }
 
     await upsertCoinbaseDevKey(req.user!.id);
@@ -57,6 +70,9 @@ export function registerCoinbaseApi(app: FastifyInstance): void {
     const conn = await getCoinbaseConnection(userId);
     if (!conn) {
       return reply.status(409).send({ error: 'No Coinbase connection found. Connect first.' });
+    }
+    if (conn.mode === 'dev_key' && !isSharedCoinbaseKeyAllowed()) {
+      return reply.status(409).send({ error: 'Coinbase dev-key mode is not available in this environment' });
     }
 
     const accounts = await getAccounts();

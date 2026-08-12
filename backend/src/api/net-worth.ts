@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { getAccounts, getSpotPrices } from '../coinbase/client.js';
+import { isSharedCoinbaseKeyAllowed } from '../config.js';
 import { db } from '../db/client.js';
 import {
   alpacaConnections,
@@ -193,7 +194,10 @@ export function registerNetWorthApi(app: FastifyInstance): void {
     let coinbaseConnected = false;
     try {
       const [connection] = await db().select().from(coinbaseConnections).where(eq(coinbaseConnections.userId, userId));
-      if (connection) {
+      // A 'dev_key' connection means "sign with the operator's shared key", not
+      // per-user credentials. Serving that in production would count the
+      // operator's balances as this user's. See isSharedCoinbaseKeyAllowed.
+      if (connection && (connection.mode !== 'dev_key' || isSharedCoinbaseKeyAllowed())) {
         coinbaseConnected = true;
         const accounts = await getAccounts();
         const symbols = accounts.map((a) => a.currency).filter((s): s is string => typeof s === 'string');
@@ -499,6 +503,11 @@ export function registerNetWorthApi(app: FastifyInstance): void {
     let debtsTotal = 0;
     const debtItems: Array<{ id: string; type: string; balance: number; monthlyPayment: number }> = [];
     let spinwheelConnected = false;
+    // Distinct from spinwheelConnected: set only after the bureau fetch actually
+    // returns. If Spinwheel is connected but its fetch throws, debtsTotal stays 0,
+    // and suppressing the Plaid subtraction on "connected" alone would make net
+    // worth silently jump by the full card and loan balances.
+    let spinwheelDebtsLoaded = false;
     try {
       const [connection] = await db()
         .select()
@@ -507,6 +516,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       if (connection) {
         spinwheelConnected = true;
         const debts = await getDebtProfile(connection.spinwheelUserId);
+        spinwheelDebtsLoaded = true;
         for (const debt of debts) {
           debtsTotal += debt.balance ?? 0;
           debtItems.push({
@@ -526,7 +536,7 @@ export function registerNetWorthApi(app: FastifyInstance): void {
     // card twice. Prefer the bureau when available (broader: it catches
     // accounts at institutions the user has not linked), otherwise fall back to
     // the Plaid-visible liabilities. Never subtract both.
-    if (!spinwheelConnected) {
+    if (!spinwheelDebtsLoaded) {
       bankTotal -= plaidDebtTotal;
     }
 

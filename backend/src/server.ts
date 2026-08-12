@@ -46,6 +46,15 @@ import { registerErrorHandler } from './plugins/error-handler.js';
 import { loggerOptions } from './plugins/logger.js';
 import { registerPlaidWebhook } from './webhook/plaid.js';
 
+/** Debug routes are for local development and the iOS simulator only.
+ *  Both conditions must hold: not a production build, AND pointed at Plaid
+ *  sandbox data. Either alone is insufficient, which is the bug this replaces:
+ *  fly.toml ships NODE_ENV=production with PLAID_ENV=sandbox, so gating on
+ *  PLAID_ENV alone exposed an unauthenticated session-minting route publicly. */
+function isDebugBuild(): boolean {
+  return config.NODE_ENV !== 'production' && config.PLAID_ENV === 'sandbox';
+}
+
 async function buildApp() {
   await initDb();
   await runMigrations();
@@ -91,7 +100,12 @@ async function buildApp() {
   // Public auth endpoints (no session required)
   app.register(async (scope) => {
     registerAuthApi(scope);
-    if (config.PLAID_ENV === 'sandbox') registerDebugSessionApi(scope);
+    // Gated on NODE_ENV, NOT on PLAID_ENV. PLAID_ENV describes which Plaid data
+    // environment we talk to; it says nothing about whether this process is
+    // publicly reachable. fly.toml ships NODE_ENV=production with
+    // PLAID_ENV=sandbox, so the old PLAID_ENV gate registered an
+    // UNAUTHENTICATED session-minting endpoint on the public internet.
+    if (isDebugBuild()) registerDebugSessionApi(scope);
   });
 
   // All other routes require a valid session token. The global rate-limiter
@@ -102,7 +116,7 @@ async function buildApp() {
 
     registerPlaidLinkApi(scope);
     registerPlaidRecurringApi(scope);
-    if (config.PLAID_ENV === 'sandbox') registerDebugApi(scope);
+    if (isDebugBuild()) registerDebugApi(scope);
     registerAccountApi(scope);
     registerPetsApi(scope);
     registerSpendingApi(scope);
