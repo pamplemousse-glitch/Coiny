@@ -1,5 +1,6 @@
 import {
   boolean,
+  date,
   index,
   integer,
   jsonb,
@@ -595,3 +596,132 @@ export const notificationLog = pgTable(
   },
   (t) => [index('notification_log_user_sent_idx').on(t.userId, t.sentAt)],
 );
+
+// ---------------------------------------------------------------------------
+// Goal system (docs/prd-app-v2.md §3). The four goal columns on `pet_state`
+// (weeklyBudgetByCategory, savingsGoal, paycheckMinAmount, largePurchaseThreshold)
+// are superseded by these tables. Keep them read-only for one release so the
+// shipped iOS build keeps working, then drop.
+// ---------------------------------------------------------------------------
+
+// Daily net worth snapshot. The single highest-priority gap in the schema: every
+// on-pace calculation, projection and trend depends on a time series, and only a
+// scalar (`pet_state.last_net_worth_usd`) existed before this.
+//
+// `byClass` holds the per-asset-class breakdown so a later change to the class
+// list does not require a migration, and so "you vs the market" can decompose a
+// change into contributions versus price movement.
+export const netWorthDaily = pgTable(
+  'net_worth_daily',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    date: date('date').notNull(),
+    totalUsd: numeric('total_usd').notNull(),
+    byClass: jsonb('by_class').$type<Record<string, number>>().notNull().default({}),
+    currency: text('currency').notNull().default('USD'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.date] })],
+);
+
+// Layer 0: the derived financial substrate every goal reads from. Recomputed on a
+// schedule rather than per request, and versioned so a change to the computation
+// can be detected and backfilled instead of silently altering history.
+export const derivedState = pgTable('derived_state', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  takeHomeMonthly: numeric('take_home_monthly'),
+  incomeVolatility: numeric('income_volatility'),
+  essentialMonthly: numeric('essential_monthly'),
+  discretionaryMonthly: numeric('discretionary_monthly'),
+  liquidCash: numeric('liquid_cash'),
+  runwayMonths: numeric('runway_months'),
+  savingsRate: numeric('savings_rate'),
+  computedAt: timestamp('computed_at', { withTimezone: true }).notNull().defaultNow(),
+  computeVersion: integer('compute_version').notNull().default(1),
+});
+
+// Layer 1: the foundation ladder. `rungs` is keyed by rung number ("0".."7") with
+// `{ status, completedAt, skippedReason }`. Status is one of:
+//   pending | active | completed | not_applicable | skipped
+//
+// Rungs never un-complete: a user who clears rung 3 and later takes on new
+// high-APR debt keeps the completion (and the creature's stage), while the rung
+// reopens as an active task. Progress is permanent, problems are current.
+export const ladderState = pgTable('ladder_state', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  currentRung: integer('current_rung').notNull().default(0),
+  rungs: jsonb('rungs')
+    .$type<Record<string, { status: string; completedAt?: string; skippedReason?: string }>>()
+    .notNull()
+    .default({}),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Layer 2: user-defined target goals. Capped at 3 active per user, enforced in the
+// store layer rather than by constraint so the cap can be raised per plan tier.
+export const goals = pgTable(
+  'goals',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    emoji: text('emoji'),
+    kind: text('kind').notNull(), // save | payoff | purchase
+    targetAmountUsd: numeric('target_amount_usd').notNull(),
+    targetDate: date('target_date'),
+    fundingAccountId: text('funding_account_id'),
+    countsExistingBalance: boolean('counts_existing_balance').notNull().default(true),
+    // { type: 'recurring'|'roundup'|'manual', amount, cadence, dayOfMonth }
+    contributionRule: jsonb('contribution_rule').$type<Record<string, unknown>>(),
+    recurringAnnual: boolean('recurring_annual').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    achievedAt: timestamp('achieved_at', { withTimezone: true }),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+  },
+  (t) => [index('goals_user_idx').on(t.userId)],
+);
+
+// Layer 3: habit guardrails, one row per guardrail per period. Streaks are derived
+// from consecutive `passed` outcomes rather than stored, so a corrected outcome
+// cannot leave a streak counter wrong.
+//
+// `repairUsed` records a forgiving-streak repair. Missing a period costs the
+// streak, never the creature.
+export const goalPeriods = pgTable(
+  'goal_periods',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    guardrailKey: text('guardrail_key').notNull(),
+    periodStart: date('period_start').notNull(),
+    periodEnd: date('period_end').notNull(),
+    outcome: text('outcome').notNull(), // passed | missed | pending | not_applicable
+    targetValue: numeric('target_value'),
+    actualValue: numeric('actual_value'),
+    repairUsed: boolean('repair_used').notNull().default(false),
+    evaluatedAt: timestamp('evaluated_at', { withTimezone: true }),
+  },
+  (t) => [uniqueIndex('goal_periods_user_key_start_idx').on(t.userId, t.guardrailKey, t.periodStart)],
+);
+
+// The creature's progression. Stage is driven by the ladder and NEVER regresses.
+// Vitality and rest are computed, not stored, because they are derived from the
+// current period's guardrails and should never be stale.
+export const petProgression = pgTable('pet_progression', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  stage: integer('stage').notNull().default(0),
+  stageEnteredAt: timestamp('stage_entered_at', { withTimezone: true }).notNull().defaultNow(),
+  unlockedArtifacts: jsonb('unlocked_artifacts').$type<string[]>().notNull().default([]),
+});
