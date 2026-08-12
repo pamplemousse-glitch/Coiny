@@ -16,6 +16,10 @@ import { isEssential, isIncome, isNonSpend } from './categories.js';
  *  dates rather than by real variability. */
 export const MIN_MONTHS_FOR_VOLATILITY = 3;
 
+/** Minimum observed span before a monthly spending rate is meaningful. A shorter
+ *  sample is dominated by whether rent happened to land inside the window. */
+export const MIN_DAYS_FOR_MONTHLY_RATE = 30;
+
 export type DerivedInputTransaction = {
   amount: string;
   date: string; // YYYY-MM-DD
@@ -107,21 +111,53 @@ function monthlyOutflows(
   const cutoff = daysBefore(now, windowDays);
   let essential = 0;
   let discretionary = 0;
-  let hasData = false;
+  let earliest: string | null = null;
+  // Any transaction older than the cutoff proves the user's history spans the whole
+  // window, even though that transaction is not itself counted. Without this the
+  // denominator would be the span of transactions INSIDE the window, so a user with
+  // a year of history whose oldest in-window transaction is 68 days old would be
+  // treated as having 68 days of history and their monthly rate inflated.
+  let historyPredatesWindow = false;
 
   for (const tx of txs) {
-    if (tx.date < cutoff) continue;
+    if (tx.date < cutoff) {
+      historyPredatesWindow = true;
+      continue;
+    }
     const amount = parseFloat(tx.amount);
     if (!Number.isFinite(amount) || amount >= 0) continue;
     if (isNonSpend(tx.category)) continue;
-    hasData = true;
+    if (earliest === null || tx.date < earliest) earliest = tx.date;
     const abs = Math.abs(amount);
     if (isEssential(tx.category)) essential += abs;
     else discretionary += abs;
   }
 
-  const months = windowDays / 30;
-  return { essential: essential / months, discretionary: discretionary / months, hasData };
+  if (earliest === null) return { essential: 0, discretionary: 0, hasData: false };
+
+  // Divide by the span actually OBSERVED, never by the nominal window.
+  //
+  // This previously divided by `windowDays / 30`, a constant 3, so a user with two
+  // weeks of history had a fortnight of spending averaged across three months and
+  // came out roughly 6x too low. That is not a cosmetic error: essentialMonthly is
+  // the denominator of runwayMonths and the multiplicand of the rung 4 emergency
+  // fund target, so an understated value hands the user a target they have already
+  // met, and ladder rungs never un-complete. A wrong rung is permanent.
+  const observedDays = historyPredatesWindow
+    ? windowDays
+    : Math.min(
+        windowDays,
+        Math.max(1, Math.round((now.getTime() - new Date(`${earliest}T00:00:00Z`).getTime()) / 86_400_000) + 1),
+      );
+
+  // Below this, a monthly rate extrapolated from the sample says more about which
+  // days happened to fall in the window than about the user. Unknown, not zero.
+  if (observedDays < MIN_DAYS_FOR_MONTHLY_RATE) {
+    return { essential: 0, discretionary: 0, hasData: false };
+  }
+
+  const months = observedDays / 30;
+  return { essential: essential / months, discretionary: discretionary / months, hasData: true };
 }
 
 /**

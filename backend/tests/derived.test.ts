@@ -14,10 +14,13 @@ function steadyHistory(months: number, salary = 5000): DerivedInputTransaction[]
     const d = new Date(NOW);
     d.setMonth(d.getMonth() - i);
     const ym = d.toISOString().slice(0, 7);
-    out.push(tx(`${ym}-01`, String(salary), 'paycheck'));
-    out.push(tx(`${ym}-05`, '-1500', 'rent'));
-    out.push(tx(`${ym}-10`, '-500', 'groceries'));
-    out.push(tx(`${ym}-15`, '-600', 'restaurants'));
+    // All on the same day of month so a trailing-window boundary includes or
+    // excludes a whole month, never a partial one. Staggered days made the
+    // 90-day window catch one extra restaurant charge and skewed the split.
+    out.push(tx(`${ym}-02`, String(salary), 'paycheck'));
+    out.push(tx(`${ym}-02`, '-1500', 'rent'));
+    out.push(tx(`${ym}-02`, '-500', 'groceries'));
+    out.push(tx(`${ym}-02`, '-600', 'restaurants'));
   }
   return out;
 }
@@ -42,16 +45,17 @@ describe('computeDerivedState', () => {
   });
 
   it('splits essential from discretionary spend', () => {
-    const d = computeDerivedState(steadyHistory(3), null, NOW);
+    // 5 months so history predates the 90-day window and the full-window divisor applies.
+    const d = computeDerivedState(steadyHistory(5), null, NOW);
     // rent 1500 + groceries 500 essential, restaurants 600 discretionary, monthly.
     expect(Math.round(d.essentialMonthly ?? 0)).toBe(2000);
     expect(Math.round(d.discretionaryMonthly ?? 0)).toBe(600);
   });
 
   it('excludes transfers from spend', () => {
-    const withTransfer = [...steadyHistory(3), tx(`${NOW.toISOString().slice(0, 7)}-11`, '-9000', 'transfer')];
-    const a = computeDerivedState(steadyHistory(3), null, NOW);
-    const b = computeDerivedState(withTransfer, null, NOW);
+    const withTransfer = [...steadyHistory(5), tx(`${NOW.toISOString().slice(0, 7)}-11`, '-9000', 'transfer')];
+    const a = computeDerivedState(steadyHistory(5), null, NOW);
+    const b = computeDerivedState([...withTransfer], null, NOW);
     expect(b.discretionaryMonthly).toBe(a.discretionaryMonthly);
   });
 
@@ -75,7 +79,7 @@ describe('computeDerivedState', () => {
   });
 
   it('computes runway from essentials, not total burn', () => {
-    const d = computeDerivedState(steadyHistory(3), 10_000, NOW);
+    const d = computeDerivedState(steadyHistory(5), 10_000, NOW);
     // 10,000 / 2,000 essential = 5 months. Using total burn would give 3.8.
     expect(Math.round(d.runwayMonths ?? 0)).toBe(5);
   });
@@ -121,7 +125,7 @@ describe('income volatility', () => {
 // null means "unknown" everywhere, and unknown must never read as zero.
 describe('unknown is not zero', () => {
   it('leaves runway null when cash is unknown', () => {
-    const d = computeDerivedState(steadyHistory(3), null, NOW);
+    const d = computeDerivedState(steadyHistory(5), null, NOW);
     expect(d.runwayMonths).toBeNull();
   });
 
@@ -135,5 +139,59 @@ describe('unknown is not zero', () => {
     const withJunk = [...steadyHistory(6), tx(`${NOW.toISOString().slice(0, 7)}-22`, 'not-a-number', 'paycheck')];
     const d = computeDerivedState(withJunk, null, NOW);
     expect(d.takeHomeMonthly).toBe(5000);
+  });
+});
+
+// Regression: monthlyOutflows divided by a constant `windowDays / 30` (always 3),
+// so a fortnight of spending was averaged across three months and came out ~6x
+// too low. essentialMonthly is the emergency-fund multiplicand for ladder rung 4,
+// and rungs never un-complete, so an understated value permanently awards a rung
+// the user has not earned.
+describe('short history does not understate monthly spend', () => {
+  function daysAgo(n: number): string {
+    const d = new Date(NOW);
+    d.setDate(d.getDate() - n);
+    return d.toISOString().slice(0, 10);
+  }
+
+  it('reports unknown rather than a scaled-down rate below the minimum span', () => {
+    // Two weeks of history: $2,000 of rent. Dividing by 3 would report ~$667/mo.
+    const txs = [tx(daysAgo(10), '-2000', 'rent'), tx(daysAgo(3), '-200', 'groceries')];
+    const d = computeDerivedState(txs, 10_000, NOW);
+    expect(d.essentialMonthly).toBeNull();
+    expect(d.runwayMonths).toBeNull();
+  });
+
+  it('scales by observed span once there is enough history', () => {
+    // Exactly 60 days of history, $4,000 of essentials. The true rate is $2,000/mo.
+    // Dividing by the nominal 3-month window would report $1,333.
+    const txs = [tx(daysAgo(59), '-2000', 'rent'), tx(daysAgo(29), '-2000', 'rent')];
+    const d = computeDerivedState(txs, null, NOW);
+    expect(Math.round(d.essentialMonthly ?? 0)).toBeGreaterThan(1800);
+    expect(Math.round(d.essentialMonthly ?? 0)).toBeLessThan(2200);
+  });
+
+  it('does not let a short history award the rung 4 emergency fund', async () => {
+    const { evaluateLadder } = await import('../src/goals/ladder.js');
+    const txs = [tx(daysAgo(10), '-2000', 'rent')];
+    const d = computeDerivedState(txs, 5000, NOW);
+    const state = evaluateLadder(
+      {
+        hasConnectedAccount: true,
+        essentialMonthly: d.essentialMonthly,
+        incomeVolatility: d.incomeVolatility,
+        takeHomeMonthly: d.takeHomeMonthly,
+        liquidCash: d.liquidCash,
+        savingsRate: d.savingsRate,
+        monthsAtSurplusRate: 0,
+        highAprDebtBalances: [],
+        investedTotal: 0,
+        taxAdvantagedRate: 0,
+        employerMatch: 'captured',
+      },
+      null,
+      NOW,
+    );
+    expect(state.rungs['4']?.status).not.toBe('completed');
   });
 });
