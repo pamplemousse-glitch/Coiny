@@ -254,19 +254,6 @@ export const metalHoldings = pgTable('metal_holdings', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-// SnapTrade connections — one per user; snaptradeUserSecret is AES-256-GCM encrypted.
-// snapUserId is a copy of the Coiny user ID registered with SnapTrade.
-export const snaptradeConnections = pgTable('snaptrade_connections', {
-  userId: text('user_id')
-    .primaryKey()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  snapUserId: text('snap_user_id').notNull(),
-  snapUserSecret: text('snap_user_secret').notNull(),
-  lastBrokerageTotal: numeric('last_brokerage_total'),
-  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
-
 // YNAB connections — one per user. Migrated to OAuth 2.0 PKCE; apiKey kept nullable for legacy PAT users.
 // accessToken / refreshToken are AES-256-GCM encrypted. tokenExpiresAt drives auto-refresh (5-min buffer).
 export const ynabConnections = pgTable('ynab_connections', {
@@ -559,25 +546,6 @@ export const farmlandParcels = pgTable('farmland_parcels', {
   lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
-
-// Steam accounts — CS2 skin portfolio via Steam community inventory API.
-// No API key required; inventory endpoint is public for public profiles.
-// lastPortfolioUsd is the sum of all CS2 item market prices in USD.
-export const steamAccounts = pgTable(
-  'steam_accounts',
-  {
-    id: serial('id').primaryKey(),
-    userId: text('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    steamId64: text('steam_id64').notNull(),
-    label: text('label'),
-    lastPortfolioUsd: numeric('last_portfolio_usd'),
-    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [uniqueIndex('steam_accounts_user_steam_idx').on(t.userId, t.steamId64)],
-);
 
 // Push notification ledger. Exists so the notification budget in
 // reactions/dispatch.ts is enforceable across restarts and instances rather

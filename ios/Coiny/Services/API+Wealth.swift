@@ -71,24 +71,6 @@ struct KrakenSyncResult: Decodable {
     let total: Double
 }
 
-// MARK: - SnapTrade DTOs
-
-struct SnapTradeConnectResult: Decodable {
-    let redirectUrl: String
-}
-
-struct SnapTradeAccount: Decodable, Identifiable {
-    let id: String
-    let name: String
-    let institution: String
-    let totalUsd: Double
-    let currency: String
-}
-
-struct SnapTradeSyncResult: Decodable {
-    let total: Double
-    let accounts: Int
-}
 
 // MARK: - YNAB DTOs
 
@@ -228,21 +210,6 @@ extension API {
     }
 }
 
-// MARK: - SnapTrade API
-
-extension API {
-    func connectSnapTrade() async throws -> SnapTradeConnectResult {
-        try await post("/api/snaptrade/connect")
-    }
-
-    func disconnectSnapTrade() async throws {
-        try await deleteVoid("/api/snaptrade/connect")
-    }
-
-    func syncSnapTrade() async throws -> SnapTradeSyncResult {
-        try await post("/api/snaptrade/sync")
-    }
-}
 
 // MARK: - YNAB API
 

@@ -21,10 +21,8 @@ import {
   pokemonCardHoldings,
   polymarketAccounts,
   realEstateAssets,
-  snaptradeConnections,
   sneakerHoldings,
   spinwheelConnections,
-  steamAccounts,
   tradingCardHoldings,
   truelayerConnections,
   vehicleAssets,
@@ -352,17 +350,6 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       // table not yet populated
     }
 
-    // --- CS2/Steam skins (pre-synced total) ---
-    let steamTotal = 0;
-    try {
-      const rows = await db().select().from(steamAccounts).where(eq(steamAccounts.userId, userId));
-      for (const r of rows) {
-        if (r.lastPortfolioUsd !== null) steamTotal += parseFloat(r.lastPortfolioUsd);
-      }
-    } catch {
-      // table not yet populated
-    }
-
     // --- YNAB budgets (pre-synced total) ---
     let ynabTotal = 0;
     let ynabConnected = false;
@@ -397,19 +384,6 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       if (alpaca) {
         alpacaConnected = true;
         if (alpaca.lastEquityUsd !== null) alpacaTotal += parseFloat(alpaca.lastEquityUsd);
-      }
-    } catch {
-      // table not yet populated
-    }
-
-    // --- SnapTrade brokerage (pre-synced total) ---
-    let snaptradeTotal = 0;
-    let snaptradeConnected = false;
-    try {
-      const [snap] = await db().select().from(snaptradeConnections).where(eq(snaptradeConnections.userId, userId));
-      if (snap) {
-        snaptradeConnected = true;
-        if (snap.lastBrokerageTotal !== null) snaptradeTotal += parseFloat(snap.lastBrokerageTotal);
       }
     } catch {
       // table not yet populated
@@ -556,8 +530,6 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       sneakersTotal +
       nftTotal +
       manualTotal +
-      steamTotal +
-      snaptradeTotal +
       ynabTotal +
       vinylTotal +
       kalshiTotal +
@@ -623,12 +595,10 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       sneakers: sneakersTotal,
       nft: nftTotal,
       manual: manualTotal,
-      steam: steamTotal,
       pokemonCards: pokemonCardsTotal,
       kalshi: kalshiTotal,
       kraken: krakenTotal,
       alpaca: alpacaTotal,
-      snaptrade: snaptradeTotal,
       ynab: ynabTotal,
       vinyl: vinylTotal,
       truelayer: truelayerTotal,
@@ -651,7 +621,6 @@ export function registerNetWorthApi(app: FastifyInstance): void {
         kalshi: kalshiConnected,
         kraken: krakenConnected,
         alpaca: alpacaConnected,
-        snaptrade: snaptradeConnected,
         spinwheel: spinwheelConnected,
         truelayer: truelayerConnected,
         ynab: ynabConnected,

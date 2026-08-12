@@ -253,6 +253,20 @@
       "when": 1786533912433,
       "tag": "0035_goal_system",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1786620312433,
+      "tag": "0036_drop_steam",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1786620412433,
+      "tag": "0037_drop_snaptrade",
+      "breakpoints": true
     }
   ]
 }

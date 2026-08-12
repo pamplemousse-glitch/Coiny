@@ -13,13 +13,12 @@ struct NetWorthView: View {
     @State private var realEstateVM = RealEstateViewModel()
     @State private var vehiclesVM = VehiclesViewModel()
     @State private var krakenVM = KrakenViewModel()
-    @State private var snaptradeVM = SnapTradeViewModel()
+    @State private var showKrakenKeyEntry = false
     @State private var ynabVM = YnabViewModel()
     @State private var kalshiVM = KalshiViewModel()
     @State private var discogsVM = DiscogsViewModel()
     @State private var polymarketVM = PolymarketViewModel()
     @State private var alpacaVM = AlpacaViewModel()
-    @State private var steamVM = SteamViewModel()
     @State private var nftVM = NftViewModel()
     @State private var manualAssetsVM = ManualAssetsViewModel()
     @State var truelayerVM = TruelayerViewModel()
@@ -46,7 +45,6 @@ struct NetWorthView: View {
         .environment(realEstateVM)
         .environment(vehiclesVM)
         .environment(alpacaVM)
-        .environment(steamVM)
         .environment(nftVM)
         .environment(manualAssetsVM)
         .environment(truelayerVM)
@@ -73,7 +71,6 @@ struct NetWorthView: View {
         async let discogs: () = discogsVM.loadStatus()
         async let polymarket: () = polymarketVM.loadAccounts()
         async let alpaca: () = alpacaVM.loadStatus()
-        async let steam: () = steamVM.loadAccounts()
         async let nft: () = nftVM.loadWallets()
         async let manualAssets: () = manualAssetsVM.loadAssets()
         async let truelayer: () = truelayerVM.loadStatus()
@@ -84,7 +81,7 @@ struct NetWorthView: View {
         async let coins: () = coinsVM.loadHoldings()
         _ = await (netWorth, coinbase, zerion, spinwheel, performance, chainWallets,
                    hyperliquid, metals, sneakers, realEstate, vehicles, kalshi, discogs,
-                   polymarket, alpaca, steam, nft, manualAssets, truelayer, pokemonCards,
+                   polymarket, alpaca, nft, manualAssets, truelayer, pokemonCards,
                    energy, farmland, tradingCards, coins)
     }
 
@@ -106,7 +103,6 @@ struct NetWorthView: View {
                     chainWalletsSection(data)
                     hyperliquidSection(data)
                     nftSection(data)
-                    steamSection(data)
                     alpacaSection(data)
                     manualAssetsSection(data)
                     metalsSection(data)
@@ -115,7 +111,6 @@ struct NetWorthView: View {
                     sneakersSection(data)
                     discogsSection(data)
                     krakenSection(data)
-                    snaptradeSection(data)
                     ynabSection(data)
                     kalshiSection(data)
                     polymarketSection(data)
@@ -301,15 +296,6 @@ extension NetWorthView {
         }
     }
 
-    private func steamSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "CS2 Skins", total: data.steam ?? 0, icon: "gamecontroller.fill", color: .cyan)
-                Divider().padding(.vertical, 6)
-                SteamView()
-            }
-        }
-    }
 
     private func alpacaSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
@@ -391,21 +377,15 @@ extension NetWorthView {
                 sectionHeader(title: "Kraken", total: data.kraken, icon: "chart.line.uptrend.xyaxis.circle.fill", color: .cyan)
                 Divider().padding(.vertical, 6)
                 KrakenInlineView(vm: krakenVM, isConnected: data.connections.kraken, onConnect: {
-                    Task { await snaptradeVM.connect() }
+                    showKrakenKeyEntry = true
                 })
             }
         }
-    }
-
-    private func snaptradeSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Brokerage", total: data.snaptrade, icon: "building.2.fill", color: .mint)
-                Divider().padding(.vertical, 6)
-                SnapTradeInlineView(vm: snaptradeVM, isConnected: data.connections.snaptrade)
-            }
+        .sheet(isPresented: $showKrakenKeyEntry) {
+            KrakenKeyEntryView(vm: krakenVM)
         }
     }
+
 
     private func ynabSection(_ data: NetWorthResponse) -> some View {
         GroupBox {

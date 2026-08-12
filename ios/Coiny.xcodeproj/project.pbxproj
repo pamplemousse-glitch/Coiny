@@ -28,7 +28,6 @@
 		2074109B368958FCFA51EE40 /* YnabViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 447287C52972DAA1D494E9BC /* YnabViewModelTests.swift */; };
 		20DB88C62CEA7D7F0D9CAE33 /* SneakersViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E80D41359E22AC0B7A543FD /* SneakersViewModelTests.swift */; };
 		220920B25D14BDCECE977BC9 /* TruelayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18AAE0E838B59D15092CC506 /* TruelayerViewModel.swift */; };
-		25929FCCE2ED04BD831C8D5F /* SnapTradeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF984AF7F5DDF4470FD8C135 /* SnapTradeViewModel.swift */; };
 		275CC33CEE3B9B10378CEF72 /* ViewSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8973AFCF92D287621A176B77 /* ViewSmokeTests.swift */; };
 		2A5ADD32914C190B7FDFDB01 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A96683673F59105FD8C490CB /* RootView.swift */; };
 		2C8043B303BF9D87D17E187F /* PetTabUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79AF863AA70124AECDD776D /* PetTabUITests.swift */; };
@@ -54,7 +53,6 @@
 		5633579096E49D2D7018D4EC /* PerformanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FF2E38FE821E29CE2D5130E /* PerformanceView.swift */; };
 		5672B8B24789E311EFC833BE /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7569F588DE7E9E44FB2B517 /* SignInView.swift */; };
 		586CE43DD4EB9EFE69894F03 /* FakeHTTPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 379B5721C69742E028B2E3B1 /* FakeHTTPClient.swift */; };
-		5920C03A77B9E294B2A5349E /* API+Steam.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0048D9A2E63B96721B0DEB3 /* API+Steam.swift */; };
 		5F0C355BD02737E6F5D5E1EF /* SpinwheelViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1597BEE9633642B9F378C2E1 /* SpinwheelViewModelTests.swift */; };
 		6373784D303F6045C615C96C /* VehiclesViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C104CD7196BD12428D6AC151 /* VehiclesViewModelTests.swift */; };
 		64A455E73B83DB1FB16A736C /* SessionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B52F2C8D5C291C6BC47B2D5F /* SessionStoreTests.swift */; };
@@ -69,7 +67,6 @@
 		6F06F1E60FD3842703559885 /* RealEstateViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1511858B95CE2674F62C8BA /* RealEstateViewModel.swift */; };
 		704552613AD01BE58F697B8F /* SpinwheelViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 560252551FB195B43FF009D4 /* SpinwheelViewModel.swift */; };
 		74A28B4AE4C174C29455B5E6 /* HTTPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 289A0FEEDF04BCEAF19628FE /* HTTPClient.swift */; };
-		7666363890E4E657B57AC30E /* SteamViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4967B2DE5D5DB23E4895B9D8 /* SteamViewModelTests.swift */; };
 		79A6E9C14C5F1D8EFD2101B2 /* NetWorthView+WealthInlines.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A7BC569B5DF82AA7830B167 /* NetWorthView+WealthInlines.swift */; };
 		7E7515B6F36304A89398060F /* AlpacaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA9C3CC56A6004773A1AA2F2 /* AlpacaView.swift */; };
 		813D469E426EAA9446238594 /* API+Debug.swift in Sources */ = {isa = PBXBuildFile; fileRef = 851CD4156E2005F77706A82A /* API+Debug.swift */; };
@@ -87,7 +84,6 @@
 		987AC1EDB753A31B50CF8837 /* NftView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D32ED5F0B28A5899A6EBA88 /* NftView.swift */; };
 		9AAFCBC9EB5DB3933DBCF5B3 /* RealEstateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F85EC65EB53040C0CD5848E /* RealEstateView.swift */; };
 		9D0730857143E07180260DF8 /* ZerionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99BEF3ADB4D0ED3C67701140 /* ZerionView.swift */; };
-		9EAE7334C734B00A4704997D /* SnapTradeViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26285B0E19CC8062A4AE742A /* SnapTradeViewModelTests.swift */; };
 		A05B06038435CA6C045792AA /* SpinwheelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 149540FBF9BFA9D95E8B05FE /* SpinwheelView.swift */; };
 		A2EF15986988C4581FAF6F75 /* SneakersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C325B0CE4D4096419D6FB63 /* SneakersView.swift */; };
 		A481FED920BBEC4A899F37BA /* KalshiViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03D03E4BF4F4B05BC31B30C2 /* KalshiViewModelTests.swift */; };
@@ -99,7 +95,6 @@
 		B44D95DEE0C06BBD3D13DFAF /* TradingCardsViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C8A559C5C1CE5E41BC91F87 /* TradingCardsViewModelTests.swift */; };
 		B7D9EFF6F2021787259829DD /* API+Performance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AFF7161BAE8ED517D1AF774 /* API+Performance.swift */; };
 		B94BFD52DBEBAB21BB375870 /* PetState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97AA2C381CDE92EFC7F64E9E /* PetState.swift */; };
-		BB667B21F1E742E1B91C44B6 /* SteamViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1045EF85A494957F0B7FD75D /* SteamViewModel.swift */; };
 		BED52206F83EE89B18A6DA91 /* PerformanceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB3F1F9E3C16B6F23900A0B7 /* PerformanceViewModel.swift */; };
 		C35276938C6B206366D2DE1C /* MetalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D8B5B4F86546575B9C283D2 /* MetalsView.swift */; };
 		CAD485F77D89010A3CB34AFF /* NetWorthView+TruelayerInlines.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5BF95FA0B5D7E297B7E2A7D /* NetWorthView+TruelayerInlines.swift */; };
@@ -110,7 +105,6 @@
 		E12D94570A604A1298219055 /* NftViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F94C0FE6B70F56084D65746B /* NftViewModel.swift */; };
 		E19FA15D4D63A5DB96ABCFAE /* PolymarketViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECEAD29701455AA573630C85 /* PolymarketViewModelTests.swift */; };
 		E3FA31116D7E69F63A507DCA /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2135274DF755F195CCB864FE /* SettingsView.swift */; };
-		E96DF8BCDE08D672457036C3 /* SteamView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 201669B4BE631A77F4E97BA2 /* SteamView.swift */; };
 		EFAF67196DAA3990A2B59658 /* NftViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE864FE76E73AB4892D0EFA8 /* NftViewModelTests.swift */; };
 		F2E6476046E44C11561AA329 /* SpinwheelInlineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8A82CF82C3C90B06D0E4C4C /* SpinwheelInlineView.swift */; };
 		F507AEF30B1975F896BDAF76 /* API+ManualAssets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65284E3BE19D29FB121805ED /* API+ManualAssets.swift */; };
@@ -146,7 +140,6 @@
 		087F5AB4BAEF11F6C77D4CAF /* KalshiViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KalshiViewModel.swift; sourceTree = "<group>"; };
 		0B9EDD0CD416E89DFFB54761 /* TradingCardsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradingCardsViewModel.swift; sourceTree = "<group>"; };
 		0D8B5B4F86546575B9C283D2 /* MetalsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalsView.swift; sourceTree = "<group>"; };
-		1045EF85A494957F0B7FD75D /* SteamViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamViewModel.swift; sourceTree = "<group>"; };
 		12AE45A6FE1B9C75B476C2E2 /* KeychainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainTests.swift; sourceTree = "<group>"; };
 		1375043E147E354417174A6B /* ActivityTabUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityTabUITests.swift; sourceTree = "<group>"; };
 		149540FBF9BFA9D95E8B05FE /* SpinwheelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpinwheelView.swift; sourceTree = "<group>"; };
@@ -159,9 +152,7 @@
 		1AFF7161BAE8ED517D1AF774 /* API+Performance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Performance.swift"; sourceTree = "<group>"; };
 		1B37C0E6815BDEC877A224FD /* PokemonCardsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PokemonCardsViewModel.swift; sourceTree = "<group>"; };
 		1CCD8176AA6314ABA1FE9D13 /* ZerionViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZerionViewModelTests.swift; sourceTree = "<group>"; };
-		201669B4BE631A77F4E97BA2 /* SteamView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamView.swift; sourceTree = "<group>"; };
 		2135274DF755F195CCB864FE /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		26285B0E19CC8062A4AE742A /* SnapTradeViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapTradeViewModelTests.swift; sourceTree = "<group>"; };
 		289A0FEEDF04BCEAF19628FE /* HTTPClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPClient.swift; sourceTree = "<group>"; };
 		2A17F0E2E9DC99FBC260EE5F /* ZerionViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZerionViewModel.swift; sourceTree = "<group>"; };
 		2A1E7F4A5A7BE14C4CBB1764 /* AlpacaViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlpacaViewModel.swift; sourceTree = "<group>"; };
@@ -178,7 +169,6 @@
 		4718BA0EA7177583D959334E /* CoinyTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CoinyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		48BF5EFEEECD2DAE48631E34 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
 		494CFC8859C818D5EEE329D9 /* PolymarketViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolymarketViewModel.swift; sourceTree = "<group>"; };
-		4967B2DE5D5DB23E4895B9D8 /* SteamViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SteamViewModelTests.swift; sourceTree = "<group>"; };
 		4D134A9AEC9A43D1B6E04D71 /* PetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetView.swift; sourceTree = "<group>"; };
 		4F85EC65EB53040C0CD5848E /* RealEstateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealEstateView.swift; sourceTree = "<group>"; };
 		5135E8290813E446256D3BE9 /* TruelayerViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TruelayerViewModelTests.swift; sourceTree = "<group>"; };
@@ -250,13 +240,11 @@
 		EE56B9302E8CAD1CAD254B84 /* FarmlandViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FarmlandViewModel.swift; sourceTree = "<group>"; };
 		EE864FE76E73AB4892D0EFA8 /* NftViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NftViewModelTests.swift; sourceTree = "<group>"; };
 		EF2E7165A1DFF7A44B19A9F1 /* CryptoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoView.swift; sourceTree = "<group>"; };
-		F0048D9A2E63B96721B0DEB3 /* API+Steam.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Steam.swift"; sourceTree = "<group>"; };
 		F010A54AD91567CB1A42C4DD /* EnergyViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyViewModelTests.swift; sourceTree = "<group>"; };
 		F352C2FF0F32520B7704A7E9 /* SneakersViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SneakersViewModel.swift; sourceTree = "<group>"; };
 		F85559CFD70FC379B8FFAC58 /* FarmlandViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FarmlandViewModelTests.swift; sourceTree = "<group>"; };
 		F94C0FE6B70F56084D65746B /* NftViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NftViewModel.swift; sourceTree = "<group>"; };
 		FA7FF7020479D78C12B2B789 /* API+Alpaca.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Alpaca.swift"; sourceTree = "<group>"; };
-		FF984AF7F5DDF4470FD8C135 /* SnapTradeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapTradeViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -306,10 +294,8 @@
 				ECEAD29701455AA573630C85 /* PolymarketViewModelTests.swift */,
 				E1982E38AAF84E0EBD37280C /* RealEstateViewModelTests.swift */,
 				B52F2C8D5C291C6BC47B2D5F /* SessionStoreTests.swift */,
-				26285B0E19CC8062A4AE742A /* SnapTradeViewModelTests.swift */,
 				8E80D41359E22AC0B7A543FD /* SneakersViewModelTests.swift */,
 				1597BEE9633642B9F378C2E1 /* SpinwheelViewModelTests.swift */,
-				4967B2DE5D5DB23E4895B9D8 /* SteamViewModelTests.swift */,
 				6C8A559C5C1CE5E41BC91F87 /* TradingCardsViewModelTests.swift */,
 				5135E8290813E446256D3BE9 /* TruelayerViewModelTests.swift */,
 				C104CD7196BD12428D6AC151 /* VehiclesViewModelTests.swift */,
@@ -341,7 +327,6 @@
 				D1E1ABB91618F1BC3D30B604 /* API+NFT.swift */,
 				1AFF7161BAE8ED517D1AF774 /* API+Performance.swift */,
 				AA7BBBE9DBF704764A61EDB0 /* API+Polymarket.swift */,
-				F0048D9A2E63B96721B0DEB3 /* API+Steam.swift */,
 				81CC75C64283FC4C17486D50 /* API+Wealth.swift */,
 				289A0FEEDF04BCEAF19628FE /* HTTPClient.swift */,
 				879471FBA14585F06C8CF171 /* Keychain.swift */,
@@ -403,7 +388,6 @@
 				C8869EB5676B2B0E725F17C8 /* SpendingView.swift */,
 				A8A82CF82C3C90B06D0E4C4C /* SpinwheelInlineView.swift */,
 				149540FBF9BFA9D95E8B05FE /* SpinwheelView.swift */,
-				201669B4BE631A77F4E97BA2 /* SteamView.swift */,
 				86BD77DFAC2D741C86C45C1B /* SubscriptionsView.swift */,
 				B7A18F8E09E672933B000DBA /* TipCard.swift */,
 				C816126CBDB97FF30688AA95 /* VehiclesView.swift */,
@@ -445,10 +429,8 @@
 				1B37C0E6815BDEC877A224FD /* PokemonCardsViewModel.swift */,
 				494CFC8859C818D5EEE329D9 /* PolymarketViewModel.swift */,
 				B1511858B95CE2674F62C8BA /* RealEstateViewModel.swift */,
-				FF984AF7F5DDF4470FD8C135 /* SnapTradeViewModel.swift */,
 				F352C2FF0F32520B7704A7E9 /* SneakersViewModel.swift */,
 				560252551FB195B43FF009D4 /* SpinwheelViewModel.swift */,
-				1045EF85A494957F0B7FD75D /* SteamViewModel.swift */,
 				0B9EDD0CD416E89DFFB54761 /* TradingCardsViewModel.swift */,
 				18AAE0E838B59D15092CC506 /* TruelayerViewModel.swift */,
 				A701578AD63596DF877CA777 /* VehiclesViewModel.swift */,
@@ -591,10 +573,8 @@
 				E19FA15D4D63A5DB96ABCFAE /* PolymarketViewModelTests.swift in Sources */,
 				0C8AF273592749659B799E17 /* RealEstateViewModelTests.swift in Sources */,
 				64A455E73B83DB1FB16A736C /* SessionStoreTests.swift in Sources */,
-				9EAE7334C734B00A4704997D /* SnapTradeViewModelTests.swift in Sources */,
 				20DB88C62CEA7D7F0D9CAE33 /* SneakersViewModelTests.swift in Sources */,
 				5F0C355BD02737E6F5D5E1EF /* SpinwheelViewModelTests.swift in Sources */,
-				7666363890E4E657B57AC30E /* SteamViewModelTests.swift in Sources */,
 				B44D95DEE0C06BBD3D13DFAF /* TradingCardsViewModelTests.swift in Sources */,
 				6673B3C5A8E68BD5050CB46B /* TruelayerViewModelTests.swift in Sources */,
 				6373784D303F6045C615C96C /* VehiclesViewModelTests.swift in Sources */,
@@ -615,7 +595,6 @@
 				FE13309C3C01C4D9830C4507 /* API+NFT.swift in Sources */,
 				B7D9EFF6F2021787259829DD /* API+Performance.swift in Sources */,
 				13E34CC2B6A97EC072111332 /* API+Polymarket.swift in Sources */,
-				5920C03A77B9E294B2A5349E /* API+Steam.swift in Sources */,
 				2DEB609DEA7DF5FC55C4547E /* API+Wealth.swift in Sources */,
 				071AE3704E1FA8543020F522 /* API.swift in Sources */,
 				7E7515B6F36304A89398060F /* AlpacaView.swift in Sources */,
@@ -662,15 +641,12 @@
 				0C5BD1D7DFED587635D0A6DD /* SessionStore.swift in Sources */,
 				E3FA31116D7E69F63A507DCA /* SettingsView.swift in Sources */,
 				5672B8B24789E311EFC833BE /* SignInView.swift in Sources */,
-				25929FCCE2ED04BD831C8D5F /* SnapTradeViewModel.swift in Sources */,
 				A2EF15986988C4581FAF6F75 /* SneakersView.swift in Sources */,
 				94CDB1E6E820F1F5B3D7F64E /* SneakersViewModel.swift in Sources */,
 				94D5A74D774F5344C7258FDD /* SpendingView.swift in Sources */,
 				F2E6476046E44C11561AA329 /* SpinwheelInlineView.swift in Sources */,
 				A05B06038435CA6C045792AA /* SpinwheelView.swift in Sources */,
 				704552613AD01BE58F697B8F /* SpinwheelViewModel.swift in Sources */,
-				E96DF8BCDE08D672457036C3 /* SteamView.swift in Sources */,
-				BB667B21F1E742E1B91C44B6 /* SteamViewModel.swift in Sources */,
 				548D9BDBBD63AD378F36F1A8 /* SubscriptionsView.swift in Sources */,
 				4B51566C09DAFA607F90FA75 /* TipCard.swift in Sources */,
 				036E0693BD90D729B71DF81E /* TradingCardsViewModel.swift in Sources */,

@@ -27,7 +27,7 @@ struct KrakenInlineView: View {
 
     private var disconnectedView: some View {
         HStack {
-            Text("Link Kraken via SnapTrade")
+            Text("Add read-only Kraken API keys")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
@@ -51,59 +51,6 @@ struct KrakenInlineView: View {
     }
 }
 
-// MARK: - SnapTrade inline
-
-struct SnapTradeInlineView: View {
-    let vm: SnapTradeViewModel
-    let isConnected: Bool
-    @Environment(\.openURL) private var openURL
-
-    var body: some View {
-        VStack(spacing: 0) {
-            if vm.isLoading {
-                ProgressView()
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-            } else if isConnected {
-                connectedView
-            } else {
-                disconnectedView
-            }
-            if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
-            }
-        }
-        .onChange(of: vm.redirectUrl) { _, url in
-            guard let url, let u = URL(string: url) else { return }
-            openURL(u)
-        }
-    }
-
-    private var disconnectedView: some View {
-        HStack {
-            Text("Link your brokerages")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Button("Connect") { Task { await vm.connect() } }
-                .font(.caption)
-                .buttonStyle(.bordered)
-        }
-        .padding(.top, 4)
-    }
-
-    private var connectedView: some View {
-        HStack {
-            Button("Sync") { Task { await vm.sync() } }
-                .font(.caption)
-                .buttonStyle(.bordered)
-            Spacer()
-            Button("Disconnect", role: .destructive) { Task { await vm.disconnect() } }
-                .font(.caption)
-        }
-        .padding(.top, 4)
-    }
-}
 
 // MARK: - YNAB inline
 
@@ -449,5 +396,62 @@ struct PolymarketInlineView: View {
             .disabled(newAddress.isEmpty)
         }
         .padding(.top, 4)
+    }
+}
+
+// MARK: - Kraken key entry
+//
+// Kraken previously had no connect path of its own: the section's Connect button
+// called SnapTrade's flow, so the integration could never actually be connected
+// from the app. Kraken uses user-supplied API keys rather than an OAuth redirect,
+// so it needs its own entry point.
+//
+// Ask for read-only keys explicitly. A Kraken key with trade or withdrawal
+// permission stored server-side is a far larger liability than a balance reader,
+// and the user is the only one who can scope it correctly at creation time.
+struct KrakenKeyEntryView: View {
+    let vm: KrakenViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var apiKey = ""
+    @State private var privateKey = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    SecureField("API key", text: $apiKey)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    SecureField("Private key", text: $privateKey)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                } header: {
+                    Text("Kraken API keys")
+                } footer: {
+                    Text("Create a key in Kraken with **Query Funds** permission only. Do not enable trading or withdrawal. Coiny reads balances and never places orders.")
+                }
+
+                if let error = vm.errorMessage {
+                    Text(error).font(.caption).foregroundStyle(.red)
+                }
+            }
+            .navigationTitle("Connect Kraken")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Connect") {
+                        Task {
+                            await vm.connect(apiKey: apiKey, privateKey: privateKey)
+                            if vm.errorMessage == nil { dismiss() }
+                        }
+                    }
+                    .disabled(apiKey.isEmpty || privateKey.isEmpty || vm.isLoading)
+                }
+            }
+        }
     }
 }

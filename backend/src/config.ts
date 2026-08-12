@@ -58,10 +58,6 @@ const configSchema = z
     // GoldAPI.io — precious metals spot prices.
     GOLDAPI_API_KEY: z.string().default(''),
 
-    // SnapTrade brokerage aggregator (Fidelity, Vanguard, Schwab, Robinhood, etc.)
-    SNAPTRADE_CLIENT_ID: z.string().default(''),
-    SNAPTRADE_CONSUMER_KEY: z.string().default(''),
-
     // Subscan API key for Polkadot (DOT) balance queries.
     SUBSCAN_API_KEY: z.string().default(''),
     // Blockfrost project ID for Cardano (ADA) balance queries.
