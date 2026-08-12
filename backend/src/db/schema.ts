@@ -12,6 +12,7 @@ import {
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
+import type { RungState } from '../goals/ladder.js';
 
 export const users = pgTable(
   'users',
@@ -656,10 +657,10 @@ export const ladderState = pgTable('ladder_state', {
     .primaryKey()
     .references(() => users.id, { onDelete: 'cascade' }),
   currentRung: integer('current_rung').notNull().default(0),
-  rungs: jsonb('rungs')
-    .$type<Record<string, { status: string; completedAt?: string; skippedReason?: string }>>()
-    .notNull()
-    .default({}),
+  // Typed against the domain model so a status string that is not a valid
+  // RungStatus cannot be written. `ladder.ts` imports nothing from here, so this
+  // direction of dependency is safe.
+  rungs: jsonb('rungs').$type<Record<string, RungState>>().notNull().default({}),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

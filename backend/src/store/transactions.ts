@@ -1,6 +1,7 @@
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { transactions } from '../db/schema.js';
+import { INCOME_CATEGORIES, NON_SPEND_CATEGORIES } from '../goals/categories.js';
 import type { Transaction } from '../types/transaction.js';
 
 export type StoredTransaction = typeof transactions.$inferSelect;
@@ -82,17 +83,6 @@ export interface SpendingSummary {
   savingsRate: number | null;
   spendByCategory: Record<string, number>;
 }
-
-// Categories that represent genuine income. Everything else that arrives as a
-// credit (refunds, transfers between the user's own accounts, credit card
-// payments, reimbursements) is NOT income and must never inflate the savings
-// rate. See INCOME_CATEGORIES usage in getSpendingSummary.
-const INCOME_CATEGORIES = new Set(['paycheck', 'income']);
-
-// Outflow categories that move money without consuming it. Excluded from spend
-// so that paying a credit card or moving cash to savings does not register as
-// spending on top of the original purchase.
-const NON_SPEND_CATEGORIES = new Set(['transfer']);
 
 // 30-day income vs spend from the transactions table.
 // Income counts only credits categorised as actual income; a positive amount
