@@ -159,7 +159,14 @@ much smaller bet: a $59 to $79 device offered to an existing paying base, rather
 cold-start hardware business with a BOM, tooling, certification and fulfilment on the
 critical path.
 
-### The gate (locked 2026-08-12)
+> **Two different numbers, do not conflate them.** The north star metric is **W4**,
+> defined in `docs/prd-app-v2.md` §1.10: the percentage of signups who complete a rung or
+> a habit-goal period within 4 weeks and are still active in week 4, target 25% at 1,000
+> users. That measures whether the product works. The gate below measures whether
+> hardware is justified. A conversation in August 2026 invented a third number,
+> "week-8 retention", which appears in neither document and should not be used.
+
+### The hardware gate (locked 2026-08-12)
 
 > **No firmware work until 1,000 paying subscribers are still active at 3 months.**
 

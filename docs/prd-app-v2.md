@@ -566,10 +566,22 @@ Finance apps enjoy the highest push opt-in of any category, roughly 72.3% ([Cont
 
 | Rule | Value |
 |---|---|
-| Maximum pushes per rolling 7 days | **3** |
+| Maximum pushes per rolling 7 days | **2** |
 | Maximum per day | 1 |
+| Minimum gap before the same event type repeats | 24 hours |
 | Quiet hours | 21:00 to 08:00 user-local, no exceptions |
-| Weekly digest | Sunday 18:00 local, 1 push, counts against the 3 |
+| Weekly digest | Sunday 18:00 local. **Opt-in, off by default.** Counts against the 2 when on |
+
+> **Reconciled 2026-08-12.** This table said 3 while §2.3's onboarding copy promised
+> "at most twice a week" and `backend/src/store/notifications.ts:9` shipped 2. Settled at
+> **2**, for two reasons. The number the user is promised at onboarding is the binding
+> one: shipping a cap looser than the promise is a broken promise, and push permission is
+> not recoverable once revoked. And the Pushwoosh figure cited above puts the opt-out
+> cliff at 2 to 5 messages per week, so 2 sits below it and 3 sits inside it.
+>
+> The weekly digest becomes opt-in as a consequence. At a cap of 2 a default digest would
+> consume half the budget every week for something the user did not ask for, leaving one
+> slot for everything that actually happened.
 | Timing for the re-engagement nudge | ~23.5 hours after the user's last session, matching their own prior session time, per [Duolingo's mechanic](https://apptitude.io/blog/how-duolingos-streak-mechanic-actually-works/) |
 
 **Never push, under any circumstance:** any `exogenous` event, a missed goal period, a broken streak, a net worth decrease, a credit score change, a rising debt balance, a single overspend, or any message whose only content is "come back."
