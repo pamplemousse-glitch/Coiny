@@ -91,25 +91,18 @@ describe('evaluateExternalEvent', () => {
     expect(result).toBeNull();
   });
 
-  it('net_worth_milestone returns celebrate reaction with milestone amount', () => {
-    const result = evaluateExternalEvent({ ...base, type: 'net_worth_milestone', amountUsd: 50_000 });
-    expect(result?.animation).toBe('celebrate');
-    expect(result?.sound).toBe('fanfare');
-    expect(result?.led).toBe('rainbow');
-    expect(result?.reason).toContain('50000');
+  // These three are not things the user did, so they must not move the creature.
+  // net worth crosses a threshold on market movement; a credit score moves on
+  // inquiries ageing off or an issuer changing a limit. Celebrating or sulking at
+  // either punishes or rewards the user for something outside their control.
+  it('does not react to events the user did not cause', () => {
+    expect(evaluateExternalEvent({ ...base, type: 'net_worth_milestone', amountUsd: 50_000 })).toBeNull();
+    expect(evaluateExternalEvent({ ...base, type: 'credit_score_improved', amountUsd: 25 })).toBeNull();
+    expect(evaluateExternalEvent({ ...base, type: 'credit_score_dropped', amountUsd: 30 })).toBeNull();
   });
 
-  it('credit_score_improved returns celebrate reaction with point delta', () => {
-    const result = evaluateExternalEvent({ ...base, type: 'credit_score_improved', amountUsd: 25 });
-    expect(result?.animation).toBe('celebrate');
-    expect(result?.sound).toBe('chime');
-    expect(result?.reason).toContain('25 pts');
-  });
-
-  it('credit_score_dropped returns sad reaction with point delta', () => {
-    const result = evaluateExternalEvent({ ...base, type: 'credit_score_dropped', amountUsd: 30 });
-    expect(result?.animation).toBe('sad');
-    expect(result?.led).toBe('red');
-    expect(result?.reason).toContain('30 pts');
+  it('still reacts to events the user did cause', () => {
+    expect(evaluateExternalEvent({ ...base, type: 'debt_paydown', amountUsd: 500 })?.animation).toBe('celebrate');
+    expect(evaluateExternalEvent({ ...base, type: 'crypto_received', amountUsd: 100 })?.animation).toBe('happy');
   });
 });

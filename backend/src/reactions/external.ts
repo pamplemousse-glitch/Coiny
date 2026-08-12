@@ -89,32 +89,23 @@ export function evaluateExternalEvent(event: ExternalEvent): Reaction | null {
         reason: `New liability detected:${amountStr}`,
       };
 
+    // Non-reacting by design. These three are not things the user did.
+    //
+    // net_worth_milestone is mostly market movement: a crypto rally can carry
+    // someone across $50k and the creature would celebrate a week in which they
+    // saved nothing. The ladder supplies the celebration moments instead, and a
+    // rung is only cleared by behaviour.
+    //
+    // credit_score_* moves on inquiries ageing off, a card issuer changing a
+    // limit, or an account closing, none of which the user chose. A sad pet on a
+    // score drop is the punishment mechanic this product exists to avoid.
+    //
+    // All three are still worth SHOWING on the Wealth tab, reported plainly.
+    // They just do not move the creature.
     case 'net_worth_milestone':
-      return {
-        animation: 'celebrate',
-        sound: 'fanfare',
-        led: 'rainbow',
-        duration: 5000,
-        reason: `Net worth milestone reached:${amountStr}`,
-      };
-
     case 'credit_score_improved':
-      return {
-        animation: 'celebrate',
-        sound: 'chime',
-        led: 'green',
-        duration: 4000,
-        reason: `Credit score improved${amountStr ? ` by ${Math.abs(event.amountUsd ?? 0).toFixed(0)} pts` : ''}`,
-      };
-
     case 'credit_score_dropped':
-      return {
-        animation: 'sad',
-        sound: 'warning',
-        led: 'red',
-        duration: 4000,
-        reason: `Credit score dropped${amountStr ? ` by ${Math.abs(event.amountUsd ?? 0).toFixed(0)} pts` : ''}`,
-      };
+      return null;
 
     case 'crypto_sent':
       return null;

@@ -1,4 +1,4 @@
-# Coiny — Fundraising Plan
+'# Coiny — Fundraising Plan
 
 Last updated: 2026-05-21
 
