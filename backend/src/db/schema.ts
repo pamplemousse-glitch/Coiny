@@ -835,6 +835,7 @@ export const analyticsEvents = pgTable(
     index('analytics_events_user_idx').on(t.userId),
     index('analytics_events_event_server_ts_idx').on(t.event, t.serverTs),
   ],
+);
 
 // Nightly-computed pace per target goal (docs/prd.md R-7.8), one row per goal,
 // upserted by the goal-system refresh so read paths serve pace without a Plaid
