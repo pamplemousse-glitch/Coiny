@@ -709,25 +709,37 @@ Google Play, binding when Android reaches parity, worth designing against now be
 
 ## 30. Roadmap and phasing
 
-Sequenced by dependency; status verified against code at `5406a7b`. The bar for the 4-week block: a user can link one account, see a net worth number, get placed on the ladder, and complete rung 1, with every step instrumented.
+Sequenced by dependency. Statuses below were updated on 2026-08-13 after the
+week 1 to 4 block was built and merged on `integration/night-build`. The bar for
+that block: a user can link one account, see a net worth number, get placed on
+the ladder, and complete rung 1, with every step instrumented.
 
 **Weeks 1 to 4:**
 
 | # | Item | Status |
 |---|---|---|
-| 1 | Instrumentation pipeline + retention query (§24, R-2.1) | Unbuilt. First, because cohorts cannot be backfilled |
-| 2 | Silent-zero + freshness response shape (R-8.1 to R-8.4), timeout adoption (R-16.5) | Unbuilt |
-| 3 | Scheduler + DB-only read path + webhook balance persistence (§16) | Unbuilt; store layer exists |
-| 4 | Wire the ladder: derived state nightly, `GET /api/pets` v2 with ladder + stage, `net_worth_daily` writer (R-7.6) | Engine Built and tested; wiring Unbuilt |
-| 5 | Plaid lifecycle + update mode (R-8.5, R-8.6) | Unbuilt |
-| 6 | Onboarding rewrite (§5): chips, sliders, `declared_assets`, the number, subscription reveal (R-5.5 to R-5.7), hatch | Unbuilt; detection itself Built |
-| 7 | Journey v1: tap-to-expand on Home, ladder, one goal, two guardrails | Unbuilt |
-| 8 | Notification day-cap, quiet hours + timezone capture, emoji-free copy (R-9.2, R-9.3, R-9.7) | Unbuilt |
-| 9 | Commission Phase 1 (paid character exploration, design-direction §7.2) started in parallel; it has lead time and nothing else does | Not started |
+| 1 | Instrumentation pipeline + retention query (§24, R-2.1) | **Built.** `analytics_events` (0039), `POST /api/telemetry`, `backend/queries/retention.sql`. Client events split from server-only ones so a device cannot forge a cohort fact |
+| 2 | Silent-zero + freshness response shape (R-8.1 to R-8.4), timeout adoption (R-16.5) | **Built.** Per-class `{value, asOf, status}`; failures excluded and counted, never summed as 0; read-path clients moved onto `util/fetch.ts` |
+| 3 | Scheduler + DB-only read path + webhook balance persistence (§16) | **Built.** 15-minute in-process tick on Node built-ins; GET is a pure DB read; sync-webhook balances persisted (0040) |
+| 4 | Wire the ladder (R-7.6) | **Built** previously (#189) |
+| 5 | Plaid lifecycle + update mode (R-8.5, R-8.6) | **Built** server-side (0041). Client-side Link update flow is still Unbuilt |
+| 6 | Onboarding rewrite (§5) | **Built**, except `declared_assets` server persistence: no table exists, so declarations are on-device |
+| 7 | Journey v1: tap-to-expand on Home, ladder, one goal, two guardrails | **Partial.** Tap-to-expand and the eight rungs are built; goals and guardrails are absent from the UI because the API landed on a sibling branch the same night |
+| 8 | Notification day-cap, quiet hours + timezone capture, emoji-free copy (R-9.2, R-9.3, R-9.7) | **Built** (0043). Unknown timezone suppresses rather than guessing |
+| 9 | Commission Phase 1 (design-direction §7.2) | **Not started.** Still the only item with external lead time, and now the longest pole: every surface ships with a placeholder creature |
+
+Pulled forward from months 2 to 3 on the same night: debt dedupe and payoff
+strategy (§7.4, 0044), target goals and guardrails (§7.2, §7.3, 0042), StoreKit
+and entitlements (§25, 0045), and the compliance floor (§26 rows 1 to 2).
 
 Already done, do not redo: income categorisation fix, market-reaction deletions, push weekly budget, goal schema + ladder engine + derived substrate, Plaid product-enrollment fix, cold-start window scaling, Steam/SnapTrade removal, Kraken key-entry sheet.
 
-**Months 2 to 3:** debt module end to end (§7.4); three target goals with pace math (§7.2); full guardrails + streaks (§7.3); reaction contract rewrite incl. engine collect-all (R-7.24, R-7.25); Wealth collapse to six groups (§7.8); stages 0 to 5 real art (commission Phases 2 to 3); paywall + StoreKit (§25); compliance floor for TestFlight (§26 rows 1 to 2); TestFlight to 30.
+**Months 2 to 3**, with the four items pulled forward already done: what remains
+is the reaction contract rewrite incl. engine collect-all (R-7.24, R-7.25); the
+Wealth collapse to six groups (§7.8); stages 0 to 5 real art (commission Phases
+2 to 3); the debt and goals UI on top of the APIs that now exist; the household
+invite and consent flow (blocked on the obligations §2 lawyer review); and
+TestFlight to 30.
 
 **Months 4 to 6:** portfolio guardrails (§7.7); multi-currency + UK groundwork (§12, §3.3); index-based property/vehicle valuation; widgets and Live Activities; Android to parity; stages 6 to 7 and cosmetics; export.
 
