@@ -75,6 +75,46 @@ final class FakeOnboardingAPI: OnboardingAPI, @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         return _ladder
     }
+
+    private var _serverDeclaredLines: [DeclaredAssetLineDTO] = []
+    private var _putDeclaredSheets: [DeclarationSheet] = []
+    private var _putDeclaredShouldHang = false
+
+    var putDeclaredSheets: [DeclarationSheet] {
+        lock.lock(); defer { lock.unlock() }
+        return _putDeclaredSheets
+    }
+
+    func setServerDeclaredLines(_ lines: [DeclaredAssetLineDTO]) {
+        lock.lock(); defer { lock.unlock() }
+        _serverDeclaredLines = lines
+    }
+
+    /// Simulates a server write that never completes, to prove the flow does
+    /// not sit on the critical path behind it.
+    func setPutDeclaredHangs() {
+        lock.lock(); defer { lock.unlock() }
+        _putDeclaredShouldHang = true
+    }
+
+    func getDeclaredAssets() async throws -> DeclaredSheetResponse {
+        lock.lock(); defer { lock.unlock() }
+        return DeclaredSheetResponse(assets: _serverDeclaredLines, nudge: nil)
+    }
+
+    @discardableResult
+    func putDeclaredAssets(_ sheet: DeclarationSheet) async throws -> DeclaredSheetResponse {
+        let hang: Bool
+        do {
+            lock.lock(); defer { lock.unlock() }
+            _putDeclaredSheets.append(sheet)
+            hang = _putDeclaredShouldHang
+        }
+        if hang {
+            try await Task.sleep(for: .seconds(60))
+        }
+        return DeclaredSheetResponse(assets: [], nudge: nil)
+    }
 }
 
 // MARK: - Tests
@@ -314,5 +354,91 @@ final class OnboardingViewModelTests: XCTestCase {
         let permissionEvents = transport.events.filter { $0.event == "push_permission_changed" }
         XCTAssertEqual(permissionEvents.count, 1)
         XCTAssertEqual(permissionEvents.first?.properties["granted"], .bool(true))
+    }
+
+    // MARK: Declared-assets server sync (R-5.3)
+
+    func testAmountsSubmitPushesTheSheetToTheServer() async {
+        let viewModel = makeViewModel()
+        await viewModel.continueFromEgg()
+        viewModel.selectedClasses = [.checking, .creditCards]
+        await viewModel.continueFromDeclare()
+        viewModel.setDeclaredValue(5_000, for: .checking)
+        viewModel.setDeclaredValue(2_000, for: .creditCards)
+        await viewModel.continueFromAmounts()
+
+        await waitUntil { !self.api.putDeclaredSheets.isEmpty }
+        let pushed = api.putDeclaredSheets.first
+        XCTAssertEqual(pushed?.assets.map(\.assetClass), [.checking, .creditCards])
+    }
+
+    func testNumberNeverWaitsOnTheServerWrite() async {
+        api.setPutDeclaredHangs()
+        let viewModel = makeViewModel()
+        await viewModel.continueFromEgg()
+        viewModel.selectedClasses = [.savings]
+        await viewModel.continueFromDeclare()
+        viewModel.setDeclaredValue(10_000, for: .savings)
+        await viewModel.continueFromAmounts()
+        // The hung PUT must not stop screen 4 from being the current step.
+        XCTAssertEqual(viewModel.step, .number)
+    }
+
+    func testFreshInstallRestoresTheServerSheetIntoTheFlow() async {
+        let declaredAt = Date(timeIntervalSince1970: 1_700_000_000)
+        api.setServerDeclaredLines([
+            DeclaredAssetLineDTO(
+                assetClass: "checking",
+                bucketedValueUsd: 5_000,
+                confidence: "declared",
+                declaredAt: declaredAt,
+                refreshedAt: declaredAt
+            ),
+            DeclaredAssetLineDTO(
+                assetClass: "student_loans",
+                bucketedValueUsd: 20_000,
+                confidence: "declared",
+                declaredAt: declaredAt,
+                refreshedAt: declaredAt
+            ),
+        ])
+        let viewModel = makeViewModel()
+        await viewModel.start()
+
+        await waitUntil { !viewModel.selectedClasses.isEmpty }
+        XCTAssertEqual(viewModel.selectedClasses, [.checking, .studentLoans])
+        XCTAssertEqual(viewModel.sheet.estimatedNetWorthUSD, -15_000)
+    }
+
+    func testRestoreNeverOverwritesAnInProgressDeclaration() async {
+        let declaredAt = Date(timeIntervalSince1970: 1_700_000_000)
+        api.setServerDeclaredLines([
+            DeclaredAssetLineDTO(
+                assetClass: "home",
+                bucketedValueUsd: 300_000,
+                confidence: "declared",
+                declaredAt: declaredAt,
+                refreshedAt: declaredAt
+            ),
+        ])
+        let viewModel = makeViewModel()
+        await viewModel.continueFromEgg()
+        viewModel.selectedClasses = [.crypto]
+        // The user is already choosing; a late server response must not clobber.
+        await viewModel.start()
+        await waitUntil(timeout: .milliseconds(300)) { false }
+        XCTAssertEqual(viewModel.selectedClasses, [.crypto])
+    }
+
+    func testReselectingAChipKeepsItsRestoredValue() async {
+        let viewModel = makeViewModel()
+        await viewModel.continueFromEgg()
+        viewModel.selectedClasses = [.car]
+        await viewModel.continueFromDeclare()
+        viewModel.setDeclaredValue(12_000, for: .car)
+        // Going back to the chips and re-confirming must not wipe the amount.
+        viewModel.selectedClasses = [.car, .savings]
+        await viewModel.continueFromDeclare()
+        XCTAssertEqual(viewModel.sheet.assets.first { $0.assetClass == .car }?.bucketedValueUSD, 12_000)
     }
 }

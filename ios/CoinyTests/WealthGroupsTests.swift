@@ -5,8 +5,8 @@ final class WealthGroupsTests: XCTestCase {
     // MARK: - Class-to-group mapping
 
     func testEveryClassBelongsToExactlyOneGroup() {
-        // 25 classes, mirroring backend NET_WORTH_CLASS_NAMES.
-        XCTAssertEqual(WealthClass.allCases.count, 25)
+        // 26 classes, mirroring backend NET_WORTH_CLASS_NAMES.
+        XCTAssertEqual(WealthClass.allCases.count, 26)
         for cls in WealthClass.allCases {
             // group is total; assert each raw name is unique.
             XCTAssertEqual(WealthClass.allCases.filter { $0 == cls }.count, 1)
@@ -19,6 +19,7 @@ final class WealthGroupsTests: XCTestCase {
             "polymarket", "kraken", "kalshi", "alpaca", "ynab", "truelayer", "nft",
             "debts", "sneakers", "pokemonCards", "tradingCards", "coins", "vinyl",
             "metals", "energy", "farmland", "realEstate", "vehicles", "manual",
+            "declared",
         ]
         XCTAssertEqual(Set(WealthClass.allCases.map(\.rawValue)), backendNames)
     }
@@ -149,6 +150,22 @@ final class WealthGroupsTests: XCTestCase {
         } else {
             XCTFail("Expected .selfReported, got \(treatment)")
         }
+    }
+
+    func testDeclaredIsAlwaysSelfReported() {
+        // The onboarding sheet's class (R-5.3): labelled "Self-reported <date>"
+        // forever, never excluded for age (R-8.2).
+        let asOf = Date(timeIntervalSince1970: 1_500_000_000)
+        let treatment = WealthPresenter.treatment(for: row(.declared, value: 275_000, asOf: asOf, status: .ok))
+        if case let .selfReported(label) = treatment {
+            XCTAssertTrue(label.hasPrefix("Self-reported "), "got \(label)")
+        } else {
+            XCTFail("Expected .selfReported, got \(treatment)")
+        }
+    }
+
+    func testDeclaredRendersInTheOwnedGroup() {
+        XCTAssertEqual(WealthClass.declared.group, .owned)
     }
 
     // MARK: - Labels

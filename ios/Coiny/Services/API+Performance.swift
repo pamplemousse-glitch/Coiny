@@ -55,6 +55,7 @@ struct NetWorthResponse: Codable {
     let sneakers: Double
     let nft: Double?
     let manual: Double?
+    let declared: Double?
     let alpaca: Double?
     let truelayer: Double?
     let kraken: Double
@@ -192,6 +193,7 @@ extension NetWorthResponse {
             total: total, bank: bank, investments: investments, crypto: crypto, defi: defi,
             chainWallets: chainWallets, hyperliquid: hyperliquid, realEstate: realEstate,
             vehicles: vehicles, metals: metals, sneakers: sneakers, nft: nft, manual: manual,
+            declared: nil,
             alpaca: alpaca, truelayer: truelayer, kraken: kraken, ynab: ynab, vinyl: vinyl,
             kalshi: kalshi, polymarket: polymarket, pokemonCards: pokemonCards, energy: energy,
             farmland: farmland, tradingCards: tradingCards, coins: coins, debts: debts,

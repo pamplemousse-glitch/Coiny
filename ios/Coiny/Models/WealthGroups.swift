@@ -43,7 +43,7 @@ enum WealthClass: String, CaseIterable, Identifiable, Sendable {
     case bank, truelayer, ynab
     case investments, alpaca
     case crypto, defi, chainWallets, kraken
-    case realEstate, vehicles, metals, sneakers, pokemonCards, tradingCards, coins, vinyl, farmland, manual
+    case realEstate, vehicles, metals, sneakers, pokemonCards, tradingCards, coins, vinyl, farmland, manual, declared
     case hyperliquid, polymarket, kalshi, nft, energy
     case debts
 
@@ -58,7 +58,7 @@ enum WealthClass: String, CaseIterable, Identifiable, Sendable {
         case .crypto, .defi, .chainWallets, .kraken:
             return .crypto
         case .realEstate, .vehicles, .metals, .sneakers, .pokemonCards,
-             .tradingCards, .coins, .vinyl, .farmland, .manual:
+             .tradingCards, .coins, .vinyl, .farmland, .manual, .declared:
             return .owned
         case .hyperliquid, .polymarket, .kalshi, .nft, .energy:
             return .speculative
@@ -88,6 +88,9 @@ enum WealthClass: String, CaseIterable, Identifiable, Sendable {
         case .vinyl: return "Vinyl"
         case .farmland: return "Farmland"
         case .manual: return "Declared assets"
+        // The onboarding sheet's signed net (S-4: "This is an estimate.").
+        // Distinct from `manual`, which is itemised entries added later.
+        case .declared: return "Estimates"
         case .hyperliquid: return "Hyperliquid"
         case .polymarket: return "Polymarket"
         case .kalshi: return "Kalshi"
@@ -207,7 +210,7 @@ enum WealthPresenter {
         // Declared values are always labelled "Self-reported <date>" even when
         // fresh (R-8.2); the server reports them as `ok` and never excludes
         // them.
-        if row.cls == .manual, includedInTotal(row.reading.status) {
+        if row.cls == .manual || row.cls == .declared, includedInTotal(row.reading.status) {
             return .selfReported(label: selfReportedLabel(row.reading.asOf))
         }
         let asOfText = row.reading.asOf.map { asOfLabel($0, now: now) }

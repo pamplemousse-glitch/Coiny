@@ -14,6 +14,9 @@ protocol OnboardingAPI: Sendable {
     func getPlaidRecurring() async throws -> PlaidRecurringResponse
     func getNetWorth() async throws -> NetWorthResponse
     func getOnboardingLadderSnapshot() async throws -> OnboardingLadderSnapshot
+    func getDeclaredAssets() async throws -> DeclaredSheetResponse
+    @discardableResult
+    func putDeclaredAssets(_ sheet: DeclarationSheet) async throws -> DeclaredSheetResponse
 }
 
 extension API: OnboardingAPI {}
@@ -116,6 +119,26 @@ final class OnboardingViewModel {
     func start() async {
         guard signupAt == nil else { return }
         signupAt = now()
+        // Fresh-install restore (R-5.3): a reinstall keeps the account but not
+        // UserDefaults, so if this device has no local declarations, ask the
+        // server for the last sheet and prefill the flow. Runs detached and
+        // applies only while the user has not started declaring, so it can
+        // never block a screen or overwrite a choice (R-5.1).
+        if store.load() == nil {
+            Task { [weak self] in
+                await self?.restoreDeclarationsFromServer()
+            }
+        }
+    }
+
+    private func restoreDeclarationsFromServer() async {
+        guard let response = try? await api.getDeclaredAssets(), !response.assets.isEmpty else { return }
+        let restored = DeclarationSheet(serverLines: response.assets)
+        guard !restored.isEmpty else { return }
+        guard step == .egg || (step == .declare && selectedClasses.isEmpty) else { return }
+        store.save(restored)
+        sheet = restored
+        selectedClasses = Set(restored.assets.map { $0.assetClass })
     }
 
     func continueFromEgg() async {
@@ -128,8 +151,12 @@ final class OnboardingViewModel {
     /// and no number to assemble.
     func continueFromDeclare() async {
         await completeStep("declare")
+        // Keep values for classes already on the sheet (a server-restored
+        // sheet, or a back-and-forth through this screen) so re-selecting a
+        // chip never wipes an amount the user already gave.
+        let existing = Dictionary(uniqueKeysWithValues: sheet.assets.map { ($0.assetClass, $0) })
         sheet = DeclarationSheet(assets: orderedSelection.map {
-            DeclaredAsset(assetClass: $0, bucketedValueUSD: nil, declaredAt: now())
+            existing[$0] ?? DeclaredAsset(assetClass: $0, bucketedValueUSD: nil, declaredAt: now())
         })
         step = sheet.isEmpty ? .connect : .amounts
     }
@@ -145,9 +172,17 @@ final class OnboardingViewModel {
         sheet.assets[index].declaredAt = now()
     }
 
-    /// Screen 3 submit: persist, emit, and show the number when there is one.
+    /// Screen 3 submit: persist locally, emit, and show the number when there
+    /// is one. The server write happens in the background: the local store is
+    /// the cache that keeps onboarding working offline, and the number must
+    /// never wait on a network write (R-5.1). A failed push is repaired by the
+    /// app-start reconcile (`DeclaredAssetsSyncService`).
     func continueFromAmounts() async {
         store.save(sheet)
+        let declared = sheet
+        Task { [api] in
+            _ = try? await api.putDeclaredAssets(declared)
+        }
         await telemetry.emit("onboarding_declared", sheet.telemetryProperties)
         await completeStep("amounts")
         step = sheet.estimatedNetWorthUSD == nil ? .connect : .number

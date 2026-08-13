@@ -434,6 +434,34 @@ export const manualAssets = pgTable('manual_assets', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Declared assets: the onboarding "what do you have / roughly how much" sheet
+// (prd.md R-5.3). One row per declared line, at most one line per asset class
+// per user. Values are the log-slider's bucketed magnitudes (two significant
+// digits), always stored as positive numbers; whether a class subtracts from
+// net worth (credit_cards, student_loans) is a property of the class, not the
+// sign of the stored value. bucketedValueUsd null means "has it, skipped the
+// amount". declaredAt is when the line was first declared; refreshedAt moves
+// every time the user re-confirms or edits the value, and is what the R-5.4
+// nudge ("your car estimate is 2 months old") is computed from. Declared
+// values are never auto-refreshed and never excluded for age (R-8.2): the
+// user is the source, so there is no fresher upstream to prefer.
+export const declaredAssets = pgTable(
+  'declared_assets',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    assetClass: text('asset_class').notNull(),
+    bucketedValueUsd: numeric('bucketed_value_usd'),
+    confidence: text('confidence').notNull().default('declared'),
+    declaredAt: timestamp('declared_at', { withTimezone: true }).notNull(),
+    refreshedAt: timestamp('refreshed_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('declared_assets_user_class_idx').on(t.userId, t.assetClass)],
+);
+
 // TrueLayer Open Banking connections — one per user; covers UK + EU banks.
 // accessToken / refreshToken are AES-256-GCM encrypted.
 // lastBalanceGbp caches the most-recently synced total (column name kept for compat);

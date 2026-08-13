@@ -74,6 +74,7 @@ type NetWorthBody = {
   crypto: number;
   defi: number;
   debts: number;
+  declared: number;
   investments: number;
   classes: Record<string, ClassReading>;
   excluded: { count: number; classes: string[] };
@@ -325,6 +326,70 @@ describe('GET /api/net-worth (DB-only read)', () => {
     expect(body.total).toBe(3800);
     expect(body.debts).toBe(0);
     expect(body.excluded.classes).toContain('debts');
+
+    await app.close();
+  });
+
+  it('feeds the declared sheet into the total as a signed net', async () => {
+    const { replaceDeclaredAssets } = await import('../src/store/declared-assets.js');
+    const now = new Date();
+    await replaceDeclaredAssets(
+      testUserId,
+      [
+        { assetClass: 'home', bucketedValueUsd: 300000, declaredAt: now },
+        { assetClass: 'credit_cards', bucketedValueUsd: 5000, declaredAt: now },
+        { assetClass: 'student_loans', bucketedValueUsd: 20000, declaredAt: now },
+      ],
+      now,
+    );
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    const body = res.json<NetWorthBody>();
+    expect(body.declared).toBe(275000);
+    expect(body.total).toBe(275000);
+    expect(body.classes.declared?.status).toBe('ok');
+    expect(body.classes.declared?.asOf).toBe(now.toISOString());
+
+    await app.close();
+  });
+
+  it('never excludes a declared value for age (R-8.2)', async () => {
+    const { replaceDeclaredAssets } = await import('../src/store/declared-assets.js');
+    const yearsOld = agoDate(500 * DAY);
+    await replaceDeclaredAssets(
+      testUserId,
+      [{ assetClass: 'car', bucketedValueUsd: 12000, declaredAt: yearsOld }],
+      yearsOld,
+    );
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    const body = res.json<NetWorthBody>();
+    expect(body.classes.declared?.status).toBe('ok');
+    expect(body.total).toBe(12000);
+    expect(body.excluded.count).toBe(0);
+
+    await app.close();
+  });
+
+  it('serves an all-skipped declared sheet as null value, never zero', async () => {
+    const { replaceDeclaredAssets } = await import('../src/store/declared-assets.js');
+    const now = new Date();
+    await replaceDeclaredAssets(testUserId, [{ assetClass: 'home', bucketedValueUsd: null, declaredAt: now }], now);
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    const body = res.json<NetWorthBody>();
+    expect(body.classes.declared?.value).toBeNull();
+    expect(body.total).toBe(0);
+    expect(body.excluded.count).toBe(0);
 
     await app.close();
   });
