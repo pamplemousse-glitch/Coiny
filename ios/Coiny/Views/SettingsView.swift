@@ -172,7 +172,9 @@ private extension SettingsView {
     func bankItemRow(_ item: PlaidItemHealth) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Bank connection")
+                // Named per S-17 so a user with several banks knows which row
+                // is which; generic only when the server has no institution.
+                Text(item.institutionName ?? "Bank connection")
                     .font(.subheadline)
                 Text(statusText(item))
                     .font(.caption)

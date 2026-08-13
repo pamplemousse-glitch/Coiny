@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import {
+  itemGet,
   itemPublicTokenExchange,
   itemRemove,
   liabilitiesGet,
@@ -17,6 +18,7 @@ import {
   getItemsByUser,
   markItemRepaired,
   type PlaidItemRow,
+  setItemInstitution,
   setItemStatus,
   upsertItem,
 } from '../store/items.js';
@@ -36,6 +38,10 @@ const ItemIdBodySchema = z.object({
 function itemHealthView(item: PlaidItemRow): Record<string, unknown> {
   return {
     item_id: item.itemId,
+    // So the repair prompt can say "Chase needs you to sign in again" instead
+    // of "Your bank" (S-17). Null for items linked without an institution
+    // connection; the client falls back to the generic string.
+    institution_name: item.institutionName,
     status: item.status,
     status_changed_at: item.statusChangedAt?.toISOString() ?? null,
     last_error_code: item.lastErrorCode,
@@ -74,7 +80,20 @@ export function registerPlaidLinkApi(app: FastifyInstance): void {
 
     const { access_token, item_id } = await itemPublicTokenExchange(parsed.data.public_token);
     const linkUserId = req.user!.id;
-    await upsertItem({ itemId: item_id, accessToken: access_token, userId: linkUserId });
+
+    // Capture the institution at link time (S-17): /item/get is free and the
+    // institution never changes for an item, so this is fetched once, not on
+    // every read. Best-effort: a failed lookup must not fail the link, and the
+    // GET /api/plaid/items lazy backfill retries it later.
+    let institution: { institutionId?: string | null; institutionName?: string | null } = {};
+    try {
+      const res = await itemGet(access_token);
+      institution = { institutionId: res.item.institution_id, institutionName: res.item.institution_name };
+    } catch {
+      // Institution name is a garnish on the link; never log it or fail on it.
+    }
+
+    await upsertItem({ itemId: item_id, accessToken: access_token, userId: linkUserId, ...institution });
 
     req.log.info({ item_id }, 'plaid item linked');
 
@@ -106,6 +125,32 @@ export function registerPlaidLinkApi(app: FastifyInstance): void {
   // broken and offer repair instead of a stale number (docs/prd.md R-8.5).
   app.get('/api/plaid/items', async (req: FastifyRequest) => {
     const items = await getItemsByUser(req.user!.id);
+
+    // Lazy backfill for items linked before the institution columns existed:
+    // fetch once from the free /item/get and persist, so subsequent reads are
+    // pure DB. Best-effort per item; a Plaid failure leaves the name null and
+    // the client falls back to "Your bank". Items whose institution is
+    // genuinely null (micro-deposit links) re-attempt here, which is accepted:
+    // the call is free and a user holds at most a dozen items.
+    await Promise.all(
+      items
+        .filter((item) => item.institutionName === null && !item.disabled)
+        .map(async (item) => {
+          try {
+            const res = await itemGet(item.accessToken);
+            if (res.item.institution_name === null) return;
+            await setItemInstitution(item.itemId, {
+              institutionId: res.item.institution_id,
+              institutionName: res.item.institution_name,
+            });
+            item.institutionName = res.item.institution_name;
+            item.institutionId = res.item.institution_id;
+          } catch {
+            // Backfill is a garnish on the health read; never fail or log it.
+          }
+        }),
+    );
+
     return { items: items.map(itemHealthView) };
   });
 
@@ -170,6 +215,10 @@ export function registerPlaidLinkApi(app: FastifyInstance): void {
         { event: 'item_state_changed', item_id: parsed.data.item_id, from: result.previous, to: 'healthy' },
         'plaid item repaired via update mode',
       );
+      // Repair completion is a server-observed fact: this endpoint IS the
+      // completion signal, so the client never reports it via telemetry
+      // (a device-reported copy would be redundant and forgeable).
+      await trackServerEvent(req.user!.id, 'item_state_changed', { state: 'repaired' });
     }
     return { ok: true, item_id: parsed.data.item_id, status: 'healthy' };
   });

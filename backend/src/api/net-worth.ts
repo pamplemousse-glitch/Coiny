@@ -12,6 +12,7 @@
 import type { FastifyInstance } from 'fastify';
 import { assembleNetWorth } from '../networth/read.js';
 import { refreshAllForUser } from '../networth/refresh.js';
+import { trackServerEvent } from '../store/analytics.js';
 import { tryConsumeManualRefresh } from '../store/asset-cache.js';
 import { getItemsByUser } from '../store/items.js';
 
@@ -35,6 +36,12 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       items.length > 0 ? await tryConsumeManualRefresh(userId, MANUAL_BANK_REFRESH_PER_DAY, today) : true;
 
     const result = await refreshAllForUser(userId, { bankAllowed });
+
+    // Server-observed (R-24.2): the cap decision is made HERE, so whether a
+    // user-driven refresh ran or hit the daily bank budget is recorded
+    // server-side, never device-reported. The client-side wealth_refresh_pulled
+    // event covers only what the server cannot see (debounced pulls).
+    await trackServerEvent(userId, 'net_worth_refreshed', { bank: result.bank });
 
     const { response } = await assembleNetWorth(userId);
     return { ...response, bankRefresh: result.bank };

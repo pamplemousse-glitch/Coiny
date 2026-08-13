@@ -3,6 +3,7 @@ import { fetchWithRetry } from '../util/fetch.js';
 import {
   type AccountsBalanceGetResponse,
   type InvestmentsHoldingsGetResponse,
+  type ItemGetResponse,
   type LiabilitiesGetResponse,
   type LinkTokenCreateResponse,
   PlaidApiError,
@@ -131,6 +132,13 @@ export function itemPublicTokenExchange(publicToken: string): Promise<PublicToke
 
 export function itemRemove(accessToken: string): Promise<{ request_id: string }> {
   return plaidPost('/item/remove', { access_token: accessToken });
+}
+
+/** /item/get: item metadata including institution_id and institution_name.
+ *  Free to call (not associated with any billed product). Used once at link
+ *  time to capture the institution, which never changes for an item. */
+export function itemGet(accessToken: string): Promise<ItemGetResponse> {
+  return plaidPost('/item/get', { access_token: accessToken });
 }
 
 export function transactionsSync(args: {

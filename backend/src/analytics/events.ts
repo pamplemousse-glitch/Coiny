@@ -25,6 +25,20 @@ const token = z.string().regex(/^[a-z0-9][a-z0-9_.:-]{0,39}$/, 'must be a lowerc
  *  magnitude may ever appear in analytics. */
 export const valueBand = z.enum(['0-1k', '1k-10k', '10k-100k', '100k-1m', '1m+']);
 
+export type ValueBand = z.infer<typeof valueBand>;
+
+/** Bucket a USD magnitude into the §8 band. The only sanctioned server-side
+ *  path from an amount to an analytics property (mirrors the iOS
+ *  TelemetryValue.usdBucket). */
+export function usdValueBand(amountUsd: number): ValueBand {
+  const magnitude = Math.abs(amountUsd);
+  if (magnitude < 1_000) return '0-1k';
+  if (magnitude < 10_000) return '1k-10k';
+  if (magnitude < 100_000) return '10k-100k';
+  if (magnitude < 1_000_000) return '100k-1m';
+  return '1m+';
+}
+
 const rungIndex = z.number().int().min(0).max(10);
 
 // --- Client-reported events (accepted by POST /api/telemetry) ---------------
@@ -88,6 +102,27 @@ export const CLIENT_EVENT_SCHEMAS = {
   push_permission_changed: z.strictObject({
     granted: z.boolean(),
   }),
+  // SPEC CHOICE: §24 has no name for the Wealth pull gesture; the server only
+  // ever sees the pulls that fire the billed POST, so 'debounced' pulls (which
+  // downgrade to the free GET inside the client's 60 s window) are knowable
+  // only client-side. Whether a pull then hit the daily bank cap is the
+  // server's own decision and rides the server-emitted net_worth_refreshed.
+  wealth_refresh_pulled: z.strictObject({
+    outcome: z.enum(['requested', 'debounced']),
+  }),
+  // SPEC CHOICE: the S-25 offline banner render (R-8.9) is by definition
+  // unobservable server-side; the event queues offline and flushes when the
+  // network returns.
+  offline_banner_shown: z.strictObject({
+    screen: z.enum(['home', 'wealth', 'activity', 'settings']),
+  }),
+  // SPEC CHOICE: the S-17 repair prompt render (R-8.7). The underlying item
+  // state is server-known (item_state_changed); that the UI actually surfaced
+  // the prompt to a pair of eyes is not. item_status mirrors the client's view
+  // of the item's health enum, never the institution.
+  repair_prompt_shown: z.strictObject({
+    item_status: z.enum(['reauth_required', 'expiring', 'revoked', 'error', 'unknown']),
+  }),
 } as const;
 
 // --- Server-emitted events (rejected from clients) ---------------------------
@@ -141,6 +176,48 @@ export const SERVER_EVENT_SCHEMAS = {
     // typed. Knowing WHICH failure dominates is what makes the breakage rate
     // actionable rather than just alarming.
     error_code: token.optional(),
+  }),
+  // SPEC CHOICE: goal CRUD has no §24 names. The mutations happen on the
+  // server's own endpoints (api/goals.ts), so these are server-emitted: a
+  // client-reported copy would be redundant and forgeable. Amounts appear only
+  // as the bucketed band; names and emoji never appear at all.
+  goal_created: z.strictObject({
+    kind: z.enum(['save', 'payoff', 'purchase']),
+    target_band: valueBand,
+    has_target_date: z.boolean(),
+    contribution_rule: z.enum(['recurring', 'roundup', 'manual']),
+  }),
+  goal_edited: z.strictObject({
+    kind: z.enum(['save', 'payoff', 'purchase']),
+    // Which fields the patch touched, as a closed vocabulary of field NAMES.
+    // Values never ride along, so a rename or amount change is countable
+    // without carrying what it changed to.
+    fields_changed: z
+      .array(
+        z.enum([
+          'name',
+          'emoji',
+          'kind',
+          'target_amount',
+          'target_date',
+          'funding_account',
+          'counts_existing_balance',
+          'contribution_rule',
+          'recurring_annual',
+        ]),
+      )
+      .min(1)
+      .max(9),
+  }),
+  goal_archived: z.strictObject({
+    kind: z.enum(['save', 'payoff', 'purchase']),
+  }),
+  // The user-driven refresh (POST /api/net-worth/refresh): whether the billed
+  // bank pull ran or hit the daily cap is the server's own decision
+  // (engineering-budgets §2), so the cap outcome is recorded here, not by the
+  // device that was told "capped".
+  net_worth_refreshed: z.strictObject({
+    bank: z.enum(['refreshed', 'failed', 'not_connected', 'capped']),
   }),
   // Post-launch, fed by StoreKit server notifications (R-25.4); defined now so
   // the hardware gate query has a stable shape to land on.

@@ -108,6 +108,13 @@ export const plaidItems = pgTable(
     // Set by ITEM/NEW_ACCOUNTS_AVAILABLE; cleared when the item is repaired or
     // relinked. Signals the client to run update mode with account selection.
     newAccountsAvailable: boolean('new_accounts_available').notNull().default(false),
+    // Institution identity from /item/get, captured at link time (it never
+    // changes for the life of an item) so the repair prompt can name the bank
+    // (S-17). Nullable: Plaid returns null for items created without an
+    // institution connection. Displayable user financial data: may appear in
+    // API responses, never in a log line or an analytics property.
+    institutionId: text('institution_id'),
+    institutionName: text('institution_name'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('plaid_items_user_idx').on(t.userId)],

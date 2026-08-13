@@ -42,11 +42,24 @@ export async function getItemForUser(
   return { ...row, accessToken: decryptString(row.accessToken) };
 }
 
-export async function upsertItem(args: { itemId: string; accessToken: string; userId: string }): Promise<void> {
+export async function upsertItem(args: {
+  itemId: string;
+  accessToken: string;
+  userId: string;
+  // From /item/get at link time (S-17: the repair prompt names the bank).
+  // Omitted (not null) when the lookup failed, so a relink whose institution
+  // fetch failed never erases a previously stored name.
+  institutionId?: string | null;
+  institutionName?: string | null;
+}): Promise<void> {
   const stored = encryptString(args.accessToken);
+  const institution =
+    args.institutionId !== undefined || args.institutionName !== undefined
+      ? { institutionId: args.institutionId ?? null, institutionName: args.institutionName ?? null }
+      : {};
   await db()
     .insert(plaidItems)
-    .values({ itemId: args.itemId, accessToken: stored, userId: args.userId })
+    .values({ itemId: args.itemId, accessToken: stored, userId: args.userId, ...institution })
     .onConflictDoUpdate({
       target: plaidItems.itemId,
       // Relinking the same institution returns the same item_id; a fresh
@@ -58,8 +71,21 @@ export async function upsertItem(args: { itemId: string; accessToken: string; us
         statusChangedAt: new Date(),
         lastErrorCode: null,
         newAccountsAvailable: false,
+        ...institution,
       },
     });
+}
+
+/** Persist the institution identity for an existing item. Used to lazily
+ *  backfill items linked before the institution columns existed. */
+export async function setItemInstitution(
+  itemId: string,
+  institution: { institutionId: string | null; institutionName: string | null },
+): Promise<void> {
+  await db()
+    .update(plaidItems)
+    .set({ institutionId: institution.institutionId, institutionName: institution.institutionName })
+    .where(eq(plaidItems.itemId, itemId));
 }
 
 /**

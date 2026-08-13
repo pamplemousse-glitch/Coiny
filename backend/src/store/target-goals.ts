@@ -169,12 +169,17 @@ export async function updateGoal(userId: string, id: number, patch: GoalPatch): 
   return row ? toGoal(row) : null;
 }
 
-/** Soft delete (R-7.9: "a fourth requires archiving one"). Idempotent. */
-export async function archiveGoal(userId: string, id: number, now: Date): Promise<void> {
-  await db()
+/** Soft delete (R-7.9: "a fourth requires archiving one"). Idempotent.
+ *  Returns the goal actually archived by THIS call, or null when nothing
+ *  matched (missing id or already archived), so the caller can emit
+ *  goal_archived exactly once per real transition. */
+export async function archiveGoal(userId: string, id: number, now: Date): Promise<TargetGoal | null> {
+  const [row] = await db()
     .update(goals)
     .set({ archivedAt: now })
-    .where(and(eq(goals.userId, userId), eq(goals.id, id), isNull(goals.archivedAt)));
+    .where(and(eq(goals.userId, userId), eq(goals.id, id), isNull(goals.archivedAt)))
+    .returning();
+  return row ? toGoal(row) : null;
 }
 
 export async function markGoalAchieved(userId: string, id: number, now: Date): Promise<void> {

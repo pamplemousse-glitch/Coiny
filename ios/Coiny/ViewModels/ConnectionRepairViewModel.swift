@@ -59,6 +59,19 @@ final class ConnectionRepairViewModel {
     /// notice a stale number.
     var needsRepair: Bool { !repairableItems.isEmpty }
 
+    /// The S-17 prompt for the first broken item, named when the server knows
+    /// the institution ("Chase needs you to sign in again. Two taps.") and
+    /// generic when it does not. A user with three banks connected needs to
+    /// know WHICH one to fix; the name is the whole point of the string.
+    var repairPromptText: String {
+        let subject = repairableItems.first?.institutionName ?? "Your bank"
+        return "\(subject) needs you to sign in again. Two taps."
+    }
+
+    /// True once repair_prompt_shown was emitted for the current broken state,
+    /// so re-loads while the banner stays up do not double-count.
+    private var hasEmittedPromptShown = false
+
     func loadItems() async {
         do {
             items = try await api.getPlaidItems()
@@ -66,6 +79,24 @@ final class ConnectionRepairViewModel {
             // Item health is a garnish on screens that render without it;
             // a load failure means no banner, never a blocked screen.
         }
+        await emitPromptShownIfNeeded()
+    }
+
+    /// The prompt render is a client-only fact (the server knows the item is
+    /// broken via item_state_changed; it cannot know the banner reached a pair
+    /// of eyes). Repair COMPLETION is deliberately not emitted here: the server
+    /// observes it at POST /api/plaid/item-repaired. Carries the status enum
+    /// only, never the institution name.
+    private func emitPromptShownIfNeeded() async {
+        guard let broken = repairableItems.first else {
+            hasEmittedPromptShown = false
+            return
+        }
+        guard !hasEmittedPromptShown else { return }
+        hasEmittedPromptShown = true
+        await telemetry.emit("repair_prompt_shown", [
+            "item_status": .string(broken.status.rawValue),
+        ])
     }
 
     /// Two taps from the broken state: this is tap one (Reconnect), Link's own

@@ -34,10 +34,13 @@ final class ConnectionRepairViewModelTests: XCTestCase {
         }
     }
 
-    private func makeVM(api: FakeAPI) -> ConnectionRepairViewModel {
-        // A fresh log-transport telemetry client per test: no network, and the
-        // shared queue is untouched.
-        ConnectionRepairViewModel(api: api, telemetry: TelemetryClient(transport: LogTelemetryTransport()))
+    private func makeVM(
+        api: FakeAPI,
+        telemetry: TelemetryClient = TelemetryClient(transport: LogTelemetryTransport())
+    ) -> ConnectionRepairViewModel {
+        // A fresh telemetry client per test: no network, and the shared queue
+        // is untouched.
+        ConnectionRepairViewModel(api: api, telemetry: telemetry)
     }
 
     // MARK: - Item health
@@ -76,6 +79,67 @@ final class ConnectionRepairViewModelTests: XCTestCase {
 
         XCTAssertTrue(vm.items.isEmpty)
         XCTAssertFalse(vm.needsRepair)
+    }
+
+    // MARK: - The S-17 prompt
+
+    func testRepairPromptTextNamesTheInstitution() async {
+        let api = FakeAPI()
+        api.items = [NetWorthFixtures.item(id: "b", institutionName: "Chase", status: .reauthRequired)]
+        let vm = makeVM(api: api)
+
+        await vm.loadItems()
+
+        XCTAssertEqual(vm.repairPromptText, "Chase needs you to sign in again. Two taps.")
+    }
+
+    func testRepairPromptTextFallsBackWhenInstitutionUnknown() async {
+        let api = FakeAPI()
+        api.items = [NetWorthFixtures.item(id: "b", status: .reauthRequired)]
+        let vm = makeVM(api: api)
+
+        await vm.loadItems()
+
+        XCTAssertEqual(vm.repairPromptText, "Your bank needs you to sign in again. Two taps.")
+    }
+
+    func testLoadItemsEmitsRepairPromptShownOncePerBrokenState() async {
+        let api = FakeAPI()
+        api.items = [NetWorthFixtures.item(id: "b", institutionName: "Chase", status: .reauthRequired)]
+        let transport = RecordingTelemetryTransport()
+        let telemetry = TelemetryClient(transport: transport)
+        let vm = makeVM(api: api, telemetry: telemetry)
+
+        await vm.loadItems()
+        await vm.loadItems() // banner still up: same broken state, no re-emit
+        await telemetry.flush()
+
+        let shown = transport.events.filter { $0.event == "repair_prompt_shown" }
+        XCTAssertEqual(shown.count, 1)
+        XCTAssertEqual(shown.first?.properties, ["item_status": .string("reauth_required")])
+        // The institution name must never ride on a telemetry event.
+        XCTAssertFalse(shown.contains { $0.properties.values.contains(.string("Chase")) })
+    }
+
+    func testRepairPromptShownReEmitsAfterHealthyThenBrokenAgain() async {
+        let api = FakeAPI()
+        api.items = [NetWorthFixtures.item(id: "b", status: .reauthRequired)]
+        let transport = RecordingTelemetryTransport()
+        let telemetry = TelemetryClient(transport: transport)
+        let vm = makeVM(api: api, telemetry: telemetry)
+
+        await vm.loadItems()
+        api.items = [NetWorthFixtures.item(id: "b", status: .healthy, repairable: false)]
+        await vm.loadItems() // repaired: dedupe resets
+        api.items = [NetWorthFixtures.item(id: "b", status: .expiring)]
+        await vm.loadItems() // broken again: a genuinely new prompt
+        await telemetry.flush()
+
+        let shown = transport.events.filter { $0.event == "repair_prompt_shown" }
+        XCTAssertEqual(shown.map(\.properties), [
+            ["item_status": .string("reauth_required")],
+            ["item_status": .string("expiring")],
+        ])
     }
 
     // MARK: - Repair flow (R-8.6: genuine update mode)

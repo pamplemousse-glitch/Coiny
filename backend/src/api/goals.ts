@@ -7,6 +7,7 @@
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { usdValueBand } from '../analytics/events.js';
 import { guardrailViews } from '../goals/evaluation.js';
 import { LAST_RUNG_ID, skipRung, unskipRung } from '../goals/ladder.js';
 import { ladderView } from '../goals/refresh.js';
@@ -103,6 +104,20 @@ function goalView(goal: TargetGoal, pace: StoredGoalPace | null) {
   return { ...goal, pace };
 }
 
+// Analytics field-name tokens for goal_edited, keyed by the PATCH schema's
+// keys. Field NAMES only; the values a patch carried never reach analytics.
+const GOAL_PATCH_FIELD_TOKENS = {
+  name: 'name',
+  emoji: 'emoji',
+  kind: 'kind',
+  targetAmountUsd: 'target_amount',
+  targetDate: 'target_date',
+  fundingAccountId: 'funding_account',
+  countsExistingBalance: 'counts_existing_balance',
+  contributionRule: 'contribution_rule',
+  recurringAnnual: 'recurring_annual',
+} as const;
+
 export function registerGoalsApi(app: FastifyInstance): void {
   app.get('/api/goals', async (req: FastifyRequest, reply: FastifyReply) => {
     const query = ListQuery.safeParse(req.query);
@@ -137,7 +152,8 @@ export function registerGoalsApi(app: FastifyInstance): void {
     const parsed = GoalCreateSchema.safeParse(req.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
-    const created = await createGoal(req.user!.id, parsed.data, new Date());
+    const userId = req.user!.id;
+    const created = await createGoal(userId, parsed.data, new Date());
     if (!created) {
       // R-7.9, hard-enforced server-side: the fourth goal is refused with an
       // error specific enough for the UI to render the archive prompt, not a
@@ -148,6 +164,19 @@ export function registerGoalsApi(app: FastifyInstance): void {
         message: 'You already have three active goals. Archive one to start another.',
       });
     }
+
+    // Server-observed (R-24.2): the create happens HERE, so the client never
+    // reports it. Amount appears only as the bucketed band; name and emoji
+    // never appear at all.
+    await trackServerEvent(userId, 'goal_created', {
+      kind: created.kind,
+      target_band: usdValueBand(created.targetAmountUsd),
+      has_target_date: created.targetDate !== null,
+      // The create schema always supplies a rule; the fallback only satisfies
+      // the row type, whose contributionRule is nullable.
+      contribution_rule: created.contributionRule?.type ?? 'recurring',
+    });
+
     return reply.status(201).send(goalView(created, null));
   });
 
@@ -168,6 +197,17 @@ export function registerGoalsApi(app: FastifyInstance): void {
 
     const updated = await updateGoal(userId, params.data.id, parsed.data);
     if (!updated) return reply.status(404).send({ error: 'not_found' });
+
+    // Server-observed (R-24.2). Field names only, never the values they
+    // carried. An empty patch ({} is a valid body) emits nothing: no fields
+    // changed, so there is nothing to measure.
+    const fieldsChanged = Object.keys(parsed.data)
+      .filter((key): key is keyof typeof GOAL_PATCH_FIELD_TOKENS => key in GOAL_PATCH_FIELD_TOKENS)
+      .map((key) => GOAL_PATCH_FIELD_TOKENS[key]);
+    if (fieldsChanged.length > 0) {
+      await trackServerEvent(userId, 'goal_edited', { kind: updated.kind, fields_changed: fieldsChanged });
+    }
+
     const paces = await getGoalPaces(userId);
     return goalView(updated, paces.get(updated.id) ?? null);
   });
@@ -178,7 +218,12 @@ export function registerGoalsApi(app: FastifyInstance): void {
     const params = IdParam.safeParse(req.params);
     if (!params.success) return reply.status(400).send({ error: params.error.flatten() });
 
-    await archiveGoal(req.user!.id, params.data.id, new Date());
+    const archived = await archiveGoal(req.user!.id, params.data.id, new Date());
+    // Server-observed (R-24.2), emitted only on the real transition so the
+    // idempotent 204 for an already-archived goal cannot double-count.
+    if (archived) {
+      await trackServerEvent(req.user!.id, 'goal_archived', { kind: archived.kind });
+    }
     return reply.status(204).send();
   });
 

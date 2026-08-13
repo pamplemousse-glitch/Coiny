@@ -96,6 +96,119 @@ describe('GET /api/plaid/items', () => {
   });
 });
 
+describe('institution identity (S-17)', () => {
+  const PLAID_ERROR_400 = {
+    error_type: 'ITEM_ERROR',
+    error_code: 'ITEM_NOT_FOUND',
+    error_message: 'item not found',
+    display_message: null,
+    request_id: 'req_err',
+  };
+
+  function mockItemGet(institutionName: string | null): void {
+    mockAgent
+      .get('https://sandbox.plaid.com')
+      .intercept({ path: '/item/get', method: 'POST' })
+      .reply(200, {
+        item: {
+          item_id: 'item_inst_1',
+          institution_id: institutionName === null ? null : 'ins_109508',
+          institution_name: institutionName,
+        },
+        request_id: 'req_ig',
+      });
+  }
+
+  it('captures the institution at link time and returns it from GET /api/plaid/items', async () => {
+    mockAgent
+      .get('https://sandbox.plaid.com')
+      .intercept({ path: '/item/public_token/exchange', method: 'POST' })
+      .reply(200, { access_token: 'access-sandbox-new', item_id: 'item_inst_1', request_id: 'req_ex' });
+    mockItemGet('First Platypus Bank');
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/plaid/exchange-token',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      body: JSON.stringify({ public_token: 'public-sandbox-abc' }),
+    });
+    expect(res.statusCode).toBe(200);
+
+    const { getItem } = await import('../src/store/items.js');
+    const stored = await getItem('item_inst_1');
+    expect(stored?.institutionName).toBe('First Platypus Bank');
+    expect(stored?.institutionId).toBe('ins_109508');
+
+    // The read is pure DB: no /item/get interceptor is registered for the
+    // linked item here, so a fetch attempt would come back nameless.
+    const itemsRes = await app.inject({ method: 'GET', url: '/api/plaid/items', headers: authHeader() });
+    const body = itemsRes.json<{ items: { item_id: string; institution_name: string | null }[] }>();
+    const linked = body.items.find((i) => i.item_id === 'item_inst_1');
+    expect(linked?.institution_name).toBe('First Platypus Bank');
+    await app.close();
+  });
+
+  it('a failed institution lookup does not fail the link', async () => {
+    mockAgent
+      .get('https://sandbox.plaid.com')
+      .intercept({ path: '/item/public_token/exchange', method: 'POST' })
+      .reply(200, { access_token: 'access-sandbox-new-2', item_id: 'item_inst_2', request_id: 'req_ex2' });
+    mockAgent
+      .get('https://sandbox.plaid.com')
+      .intercept({ path: '/item/get', method: 'POST' })
+      .reply(400, PLAID_ERROR_400);
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/plaid/exchange-token',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      body: JSON.stringify({ public_token: 'public-sandbox-def' }),
+    });
+    expect(res.statusCode).toBe(200);
+
+    const { getItem } = await import('../src/store/items.js');
+    expect((await getItem('item_inst_2'))?.institutionName).toBeNull();
+    await app.close();
+  });
+
+  it('lazily backfills the institution for items linked before the columns existed', async () => {
+    // TEST_ITEM_ID was upserted with no institution, like every pre-0047 item.
+    mockItemGet('Tartan Bank');
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/plaid/items', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{ items: { institution_name: string | null }[] }>();
+    expect(body.items[0]?.institution_name).toBe('Tartan Bank');
+
+    // Persisted, not just decorated: the store row now carries the name, so
+    // the next read needs no Plaid call.
+    const { getItem } = await import('../src/store/items.js');
+    expect((await getItem(TEST_ITEM_ID))?.institutionName).toBe('Tartan Bank');
+    await app.close();
+  });
+
+  it('still returns item health when the backfill fetch fails', async () => {
+    mockAgent
+      .get('https://sandbox.plaid.com')
+      .intercept({ path: '/item/get', method: 'POST' })
+      .reply(400, PLAID_ERROR_400);
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/plaid/items', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{ items: { item_id: string; institution_name: string | null }[] }>();
+    expect(body.items[0]).toMatchObject({ item_id: TEST_ITEM_ID, institution_name: null });
+    await app.close();
+  });
+});
+
 describe('POST /api/plaid/update-link-token', () => {
   it('mints an update-mode token with the stored access token and no products', async () => {
     let captured: Record<string, unknown> | undefined;
@@ -227,6 +340,29 @@ describe('POST /api/plaid/item-repaired', () => {
     expect(item?.lastErrorCode).toBeNull();
     expect(item?.newAccountsAvailable).toBe(false);
     expect(item?.disabled).toBe(false);
+
+    // Repair completion is server-observed at THIS endpoint (R-24.2), so the
+    // event is emitted here, never client-reported.
+    const { listAnalyticsEvents } = await import('../src/store/analytics.js');
+    const events = await listAnalyticsEvents(testUserId, 'item_state_changed');
+    expect(events.map((e) => e.properties)).toContainEqual({ state: 'repaired' });
+    await app.close();
+  });
+
+  it('does not emit a repaired event when the item was already healthy', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/plaid/item-repaired',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      body: JSON.stringify({ item_id: TEST_ITEM_ID }),
+    });
+    expect(res.statusCode).toBe(200);
+
+    const { listAnalyticsEvents } = await import('../src/store/analytics.js');
+    const events = await listAnalyticsEvents(testUserId, 'item_state_changed');
+    expect(events.map((e) => e.properties)).not.toContainEqual({ state: 'repaired' });
     await app.close();
   });
 

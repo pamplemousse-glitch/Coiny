@@ -19,6 +19,12 @@ enum PlaidItemStatus: String, Decodable, Equatable, Sendable {
 
 struct PlaidItemHealth: Decodable, Identifiable, Equatable, Sendable {
     let itemId: String
+    /// The bank's name from Plaid, captured server-side at link time, so the
+    /// repair prompt can say "Chase needs you to sign in again" (S-17). Nil for
+    /// items linked without an institution connection and for servers predating
+    /// the field; callers fall back to the generic string. Displayable, but
+    /// never logged and never attached to a telemetry event.
+    let institutionName: String?
     let status: PlaidItemStatus
     let statusChangedAt: Date?
     let lastErrorCode: String?
@@ -31,6 +37,7 @@ struct PlaidItemHealth: Decodable, Identifiable, Equatable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case itemId = "item_id"
+        case institutionName = "institution_name"
         case status
         case statusChangedAt = "status_changed_at"
         case lastErrorCode = "last_error_code"

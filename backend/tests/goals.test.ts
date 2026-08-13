@@ -45,6 +45,29 @@ describe('POST /api/goals', () => {
     await app.close();
   });
 
+  it('emits goal_created with the bucketed band, never the amount (R-24.2)', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    expect((await createViaApi(app)).statusCode).toBe(201);
+
+    const { listAnalyticsEvents } = await import('../src/store/analytics.js');
+    const events = await listAnalyticsEvents(testUserId, 'goal_created');
+    expect(events).toHaveLength(1);
+    expect(events[0]?.properties).toEqual({
+      kind: 'save',
+      target_band: '1k-10k',
+      has_target_date: true,
+      contribution_rule: 'recurring',
+    });
+    // The privacy invariant, asserted directly: no property carries the raw
+    // 5000, the goal name, or the emoji.
+    expect(JSON.stringify(events[0]?.properties)).not.toContain('5000');
+    expect(JSON.stringify(events[0]?.properties)).not.toContain('Emergency');
+
+    await app.close();
+  });
+
   it('returns the specific limit error for a fourth active goal', async () => {
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
@@ -201,6 +224,29 @@ describe('PATCH /api/goals/:id', () => {
     await app.close();
   });
 
+  it('emits goal_edited with field names only, never the values (R-24.2)', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const created = (await createViaApi(app)).json();
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/goals/${created.id}`,
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'House deposit', targetAmountUsd: 25_000 }),
+    });
+    expect(res.statusCode).toBe(200);
+
+    const { listAnalyticsEvents } = await import('../src/store/analytics.js');
+    const events = await listAnalyticsEvents(testUserId, 'goal_edited');
+    expect(events).toHaveLength(1);
+    expect(events[0]?.properties).toEqual({ kind: 'save', fields_changed: ['name', 'target_amount'] });
+    expect(JSON.stringify(events[0]?.properties)).not.toContain('House');
+    expect(JSON.stringify(events[0]?.properties)).not.toContain('25000');
+
+    await app.close();
+  });
+
   it('refuses to strip the date from a recurring annual goal', async () => {
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
@@ -249,6 +295,27 @@ describe('DELETE /api/goals/:id', () => {
     const { getGoal } = await import('../src/store/target-goals.js');
     const stored = await getGoal(testUserId, created.id);
     expect(stored?.archivedAt).not.toBeNull();
+
+    await app.close();
+  });
+
+  it('emits goal_archived once, even when the delete is repeated (R-24.2)', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const created = (await createViaApi(app)).json();
+    expect(
+      (await app.inject({ method: 'DELETE', url: `/api/goals/${created.id}`, headers: authHeader() })).statusCode,
+    ).toBe(204);
+    // Idempotent repeat: still 204, but no second analytics row.
+    expect(
+      (await app.inject({ method: 'DELETE', url: `/api/goals/${created.id}`, headers: authHeader() })).statusCode,
+    ).toBe(204);
+
+    const { listAnalyticsEvents } = await import('../src/store/analytics.js');
+    const events = await listAnalyticsEvents(testUserId, 'goal_archived');
+    expect(events).toHaveLength(1);
+    expect(events[0]?.properties).toEqual({ kind: 'save' });
 
     await app.close();
   });

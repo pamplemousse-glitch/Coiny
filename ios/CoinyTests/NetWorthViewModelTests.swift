@@ -111,9 +111,10 @@ final class NetWorthViewModelTests: XCTestCase {
     private func makeVM(
         api: FakeAPI,
         cache: FakeCache = FakeCache(),
+        telemetry: TelemetryClient = TelemetryClient(transport: LogTelemetryTransport()),
         now: @escaping () -> Date = { Date() }
     ) -> NetWorthViewModel {
-        NetWorthViewModel(api: api, cache: cache, now: now)
+        NetWorthViewModel(api: api, cache: cache, telemetry: telemetry, now: now)
     }
 
     // MARK: - Initial state
@@ -456,6 +457,51 @@ final class NetWorthViewModelTests: XCTestCase {
             XCTFail("Expected .failed with no cache, got \(vm.state)")
         }
         XCTAssertFalse(vm.isOffline)
+    }
+
+    // MARK: - Telemetry (section 24: client-only facts)
+
+    func testPullEmitsRequestedThenDebounced() async {
+        let fake = FakeAPI()
+        fake.setRefreshResult(.success(NetWorthFixtures.response(total: 1)))
+        fake.setResult(.success(NetWorthFixtures.response(total: 2)))
+        let transport = RecordingTelemetryTransport()
+        let telemetry = TelemetryClient(transport: transport)
+        var currentTime = Date(timeIntervalSince1970: 1_000_000)
+        let vm = makeVM(api: fake, telemetry: telemetry, now: { currentTime })
+
+        await vm.refresh()
+        currentTime = currentTime.addingTimeInterval(30)
+        await vm.refresh()
+        await telemetry.flush()
+
+        let pulls = transport.events.filter { $0.event == "wealth_refresh_pulled" }
+        XCTAssertEqual(pulls.map(\.properties), [
+            ["outcome": .string("requested")],
+            ["outcome": .string("debounced")],
+        ], "the debounced pull is invisible to the server; only the client can count it")
+    }
+
+    func testOfflineBannerEmitsOncePerTransition() async {
+        let fake = FakeAPI()
+        let cache = FakeCache()
+        cache.save(NetWorthFixtures.response(total: 11))
+        fake.setResult(.failure(URLError(.notConnectedToInternet)))
+        let transport = RecordingTelemetryTransport()
+        let telemetry = TelemetryClient(transport: transport)
+        let vm = makeVM(api: fake, cache: cache, telemetry: telemetry)
+
+        await vm.load()
+        await vm.load() // still offline: same banner, no re-emit
+        fake.setResult(.success(NetWorthFixtures.response(total: 12)))
+        await vm.load() // back online, banner clears
+        fake.setResult(.failure(URLError(.notConnectedToInternet)))
+        await vm.load() // offline again: a genuinely new banner
+        await telemetry.flush()
+
+        let banners = transport.events.filter { $0.event == "offline_banner_shown" }
+        XCTAssertEqual(banners.count, 2)
+        XCTAssertEqual(banners.first?.properties, ["screen": .string("wealth")])
     }
 
     func testSuccessfulLoadClearsOfflineFlag() async {

@@ -77,11 +77,13 @@ enum NetWorthFixtures {
 
     static func item(
         id: String = "item-1",
+        institutionName: String? = nil,
         status: PlaidItemStatus = .reauthRequired,
         repairable: Bool = true
     ) -> PlaidItemHealth {
         PlaidItemHealth(
             itemId: id,
+            institutionName: institutionName,
             status: status,
             statusChangedAt: nil,
             lastErrorCode: nil,

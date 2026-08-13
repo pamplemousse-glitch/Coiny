@@ -687,6 +687,18 @@ describe('POST /api/net-worth/refresh (explicit live path)', () => {
     // Holdings are subscription-billed, not per-call: still refreshed.
     expect(mockedInvestmentsHoldingsGet).toHaveBeenCalledTimes(5);
 
+    // The cap decision is server-observed instrumentation (R-24.2): four
+    // refreshed rows then one capped row, recorded here, never by the device.
+    const { listAnalyticsEvents } = await import('../src/store/analytics.js');
+    const events = await listAnalyticsEvents(testUserId, 'net_worth_refreshed');
+    expect(events.map((e) => e.properties)).toEqual([
+      { bank: 'refreshed' },
+      { bank: 'refreshed' },
+      { bank: 'refreshed' },
+      { bank: 'refreshed' },
+      { bank: 'capped' },
+    ]);
+
     await app.close();
   });
 
