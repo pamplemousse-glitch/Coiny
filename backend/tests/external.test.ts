@@ -77,12 +77,9 @@ describe('evaluateExternalEvent', () => {
     expect(result?.reason).toContain('50.00');
   });
 
-  it('new_liability returns concerned reaction', () => {
+  it('new_liability is acknowledged, not judged', () => {
     const result = evaluateExternalEvent({ ...base, type: 'new_liability', amountUsd: 1000, source: 'spinwheel' });
-    expect(result?.animation).toBe('concerned');
-    expect(result?.sound).toBe('warning');
-    expect(result?.led).toBe('amber');
-    expect(result?.duration).toBe(3000);
+    expect(result?.animation).toBe('neutral');
     expect(result?.reason).toContain('1000.00');
   });
 
@@ -99,6 +96,16 @@ describe('evaluateExternalEvent', () => {
     expect(evaluateExternalEvent({ ...base, type: 'net_worth_milestone', amountUsd: 50_000 })).toBeNull();
     expect(evaluateExternalEvent({ ...base, type: 'credit_score_improved', amountUsd: 25 })).toBeNull();
     expect(evaluateExternalEvent({ ...base, type: 'credit_score_dropped', amountUsd: 30 })).toBeNull();
+  });
+
+  // R-7.23: opening a card or taking a mortgage is a decision, not a moral
+  // failure, and a "new" liability is often the bureau reporting an account that
+  // already existed. Neutral is outside the push allowlist, so it never interrupts.
+  it('acknowledges a new liability without concern or sound', () => {
+    const result = evaluateExternalEvent({ ...base, type: 'new_liability', amountUsd: 4000 });
+    expect(result?.animation).toBe('neutral');
+    expect(result?.sound).toBe('off');
+    expect(result?.led).toBe('off');
   });
 
   it('still reacts to events the user did cause', () => {

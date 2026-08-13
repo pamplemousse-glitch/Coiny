@@ -390,13 +390,25 @@ export function registerNetWorthApi(app: FastifyInstance): void {
     }
 
     // --- Vinyl collection (Discogs) ---
-    let vinylTotal = 0;
+    //
+    // R-7 / R-17.3, register row DR-10: Discogs marketplace price data is
+    // "Restricted Data" under their API terms and may not be used for any
+    // commercial purpose without written permission. Permission has been
+    // requested and is not granted, so no Discogs-derived value is served:
+    // vinylTotal stays 0 and is excluded from the total.
+    //
+    // The connection flag is still reported so the UI can show the account as
+    // linked and explain why no value appears. The sync endpoint still writes
+    // lastCollectionUsd, which is retained but not displayed; re-enabling is a
+    // one-line change here PLUS both attribution strings and the six-hour
+    // display-staleness rule, which needs the scheduler. Do not re-enable
+    // without all three.
+    const vinylTotal = 0;
     let discogsConnected = false;
     try {
       const [discogs] = await db().select().from(discogsConnections).where(eq(discogsConnections.userId, userId));
       if (discogs) {
         discogsConnected = true;
-        if (discogs.lastCollectionUsd !== null) vinylTotal += parseFloat(discogs.lastCollectionUsd);
       }
     } catch {
       // table not yet populated

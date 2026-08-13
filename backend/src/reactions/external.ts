@@ -80,12 +80,16 @@ export function evaluateExternalEvent(event: ExternalEvent): Reaction | null {
         reason: `Missed debt payment:${amountStr}`,
       };
 
+    // R-7.23: neutral acknowledgment, not concern. Opening a card or taking a
+    // mortgage is a decision, not a moral failure, and a "new" liability is often
+    // just the bureau reporting an account that already existed. `neutral` is
+    // outside the push allowlist in dispatch.ts, so this never interrupts anyone.
     case 'new_liability':
       return {
-        animation: 'concerned',
-        sound: 'warning',
-        led: 'amber',
-        duration: 3000,
+        animation: 'neutral',
+        sound: 'off',
+        led: 'off',
+        duration: 1500,
         reason: `New liability detected:${amountStr}`,
       };
 

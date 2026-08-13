@@ -311,7 +311,7 @@ The most important table in the document. Principle 1 enforced: every event carr
 
 **R-7.22** [Built] Market and score events do not move the creature: `crypto_price_surge`/`crypto_price_drop` deleted, `net_worth_milestone` and `credit_score_*` return null with the reasoning in comments (`backend/src/reactions/external.ts:11-12,92-108`). The counter-metric proving it stays true is R-2.3.
 
-**R-7.23** [Unbuilt, MINOR] `new_liability` still fires concerned/warning/amber (`external.ts:83-90`). Opening a card is not a moral failure: soften to neutral acknowledgment, no push.
+**R-7.23** [Built] `new_liability` returns neutral with sound and LED off (`backend/src/reactions/external.ts:87-94`). Opening a card or taking a mortgage is a decision, not a moral failure, and a "new" liability is often the bureau reporting an account that already existed. `neutral` sits outside the push allowlist in `dispatch.ts`, so it never interrupts.
 
 **R-7.24** [Unbuilt] Event taxonomy target state (delta from current `rules/definitions.ts` five rules plus `external.ts`):
 
@@ -542,7 +542,7 @@ One row per provider that changes what gets built; the full contractual analysis
 | Kraken | Bring-your-own-key; stored keys can carry trade/withdrawal rights | Key-entry sheet instructing **Query Funds only** [Built, `NetWorthView+WealthInlines.swift:402-432`]. **R-17.1** [Unbuilt, MAJOR]: server rejects keys whose permissions exceed query (Kraken exposes key permissions); until then the DB is a honeypot that can move money, not just read it. The "does a read-only integration need Kraken's written consent" question is with the lawyer (obligations §8 Q9) | Partial |
 | Coinbase | Shared dev-key mode is confined to non-production; per-user OAuth is the only sanctioned path | **R-17.2** [Unbuilt, MAJOR]: build the OAuth flow (read-only scopes, PKCE) before the Coinbase feature ships to any tester; scopes are hard to change after registration, request the minimal read set once | Unbuilt |
 | Spinwheel | Production is sales-gated; terms unverified; credit data puts FCRA in the room | Do not enable credit data in production before reading the developer policy and asking obligations §8 Q8; encrypt the stored score (R-13.4) | Blocked on verification |
-| Discogs | Marketplace price data is Restricted Data: no commercial use without written permission; mandatory attribution; nothing older than six hours may be displayed | **R-17.3** [Unbuilt, MAJOR]: per register row DR-10, until permission is granted vinyl is a **manual asset** and no Discogs price data is displayed. The current build still serves a Discogs-derived portfolio value (`net-worth.ts:393-397`); suppress it. When re-enabled: both attribution strings, and the six-hour rule enforced by the scheduler | Violating decision today |
+| Discogs | Marketplace price data is Restricted Data: no commercial use without written permission; mandatory attribution; nothing older than six hours may be displayed | **R-17.3** [Built]: per register row DR-10, no Discogs-derived value is served. `vinylTotal` is pinned to 0 and excluded from the total (`backend/src/api/net-worth.ts:392-407`); the connection flag is still reported so the UI can explain why no value appears, and `lastCollectionUsd` is still written by sync but never read. Re-enabling requires three things together, not one: the value, both attribution strings, and the six-hour display-staleness rule, which needs the scheduler | Enforced |
 | YNAB | 25-token cap in restricted mode; unrestricted review takes 2 to 4 weeks; mandatory non-affiliation footer | **R-17.4** [Unbuilt, MINOR]: add the footer; request unrestricted review before public launch, not at the 26th user | Partial |
 | TrueLayer | UK regulated activity; 90-day re-auth; end-user contracts with TrueLayer | Live mode prohibited until obligations §8 Q2 is answered (§3.3); D16 schema fixes (R-13.2) before any UK user sees a balance | Sandbox only, correct |
 | Alpaca | Key collection is off the sanctioned OAuth path | OAuth migration, LATER, trigger: paid launch or Alpaca objection | Working, tolerated |
@@ -743,7 +743,7 @@ Append-only. Superseded rows are marked, never edited. A new decision gets the n
 | DR-7 | 2026-08-12 | W4 definition fixed as in §2 (rung or habit period within 4 weeks AND `app_open` in days 21 to 27; counter-metric for quiet completers) | Supersedes "still active in week 4" and a days-22-28 draft | §2; `retention.sql` pending |
 | DR-8 | 2026-08-12 | Steam and SnapTrade removed | Steam: no contractual footing (obligations §4). SnapTrade: free tier is one user, commercial terms bite at TestFlight | Commit `5406a7b` |
 | DR-9 | 2026-08-12 | Kraken: bring-your-own-key with its own entry sheet, Query Funds permission only | obligations §5 honeypot analysis | `NetWorthView+WealthInlines.swift:402-432`; server-side enforcement pending (R-17.1) |
-| DR-10 | 2026-08-12 | Discogs commercial permission pending: until granted, vinyl is a manual asset and no Discogs price data is displayed | Discogs Restricted Data terms, obligations §4 | Not yet enforced (R-17.3 flags the violation) |
+| DR-10 | 2026-08-12 | Discogs commercial permission pending: until granted, vinyl is a manual asset and no Discogs price data is displayed | Discogs Restricted Data terms, obligations §4 | **Enforced** 2026-08-12 (R-17.3) |
 | DR-11 | 2026-08-11 | Maximum three active target goals, hard cap | Concentration research, prd-app-v2 §3.1/§8 Q3 | §7.2; no code yet |
 | DR-12 | 2026-08-11 | Debt strategy default is Blend, cost of choice always shown in dollars | Gal/McShane, Brown/Lahey, Kettle; prd-app-v2 §4.2 | §7.14; no code yet |
 | DR-13 | 2026-08-11 | Phone-primary, device-secondary (Design Decision C) | prd-app-v2 §7 | n/a |
@@ -810,7 +810,7 @@ Verified by reading source at `5406a7b` on 2026-08-12. Built = behaves as specif
 | R-7.19 | Three-variable state | Partial | Stage derivation Built (`ladder.ts:309-315`); Vitality/Rest Unbuilt; legacy `healthScore`/`mood` live (`schema.ts:51-52`, `health/decay.ts:9-11`) |
 | R-7.20, R-7.21 | Sleep rendering, sprites | Unbuilt | SF Symbols, bars, spring, thinMaterial all present (`PetView.swift:85-174`) |
 | R-7.22 | No market reactions | Built | `external.ts:11-12,92-108` |
-| R-7.23 | Soften new_liability | Unbuilt | Still concerned/warning/amber (`external.ts:83-90`) |
+| R-7.23 | Soften new_liability | **Built** | neutral, sound and LED off (`external.ts:87-94`); test in `external.test.ts` |
 | R-7.24 | Event taxonomy | Unbuilt | Five legacy rules incl. punitive `large_purchase` (`rules/definitions.ts:120-134`) |
 | R-7.25 | Engine collect-all | Unbuilt | First-match return (`rules/engine.ts:11-18`) |
 | R-7.26 | Portfolio guardrails | Unbuilt | Deferred by design (§30) |
@@ -853,7 +853,7 @@ Verified by reading source at `5406a7b` on 2026-08-12. Built = behaves as specif
 | R-16.5 | Timeout adoption | Unbuilt, MAJOR | Wrapper exists (`util/fetch.ts:1-14`); read-path clients bypass it |
 | R-17.1 | Kraken permission check | Unbuilt, MAJOR | Copy only |
 | R-17.2 | Coinbase OAuth | Unbuilt, MAJOR | dev_key confined to non-prod (`config.ts` guard) |
-| R-17.3 | Discogs suppression | Unbuilt, MAJOR | Price-derived value still served (`net-worth.ts:393-397`) |
+| R-17.3 | Discogs suppression | **Built** | `vinylTotal` pinned to 0 (`net-worth.ts:392-407`); test in `discogs.test.ts` |
 | R-17.4 | YNAB footer | Unbuilt, MINOR | No footer string in repo |
 | R-18.1 | Client cache hygiene | Unbuilt | No client cache exists |
 | R-20.1 to R-20.3 | Backups, rehearsal, key | Unbuilt / config-only | No dump workflow in `.github/workflows` |
