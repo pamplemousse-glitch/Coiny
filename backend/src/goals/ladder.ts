@@ -49,6 +49,13 @@ export type LadderContext = {
   taxAdvantagedRate: number | null;
   /** User-declared: do they have an employer plan with a match, and is it captured. */
   employerMatch: 'captured' | 'not_captured' | 'no_employer_plan' | 'unknown';
+  /** User-adjustable rung 5 target, 0 to 1. Null means "use the default"
+   *  (DEFAULT_SHELTERED_RATE), which is different from a declared 0. */
+  shelteredTargetRate: number | null;
+  /** User-adjustable rung 6 savings-rate target, 0 to 1. Null means "use the
+   *  default" (SURPLUS_SAVINGS_RATE). The caller must compute
+   *  `monthsAtSurplusRate` against the SAME rate it puts here. */
+  surplusTargetRate: number | null;
 };
 
 export type RungProgress = {
@@ -188,7 +195,9 @@ export const RUNGS: RungDefinition[] = [
     blurb: 'Retirement accounts funded at a rate you set.',
     evaluate: (ctx) => {
       if (ctx.taxAdvantagedRate === null) return unknown();
-      return ratio(ctx.taxAdvantagedRate, 0.15);
+      // The 15% default is the PRD's starting point; the rate is user-adjustable
+      // (docs/prd.md R-7.1, rung 5), so a declared rate always wins.
+      return ratio(ctx.taxAdvantagedRate, ctx.shelteredTargetRate ?? DEFAULT_SHELTERED_RATE);
     },
   },
   {
@@ -196,7 +205,7 @@ export const RUNGS: RungDefinition[] = [
     key: 'surplus',
     name: 'Surplus',
     stage: 'Elder',
-    blurb: 'A 25% savings rate, held for three months running.',
+    blurb: 'Your target savings rate, held for three months running.',
     evaluate: (ctx) => {
       if (ctx.savingsRate === null) return unknown();
       return {
@@ -225,7 +234,14 @@ export const RUNGS: RungDefinition[] = [
   },
 ];
 
-export const SURPLUS_SAVINGS_RATE = 0.25;
+/** Default rung 5 target rate, user-adjustable via `shelteredTargetRate`. */
+export const DEFAULT_SHELTERED_RATE = 0.15;
+
+/** Default rung 6 savings-rate target, user-adjustable via `surplusTargetRate`.
+ *  Lowered from 0.25 per register row DR-23: 25% of take-home is materially
+ *  harder than the published 25%-of-gross standard the old value was copied
+ *  from, and our rate is take-home based (derived.ts). */
+export const SURPLUS_SAVINGS_RATE = 0.2;
 
 /** The final rung's id. Rung 7 never completes by design, so this is also the
  *  ceiling for `currentRung`. */

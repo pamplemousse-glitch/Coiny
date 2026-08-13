@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_SHELTERED_RATE,
   emergencyFundMonths,
   evaluateLadder,
   type LadderContext,
   RUNGS,
   reopenedRungs,
+  SURPLUS_SAVINGS_RATE,
   stageForLadder,
 } from '../src/goals/ladder.js';
 
@@ -23,6 +25,8 @@ function ctx(overrides: Partial<LadderContext> = {}): LadderContext {
     investedTotal: 0,
     taxAdvantagedRate: 0,
     employerMatch: 'captured',
+    shelteredTargetRate: null,
+    surplusTargetRate: null,
     ...overrides,
   };
 }
@@ -130,6 +134,40 @@ describe('no rung can be failed', () => {
     for (const s of states) {
       for (const r of Object.values(s.rungs)) expect(allowed.has(r.status)).toBe(true);
     }
+  });
+});
+
+describe('adjustable target rates', () => {
+  // Pin tests: these constants are product decisions, not tuning knobs.
+  // SURPLUS_SAVINGS_RATE was lowered from 0.25 per register row DR-23.
+  it('pins the surplus savings rate default at 0.20', () => {
+    expect(SURPLUS_SAVINGS_RATE).toBe(0.2);
+  });
+
+  it('pins the sheltered rate default at 0.15', () => {
+    expect(DEFAULT_SHELTERED_RATE).toBe(0.15);
+  });
+
+  it('judges rung 5 against the default when no rate is declared', () => {
+    const state = evaluateLadder(ctx({ taxAdvantagedRate: 0.15, shelteredTargetRate: null }), null, NOW);
+    expect(state.rungs['5']?.status).toBe('completed');
+  });
+
+  it('leaves rung 5 open below the default when no rate is declared', () => {
+    const state = evaluateLadder(ctx({ taxAdvantagedRate: 0.1, shelteredTargetRate: null }), null, NOW);
+    expect(state.rungs['5']?.status).not.toBe('completed');
+  });
+
+  it('judges rung 5 against a declared rate instead of the default', () => {
+    const state = evaluateLadder(ctx({ taxAdvantagedRate: 0.1, shelteredTargetRate: 0.1 }), null, NOW);
+    expect(state.rungs['5']?.status).toBe('completed');
+  });
+
+  it('reports the declared rate as the rung 5 target and gap basis', () => {
+    const rung5 = RUNGS.find((r) => r.id === 5);
+    const result = rung5?.evaluate(ctx({ taxAdvantagedRate: 0.05, shelteredTargetRate: 0.1 }));
+    expect(result?.target).toBe(0.1);
+    expect(result?.progress).toBeCloseTo(0.5, 5);
   });
 });
 

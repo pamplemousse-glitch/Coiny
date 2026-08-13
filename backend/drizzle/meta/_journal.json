@@ -267,6 +267,13 @@
       "when": 1786620412433,
       "tag": "0037_drop_snaptrade",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1786620512433,
+      "tag": "0038_goal_wiring",
+      "breakpoints": true
     }
   ]
 }

@@ -12,7 +12,7 @@ import {
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
-import type { RungState } from '../goals/ladder.js';
+import type { LadderContext, RungState } from '../goals/ladder.js';
 
 export const users = pgTable(
   'users',
@@ -629,6 +629,27 @@ export const ladderState = pgTable('ladder_state', {
   // RungStatus cannot be written. `ladder.ts` imports nothing from here, so this
   // direction of dependency is safe.
   rungs: jsonb('rungs').$type<Record<string, RungState>>().notNull().default({}),
+  // The LadderContext the last refresh evaluated. Persisted so read paths
+  // (GET /api/pets) can report the active rung's live progress, target and gap
+  // without re-running the Plaid fan-out, and so a declaration change can
+  // re-evaluate the ladder against the freshest known financial inputs.
+  inputs: jsonb('inputs').$type<LadderContext>(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// User-declared ladder targets. Only the two adjustable rates live here.
+// Employer match deliberately has NO storage or intake anywhere: whether rung 2
+// stays declared, becomes not-applicable, or is removed is an open product
+// decision, and the refresh path feeds `employerMatch: 'unknown'`, which the
+// engine treats as indeterminate, never as satisfied.
+export const userDeclarations = pgTable('user_declarations', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  // Rung 5 target rate override, 0 to 1. Null means use DEFAULT_SHELTERED_RATE.
+  shelteredTargetRate: numeric('sheltered_target_rate'),
+  // Rung 6 savings-rate target override, 0 to 1. Null means SURPLUS_SAVINGS_RATE.
+  surplusTargetRate: numeric('surplus_target_rate'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

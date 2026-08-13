@@ -188,6 +188,8 @@ describe('short history does not understate monthly spend', () => {
         investedTotal: 0,
         taxAdvantagedRate: 0,
         employerMatch: 'captured',
+        shelteredTargetRate: null,
+        surplusTargetRate: null,
       },
       null,
       NOW,

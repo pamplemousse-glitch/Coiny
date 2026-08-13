@@ -402,3 +402,85 @@ describe('GET /api/net-worth', () => {
     await app.close();
   });
 });
+
+describe('GET /api/net-worth goal system refresh', () => {
+  beforeEach(async () => {
+    vi.resetAllMocks();
+    await resetDatabase();
+    mockedInvestmentsHoldingsGet.mockResolvedValue({ accounts: [], holdings: [], securities: [], request_id: 'r' });
+    mockedLiabilitiesGet.mockResolvedValue({
+      accounts: [],
+      liabilities: { credit: null, mortgage: null, student: null },
+      request_id: 'r',
+    });
+  });
+
+  it('records a net worth point and creates ladder state on request', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+
+    const { netWorthPointCount, getLadderState } = await import('../src/store/goals.js');
+    expect(await netWorthPointCount(testUserId)).toBe(1);
+    const ladder = await getLadderState(testUserId);
+    // No account connected: rung 0 is active, not completed.
+    expect(ladder?.currentRung).toBe(0);
+    expect(ladder?.rungs['0']?.status).toBe('active');
+
+    await app.close();
+  });
+
+  it('feeds measured liquid cash into the ladder once a bank is linked', async () => {
+    const { upsertItem } = await import('../src/store/items.js');
+    await upsertItem({ itemId: 'item-goal-1', accessToken: 'access-goal-1', userId: testUserId });
+
+    mockedAccountsBalanceGet.mockResolvedValue({
+      accounts: [
+        {
+          account_id: 'acct-goal',
+          name: 'Checking',
+          type: 'depository',
+          subtype: 'checking',
+          official_name: null,
+          balances: { current: 3000, available: 3000, iso_currency_code: 'USD', limit: null },
+        },
+      ],
+      request_id: 'r',
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+
+    const { getLadderState, getLadderInputs, getDerivedState } = await import('../src/store/goals.js');
+    expect((await getLadderState(testUserId))?.rungs['0']?.status).toBe('completed');
+    expect((await getLadderInputs(testUserId))?.liquidCash).toBe(3000);
+    expect((await getDerivedState(testUserId))?.liquidCash).toBe(3000);
+
+    await app.close();
+  });
+
+  it('feeds high-APR bureau debt into the ladder inputs', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { spinwheelConnections } = await import('../src/db/schema.js');
+    await db().insert(spinwheelConnections).values({ userId: testUserId, spinwheelUserId: 'sw-goal-1' });
+
+    mockedGetDebtProfile.mockResolvedValue([
+      { id: 'debt-hi', type: 'CREDIT_CARD', balance: 2500, interestRate: 18, minimumPayment: 75 },
+      { id: 'debt-lo', type: 'STUDENT_LOAN', balance: 10_000, interestRate: 5, minimumPayment: 150 },
+    ]);
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+
+    const { getLadderInputs } = await import('../src/store/goals.js');
+    expect((await getLadderInputs(testUserId))?.highAprDebtBalances).toEqual([2500]);
+
+    await app.close();
+  });
+});

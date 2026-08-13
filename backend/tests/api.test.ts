@@ -93,6 +93,163 @@ describe('PUT /api/pets/goals', () => {
   });
 });
 
+describe('GET /api/pets goal system fields', () => {
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  it('returns null ladder and derived before the first refresh', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/pets', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json<Record<string, unknown>>();
+    expect(body.ladder).toBeNull();
+    expect(body.derived).toBeNull();
+    expect(body.stage).toBe(0);
+    expect(body.declarations).toEqual({ shelteredTargetRate: null, surplusTargetRate: null });
+
+    await app.close();
+  });
+
+  it('keeps the legacy scalars alongside the new fields', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/pets', headers: authHeader() });
+    const body = res.json<Record<string, unknown>>();
+    expect(typeof body.healthScore).toBe('number');
+    expect(typeof body.mood).toBe('number');
+    expect(body).toHaveProperty('goals');
+    expect(body).toHaveProperty('reactionHistory');
+
+    await app.close();
+  });
+
+  it('returns the ladder with the active rung after a refresh', async () => {
+    const { refreshGoalSystem } = await import('../src/goals/refresh.js');
+    await refreshGoalSystem(
+      testUserId,
+      {
+        hasConnectedAccount: true,
+        liquidCash: 1000,
+        highAprDebtBalances: [],
+        investedTotal: null,
+        taxAdvantagedRate: null,
+        netWorth: null,
+      },
+      new Date(),
+    );
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/pets', headers: authHeader() });
+    const body = res.json<{
+      stage: number;
+      ladder: {
+        currentRung: number;
+        activeRung: { id: number; key: string; target: number | null; gap: number | null } | null;
+        reopened: unknown[];
+      };
+      derived: { liquidCash: number | null };
+    }>();
+
+    expect(body.ladder.currentRung).toBe(1);
+    expect(body.ladder.activeRung?.key).toBe('floor');
+    expect(body.ladder.activeRung?.target).toBe(2000);
+    expect(body.ladder.activeRung?.gap).toBe(1000);
+    expect(body.derived.liquidCash).toBe(1000);
+    expect(body.stage).toBeGreaterThanOrEqual(0);
+
+    await app.close();
+  });
+});
+
+describe('PUT /api/pets/declarations', () => {
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  it('stores declared rates and returns them', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/pets/declarations',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      body: JSON.stringify({ shelteredTargetRate: 0.1, surplusTargetRate: 0.3 }),
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{ declarations: { shelteredTargetRate: number; surplusTargetRate: number } }>();
+    expect(body.declarations.shelteredTargetRate).toBeCloseTo(0.1, 5);
+    expect(body.declarations.surplusTargetRate).toBeCloseTo(0.3, 5);
+
+    await app.close();
+  });
+
+  it('rejects a rate above 1', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/pets/declarations',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      body: JSON.stringify({ surplusTargetRate: 1.5 }),
+    });
+    expect(res.statusCode).toBe(400);
+    await app.close();
+  });
+
+  it('rejects a zero rate, which would trivially satisfy a rung', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/pets/declarations',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      body: JSON.stringify({ shelteredTargetRate: 0 }),
+    });
+    expect(res.statusCode).toBe(400);
+    await app.close();
+  });
+
+  it('rejects unknown fields, including any employer match intake', async () => {
+    // Employer match deliberately has no intake anywhere (founder decision).
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/pets/declarations',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      body: JSON.stringify({ employerMatch: 'captured' }),
+    });
+    expect(res.statusCode).toBe(400);
+    await app.close();
+  });
+
+  it('returns 401 without auth', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/api/pets/declarations',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ surplusTargetRate: 0.3 }),
+    });
+    expect(res.statusCode).toBe(401);
+    await app.close();
+  });
+});
+
 describe('GET /api/spending', () => {
   beforeEach(async () => {
     await resetDatabase();

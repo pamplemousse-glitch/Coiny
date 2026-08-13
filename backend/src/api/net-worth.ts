@@ -22,20 +22,17 @@ import {
   polymarketAccounts,
   realEstateAssets,
   sneakerHoldings,
-  spinwheelConnections,
   tradingCardHoldings,
   truelayerConnections,
   vehicleAssets,
   ynabConnections,
   zerionWallets,
 } from '../db/schema.js';
-import { accountsBalanceGet, investmentsHoldingsGet, liabilitiesGet } from '../plaid/client.js';
+import { refreshGoalSystem } from '../goals/refresh.js';
+import { fetchDebtSnapshot, fetchPlaidSnapshot, highAprDebtBalances } from '../goals/snapshot.js';
 import { dispatchReaction } from '../reactions/dispatch.js';
 import { evaluateExternalEvent } from '../reactions/external.js';
-import { getDebtProfile } from '../spinwheel/client.js';
-import { getItemsByUser } from '../store/items.js';
 import { recordReaction } from '../store/pet.js';
-import { getCachedLiabilities } from '../store/plaid-liabilities.js';
 import { getRecentOutflows } from '../store/transactions.js';
 import { getPortfolio } from '../zerion/client.js';
 
@@ -54,137 +51,15 @@ export function registerNetWorthApi(app: FastifyInstance): void {
     const userId = req.user!.id;
 
     // --- Bank, Investments, Liabilities (Plaid) ---
-    let bankTotal = 0;
-    let plaidDebtTotal = 0;
-    let liquidDeposits = 0;
-    let investmentsTotal = 0;
-    const bankAccounts: Array<{
-      accountId: string;
-      name: string;
-      type: string;
-      balance: number;
-      minPayment: number | null;
-      nextDueDate: string | null;
-      isOverdue: boolean | null;
-      primaryApr: number | null;
-    }> = [];
-    const investmentHoldings: Array<{
-      securityId: string;
-      name: string | null;
-      ticker: string | null;
-      value: number;
-    }> = [];
-
-    try {
-      const items = await getItemsByUser(userId);
-
-      // Fetch balances and investment holdings in parallel; liabilities read from cache.
-      const [balanceResults, holdingsResults] = await Promise.all([
-        Promise.allSettled(items.map((item) => accountsBalanceGet(item.accessToken))),
-        Promise.allSettled(items.map((item) => investmentsHoldingsGet(item.accessToken))),
-      ]);
-
-      // Build liability payment metadata map from cache; fall back to live API if cache is empty.
-      type LiabilityMeta = {
-        minPayment: number | null;
-        nextDueDate: string | null;
-        isOverdue: boolean | null;
-        primaryApr: number | null;
-      };
-      const liabilityMeta = new Map<string, LiabilityMeta>();
-
-      const cachedRows = await getCachedLiabilities(userId);
-      if (cachedRows.length > 0) {
-        for (const row of cachedRows) {
-          liabilityMeta.set(row.accountId, {
-            minPayment: row.minPayment != null ? parseFloat(row.minPayment) : null,
-            nextDueDate: row.nextDueDate ?? null,
-            isOverdue: row.isOverdue ?? null,
-            primaryApr: row.primaryApr != null ? parseFloat(row.primaryApr) : null,
-          });
-        }
-      } else {
-        // Cache empty — fall back to live Plaid calls.
-        const liabilityResults = await Promise.allSettled(items.map((item) => liabilitiesGet(item.accessToken)));
-        for (const res of liabilityResults) {
-          if (res.status === 'rejected') continue;
-          for (const c of res.value.liabilities.credit ?? []) {
-            const purchaseApr = c.aprs?.find((a) => a.apr_type === 'purchase_apr') ?? c.aprs?.[0] ?? null;
-            liabilityMeta.set(c.account_id, {
-              minPayment: c.minimum_payment_amount,
-              nextDueDate: c.next_payment_due_date,
-              isOverdue: c.is_overdue ?? null,
-              primaryApr: purchaseApr?.apr_percentage ?? null,
-            });
-          }
-          for (const m of res.value.liabilities.mortgage ?? []) {
-            liabilityMeta.set(m.account_id, {
-              minPayment: m.next_monthly_payment,
-              nextDueDate: m.next_payment_due_date,
-              isOverdue: null,
-              primaryApr: null,
-            });
-          }
-          for (const s of res.value.liabilities.student ?? []) {
-            liabilityMeta.set(s.account_id, {
-              minPayment: s.minimum_payment_amount,
-              nextDueDate: s.next_payment_due_date,
-              isOverdue: null,
-              primaryApr: null,
-            });
-          }
-        }
-      }
-
-      // Bank balances — depository adds, credit/loan subtracts; investment/brokerage excluded
-      for (const result of balanceResults) {
-        if (result.status === 'rejected') continue;
-        for (const acct of result.value.accounts) {
-          if (acct.type === 'investment' || acct.type === 'brokerage') continue;
-          const balance = acct.balances.current ?? acct.balances.available ?? 0;
-          if (acct.type === 'depository') {
-            bankTotal += balance;
-            liquidDeposits += Math.max(0, balance);
-          } else if (acct.type === 'credit' || acct.type === 'loan') {
-            // Accumulated separately, NOT subtracted here. Spinwheel pulls the
-            // same cards and loans from the credit bureau, so subtracting both
-            // double-counts the debt. Reconciled once below, after we know
-            // whether Spinwheel is connected.
-            plaidDebtTotal += balance;
-          }
-          const meta = liabilityMeta.get(acct.account_id);
-          bankAccounts.push({
-            accountId: acct.account_id,
-            name: acct.name,
-            type: acct.type,
-            balance,
-            minPayment: meta?.minPayment ?? null,
-            nextDueDate: meta?.nextDueDate ?? null,
-            isOverdue: meta?.isOverdue ?? null,
-            primaryApr: meta?.primaryApr ?? null,
-          });
-        }
-      }
-
-      // Investment holdings — sum institution_value across all securities
-      for (const result of holdingsResults) {
-        if (result.status === 'rejected') continue;
-        const secMap = new Map(result.value.securities.map((s) => [s.security_id, s]));
-        for (const h of result.value.holdings) {
-          const value = h.institution_value ?? 0;
-          investmentsTotal += value;
-          const sec = secMap.get(h.security_id);
-          investmentHoldings.push({
-            securityId: h.security_id,
-            name: sec?.name ?? null,
-            ticker: sec?.ticker_symbol ?? null,
-            value,
-          });
-        }
-      }
-    } catch {
-      // no bank linked
-    }
+    // Assembled in src/goals/snapshot.ts so the goal-system refresh below reads
+    // the same numbers as this endpoint. Credit/loan balances are accumulated
+    // separately in plaidDebtTotal, NOT subtracted from bankTotal here:
+    // Spinwheel pulls the same cards and loans from the credit bureau, so
+    // subtracting both double-counts the debt. Reconciled once below, after we
+    // know whether Spinwheel loaded.
+    const plaidSnapshot = await fetchPlaidSnapshot(userId);
+    let bankTotal = plaidSnapshot.bankTotal;
+    const { plaidDebtTotal, liquidDeposits, investmentsTotal, bankAccounts, investmentHoldings } = plaidSnapshot;
 
     // --- Crypto (Coinbase) ---
     let cryptoTotal = 0;
@@ -486,36 +361,9 @@ export function registerNetWorthApi(app: FastifyInstance): void {
     }
 
     // --- Debts (Spinwheel) ---
-    let debtsTotal = 0;
-    const debtItems: Array<{ id: string; type: string; balance: number; monthlyPayment: number }> = [];
-    let spinwheelConnected = false;
-    // Distinct from spinwheelConnected: set only after the bureau fetch actually
-    // returns. If Spinwheel is connected but its fetch throws, debtsTotal stays 0,
-    // and suppressing the Plaid subtraction on "connected" alone would make net
-    // worth silently jump by the full card and loan balances.
-    let spinwheelDebtsLoaded = false;
-    try {
-      const [connection] = await db()
-        .select()
-        .from(spinwheelConnections)
-        .where(eq(spinwheelConnections.userId, userId));
-      if (connection) {
-        spinwheelConnected = true;
-        const debts = await getDebtProfile(connection.spinwheelUserId);
-        spinwheelDebtsLoaded = true;
-        for (const debt of debts) {
-          debtsTotal += debt.balance ?? 0;
-          debtItems.push({
-            id: debt.id,
-            type: debt.type,
-            balance: debt.balance ?? 0,
-            monthlyPayment: debt.minimumPayment ?? 0,
-          });
-        }
-      }
-    } catch {
-      // spinwheel not connected or error
-    }
+    // Also assembled in src/goals/snapshot.ts, shared with the goal refresh.
+    const debtSnapshot = await fetchDebtSnapshot(userId);
+    const { debtsTotal, debtItems, spinwheelConnected, spinwheelDebtsLoaded } = debtSnapshot;
 
     // Reconcile the two debt sources. Spinwheel reads the credit bureau and
     // Plaid reads the institution, so a user connected to both sees the same
@@ -590,6 +438,60 @@ export function registerNetWorthApi(app: FastifyInstance): void {
       }
     } catch {
       // no transactions yet
+    }
+
+    // --- Goal-system refresh (docs/prd.md R-7.6) ---
+    // Runs on this request path because no scheduler exists yet; the seam for
+    // the nightly job is refreshGoalSystem itself (src/goals/refresh.ts).
+    // Failure here must never break the net-worth response, and per the logging
+    // rules nothing financial is logged, only the fact of the failure.
+    try {
+      await refreshGoalSystem(
+        userId,
+        {
+          hasConnectedAccount: plaidSnapshot.hasConnectedAccount,
+          liquidCash: plaidSnapshot.balancesLoaded ? liquidDeposits : null,
+          highAprDebtBalances: highAprDebtBalances(debtSnapshot, bankAccounts),
+          // Null when no account is connected (unknown), a measured sum once one
+          // is: a connected user whose institutions report no holdings has a
+          // Plaid-visible invested total of zero, not an unknown one.
+          investedTotal: plaidSnapshot.hasConnectedAccount ? investmentsTotal : null,
+          // No honest producer exists; rung 5 stays indeterminate by design.
+          taxAdvantagedRate: null,
+          netWorth: {
+            totalUsd: total,
+            byClass: {
+              bank: bankTotal,
+              investments: investmentsTotal,
+              crypto: cryptoTotal,
+              defi: defiTotal,
+              chainWallets: chainWalletsTotal,
+              hyperliquid: hyperliquidTotal,
+              polymarket: polymarketTotal,
+              kraken: krakenTotal,
+              alpaca: alpacaTotal,
+              realEstate: realEstateTotal,
+              vehicles: vehiclesTotal,
+              metals: metalsTotal,
+              sneakers: sneakersTotal,
+              nft: nftTotal,
+              manual: manualTotal,
+              ynab: ynabTotal,
+              kalshi: kalshiTotal,
+              truelayer: truelayerTotal,
+              pokemonCards: pokemonCardsTotal,
+              energy: energyTotal,
+              farmland: farmlandTotal,
+              tradingCards: tradingCardsTotal,
+              coins: coinsTotal,
+              debts: -debtsTotal,
+            },
+          },
+        },
+        new Date(),
+      );
+    } catch {
+      req.log.warn('goal system refresh failed');
     }
 
     return {

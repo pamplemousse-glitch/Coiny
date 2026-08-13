@@ -101,6 +101,8 @@ describe('ladder persistence and stage', () => {
     investedTotal: 0,
     taxAdvantagedRate: 0,
     employerMatch: 'captured' as const,
+    shelteredTargetRate: null,
+    surplusTargetRate: null,
     ...over,
   });
 
