@@ -1,10 +1,21 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { isValidTimeZone } from '../push/quiet-hours.js';
 import { upsertDeviceToken } from '../store/devices.js';
 
+// `timezone` is the device's IANA identifier (R-9.3 quiet hours). Optional so
+// older app builds keep registering, but when present it must be one the tz
+// database accepts: rejecting a bad identifier here beats storing it and
+// discovering the problem at dispatch time.
 const PostBodySchema = z.object({
   token: z.string().min(10).max(200),
   platform: z.enum(['ios', 'android']),
+  timezone: z
+    .string()
+    .min(1)
+    .max(64)
+    .refine(isValidTimeZone, { message: 'not a valid IANA timezone identifier' })
+    .optional(),
 });
 
 export function registerDevicesApi(app: FastifyInstance): void {

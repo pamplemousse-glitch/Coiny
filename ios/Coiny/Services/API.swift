@@ -160,8 +160,14 @@ actor API {
 
     @discardableResult
     func registerDeviceToken(_ hexToken: String) async throws -> EmptyResponse {
-        struct Body: Encodable { let token: String; let platform: String }
-        return try await post("/api/devices/push-token", body: Body(token: hexToken, platform: "ios"))
+        // The IANA timezone lets the backend enforce quiet hours in the
+        // user's own zone (docs/prd.md R-9.3); without it, pushes for this
+        // user are suppressed entirely rather than sent on a guessed zone.
+        struct Body: Encodable { let token: String; let platform: String; let timezone: String }
+        return try await post(
+            "/api/devices/push-token",
+            body: Body(token: hexToken, platform: "ios", timezone: TimeZone.current.identifier)
+        )
     }
 
     // MARK: - Account

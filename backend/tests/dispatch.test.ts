@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/push/apns.js', () => ({
   sendApnsPush: vi.fn(),
@@ -6,6 +6,7 @@ vi.mock('../src/push/apns.js', () => ({
 
 vi.mock('../src/store/devices.js', () => ({
   listDeviceTokens: vi.fn(),
+  latestDeviceTimezone: vi.fn(),
 }));
 
 vi.mock('../src/store/notifications.js', () => ({
@@ -14,13 +15,14 @@ vi.mock('../src/store/notifications.js', () => ({
 }));
 
 import { sendApnsPush } from '../src/push/apns.js';
-import { dispatchReaction } from '../src/reactions/dispatch.js';
+import { dispatchReaction, PUSHABLE_ANIMATIONS } from '../src/reactions/dispatch.js';
 import type { Reaction } from '../src/reactions/types.js';
-import { listDeviceTokens } from '../src/store/devices.js';
+import { latestDeviceTimezone, listDeviceTokens } from '../src/store/devices.js';
 import { canSendPush, recordNotification } from '../src/store/notifications.js';
 
 const mockedSendApnsPush = vi.mocked(sendApnsPush);
 const mockedListDeviceTokens = vi.mocked(listDeviceTokens);
+const mockedLatestDeviceTimezone = vi.mocked(latestDeviceTimezone);
 const mockedCanSendPush = vi.mocked(canSendPush);
 const mockedRecordNotification = vi.mocked(recordNotification);
 
@@ -40,8 +42,19 @@ const REACTION: Reaction = {
 describe('dispatchReaction', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    // Fake only Date, not the task queue: the dispatcher fans out via real
+    // microtasks and setImmediate. 16:00 UTC is 12:00 in America/New_York,
+    // comfortably outside quiet hours, so pre-existing tests see the same
+    // behavior they always did regardless of when the suite runs.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-13T16:00:00Z'));
+    mockedLatestDeviceTimezone.mockResolvedValue('America/New_York');
     mockedCanSendPush.mockResolvedValue(true);
     mockedRecordNotification.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('sends APNs push to all iOS device tokens', async () => {
@@ -187,5 +200,74 @@ describe('dispatchReaction', () => {
     await flushAll();
 
     expect(mockedSendApnsPush).not.toHaveBeenCalled();
+  });
+
+  // R-9.3: quiet hours are 21:00 to 08:00 in the user's own timezone.
+  it('suppresses the push at 22:00 in the device timezone (Asia/Tokyo)', async () => {
+    vi.setSystemTime(new Date('2026-08-13T13:00:00Z')); // 22:00 in Asia/Tokyo
+    mockedLatestDeviceTimezone.mockResolvedValue('Asia/Tokyo');
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+
+    dispatchReaction('user-1', REACTION);
+    await flushAll();
+
+    expect(mockedSendApnsPush).not.toHaveBeenCalled();
+  });
+
+  it('delivers the push at 09:00 in the device timezone (Asia/Tokyo)', async () => {
+    vi.setSystemTime(new Date('2026-08-13T00:00:00Z')); // 09:00 in Asia/Tokyo
+    mockedLatestDeviceTimezone.mockResolvedValue('Asia/Tokyo');
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+    mockedSendApnsPush.mockResolvedValue(undefined);
+
+    dispatchReaction('user-1', REACTION);
+    await flushAll();
+
+    expect(mockedSendApnsPush).toHaveBeenCalledTimes(1);
+  });
+
+  // R-9.3: with no stored timezone the dispatcher must suppress, never guess a
+  // zone and never fall back to UTC or the server's zone.
+  it('suppresses the push when no device timezone is stored', async () => {
+    mockedLatestDeviceTimezone.mockResolvedValue(null);
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+
+    dispatchReaction('user-1', REACTION);
+    await flushAll();
+
+    expect(mockedSendApnsPush).not.toHaveBeenCalled();
+  });
+
+  it('logs quiet_hours_unknown_tz when no device timezone is stored', async () => {
+    mockedLatestDeviceTimezone.mockResolvedValue(null);
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    dispatchReaction('user-1', REACTION);
+    await flushAll();
+
+    const logged = consoleSpy.mock.calls.map((c) => String(c[0]));
+    expect(logged.some((line) => line.includes('quiet_hours_unknown_tz'))).toBe(true);
+    consoleSpy.mockRestore();
+  });
+
+  // R-9.7: no emoji in any user-facing string. The titles used to carry them.
+  it('sends emoji-free push titles and bodies', async () => {
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+    mockedSendApnsPush.mockResolvedValue(undefined);
+
+    dispatchReaction('user-1', REACTION);
+    await flushAll();
+
+    const [, title, body] = mockedSendApnsPush.mock.calls[0] ?? [];
+    expect(`${title} ${body}`).not.toMatch(/\p{Extended_Pictographic}/u);
+  });
+
+  // R-9.5: the allowlist is the enforcement of the never-push list (exogenous
+  // events, broken streaks, net worth decreases, credit changes, "come back"
+  // pings map to non-pushable animations). Pinning the exact contents means
+  // widening it is a visible product decision, not a silent side effect.
+  it('pins the pushable animation allowlist to exactly celebrate, sad, concerned', () => {
+    expect(Array.from(PUSHABLE_ANIMATIONS).sort()).toEqual(['celebrate', 'concerned', 'sad']);
   });
 });
