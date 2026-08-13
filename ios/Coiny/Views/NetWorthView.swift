@@ -296,7 +296,6 @@ extension NetWorthView {
         }
     }
 
-
     private func alpacaSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
@@ -385,7 +384,6 @@ extension NetWorthView {
             KrakenKeyEntryView(vm: krakenVM)
         }
     }
-
 
     private func ynabSection(_ data: NetWorthResponse) -> some View {
         GroupBox {

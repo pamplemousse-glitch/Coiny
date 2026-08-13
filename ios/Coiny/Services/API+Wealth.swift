@@ -71,7 +71,6 @@ struct KrakenSyncResult: Decodable {
     let total: Double
 }
 
-
 // MARK: - YNAB DTOs
 
 struct YnabOAuthUrlResponse: Decodable {
@@ -209,7 +208,6 @@ extension API {
         try await post("/api/kraken/sync")
     }
 }
-
 
 // MARK: - YNAB API
 

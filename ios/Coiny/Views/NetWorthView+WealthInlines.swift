@@ -51,7 +51,6 @@ struct KrakenInlineView: View {
     }
 }
 
-
 // MARK: - YNAB inline
 
 struct YnabInlineView: View {
@@ -429,7 +428,11 @@ struct KrakenKeyEntryView: View {
                 } header: {
                     Text("Kraken API keys")
                 } footer: {
-                    Text("Create a key in Kraken with **Query Funds** permission only. Do not enable trading or withdrawal. Coiny reads balances and never places orders.")
+                    Text(
+                        "Create a key in Kraken with **Query Funds** permission only. "
+                            + "Do not enable trading or withdrawal. Coiny reads balances "
+                            + "and never places orders."
+                    )
                 }
 
                 if let error = vm.errorMessage {
