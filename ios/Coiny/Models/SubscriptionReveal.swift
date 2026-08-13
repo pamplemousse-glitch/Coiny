@@ -1,14 +1,14 @@
 import Foundation
 
-/// Assembly logic for the subscription reveal, onboarding screen 6
-/// (PRD sections 5.5 and 5.6, register row DR-19).
-///
-/// Two sources feed it: Plaid's own recurring streams (seeded server-side at
-/// token exchange, available minutes after link) and the local 120-day
-/// detector (`GET /api/subscriptions`). Per R-5.5 the two are deduped by
-/// lowercased merchant name, the local detector's numbers win on conflict,
-/// rows sort by amount descending, and the headline total is annualised as
-/// sum(amount x 365 / cadenceDays).
+// Assembly logic for the subscription reveal, onboarding screen 6
+// (PRD sections 5.5 and 5.6, register row DR-19).
+//
+// Two sources feed it: Plaid's own recurring streams (seeded server-side at
+// token exchange, available minutes after link) and the local 120-day
+// detector (`GET /api/subscriptions`). Per R-5.5 the two are deduped by
+// lowercased merchant name, the local detector's numbers win on conflict,
+// rows sort by amount descending, and the headline total is annualised as
+// sum(amount x 365 / cadenceDays).
 
 // MARK: - Reveal rows
 

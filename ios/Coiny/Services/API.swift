@@ -249,35 +249,6 @@ actor API {
         try await deleteVoid("/api/spinwheel/connect")
     }
 
-    // MARK: - Chain Wallets
-
-    func getChainWallets() async throws -> [ChainWallet] {
-        try await get("/api/chain-wallets")
-    }
-
-    func addChainWallet(chain: String, address: String, label: String?) async throws {
-        struct Body: Encodable { let chain: String; let address: String; let label: String? }
-        let _: EmptyResponse = try await post("/api/chain-wallets", body: Body(chain: chain, address: address, label: label))
-    }
-
-    func removeChainWallet(chain: String, address: String) async throws {
-        try await deleteVoid("/api/chain-wallets/\(chain)/\(encodePathComponent(address))")
-    }
-
-    func syncChainWallets() async throws -> ChainWalletSyncResult {
-        try await post("/api/chain-wallets/sync")
-    }
-
-    private func encodePathComponent(_ s: String) -> String {
-        s.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? s
-    }
-
-    // MARK: - Misc
-
-    func health() async throws -> HealthResponse {
-        try await request(method: "GET", path: "/health", body: Optional<Empty>.none, requiresAuth: false)
-    }
-
     // MARK: - Internals
 
     func get<T: Decodable>(_ path: String) async throws -> T {
@@ -387,38 +358,33 @@ actor API {
     }
 }
 
-// MARK: - Spending + Subscriptions + Net Worth
+// MARK: - Chain Wallets + Misc
+// Kept outside the actor body for SwiftLint's type_body_length; extensions on
+// the actor still run on the actor.
 extension API {
-    func getSpendingSummary() async throws -> SpendingSummaryResponse {
-        try await get("/api/spending/summary")
+    func getChainWallets() async throws -> [ChainWallet] {
+        try await get("/api/chain-wallets")
     }
 
-    func getSpendingOverrides() async throws -> [SpendingOverride] {
-        try await get("/api/spending/overrides")
+    func addChainWallet(chain: String, address: String, label: String?) async throws {
+        struct Body: Encodable { let chain: String; let address: String; let label: String? }
+        let _: EmptyResponse = try await post("/api/chain-wallets", body: Body(chain: chain, address: address, label: label))
     }
 
-    @discardableResult
-    func setSpendingOverride(merchantName: String, category: String) async throws -> EmptyResponse {
-        struct Body: Encodable { let merchant_name: String; let category: String }
-        return try await put("/api/spending/overrides", body: Body(merchant_name: merchantName, category: category))
+    func removeChainWallet(chain: String, address: String) async throws {
+        try await deleteVoid("/api/chain-wallets/\(chain)/\(encodePathComponent(address))")
     }
 
-    func deleteSpendingOverride(merchantName: String) async throws {
-        struct Body: Encodable { let merchant_name: String }
-        let _: EmptyResponse = try await request(
-            method: "DELETE",
-            path: "/api/spending/overrides",
-            body: Body(merchant_name: merchantName),
-            requiresAuth: true
-        )
+    func syncChainWallets() async throws -> ChainWalletSyncResult {
+        try await post("/api/chain-wallets/sync")
     }
 
-    func getSubscriptions() async throws -> [DetectedSubscription] {
-        try await get("/api/subscriptions")
+    private func encodePathComponent(_ s: String) -> String {
+        s.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? s
     }
 
-    func getNetWorth() async throws -> NetWorthResponse {
-        try await get("/api/net-worth")
+    func health() async throws -> HealthResponse {
+        try await request(method: "GET", path: "/health", body: Optional<Empty>.none, requiresAuth: false)
     }
 }
 

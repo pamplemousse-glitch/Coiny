@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Onboarding screens 1 to 3 (PRD section 5.2): the egg, the chip quiz, the
-/// sliders. Screens 4 to 8 live in `OnboardingConnectScreens.swift`; the flow
-/// container is `OnboardingView.swift`.
+// Onboarding screens 1 to 3 (PRD section 5.2): the egg, the chip quiz, the
+// sliders. Screens 4 to 8 live in `OnboardingConnectScreens.swift`; the flow
+// container is `OnboardingView.swift`.
 
 // MARK: - Shared style
 

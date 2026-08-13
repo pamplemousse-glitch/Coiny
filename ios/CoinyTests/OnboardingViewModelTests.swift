@@ -65,7 +65,10 @@ final class FakeOnboardingAPI: OnboardingAPI, @unchecked Sendable {
     func getNetWorth() async throws -> NetWorthResponse {
         lock.lock(); defer { lock.unlock() }
         guard let json = _netWorthJSON else { throw URLError(.timedOut) }
-        return try JSONDecoder().decode(NetWorthResponse.self, from: Data(json.utf8))
+        let decoder = JSONDecoder()
+        // The response now carries ISO dates (generatedAt, per-class asOf).
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(NetWorthResponse.self, from: Data(json.utf8))
     }
 
     func getOnboardingLadderSnapshot() async throws -> OnboardingLadderSnapshot {
@@ -129,7 +132,12 @@ final class OnboardingViewModelTests: XCTestCase {
       },
       "connections": {
         "coinbase": false, "zerion": false, "spinwheel": false, "kraken": false, "ynab": false
-      }
+      },
+      "classes": {
+        "bank": {"value": 342880, "asOf": "2026-08-13T04:00:00Z", "status": "ok"}
+      },
+      "excluded": {"count": 0, "classes": []},
+      "generatedAt": "2026-08-13T05:00:00Z"
     }
     """
 

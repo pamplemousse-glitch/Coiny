@@ -1,15 +1,15 @@
 import Foundation
 
-/// The declared-asset model behind onboarding screens 2 to 4 (PRD section 5.2)
-/// and the "compute, do not ask" rule (section 5.4): the only questions asked
-/// are class membership (chips, no amounts) and an optional rough magnitude
-/// per class (log-scale slider, skippable, never a keyboard).
-///
-/// Server persistence gap, stated honestly: R-5.3's `declared_assets` table
-/// and its API do not exist yet, so declarations persist on-device via
-/// `DeclaredAssetsStore` until the endpoint lands. The model already carries
-/// everything that table needs (class, bucketed value, declaredAt), so wiring
-/// it up later is a transport change, not a redesign.
+// The declared-asset model behind onboarding screens 2 to 4 (PRD section 5.2)
+// and the "compute, do not ask" rule (section 5.4): the only questions asked
+// are class membership (chips, no amounts) and an optional rough magnitude
+// per class (log-scale slider, skippable, never a keyboard).
+//
+// Server persistence gap, stated honestly: R-5.3's `declared_assets` table
+// and its API do not exist yet, so declarations persist on-device via
+// `DeclaredAssetsStore` until the endpoint lands. The model already carries
+// everything that table needs (class, bucketed value, declaredAt), so wiring
+// it up later is a transport change, not a redesign.
 
 // MARK: - Classes
 

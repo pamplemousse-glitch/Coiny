@@ -1,19 +1,19 @@
 import SwiftUI
 
-/// THE PLACEHOLDER CREATURE, single point of replacement.
-///
-/// Commissioned art does not exist yet (design-direction section 5 is the
-/// brief). Every creature render in onboarding goes through this one view, so
-/// swapping in real sprites later touches this file only. The Pet tab rebuild
-/// carries its own Window placeholder in `PetView.swift`; unifying the two
-/// into one shared component is a deliberate one-edit follow-up once both
-/// land.
-///
-/// The frame follows design-direction section 1.1: a hard-edged Window,
-/// 2px corner radius, 1px inset bezel, field color warmer than the screen
-/// background, no number ever inside the frame. Placeholder drawing is crude
-/// shapes on purpose (R-7.21 bans stock SF Symbols standing in for the
-/// creature).
+// THE PLACEHOLDER CREATURE, single point of replacement.
+//
+// Commissioned art does not exist yet (design-direction section 5 is the
+// brief). Every creature render in onboarding goes through this one view, so
+// swapping in real sprites later touches this file only. The Pet tab rebuild
+// carries its own Window placeholder in `PetView.swift`; unifying the two
+// into one shared component is a deliberate one-edit follow-up once both
+// land.
+//
+// The frame follows design-direction section 1.1: a hard-edged Window,
+// 2px corner radius, 1px inset bezel, field color warmer than the screen
+// background, no number ever inside the frame. Placeholder drawing is crude
+// shapes on purpose (R-7.21 bans stock SF Symbols standing in for the
+// creature).
 
 // MARK: - Palette
 

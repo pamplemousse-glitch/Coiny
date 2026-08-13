@@ -8,9 +8,13 @@ final class NetWorthViewModelTests: XCTestCase {
     private final class FakeAPI: NetWorthViewModelAPI, @unchecked Sendable {
         private let lock = NSLock()
         private var result: Result<NetWorthResponse, Error>
+        private var refreshResult: Result<NetWorthResponse, Error>
+        private(set) var getCallCount = 0
+        private(set) var refreshCallCount = 0
 
         init() {
             result = .success(Self.empty)
+            refreshResult = .success(Self.empty)
         }
 
         func setResult(_ result: Result<NetWorthResponse, Error>) {
@@ -18,8 +22,18 @@ final class NetWorthViewModelTests: XCTestCase {
             self.result = result
         }
 
+        func setRefreshResult(_ result: Result<NetWorthResponse, Error>) {
+            lock.lock(); defer { lock.unlock() }
+            refreshResult = result
+        }
+
         func getNetWorth() async throws -> NetWorthResponse {
-            lock.lock(); let r = result; lock.unlock()
+            lock.lock(); getCallCount += 1; let r = result; lock.unlock()
+            return try r.get()
+        }
+
+        func refreshNetWorth() async throws -> NetWorthResponse {
+            lock.lock(); refreshCallCount += 1; let r = refreshResult; lock.unlock()
             return try r.get()
         }
 
@@ -71,10 +85,41 @@ final class NetWorthViewModelTests: XCTestCase {
         )
     }
 
+    /// In-memory cache so tests never touch the real snapshot file.
+    private final class FakeCache: NetWorthCaching, @unchecked Sendable {
+        private let lock = NSLock()
+        private var stored: NetWorthResponse?
+        private(set) var saveCount = 0
+
+        func save(_ response: NetWorthResponse) {
+            lock.lock(); defer { lock.unlock() }
+            stored = response
+            saveCount += 1
+        }
+
+        func load() -> NetWorthResponse? {
+            lock.lock(); defer { lock.unlock() }
+            return stored
+        }
+
+        func clear() {
+            lock.lock(); defer { lock.unlock() }
+            stored = nil
+        }
+    }
+
+    private func makeVM(
+        api: FakeAPI,
+        cache: FakeCache = FakeCache(),
+        now: @escaping () -> Date = { Date() }
+    ) -> NetWorthViewModel {
+        NetWorthViewModel(api: api, cache: cache, now: now)
+    }
+
     // MARK: - Initial state
 
     func testStartsIdle() {
-        let vm = NetWorthViewModel(api: FakeAPI())
+        let vm = makeVM(api: FakeAPI())
         if case .idle = vm.state { } else {
             XCTFail("Expected .idle, got \(vm.state)")
         }
@@ -123,7 +168,7 @@ final class NetWorthViewModelTests: XCTestCase {
             connections: NetWorthConnections(coinbase: true, zerion: false, spinwheel: false, kraken: false, ynab: false, kalshi: nil, alpaca: nil, truelayer: nil)
         )
         fake.setResult(.success(response))
-        let vm = NetWorthViewModel(api: fake)
+        let vm = makeVM(api: fake)
 
         await vm.load()
 
@@ -139,7 +184,7 @@ final class NetWorthViewModelTests: XCTestCase {
         struct Boom: LocalizedError { var errorDescription: String? { "net worth failed" } }
         let fake = FakeAPI()
         fake.setResult(.failure(Boom()))
-        let vm = NetWorthViewModel(api: fake)
+        let vm = makeVM(api: fake)
 
         await vm.load()
 
@@ -191,7 +236,7 @@ final class NetWorthViewModelTests: XCTestCase {
             connections: NetWorthConnections(coinbase: false, zerion: false, spinwheel: true, kraken: false, ynab: false, kalshi: nil, alpaca: nil, truelayer: nil)
         )
         fake.setResult(.success(response))
-        let vm = NetWorthViewModel(api: fake)
+        let vm = makeVM(api: fake)
 
         await vm.load()
 
@@ -234,7 +279,7 @@ final class NetWorthViewModelTests: XCTestCase {
             connections: NetWorthConnections(coinbase: false, zerion: false, spinwheel: false, kraken: true, ynab: false, kalshi: true, alpaca: true, truelayer: true)
         )
         fake.setResult(.success(response))
-        let vm = NetWorthViewModel(api: fake)
+        let vm = makeVM(api: fake)
 
         await vm.load()
 
@@ -288,7 +333,7 @@ final class NetWorthViewModelTests: XCTestCase {
             connections: NetWorthConnections(coinbase: false, zerion: false, spinwheel: false, kraken: false, ynab: false, kalshi: nil, alpaca: nil, truelayer: nil)
         )
         fake.setResult(.success(response))
-        let vm = NetWorthViewModel(api: fake)
+        let vm = makeVM(api: fake)
 
         await vm.load()
 
@@ -303,5 +348,129 @@ final class NetWorthViewModelTests: XCTestCase {
         XCTAssertEqual(vm.netWorth?.coins, 1050)
         XCTAssertEqual(vm.netWorth?.total, 20_000)
         if case .loaded = vm.state { } else { XCTFail("Expected .loaded") }
+    }
+
+    // MARK: - Refresh (POST /api/net-worth/refresh)
+
+    func testRefreshCallsRefreshEndpoint() async {
+        let fake = FakeAPI()
+        fake.setRefreshResult(.success(NetWorthFixtures.response(total: 42)))
+        let vm = makeVM(api: fake)
+
+        await vm.refresh()
+
+        XCTAssertEqual(fake.refreshCallCount, 1)
+        XCTAssertEqual(fake.getCallCount, 0)
+        XCTAssertEqual(vm.netWorth?.total, 42)
+    }
+
+    func testRefreshInsideDebounceWindowDowngradesToGet() async {
+        let fake = FakeAPI()
+        fake.setRefreshResult(.success(NetWorthFixtures.response(total: 1)))
+        fake.setResult(.success(NetWorthFixtures.response(total: 2)))
+        var currentTime = Date(timeIntervalSince1970: 1_000_000)
+        let vm = makeVM(api: fake, now: { currentTime })
+
+        await vm.refresh()
+        currentTime = currentTime.addingTimeInterval(30)
+        await vm.refresh()
+
+        XCTAssertEqual(fake.refreshCallCount, 1, "second pull inside 60s must not hit the vendor path")
+        XCTAssertEqual(fake.getCallCount, 1)
+        XCTAssertEqual(vm.netWorth?.total, 2)
+    }
+
+    func testRefreshPastDebounceWindowHitsRefreshAgain() async {
+        let fake = FakeAPI()
+        fake.setRefreshResult(.success(NetWorthFixtures.response(total: 1)))
+        var currentTime = Date(timeIntervalSince1970: 1_000_000)
+        let vm = makeVM(api: fake, now: { currentTime })
+
+        await vm.refresh()
+        currentTime = currentTime.addingTimeInterval(61)
+        await vm.refresh()
+
+        XCTAssertEqual(fake.refreshCallCount, 2)
+    }
+
+    func testRefreshSetsBankCappedFlag() async {
+        let fake = FakeAPI()
+        fake.setRefreshResult(.success(NetWorthFixtures.response(bankRefresh: "capped")))
+        let vm = makeVM(api: fake)
+
+        await vm.refresh()
+
+        XCTAssertTrue(vm.bankRefreshCapped)
+    }
+
+    func testRefreshFailureKeepsDataAndSurfacesError() async {
+        struct Boom: LocalizedError { var errorDescription: String? { "refresh died" } }
+        let fake = FakeAPI()
+        fake.setResult(.success(NetWorthFixtures.response(total: 7)))
+        var currentTime = Date(timeIntervalSince1970: 1_000_000)
+        let vm = makeVM(api: fake, now: { currentTime })
+        await vm.load()
+        fake.setRefreshResult(.failure(Boom()))
+        currentTime = currentTime.addingTimeInterval(120)
+
+        await vm.refresh()
+
+        XCTAssertEqual(vm.netWorth?.total, 7, "a failed refresh must not blank the screen")
+        XCTAssertNotNil(vm.refreshErrorMessage, "a failed refresh must be visible, never silent")
+    }
+
+    // MARK: - Offline cache (R-8.9)
+
+    func testLoadSavesSuccessfulResponseToCache() async {
+        let fake = FakeAPI()
+        let cache = FakeCache()
+        fake.setResult(.success(NetWorthFixtures.response(total: 9)))
+        let vm = makeVM(api: fake, cache: cache)
+
+        await vm.load()
+
+        XCTAssertEqual(cache.load()?.total, 9)
+    }
+
+    func testLoadFailureFallsBackToCachedSnapshotWithOfflineFlag() async {
+        let fake = FakeAPI()
+        let cache = FakeCache()
+        cache.save(NetWorthFixtures.response(total: 11))
+        fake.setResult(.failure(URLError(.notConnectedToInternet)))
+        let vm = makeVM(api: fake, cache: cache)
+
+        await vm.load()
+
+        XCTAssertEqual(vm.netWorth?.total, 11, "offline must render the last numbers, not a blank screen")
+        XCTAssertTrue(vm.isOffline)
+    }
+
+    func testLoadFailureWithoutCacheFails() async {
+        let fake = FakeAPI()
+        fake.setResult(.failure(URLError(.notConnectedToInternet)))
+        let vm = makeVM(api: fake)
+
+        await vm.load()
+
+        if case .failed = vm.state { } else {
+            XCTFail("Expected .failed with no cache, got \(vm.state)")
+        }
+        XCTAssertFalse(vm.isOffline)
+    }
+
+    func testSuccessfulLoadClearsOfflineFlag() async {
+        let fake = FakeAPI()
+        let cache = FakeCache()
+        cache.save(NetWorthFixtures.response(total: 11))
+        fake.setResult(.failure(URLError(.notConnectedToInternet)))
+        let vm = makeVM(api: fake, cache: cache)
+        await vm.load()
+        XCTAssertTrue(vm.isOffline)
+
+        fake.setResult(.success(NetWorthFixtures.response(total: 12)))
+        await vm.load()
+
+        XCTAssertFalse(vm.isOffline)
+        XCTAssertEqual(vm.netWorth?.total, 12)
     }
 }
