@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0136A9D7C29C51310ED4C040 /* ChainWalletsViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B017F4E8C665C42D356DE250 /* ChainWalletsViewModelTests.swift */; };
+		029C9DE542DE9EFC6C2B74E2 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 658AD9ADB0EEB247C3F10450 /* PrivacyInfo.xcprivacy */; };
 		036E0693BD90D729B71DF81E /* TradingCardsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B9EDD0CD416E89DFFB54761 /* TradingCardsViewModel.swift */; };
 		049280CF0928B96EDE8B010A /* AlpacaViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A1E7F4A5A7BE14C4CBB1764 /* AlpacaViewModel.swift */; };
 		071AE3704E1FA8543020F522 /* API.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18E99499DA3CE01DE33AAB7B /* API.swift */; };
@@ -178,6 +179,7 @@
 		5EA22C9CCB74F58819DC9960 /* WealthTabUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WealthTabUITests.swift; sourceTree = "<group>"; };
 		618CA9077B0177F449506F80 /* Coiny.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Coiny.entitlements; sourceTree = "<group>"; };
 		65284E3BE19D29FB121805ED /* API+ManualAssets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+ManualAssets.swift"; sourceTree = "<group>"; };
+		658AD9ADB0EEB247C3F10450 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		65C1C51D5C4985B0BAE73002 /* NetWorthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetWorthViewModel.swift; sourceTree = "<group>"; };
 		691F168939803E11E7179DA9 /* MetalsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalsViewModel.swift; sourceTree = "<group>"; };
 		6AF73651E65C599901D32475 /* ChainWalletsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChainWalletsView.swift; sourceTree = "<group>"; };
@@ -345,6 +347,7 @@
 				618CA9077B0177F449506F80 /* Coiny.entitlements */,
 				180CBB3806803A3DAFA9428B /* CoinyApp.swift */,
 				1660ED70D8D82F79BF9545EF /* Info.plist */,
+				658AD9ADB0EEB247C3F10450 /* PrivacyInfo.xcprivacy */,
 			);
 			path = Coiny;
 			sourceTree = "<group>";
@@ -466,6 +469,7 @@
 			buildConfigurationList = 753C1A4FF103FD7E2417F638 /* Build configuration list for PBXNativeTarget "Coiny" */;
 			buildPhases = (
 				C64662F46441DC0542D096E2 /* Sources */,
+				4801BBDF4E0FA6B207305FA6 /* Resources */,
 				2E83E0A39AD9B98F2836F28B /* Frameworks */,
 			);
 			buildRules = (
@@ -543,6 +547,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		4801BBDF4E0FA6B207305FA6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				029C9DE542DE9EFC6C2B74E2 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		B613EA4346B92FAA3E2C93E0 /* Sources */ = {

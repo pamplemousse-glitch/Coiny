@@ -1,0 +1,79 @@
+# App Store Connect Privacy Labels: Transcription Checklist
+
+Field-by-field answers for App Store Connect > App Privacy (PRD R-22.2).
+These answers, `ios/Coiny/PrivacyInfo.xcprivacy`, and
+`docs/legal/privacy-policy.md` were written together on 2026-08-13 and name the
+same data categories. If any one changes, change all three in the same PR.
+
+Derivation: enumerated from `backend/src/db/schema.ts`, `backend/src/api/*`,
+and the iOS views, not from memory. Plaid LinkKit ships its own privacy
+manifest; Apple aggregates it at submission, but the label answers below
+already cover what LinkKit collects on our behalf (financial info, identifiers).
+
+## Step 0: the two gate questions
+
+| App Store Connect question | Answer |
+|---|---|
+| Do you or your third-party partners collect data from this app? | **Yes** |
+| Is data used to track users across apps/websites owned by other companies? | **No** (for every data type) |
+
+## Step 1: data types to declare
+
+Select exactly these. For every one of them, the follow-up answers are the
+same and are given in Step 2.
+
+| ASC category | ASC data type | What it actually is in Coiny |
+|---|---|---|
+| Contact Info | Name | Sign in with Apple full name, first sign-in only |
+| Contact Info | Email Address | Sign-in email, stored encrypted |
+| Contact Info | Phone Number | Entered for Spinwheel SMS identity verification; sent, not stored |
+| Financial Info | Credit Info | Credit score from Spinwheel |
+| Financial Info | Other Financial Info | Balances, transactions, liabilities, asset values and identifiers (wallet addresses, property addresses, VINs), goals, net worth history |
+| Identifiers | User ID | Apple/Google subject identifier + Coiny account id |
+| Identifiers | Device ID | APNs push token registered with the backend |
+| Usage Data | Product Interaction | First-party telemetry events (PRD section 24); bucketed, no amounts, no merchant names |
+| Other Data | Other Data Types | Date of birth, entered for Spinwheel identity verification; sent, not stored |
+
+Do **not** declare: Location, Contacts, User Content, Browsing History, Search
+History, Health & Fitness, Purchases (until StoreKit ships, then revisit),
+Diagnostics (no crash SDK is integrated), Sensitive Info, Payment Info (Apple
+is merchant of record; we never see payment details).
+
+## Step 2: per-type follow-up answers
+
+For **every** type declared above:
+
+| ASC question | Answer |
+|---|---|
+| How is this data used? | **App Functionality** (for Product Interaction only: **Analytics** and App Functionality) |
+| Is this data linked to the user's identity? | **Yes** |
+| Is this data used for tracking? | **No** |
+
+Nothing is collected "not linked to identity": every row in the backend is
+keyed by user id.
+
+## Step 3: consistency invariants (checked 2026-08-13)
+
+- Every type above appears in `PrivacyInfo.xcprivacy` under
+  `NSPrivacyCollectedDataTypes` with `Linked = true`, `Tracking = false`, and
+  matching purposes. Verified: the manifest has exactly 9 entries matching the
+  9 rows in Step 1.
+- Every type above is described in plain language in the privacy policy
+  sections 1 and 3. Verified.
+- `NSPrivacyTracking` is `false` and `NSPrivacyTrackingDomains` is empty:
+  matches the "No tracking" answers.
+
+## Caveats to re-check at submission time
+
+1. **Product Interaction** presumes the section 24 telemetry pipeline is in the
+   submitted binary (it is a BLOCKER before the first tester, so it should be).
+   If a build ships without telemetry, an over-declared label is not a
+   rejection risk, but keep the trio in sync when in doubt.
+2. **Device ID** is declared conservatively for the APNs push token. Judgment
+   call: some apps omit push tokens under Apple's optional-disclosure carve
+   out; the token is stored server-side and linked to the account, which fails
+   the carve out's conditions, so declare it.
+3. **Purchases** must be added to the label when StoreKit subscriptions ship
+   (paid launch, not TestFlight).
+4. If a crash-reporting or analytics SDK is ever added (PRD says revisit at
+   1,000 users), redo this whole file.
