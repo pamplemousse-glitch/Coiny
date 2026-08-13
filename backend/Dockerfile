@@ -48,6 +48,12 @@ RUN pnpm install --frozen-lockfile --filter coiny-backend... --prod --node-linke
 FROM node:22-alpine AS runtime
 WORKDIR /app
 
+# node:22-alpine bundles npm, which the entrypoint never invokes and which
+# carries its own transitive advisories (brace-expansion, ip-address, sigstore,
+# tar at last scan). Removing it drops those findings and shrinks the attack
+# surface of a container whose only job is to exec one node process.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
 COPY --from=deps /app/node_modules ./node_modules
 
 COPY backend/package.json ./backend/
