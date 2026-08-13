@@ -274,6 +274,13 @@
       "when": 1786620512433,
       "tag": "0038_goal_wiring",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1786620712433,
+      "tag": "0040_freshness",
+      "breakpoints": true
     }
   ]
 }

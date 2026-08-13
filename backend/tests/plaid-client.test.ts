@@ -1,29 +1,29 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('undici', () => ({ request: vi.fn() }));
-
-import { request } from 'undici';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { linkTokenCreate } from '../src/plaid/client.js';
 
-const mockedRequest = vi.mocked(request);
-
+// The Plaid client goes through util/fetch.ts (global fetch with timeout and
+// retry, R-16.5), so the network seam to stub is global fetch.
 function mockPlaidResponse(payload: Record<string, unknown>): void {
-  mockedRequest.mockResolvedValue({
-    statusCode: 200,
-    body: { text: async () => JSON.stringify(payload) },
-  } as never);
+  vi.mocked(fetch).mockResolvedValue({
+    status: 200,
+    text: async () => JSON.stringify(payload),
+  } as unknown as Response);
 }
 
 function sentBody(): Record<string, unknown> {
-  const call = mockedRequest.mock.calls[0];
+  const call = vi.mocked(fetch).mock.calls[0];
   const options = call?.[1] as { body: string };
   return JSON.parse(options.body) as Record<string, unknown>;
 }
 
 describe('linkTokenCreate', () => {
   beforeEach(() => {
-    vi.resetAllMocks();
+    vi.stubGlobal('fetch', vi.fn());
     mockPlaidResponse({ link_token: 'link-test', expiration: '2026-08-12T01:00:00Z', request_id: 'r' });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('requests 730 days of transaction history, not the 90-day default', async () => {

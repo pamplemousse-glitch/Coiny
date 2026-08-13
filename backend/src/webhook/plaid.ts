@@ -7,6 +7,7 @@ import { type PlaidAccount, PlaidApiError, type PlaidWebhookEnvelope } from '../
 import { dispatchReaction } from '../reactions/dispatch.js';
 import type { RuleContext } from '../rules/engine.js';
 import { evaluate } from '../rules/engine.js';
+import { upsertPlaidAccountBalances } from '../store/asset-cache.js';
 import { claimEvent } from '../store/events.js';
 import { disableItem, getItem, markInitialSyncComplete, setCursor } from '../store/items.js';
 import { applyHealthDelta, getGoals, recordReaction } from '../store/pet.js';
@@ -168,6 +169,7 @@ async function syncItem(
   const originalCursor = item.cursor ?? undefined;
   let cursor = originalCursor;
   let accountBalances = new Map<string, number | null>();
+  let latestAccounts: PlaidAccount[] = [];
   const allAdded: import('../plaid/types.js').PlaidTransaction[] = [];
 
   for (;;) {
@@ -189,6 +191,7 @@ async function syncItem(
     }
 
     accountBalances = balancesByAccount(res.accounts);
+    latestAccounts = res.accounts;
     allAdded.push(...res.added);
     cursor = res.next_cursor;
 
@@ -221,6 +224,27 @@ async function syncItem(
   // Cursor advances only after transactions are safely persisted. Reversing this
   // order would cause permanent data loss if the process crashed between the two calls.
   if (cursor) await setCursor(item.itemId, cursor);
+
+  // Persist the balances Plaid sent with this sync (prd.md R-16.4): they are
+  // already paid for inside the Transactions subscription and are the free
+  // freshness path for the bank class. Best effort AFTER the cursor advance so
+  // a cache write failure can never stall transaction ingestion; the next
+  // webhook (1-4x/day) retries naturally.
+  try {
+    await upsertPlaidAccountBalances(
+      userId,
+      item.itemId,
+      latestAccounts.map((acc) => ({
+        accountId: acc.account_id,
+        name: acc.name,
+        type: acc.type,
+        subtype: acc.subtype,
+        balance: acc.balances.current ?? acc.balances.available,
+      })),
+    );
+  } catch (err) {
+    app.log.warn({ err, item_id: item.itemId }, 'plaid balance cache write failed');
+  }
 
   if (!item.initialSyncComplete) {
     app.log.info(

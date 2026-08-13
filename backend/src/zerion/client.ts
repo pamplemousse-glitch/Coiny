@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { config } from '../config.js';
+import { fetchWithRetry } from '../util/fetch.js';
 
 const BASE_URL = 'https://api.zerion.io';
 
@@ -22,7 +23,11 @@ function authHeader(): string {
 // exponential backoff) and 202 still-indexing (polls every 5s, up to ~30s).
 async function zerionFetch(urlOrPath: string, attempt = 0): Promise<Response> {
   const url = urlOrPath.startsWith('http') ? urlOrPath : `${BASE_URL}${urlOrPath}`;
-  const res = await fetch(url, {
+  // fetchWithRetry adds the 5 s per-attempt timeout (R-16.5). The 429 and 202
+  // loops below stay: they are Zerion-specific (header-driven backoff and
+  // still-indexing polls), and since the read path is DB-only they can only
+  // ever run inside a background refresh, never inside a GET.
+  const res = await fetchWithRetry(url, {
     headers: {
       Authorization: authHeader(),
       Accept: 'application/json',
@@ -135,10 +140,13 @@ export async function getPortfolio(walletAddress: string, options: { sync?: bool
   if (options.sync) params.set('sync', 'true');
 
   const raw = await zerionGet(`/v1/wallets/${encodeURIComponent(walletAddress)}/portfolio?${params}`);
-  if (!raw) return { total_usd: 0, change_1d_abs: null, change_1d_pct: null };
+  // A 404 or an unparseable body must throw, never read as an empty wallet:
+  // converting either into total_usd: 0 is exactly the silent-zero failure
+  // prd.md R-8.1 bans (a dead vendor indistinguishable from a broke user).
+  if (!raw) throw new ZerionError(404, 'Zerion wallet portfolio not found');
 
   const parsed = ZerionPortfolioResponseSchema.safeParse(raw);
-  if (!parsed.success) return { total_usd: 0, change_1d_abs: null, change_1d_pct: null };
+  if (!parsed.success) throw new ZerionError(200, 'Zerion portfolio response failed schema parse');
 
   const attrs = parsed.data.data.attributes;
   return {

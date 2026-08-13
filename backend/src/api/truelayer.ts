@@ -135,7 +135,7 @@ export function registerTruelayerApi(app: FastifyInstance): void {
 
     await db()
       .update(truelayerConnections)
-      .set({ lastBalanceGbp: totalUsd.toString() })
+      .set({ lastBalanceGbp: totalUsd.toString(), lastSyncedAt: new Date() })
       .where(eq(truelayerConnections.userId, userId));
 
     req.log.info({ userId }, 'truelayer sync complete');

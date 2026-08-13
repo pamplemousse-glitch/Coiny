@@ -57,21 +57,20 @@ describe('zerion getPortfolio', () => {
     expect(result.change_1d_pct).toBe(0.0325);
   });
 
-  it('returns total_usd: 0 when response is 404', async () => {
+  // prd.md R-8.1: a 404 or unparseable body must throw, never read as an empty
+  // wallet. Returning total_usd: 0 here was the silent-zero defect (D5).
+  it('throws ZerionError when response is 404', async () => {
     vi.mocked(fetch).mockResolvedValue(makeFetchResponse(null, 404));
 
-    const { getPortfolio } = await import('../src/zerion/client.js');
-    const result = await getPortfolio('0xnotfound');
-    expect(result.total_usd).toBe(0);
-    expect(result.change_1d_pct).toBeNull();
+    const { getPortfolio, ZerionError } = await import('../src/zerion/client.js');
+    await expect(getPortfolio('0xnotfound')).rejects.toBeInstanceOf(ZerionError);
   });
 
-  it('returns total_usd: 0 when response shape is unexpected', async () => {
+  it('throws ZerionError when response shape fails schema parse', async () => {
     vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ unexpected: true }));
 
-    const { getPortfolio } = await import('../src/zerion/client.js');
-    const result = await getPortfolio('0xbad');
-    expect(result.total_usd).toBe(0);
+    const { getPortfolio, ZerionError } = await import('../src/zerion/client.js');
+    await expect(getPortfolio('0xbad')).rejects.toBeInstanceOf(ZerionError);
   });
 
   it('throws ZerionError on non-ok non-404 response with structured detail', async () => {
@@ -110,12 +109,11 @@ describe('zerion getPortfolio', () => {
     expect(result.change_1d_abs).toBe(312.5);
   });
 
-  it('returns change_1d_abs: null on 404', async () => {
+  it('throws ZerionError on 404 rather than fabricating null changes', async () => {
     vi.mocked(fetch).mockResolvedValue(makeFetchResponse(null, 404));
 
-    const { getPortfolio } = await import('../src/zerion/client.js');
-    const result = await getPortfolio('0xnotfound');
-    expect(result.change_1d_abs).toBeNull();
+    const { getPortfolio, ZerionError } = await import('../src/zerion/client.js');
+    await expect(getPortfolio('0xnotfound')).rejects.toBeInstanceOf(ZerionError);
   });
 });
 
