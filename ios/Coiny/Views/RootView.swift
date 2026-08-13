@@ -5,11 +5,11 @@ struct RootView: View {
 
     var body: some View {
         TabView {
-            PetView()
+            HomeView()
                 .tabItem {
-                    Label("Pet", systemImage: "face.smiling")
+                    Label("Home", systemImage: "house")
                 }
-                .accessibilityIdentifier("tab.pet")
+                .accessibilityIdentifier("tab.home")
 
             SpendingView()
                 .tabItem {
