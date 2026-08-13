@@ -8,6 +8,10 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { guardrailViews } from '../goals/evaluation.js';
+import { LAST_RUNG_ID, skipRung, unskipRung } from '../goals/ladder.js';
+import { ladderView } from '../goals/refresh.js';
+import { trackServerEvent } from '../store/analytics.js';
+import { getLadderInputs, getLadderState, saveLadderState } from '../store/goals.js';
 import {
   archiveGoal,
   createGoal,
@@ -78,6 +82,22 @@ const GoalPatchSchema = z
 const IdParam = z.object({ id: z.coerce.number().int().positive() });
 
 const ListQuery = z.object({ includeArchived: z.coerce.boolean().default(false) });
+
+const RungParam = z.object({ rungId: z.coerce.number().int().min(0).max(LAST_RUNG_ID) });
+
+// R-7.4: skip with a STATED reason. The reasons are a closed token vocabulary
+// (the client renders the human copy) so the stored value and the analytics
+// property are both machine tokens, never free text.
+const SkipBody = z
+  .object({
+    status: z.enum(['skipped', 'not_applicable']),
+    reason: z.enum(['handled_elsewhere', 'not_relevant', 'not_now']).nullable().default(null),
+  })
+  .strict()
+  .refine((b) => b.status !== 'skipped' || b.reason !== null, {
+    message: 'a skip needs a stated reason',
+    path: ['reason'],
+  });
 
 function goalView(goal: TargetGoal, pace: StoredGoalPace | null) {
   return { ...goal, pace };
@@ -160,5 +180,61 @@ export function registerGoalsApi(app: FastifyInstance): void {
 
     await archiveGoal(req.user!.id, params.data.id, new Date());
     return reply.status(204).send();
+  });
+
+  // --- Rung skips (R-7.4) ----------------------------------------------------
+  // A rung can be opted out of, never failed. `skipped` is the user's own call
+  // and reversible below; `not_applicable` is structural. A completed rung
+  // cannot be skipped: the completion stands (ladder invariant 1).
+
+  app.post('/api/goals/ladder/rungs/:rungId/skip', async (req: FastifyRequest, reply: FastifyReply) => {
+    const params = RungParam.safeParse(req.params);
+    if (!params.success) return reply.status(400).send({ error: params.error.flatten() });
+    const parsed = SkipBody.safeParse(req.body);
+    if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
+
+    const userId = req.user!.id;
+    const state = await getLadderState(userId);
+    // No ladder row means the pipeline has never run for this user; there is
+    // nothing coherent to skip inside yet.
+    if (!state) return reply.status(409).send({ error: 'ladder_not_ready' });
+
+    const next = skipRung(state, params.data.rungId, parsed.data.status, parsed.data.reason);
+    if (!next) return reply.status(409).send({ error: 'rung_not_skippable' });
+
+    await saveLadderState(userId, next, new Date());
+    // rung_skipped covers both opt-out statuses; skip_reason is always a token
+    // from the closed SkipBody vocabulary, never user text.
+    await trackServerEvent(userId, 'rung_skipped', {
+      rung_index: params.data.rungId,
+      skip_reason: parsed.data.reason ?? 'not_applicable',
+    });
+    if (next.currentRung !== state.currentRung) {
+      await trackServerEvent(userId, 'rung_started', { rung_index: next.currentRung });
+    }
+
+    return ladderView(next, await getLadderInputs(userId));
+  });
+
+  app.delete('/api/goals/ladder/rungs/:rungId/skip', async (req: FastifyRequest, reply: FastifyReply) => {
+    const params = RungParam.safeParse(req.params);
+    if (!params.success) return reply.status(400).send({ error: params.error.flatten() });
+
+    const userId = req.user!.id;
+    const state = await getLadderState(userId);
+    if (!state) return reply.status(409).send({ error: 'ladder_not_ready' });
+
+    const next = unskipRung(state, params.data.rungId);
+    if (!next) return reply.status(409).send({ error: 'rung_not_skipped' });
+
+    await saveLadderState(userId, next, new Date());
+    // No catalog event exists for reversing a skip and names are binding
+    // (R-24.2), so none is invented; a currentRung change is still a
+    // rung_started fact.
+    if (next.currentRung !== state.currentRung) {
+      await trackServerEvent(userId, 'rung_started', { rung_index: next.currentRung });
+    }
+
+    return ladderView(next, await getLadderInputs(userId));
   });
 }

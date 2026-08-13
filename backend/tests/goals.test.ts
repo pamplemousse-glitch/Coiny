@@ -330,3 +330,186 @@ describe('GET /api/goals/guardrails', () => {
     await app.close();
   });
 });
+
+describe('POST /api/goals/ladder/rungs/:rungId/skip', () => {
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  async function seedLadder() {
+    const { saveLadderState } = await import('../src/store/goals.js');
+    await saveLadderState(
+      testUserId,
+      {
+        currentRung: 1,
+        rungs: {
+          '0': { status: 'completed', completedAt: NOW.toISOString() },
+          '1': { status: 'active' },
+          '2': { status: 'pending' },
+          '3': { status: 'pending' },
+          '4': { status: 'pending' },
+          '5': { status: 'pending' },
+          '6': { status: 'pending' },
+          '7': { status: 'pending' },
+        },
+      },
+      NOW,
+    );
+  }
+
+  async function skip(app: TestApp, rungId: number, over = {}) {
+    return app.inject({
+      method: 'POST',
+      url: `/api/goals/ladder/rungs/${rungId}/skip`,
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'skipped', reason: 'handled_elsewhere', ...over }),
+    });
+  }
+
+  it('skips a rung, stores the reason, and re-elects the active rung', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    await seedLadder();
+
+    const res = await skip(app, 1);
+    expect(res.statusCode).toBe(200);
+    const view = res.json();
+    expect(view.rungs['1']).toEqual({ status: 'skipped', skippedReason: 'handled_elsewhere' });
+    expect(view.currentRung).toBe(2);
+
+    await app.close();
+  });
+
+  it('emits rung_skipped with the reason token', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    await seedLadder();
+
+    await skip(app, 2, { reason: 'not_relevant' });
+    const { listAnalyticsEvents } = await import('../src/store/analytics.js');
+    const events = await listAnalyticsEvents(testUserId, 'rung_skipped');
+    expect(events).toHaveLength(1);
+    expect(events[0]?.properties).toEqual({ rung_index: 2, skip_reason: 'not_relevant' });
+
+    await app.close();
+  });
+
+  it('accepts not_applicable without a reason', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    await seedLadder();
+
+    const res = await skip(app, 2, { status: 'not_applicable', reason: null });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().rungs['2']).toEqual({ status: 'not_applicable' });
+
+    await app.close();
+  });
+
+  it('rejects a skip without a stated reason (R-7.4)', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    await seedLadder();
+
+    const res = await skip(app, 2, { reason: null });
+    expect(res.statusCode).toBe(400);
+
+    await app.close();
+  });
+
+  it('refuses to skip a completed rung: the completion stands', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    await seedLadder();
+
+    const res = await skip(app, 0);
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: 'rung_not_skippable' });
+
+    await app.close();
+  });
+
+  it('answers 409 ladder_not_ready before the pipeline has ever run', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await skip(app, 1);
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: 'ladder_not_ready' });
+
+    await app.close();
+  });
+
+  it('returns 401 without auth', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/goals/ladder/rungs/1/skip',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'skipped', reason: 'not_now' }),
+    });
+    expect(res.statusCode).toBe(401);
+
+    await app.close();
+  });
+});
+
+describe('DELETE /api/goals/ladder/rungs/:rungId/skip', () => {
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  it('reverses a skip and re-elects the rung as active', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const { saveLadderState } = await import('../src/store/goals.js');
+    await saveLadderState(
+      testUserId,
+      {
+        currentRung: 2,
+        rungs: {
+          '0': { status: 'completed', completedAt: NOW.toISOString() },
+          '1': { status: 'skipped', skippedReason: 'not_now' },
+          '2': { status: 'active' },
+          '3': { status: 'pending' },
+          '4': { status: 'pending' },
+          '5': { status: 'pending' },
+          '6': { status: 'pending' },
+          '7': { status: 'pending' },
+        },
+      },
+      NOW,
+    );
+
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/api/goals/ladder/rungs/1/skip',
+      headers: authHeader(),
+    });
+    expect(res.statusCode).toBe(200);
+    const view = res.json();
+    expect(view.rungs['1']?.status).toBe('active');
+    expect(view.currentRung).toBe(1);
+
+    await app.close();
+  });
+
+  it('answers 409 for a rung that is not opted out', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const { saveLadderState } = await import('../src/store/goals.js');
+    await saveLadderState(testUserId, { currentRung: 0, rungs: { '0': { status: 'active' } } }, NOW);
+
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/api/goals/ladder/rungs/0/skip',
+      headers: authHeader(),
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: 'rung_not_skipped' });
+
+    await app.close();
+  });
+});

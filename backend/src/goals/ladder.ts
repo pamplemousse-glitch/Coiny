@@ -297,17 +297,68 @@ export function evaluateLadder(ctx: LadderContext, prior: LadderState | null, no
     rungs[key] = { ...before, status: 'pending' };
   }
 
-  // The active rung is the first that is neither completed, skipped, nor
-  // inapplicable. Everything before it is settled; everything after it is dimmed.
+  return resolveActive(rungs);
+}
+
+/** Re-elect the active rung: the first that is neither completed, skipped, nor
+ *  inapplicable. Everything before it is settled; everything after it is dimmed.
+ *  Any stale `active` marker is demoted first so the election is total. */
+function resolveActive(rungs: Record<string, RungState>): LadderState {
+  const out: Record<string, RungState> = { ...rungs };
+  for (const [key, state] of Object.entries(out)) {
+    if (state.status === 'active') out[key] = { ...state, status: 'pending' };
+  }
+
   const settled = new Set<RungStatus>(['completed', 'skipped', 'not_applicable']);
-  const active = RUNGS.find((r) => !settled.has(rungs[String(r.id)]?.status ?? 'pending'));
+  const active = RUNGS.find((r) => !settled.has(out[String(r.id)]?.status ?? 'pending'));
   // Rung 7 never completes, so `active` is only undefined if every rung was skipped
   // or marked inapplicable. Fall back to the last rung rather than to 0, which would
   // read as a regression to the user.
   const currentRung = active?.id ?? LAST_RUNG_ID;
-  if (active) rungs[String(active.id)] = { ...rungs[String(active.id)], status: 'active' };
+  if (active) out[String(active.id)] = { ...out[String(active.id)], status: 'active' };
 
-  return { currentRung, rungs };
+  return { currentRung, rungs: out };
+}
+
+// --- Skips (R-7.4) ----------------------------------------------------------
+
+/** The two user-settable opt-out statuses. There is deliberately no third
+ *  option: a rung can never be FAILED (invariant 2). */
+export type RungSkipStatus = 'skipped' | 'not_applicable';
+
+/** Mark a rung skipped (user-reversible) or not applicable (structural), per
+ *  R-7.4, and re-elect the active rung.
+ *
+ *  Returns null when the request is invalid: an unknown rung, or a completed
+ *  rung, whose completion stands (invariant 1) and cannot be skipped away. */
+export function skipRung(
+  state: LadderState,
+  rungId: number,
+  status: RungSkipStatus,
+  reason: string | null,
+): LadderState | null {
+  const key = String(rungId);
+  const before = state.rungs[key];
+  if (!before || before.status === 'completed') return null;
+
+  const rungs: Record<string, RungState> = { ...state.rungs };
+  const next: RungState = { status };
+  if (reason !== null) next.skippedReason = reason;
+  rungs[key] = next;
+  return resolveActive(rungs);
+}
+
+/** Reverse a skip (R-7.4: a skip is the user's to reverse). The rung returns to
+ *  pending; the next refresh re-judges it and a satisfied condition completes
+ *  it. Returns null when the rung is not currently opted out. */
+export function unskipRung(state: LadderState, rungId: number): LadderState | null {
+  const key = String(rungId);
+  const before = state.rungs[key];
+  if (!before || (before.status !== 'skipped' && before.status !== 'not_applicable')) return null;
+
+  const rungs: Record<string, RungState> = { ...state.rungs };
+  rungs[key] = { status: 'pending' };
+  return resolveActive(rungs);
 }
 
 /** Rungs whose condition is currently violated despite having been completed.
