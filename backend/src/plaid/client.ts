@@ -90,6 +90,38 @@ export function linkTokenCreate(args: {
   });
 }
 
+/**
+ * Mint a link token in UPDATE MODE for an existing Item (docs/prd.md R-8.6).
+ *
+ * Update mode is selected by passing the Item's `access_token` and omitting
+ * `products` entirely: Plaid re-authenticates the existing Item in place, the
+ * access token and history survive, and no new products are billed. Passing
+ * `products` here would either error or initialize (and bill) new products,
+ * and exchanging a fresh public token would orphan the Item, so neither
+ * happens in this flow. `webhook` is also omitted: it has no effect in update
+ * mode (/item/webhook/update is the way to change an Item's webhook).
+ *
+ * `account_selection_enabled` opts into Account Select so the user can share
+ * accounts detected via NEW_ACCOUNTS_AVAILABLE (US/CA institutions).
+ */
+export function linkTokenCreateUpdateMode(args: {
+  client_user_id: string;
+  access_token: string;
+  account_selection_enabled?: boolean;
+  language?: string;
+  country_codes?: string[];
+  client_name?: string;
+}): Promise<LinkTokenCreateResponse> {
+  return plaidPost('/link/token/create', {
+    client_name: args.client_name ?? 'Coiny',
+    language: args.language ?? 'en',
+    country_codes: args.country_codes ?? ['US'],
+    access_token: args.access_token,
+    user: { client_user_id: args.client_user_id },
+    ...(args.account_selection_enabled ? { update: { account_selection_enabled: true } } : {}),
+  });
+}
+
 export function itemPublicTokenExchange(publicToken: string): Promise<PublicTokenExchangeResponse> {
   return plaidPost('/item/public_token/exchange', { public_token: publicToken });
 }
