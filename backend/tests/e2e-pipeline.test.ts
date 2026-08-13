@@ -249,7 +249,8 @@ describe('pipeline: reset cursor → re-fire → reaction recorded', () => {
     expect(pet.reactionHistory.length).toBeGreaterThanOrEqual(2);
     const latest = pet.reactionHistory[0]!;
     expect(latest.eventType).toBe('paycheck_received');
-    expect(latest.reaction.animation).toBe('celebrate');
+    // R-7.24: a paycheck is routine (happy), not a celebration.
+    expect(latest.reaction.animation).toBe('happy');
     expect(latest.reaction.reason).toContain('paycheck_received');
 
     // ── Step 5: assert rule_matched visible in debug/transactions ──

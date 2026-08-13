@@ -10,6 +10,8 @@ import {
   recurringTransactionsGet,
 } from '../plaid/client.js';
 import { PlaidApiError } from '../plaid/types.js';
+import { reactionForEvent } from '../reactions/contract.js';
+import { performReactions } from '../reactions/perform.js';
 import { trackServerEvent } from '../store/analytics.js';
 import { canAddConnection } from '../store/entitlements.js';
 import {
@@ -102,6 +104,17 @@ export function registerPlaidLinkApi(app: FastifyInstance): void {
     // first data fetch, so it is omitted rather than guessed.
     const nthConnection = (await getItemsByUser(linkUserId)).length;
     await trackServerEvent(linkUserId, 'account_connected', { provider: 'plaid', nth_connection: nthConnection });
+
+    // connection_added (R-7.24): happy, in-app only. Connecting an account is
+    // one of the few onboarding-era actions the creature should acknowledge.
+    // Best-effort: a reaction failure must never fail the link exchange.
+    try {
+      await performReactions(linkUserId, [
+        { name: 'connection_added', reaction: reactionForEvent('connection_added') },
+      ]);
+    } catch (err) {
+      req.log.warn({ err }, 'connection_added reaction failed');
+    }
 
     // Seed recurring streams and liability cache in the background.
     // Non-fatal — will populate on the first webhook if this fails.

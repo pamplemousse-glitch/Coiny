@@ -5,9 +5,10 @@ import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { transactions } from '../db/schema.js';
 import { itemWebhookUpdate, sandboxItemFireWebhook } from '../plaid/client.js';
+import { orderCandidates } from '../reactions/contract.js';
 import { dispatchReaction } from '../reactions/dispatch.js';
 import type { Animation, Reaction } from '../reactions/types.js';
-import { evaluate } from '../rules/engine.js';
+import { evaluateAll } from '../rules/engine.js';
 import { clearUserEvents } from '../store/events.js';
 import { getItemsByUser, resetCursor } from '../store/items.js';
 import { getGoals, recordReaction } from '../store/pet.js';
@@ -23,6 +24,7 @@ const DEBUG_PRESETS: Record<Animation, Omit<Reaction, 'reason'>> = {
   concerned: { animation: 'concerned', sound: 'warning', led: 'amber', duration: 2000 },
   neutral: { animation: 'neutral', sound: 'off', led: 'off', duration: 1000 },
   sleeping: { animation: 'sleeping', sound: 'off', led: 'off', duration: 0 },
+  curious: { animation: 'curious', sound: 'off', led: 'off', duration: 1500 },
 };
 
 const ReactQuerySchema = z.object({
@@ -59,7 +61,9 @@ export function registerDebugApi(app: FastifyInstance): void {
     const reaction: Reaction = { ...preset, reason: `(debug) ${parsed.data.animation}` };
 
     await recordReaction(req.user!.id, 'debug', reaction);
-    dispatchReaction(req.user!.id, reaction);
+    // 'debug' has its own contract row (push allowed): this endpoint exists to
+    // exercise the full APNs path and only registers when PLAID_ENV=sandbox.
+    dispatchReaction(req.user!.id, reaction, 'debug');
     return { ok: true, reaction };
   });
 
@@ -92,14 +96,17 @@ export function registerDebugApi(app: FastifyInstance): void {
             ...(row.merchantName ? { counterparty: { name: row.merchantName, type: 'organization' as const } } : {}),
           },
         };
-        const match = evaluate(fakeTx, goals, { weeklySpendByCategory: weeklySpend });
+        // Collect-all (R-7.25): every matching rule, plus which one the
+        // contract's precedence would actually perform.
+        const matches = orderCandidates(evaluateAll(fakeTx, goals, { weeklySpendByCategory: weeklySpend }));
         return {
           id: row.transactionId,
           date: row.date,
           merchant: row.merchantName,
           amount: row.amount,
           category: row.category,
-          rule_matched: match?.name ?? null,
+          rule_matched: matches[0]?.name ?? null,
+          rules_matched: matches.map((m) => m.name),
         };
       }),
     };

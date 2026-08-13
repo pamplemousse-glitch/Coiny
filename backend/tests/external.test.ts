@@ -59,21 +59,26 @@ describe('evaluateExternalEvent', () => {
     expect(evaluateExternalEvent({ ...base, type: 'crypto_price_drop', symbol: 'DOGE' })).toBeNull();
   });
 
-  it('debt_paydown returns celebrate reaction', () => {
+  // R-7.24: a payment toward debt is happy and routine (the extra_debt_payment
+  // treatment). Celebration is reserved for debt_cleared, which has no honest
+  // producer until the R-7.13 debt_accounts merge.
+  it('debt_paydown returns happy reaction', () => {
     const result = evaluateExternalEvent({ ...base, type: 'debt_paydown', amountUsd: 200, source: 'spinwheel' });
-    expect(result?.animation).toBe('celebrate');
+    expect(result?.animation).toBe('happy');
     expect(result?.sound).toBe('chime');
     expect(result?.led).toBe('green');
-    expect(result?.duration).toBe(4000);
+    expect(result?.duration).toBe(3000);
     expect(result?.reason).toContain('200.00');
   });
 
-  it('debt_missed_payment returns sad reaction', () => {
+  // R-7.24/R-7.20: concerned and amber, never sad and red. Distress is
+  // reserved for sustained multi-week vitality failure, not a single event.
+  it('debt_missed_payment returns concerned reaction', () => {
     const result = evaluateExternalEvent({ ...base, type: 'debt_missed_payment', amountUsd: 50, source: 'spinwheel' });
-    expect(result?.animation).toBe('sad');
+    expect(result?.animation).toBe('concerned');
     expect(result?.sound).toBe('warning');
-    expect(result?.led).toBe('red');
-    expect(result?.duration).toBe(4000);
+    expect(result?.led).toBe('amber');
+    expect(result?.duration).toBe(3000);
     expect(result?.reason).toContain('50.00');
   });
 
@@ -109,7 +114,7 @@ describe('evaluateExternalEvent', () => {
   });
 
   it('still reacts to events the user did cause', () => {
-    expect(evaluateExternalEvent({ ...base, type: 'debt_paydown', amountUsd: 500 })?.animation).toBe('celebrate');
+    expect(evaluateExternalEvent({ ...base, type: 'debt_paydown', amountUsd: 500 })?.animation).toBe('happy');
     expect(evaluateExternalEvent({ ...base, type: 'crypto_received', amountUsd: 100 })?.animation).toBe('happy');
   });
 });

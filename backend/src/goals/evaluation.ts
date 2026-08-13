@@ -8,6 +8,8 @@
 import { and, eq, gte, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { transactions } from '../db/schema.js';
+import { reactionForEvent } from '../reactions/contract.js';
+import { performReactions, type ReactionCandidate } from '../reactions/perform.js';
 import { getCachedLiabilities } from '../store/plaid-liabilities.js';
 import {
   getFundingActivity,
@@ -48,6 +50,12 @@ const PACE_WINDOW_DAYS = 120;
 const WEEKLY_BACKFILL = 4;
 const MONTHLY_BACKFILL = 2;
 
+/** A reaction is only fired for a period that closed recently. The `direct`
+ *  class is defined as "the user's own action in the last 7 days" (section
+ *  7.6); a month-old period settling on a dormant user's return is history,
+ *  not news, and reacting to it would read as scolding the absence. */
+const REACTION_RECENCY_DAYS = 7;
+
 export type GoalEvaluationInputs = {
   /** Live balance per account id, for balance-counting goals. Null when the
    *  caller had no balance read; those goals then report a null pace rather
@@ -60,9 +68,10 @@ export type GoalEvaluationInputs = {
 
 // --- Pace ------------------------------------------------------------------
 
-async function refreshGoalPaces(userId: string, inputs: GoalEvaluationInputs, now: Date): Promise<void> {
+async function refreshGoalPaces(userId: string, inputs: GoalEvaluationInputs, now: Date): Promise<ReactionCandidate[]> {
   const goals = await listUnarchivedGoals(userId);
   const today = now.toISOString().slice(0, 10);
+  const candidates: ReactionCandidate[] = [];
 
   for (const goal of goals) {
     const activity = goal.fundingAccountId
@@ -90,6 +99,10 @@ async function refreshGoalPaces(userId: string, inputs: GoalEvaluationInputs, no
 
     if (pace.achieved && goal.achievedAt === null) {
       await markGoalAchieved(userId, goal.id, now);
+      // goal_achieved (R-7.24): celebrate, allowed to push. Fired on the
+      // null-to-achieved edge only, so re-refreshes stay silent. The reason
+      // carries no goal name: names are user text and the event label is enough.
+      candidates.push({ name: 'goal_achieved', reaction: reactionForEvent('goal_achieved') });
     }
 
     // Sinking-fund reset (R-7.7): once an achieved recurring-annual goal's date
@@ -104,6 +117,7 @@ async function refreshGoalPaces(userId: string, inputs: GoalEvaluationInputs, no
       }
     }
   }
+  return candidates;
 }
 
 // --- Guardrail periods -----------------------------------------------------
@@ -152,7 +166,12 @@ function isFinal(outcome: string): boolean {
   return outcome === 'passed' || outcome === 'missed';
 }
 
-async function evaluateGuardrailPeriods(userId: string, inputs: GoalEvaluationInputs, now: Date): Promise<void> {
+async function evaluateGuardrailPeriods(
+  userId: string,
+  inputs: GoalEvaluationInputs,
+  now: Date,
+): Promise<ReactionCandidate[]> {
+  const reactionCandidates: ReactionCandidate[] = [];
   const [{ txs, earliest }, liabilityRows, activeGoals, storedPeriods] = await Promise.all([
     loadGuardrailTransactions(userId, now),
     getCachedLiabilities(userId),
@@ -216,6 +235,35 @@ async function evaluateGuardrailPeriods(userId: string, inputs: GoalEvaluationIn
         now,
       );
 
+      // R-7.24: guardrail outcomes now move the creature, but only when the
+      // period just closed (see REACTION_RECENCY_DAYS) and only on the settle
+      // edge (finals are skipped above, so reaching here IS the transition).
+      //   passed          -> goal_period_passed (happy; digest push only)
+      //   missed+repair   -> silent: the token did its job, nothing to mourn
+      //   missed          -> goal_period_missed (neutral, never a push), plus
+      //                      streak_broken when a live streak just ended,
+      //                      which per R-7.12 changes nothing else
+      const periodEndMs = new Date(`${period.end}T00:00:00Z`).getTime();
+      const recent = now.getTime() - periodEndMs <= REACTION_RECENCY_DAYS * 86_400_000;
+      if (recent && result.outcome === 'passed') {
+        reactionCandidates.push({
+          name: 'goal_period_passed',
+          reaction: reactionForEvent('goal_period_passed', `goal_period_passed (${def.key})`),
+        });
+      }
+      if (recent && result.outcome === 'missed' && !repairUsed) {
+        reactionCandidates.push({
+          name: 'goal_period_missed',
+          reaction: reactionForEvent('goal_period_missed', `goal_period_missed (${def.key})`),
+        });
+        if (priorState.streak > 0) {
+          reactionCandidates.push({
+            name: 'streak_broken',
+            reaction: reactionForEvent('streak_broken', `streak_broken (${def.key})`),
+          });
+        }
+      }
+
       const updated: StoredGoalPeriod = {
         guardrailKey: def.key,
         periodStart: period.start,
@@ -234,6 +282,7 @@ async function evaluateGuardrailPeriods(userId: string, inputs: GoalEvaluationIn
       }
     }
   }
+  return reactionCandidates;
 }
 
 /** One full goal-system evaluation pass for one user: pace for every
@@ -241,8 +290,21 @@ async function evaluateGuardrailPeriods(userId: string, inputs: GoalEvaluationIn
  *  pace upserts per goal, periods upsert on (user, guardrail, start), and
  *  final outcomes are never overwritten. */
 export async function evaluateGoalSystem(userId: string, inputs: GoalEvaluationInputs, now: Date): Promise<void> {
-  await refreshGoalPaces(userId, inputs, now);
-  await evaluateGuardrailPeriods(userId, inputs, now);
+  const paceCandidates = await refreshGoalPaces(userId, inputs, now);
+  const guardrailCandidates = await evaluateGuardrailPeriods(userId, inputs, now);
+
+  // One candidate set for the whole pass, one performed reaction: the creature
+  // has one body, and a week where three guardrails settled at once is still
+  // one moment. The rest land in analytics as precedence-suppressed. Reaction
+  // failure must never fail the evaluation pass, so this is best-effort.
+  const candidates = [...paceCandidates, ...guardrailCandidates];
+  if (candidates.length > 0) {
+    try {
+      await performReactions(userId, candidates, now);
+    } catch (err) {
+      console.warn('goal system reaction failed:', err);
+    }
+  }
 }
 
 // --- Read-side presentation -------------------------------------------------

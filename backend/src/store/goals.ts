@@ -16,6 +16,8 @@ import {
   monthlySavingsRate,
 } from '../goals/derived.js';
 import { evaluateLadder, type LadderContext, type LadderState, stageForLadder } from '../goals/ladder.js';
+import { reactionForEvent } from '../reactions/contract.js';
+import { performReactions } from '../reactions/perform.js';
 import { trackServerEvent } from './analytics.js';
 
 /** Bumped when the derived-state computation changes in a way that makes stored
@@ -127,10 +129,12 @@ export async function refreshLadder(userId: string, ctx: LadderContext, now: Dat
   // Emitted on the transition edge only, so a rung completing once emits once
   // no matter how many refreshes follow (rungs never un-complete).
   const priorRungs = prior?.rungs ?? {};
+  const completedRungs: number[] = [];
   for (const [key, state] of Object.entries(next.rungs)) {
     const before = priorRungs[key]?.status ?? 'pending';
     if (state.status === 'completed' && before !== 'completed') {
       await trackServerEvent(userId, 'rung_completed', { rung_index: Number(key) });
+      completedRungs.push(Number(key));
     }
     if (state.status === 'skipped' && before !== 'skipped') {
       await trackServerEvent(userId, 'rung_skipped', { rung_index: Number(key) });
@@ -138,6 +142,26 @@ export async function refreshLadder(userId: string, ctx: LadderContext, now: Dat
   }
   if (prior?.currentRung !== next.currentRung) {
     await trackServerEvent(userId, 'rung_started', { rung_index: next.currentRung });
+  }
+
+  // R-7.24: a rung completing is the loudest moment in the app. All completion
+  // edges from this refresh go in as ONE candidate set, highest rung first: a
+  // well-off user auto-completing rungs 0 to 5 on day one gets one
+  // transformation, not six back-to-back (the creature has one body), and the
+  // other five land in analytics as precedence-suppressed. Reaction failure
+  // must never fail the ladder write, so this is best-effort.
+  if (completedRungs.length > 0) {
+    try {
+      const candidates = [...completedRungs]
+        .sort((a, b) => b - a)
+        .map((idx) => ({
+          name: 'ladder_rung_completed',
+          reaction: reactionForEvent('ladder_rung_completed', `ladder_rung_completed (rung ${idx})`),
+        }));
+      await performReactions(userId, candidates, now);
+    } catch (err) {
+      console.warn('rung completion reaction failed:', err);
+    }
   }
 
   const stage = stageForLadder(next);

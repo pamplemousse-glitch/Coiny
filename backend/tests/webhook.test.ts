@@ -279,7 +279,10 @@ describe('POST /webhooks/plaid', () => {
 
     await flushAll();
     expect(spy).toHaveBeenCalledOnce();
-    expect(spy.mock.calls[0]?.[1]?.animation).toBe('celebrate');
+    // R-7.24: a paycheck is routine (happy), not a celebration. Celebrate is
+    // reserved for rungs, cleared debts and achieved goals.
+    expect(spy.mock.calls[0]?.[1]?.animation).toBe('happy');
+    expect(spy.mock.calls[0]?.[2]).toBe('paycheck_received');
 
     await app.close();
   });
