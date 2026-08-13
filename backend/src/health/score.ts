@@ -1,13 +1,16 @@
-// Score deltas per event type. Applied after each matching rule fires.
-// Positive = financially healthy behaviour. Negative = risky/overspent.
-const DELTAS: Record<string, number> = {
-  paycheck_received: 10,
-  bill_paid_on_time: 5,
-  savings_milestone: 15,
-  overspent_in_category: -10,
-  large_purchase: -5,
-};
+// Health-score deltas per event, read from the reaction contract so the
+// creature's movement, its push policy and its health effect can never drift
+// apart (docs/prd.md R-7.24). Applied to the legacy healthScore/mood pair
+// until the R-7.19 three-variable model (stage/vitality/rest) replaces it.
+//
+// Notable zeros, by design:
+//   - large_purchase: neutral plus a question, never a penalty (R-7.24)
+//   - streak_broken: a broken streak resets the counter and NOTHING else
+//     (R-7.12)
+//   - every structural and exogenous event: not the user's doing
+
+import { contractFor } from '../reactions/contract.js';
 
 export function deltaForEvent(eventType: string): number {
-  return DELTAS[eventType] ?? 0;
+  return contractFor(eventType).healthDelta;
 }

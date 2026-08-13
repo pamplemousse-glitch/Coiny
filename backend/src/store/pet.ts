@@ -1,4 +1,4 @@
-import { desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/client.js';
 import { petState, reactionHistory } from '../db/schema.js';
@@ -103,6 +103,30 @@ export async function applyHealthDelta(userId: string, delta: number): Promise<v
       mood: sql`LEAST(100, GREATEST(0, ${petState.mood} + ${delta}))`,
     })
     .where(eq(petState.userId, userId));
+}
+
+/** Performed reactions at or after `since`. Feeds the R-7.25 per-day reaction
+ *  budget in reactions/perform.ts: reaction_history holds exactly the
+ *  reactions the creature actually performed, so counting rows is counting
+ *  spent budget. */
+export async function countReactionsSince(userId: string, since: Date): Promise<number> {
+  const [row] = await db()
+    .select({ count: sql<number>`CAST(COUNT(*) AS INTEGER)` })
+    .from(reactionHistory)
+    .where(and(eq(reactionHistory.userId, userId), gte(reactionHistory.at, since)));
+  return row?.count ?? 0;
+}
+
+/** When this event type last performed, or null if it never has. Feeds the
+ *  once-per-week overspend cap (R-7.24). */
+export async function lastReactionAtForEvent(userId: string, eventType: string): Promise<Date | null> {
+  const [row] = await db()
+    .select({ at: reactionHistory.at })
+    .from(reactionHistory)
+    .where(and(eq(reactionHistory.userId, userId), eq(reactionHistory.eventType, eventType)))
+    .orderBy(desc(reactionHistory.at))
+    .limit(1);
+  return row?.at ?? null;
 }
 
 export async function recordReaction(userId: string, eventType: string, reaction: Reaction): Promise<void> {

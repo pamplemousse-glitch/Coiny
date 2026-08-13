@@ -239,7 +239,7 @@ export function registerZerionApi(app: FastifyInstance): void {
           });
 
           if (reaction) {
-            dispatchReaction(userId, reaction);
+            dispatchReaction(userId, reaction, eventType);
             await recordReaction(userId, eventType, reaction);
             reacted++;
           }

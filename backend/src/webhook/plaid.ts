@@ -1,13 +1,13 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { deltaForEvent } from '../health/score.js';
 import { plaidTxToInternal } from '../plaid/adapter.js';
 import { liabilitiesGet, recurringTransactionsGet, transactionsSync } from '../plaid/client.js';
 import { verifyPlaidSignature } from '../plaid/signature.js';
 import { type PlaidAccount, PlaidApiError, type PlaidWebhookEnvelope } from '../plaid/types.js';
-import { dispatchReaction } from '../reactions/dispatch.js';
+import { reactionForEvent } from '../reactions/contract.js';
+import { performReactions } from '../reactions/perform.js';
 import type { RuleContext } from '../rules/engine.js';
-import { evaluate } from '../rules/engine.js';
+import { evaluateAll } from '../rules/engine.js';
 import { trackServerEvent } from '../store/analytics.js';
 import { upsertPlaidAccountBalances } from '../store/asset-cache.js';
 import { claimEvent } from '../store/events.js';
@@ -20,7 +20,7 @@ import {
   setItemStatus,
   setNewAccountsAvailable,
 } from '../store/items.js';
-import { applyHealthDelta, getGoals, recordReaction } from '../store/pet.js';
+import { getGoals } from '../store/pet.js';
 import { cacheLiabilities } from '../store/plaid-liabilities.js';
 import { upsertRecurringStreams } from '../store/plaid-recurring.js';
 import { getWeeklySpendByCategory, persistTransactions, upsertModifiedTransactions } from '../store/transactions.js';
@@ -258,19 +258,15 @@ async function dispatch(app: FastifyInstance, envelope: PlaidWebhookEnvelope): P
       },
       'plaid liabilities cached',
     );
-    // Fire overdue reaction if any credit account is past-due.
+    // bill_overdue (R-7.24): concerned, pushes once (the same-type cooldown is
+    // the "once"), one-tap-pay deep link is the client's job. Routed through
+    // the contract like every other event; the reason names no issuer and no
+    // amount because none is needed.
     const overdueAccounts = liabilities.liabilities.credit?.filter((c) => c.is_overdue === true) ?? [];
     if (overdueAccounts.length > 0) {
-      const overdueReaction = {
-        animation: 'concerned' as const,
-        sound: 'warning' as const,
-        led: 'red' as const,
-        duration: 2000,
-        reason: 'overdue_payment',
-      };
-      await applyHealthDelta(item.userId, -5);
-      await recordReaction(item.userId, 'overdue_payment', overdueReaction);
-      dispatchReaction(item.userId, overdueReaction);
+      await performReactions(item.userId, [
+        { name: 'bill_overdue', reaction: reactionForEvent('bill_overdue', 'bill_overdue (credit account past due)') },
+      ]);
     }
     return;
   }
@@ -434,7 +430,10 @@ async function syncItem(
     }
 
     const context: RuleContext = { weeklySpendByCategory: runningSpend };
-    const match = evaluate(tx, goals, context);
+    // R-7.25: collect EVERY matching rule; the reaction contract then performs
+    // exactly one and records the rest as suppressed, so a transaction that is
+    // both a paycheck and a contribution loses nothing to array order.
+    const matches = evaluateAll(tx, goals, context);
     // No `amount`: logging it puts financial detail in every log sink, which
     // .claude/rules/security.md #2 forbids. transaction_id is pseudonymous and
     // is enough to correlate; the amount can be read from the DB when debugging.
@@ -442,14 +441,12 @@ async function syncItem(
       {
         transaction_id: tx.id,
         category: tx.details?.category ?? null,
-        rule_matched: match?.name ?? null,
+        rules_matched: matches.map((m) => m.name),
       },
       'rule evaluation',
     );
-    if (match) {
-      await applyHealthDelta(userId, deltaForEvent(match.name));
-      await recordReaction(userId, match.name, match.reaction);
-      dispatchReaction(userId, match.reaction);
+    if (matches.length > 0) {
+      await performReactions(userId, matches);
     }
   }
 }

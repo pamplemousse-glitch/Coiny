@@ -15,7 +15,7 @@ vi.mock('../src/store/notifications.js', () => ({
 }));
 
 import { sendApnsPush } from '../src/push/apns.js';
-import { dispatchReaction, PUSHABLE_ANIMATIONS } from '../src/reactions/dispatch.js';
+import { dispatchReaction, PUSHABLE_EVENTS } from '../src/reactions/dispatch.js';
 import type { Reaction } from '../src/reactions/types.js';
 import { latestDeviceTimezone, listDeviceTokens } from '../src/store/devices.js';
 import { canSendPush, recordNotification } from '../src/store/notifications.js';
@@ -36,7 +36,7 @@ const REACTION: Reaction = {
   sound: 'fanfare',
   led: 'green',
   duration: 3000,
-  reason: 'paycheck_received (Direct Deposit $4,210.55)',
+  reason: 'goal_achieved (Emergency fund $4,210.55)',
 };
 
 describe('dispatchReaction', () => {
@@ -57,14 +57,14 @@ describe('dispatchReaction', () => {
     vi.useRealTimers();
   });
 
-  it('sends APNs push to all iOS device tokens', async () => {
+  it('sends APNs push to all iOS device tokens for a pushable event', async () => {
     mockedListDeviceTokens.mockResolvedValue([
       { token: 'token-a', platform: 'ios' },
       { token: 'token-b', platform: 'ios' },
     ]);
     mockedSendApnsPush.mockResolvedValue(undefined);
 
-    dispatchReaction('user-1', REACTION);
+    dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
     expect(mockedSendApnsPush).toHaveBeenCalledTimes(2);
@@ -86,11 +86,11 @@ describe('dispatchReaction', () => {
     mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
     mockedSendApnsPush.mockResolvedValue(undefined);
 
-    dispatchReaction('user-1', REACTION);
+    dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
     const body = mockedSendApnsPush.mock.calls[0]?.[2] ?? '';
-    expect(body).not.toContain('Direct Deposit');
+    expect(body).not.toContain('Emergency fund');
     expect(body).not.toContain('4,210.55');
   });
 
@@ -98,11 +98,11 @@ describe('dispatchReaction', () => {
     mockedListDeviceTokens.mockResolvedValue([]);
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    dispatchReaction('user-1', REACTION);
+    dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
     for (const call of consoleSpy.mock.calls) {
-      expect(String(call[0])).not.toContain('Direct Deposit');
+      expect(String(call[0])).not.toContain('Emergency fund');
     }
     consoleSpy.mockRestore();
   });
@@ -111,16 +111,59 @@ describe('dispatchReaction', () => {
     mockedCanSendPush.mockResolvedValue(false);
     mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
 
-    dispatchReaction('user-1', REACTION);
+    dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
     expect(mockedSendApnsPush).not.toHaveBeenCalled();
   });
 
-  it('does not push for animations outside the allowlist', async () => {
+  // Pushability is the event's contract row, not the animation. A paycheck is
+  // routine (push 'no') no matter what the creature does on screen.
+  it('does not push for events outside the contract allowlist', async () => {
     mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
 
-    dispatchReaction('user-1', { ...REACTION, animation: 'happy' });
+    dispatchReaction('user-1', { ...REACTION, animation: 'happy' }, 'paycheck_received');
+    await flushAll();
+
+    expect(mockedSendApnsPush).not.toHaveBeenCalled();
+    expect(mockedCanSendPush).not.toHaveBeenCalled();
+  });
+
+  // R-9.5: a single overspend must never reach a lock screen, even though its
+  // animation (concerned) is one that other events push with. The old
+  // animation-based allowlist could not express this; the event contract can.
+  it('never pushes overspend_vs_plan even with a concerned animation', async () => {
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+
+    dispatchReaction(
+      'user-1',
+      { animation: 'concerned', sound: 'warning', led: 'amber', duration: 2000, reason: 'overspend_vs_plan' },
+      'overspend_vs_plan',
+    );
+    await flushAll();
+
+    expect(mockedSendApnsPush).not.toHaveBeenCalled();
+    expect(mockedCanSendPush).not.toHaveBeenCalled();
+  });
+
+  it('pushes bill_overdue with the same concerned animation', async () => {
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+    mockedSendApnsPush.mockResolvedValue(undefined);
+
+    dispatchReaction(
+      'user-1',
+      { animation: 'concerned', sound: 'warning', led: 'amber', duration: 2000, reason: 'bill_overdue' },
+      'bill_overdue',
+    );
+    await flushAll();
+
+    expect(mockedSendApnsPush).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not push for an unknown event type', async () => {
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+
+    dispatchReaction('user-1', REACTION, 'some_future_event');
     await flushAll();
 
     expect(mockedSendApnsPush).not.toHaveBeenCalled();
@@ -131,10 +174,10 @@ describe('dispatchReaction', () => {
     mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
     mockedSendApnsPush.mockResolvedValue(undefined);
 
-    dispatchReaction('user-1', REACTION, 'paycheck_received');
+    dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
-    expect(mockedRecordNotification).toHaveBeenCalledWith('user-1', 'paycheck_received');
+    expect(mockedRecordNotification).toHaveBeenCalledWith('user-1', 'goal_achieved');
   });
 
   it('does not record the notification when every push fails', async () => {
@@ -142,7 +185,7 @@ describe('dispatchReaction', () => {
     mockedSendApnsPush.mockRejectedValue(new Error('BadDeviceToken'));
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    dispatchReaction('user-1', REACTION);
+    dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
     expect(mockedRecordNotification).not.toHaveBeenCalled();
@@ -152,7 +195,7 @@ describe('dispatchReaction', () => {
   it('does not push when there are no device tokens', async () => {
     mockedListDeviceTokens.mockResolvedValue([] as { token: string; platform: string }[]);
 
-    dispatchReaction('user-1', REACTION);
+    dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
     expect(mockedSendApnsPush).not.toHaveBeenCalled();
@@ -161,7 +204,7 @@ describe('dispatchReaction', () => {
   it('skips non-iOS tokens', async () => {
     mockedListDeviceTokens.mockResolvedValue([{ token: 'android-token', platform: 'android' }]);
 
-    dispatchReaction('user-1', REACTION);
+    dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
     expect(mockedSendApnsPush).not.toHaveBeenCalled();
@@ -173,7 +216,7 @@ describe('dispatchReaction', () => {
 
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    dispatchReaction('user-1', REACTION);
+    dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
     expect(errorSpy).toHaveBeenCalledWith('APNs push failed:', expect.any(Error));
@@ -185,21 +228,22 @@ describe('dispatchReaction', () => {
 
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    dispatchReaction('user-1', REACTION);
+    dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
     expect(errorSpy).toHaveBeenCalledWith('Push fan-out error:', expect.any(Error));
     errorSpy.mockRestore();
   });
 
-  it('uses unknown animation title fallback without pushing', async () => {
+  it('falls back to a generic title for an animation with no push copy', async () => {
     mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+    mockedSendApnsPush.mockResolvedValue(undefined);
 
-    // biome-ignore lint/suspicious/noExplicitAny: testing unknown animation fallback path
-    dispatchReaction('user-1', { ...REACTION, animation: 'unknown_animation' as any });
+    dispatchReaction('user-1', { ...REACTION, animation: 'happy' }, 'goal_achieved');
     await flushAll();
 
-    expect(mockedSendApnsPush).not.toHaveBeenCalled();
+    const [, title] = mockedSendApnsPush.mock.calls[0] ?? [];
+    expect(title).toBe('Coiny reacted');
   });
 
   // R-9.3: quiet hours are 21:00 to 08:00 in the user's own timezone.
@@ -208,7 +252,7 @@ describe('dispatchReaction', () => {
     mockedLatestDeviceTimezone.mockResolvedValue('Asia/Tokyo');
     mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
 
-    dispatchReaction('user-1', REACTION);
+    dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
     expect(mockedSendApnsPush).not.toHaveBeenCalled();
@@ -220,7 +264,7 @@ describe('dispatchReaction', () => {
     mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
     mockedSendApnsPush.mockResolvedValue(undefined);
 
-    dispatchReaction('user-1', REACTION);
+    dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
     expect(mockedSendApnsPush).toHaveBeenCalledTimes(1);
@@ -232,7 +276,7 @@ describe('dispatchReaction', () => {
     mockedLatestDeviceTimezone.mockResolvedValue(null);
     mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
 
-    dispatchReaction('user-1', REACTION);
+    dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
     expect(mockedSendApnsPush).not.toHaveBeenCalled();
@@ -243,7 +287,7 @@ describe('dispatchReaction', () => {
     mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
     const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    dispatchReaction('user-1', REACTION);
+    dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
     const logged = consoleSpy.mock.calls.map((c) => String(c[0]));
@@ -256,18 +300,28 @@ describe('dispatchReaction', () => {
     mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
     mockedSendApnsPush.mockResolvedValue(undefined);
 
-    dispatchReaction('user-1', REACTION);
+    dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
     const [, title, body] = mockedSendApnsPush.mock.calls[0] ?? [];
     expect(`${title} ${body}`).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 
-  // R-9.5: the allowlist is the enforcement of the never-push list (exogenous
-  // events, broken streaks, net worth decreases, credit changes, "come back"
-  // pings map to non-pushable animations). Pinning the exact contents means
+  // R-9.5: the event allowlist is the enforcement of the never-push list. It
+  // replaced the animation allowlist deliberately: animations could not tell
+  // overspend_vs_plan from bill_overdue. Pinning the exact contents means
   // widening it is a visible product decision, not a silent side effect.
-  it('pins the pushable animation allowlist to exactly celebrate, sad, concerned', () => {
-    expect(Array.from(PUSHABLE_ANIMATIONS).sort()).toEqual(['celebrate', 'concerned', 'sad']);
+  // ('debug' is sandbox-only: /api/debug/react exists to exercise the APNs
+  // path and never registers in production.)
+  it('pins the pushable event allowlist exactly', () => {
+    expect(Array.from(PUSHABLE_EVENTS).sort()).toEqual([
+      'bill_overdue',
+      'debt_cleared',
+      'debt_missed_payment',
+      'debug',
+      'goal_achieved',
+      'ladder_rung_completed',
+      'utilization_high_pre_close',
+    ]);
   });
 });

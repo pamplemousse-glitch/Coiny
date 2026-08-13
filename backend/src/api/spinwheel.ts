@@ -144,7 +144,7 @@ export function registerSpinwheelApi(app: FastifyInstance): void {
         });
         if (reaction) {
           await recordReaction(userId, type, reaction);
-          dispatchReaction(userId, reaction);
+          dispatchReaction(userId, reaction, type);
         }
       }
     }

@@ -139,7 +139,8 @@ describe('GET /api/debug/transactions', () => {
 
     const groceries = body.transactions.find((t) => t.id === 'txn_groceries');
     expect(groceries?.category).toBe('groceries');
-    expect(groceries?.rule_matched).toBe('overspent_in_category');
+    // R-7.24 rename: overspent_in_category is now overspend_vs_plan.
+    expect(groceries?.rule_matched).toBe('overspend_vs_plan');
 
     const paycheck = body.transactions.find((t) => t.id === 'txn_paycheck');
     expect(paycheck?.category).toBe('paycheck');

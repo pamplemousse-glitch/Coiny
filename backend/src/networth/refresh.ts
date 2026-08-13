@@ -252,7 +252,7 @@ export async function runGoalRefreshFromCache(userId: string, now: Date = new Da
     });
     if (reaction) {
       await recordReaction(userId, 'net_worth_milestone', reaction);
-      dispatchReaction(userId, reaction);
+      dispatchReaction(userId, reaction, 'net_worth_milestone');
     }
   }
   if (prev === null || Math.abs(total - prev) > 0.01) {

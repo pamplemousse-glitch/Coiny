@@ -152,6 +152,21 @@ export const SERVER_EVENT_SCHEMAS = {
     repair_used: z.boolean(),
   }),
   push_sent: z.strictObject({ type: token }),
+  // SPEC CHOICE: the reaction funnel (R-7.24/R-7.25). reaction_shown (client)
+  // reports what a pair of eyes saw; these two are the server's own record of
+  // what the reaction contract decided. Every collected match either performs
+  // or is suppressed with a reason, so the funnel finally sees the matches the
+  // old first-match engine dropped silently. origin=market must be zero
+  // forever (R-2.3), same rule as reaction_shown.
+  reaction_performed: z.strictObject({
+    type: token,
+    origin: z.enum(['behavior', 'market']),
+    suppressed_count: z.number().int().min(0).max(50),
+  }),
+  reaction_suppressed: z.strictObject({
+    type: token,
+    reason: z.enum(['precedence', 'weekly_cap', 'daily_budget', 'non_direct']),
+  }),
   sync_completed: z.strictObject({
     provider: token,
     duration_ms: z.number().int().min(0).max(600000),
