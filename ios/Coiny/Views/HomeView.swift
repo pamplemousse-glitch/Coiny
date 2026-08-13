@@ -23,6 +23,7 @@ struct HomeView: View {
     @State private var showSettings = false
     @State private var reactionOverride: CreatureCondition?
     @State private var connectFlow = ConnectAccountFlow()
+    @State private var journeyStore = JourneyStore()
     @Namespace private var windowNamespace
 
     private var pet: PetState? { store.pet }
@@ -217,7 +218,11 @@ struct HomeView: View {
             Rectangle()
                 .fill(CoinyTheme.rule)
                 .frame(height: 1)
-            HomeJourneyView(rows: HomePresentation.journeyRows(for: pet))
+            HomeJourneyView(
+                rows: HomePresentation.journeyRows(for: pet),
+                journey: journeyStore,
+                onLadderChanged: { await store.refresh() }
+            )
         }
     }
 
