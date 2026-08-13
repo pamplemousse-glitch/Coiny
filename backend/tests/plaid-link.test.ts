@@ -273,14 +273,16 @@ describe('item health store transitions', () => {
     expect(item?.accessToken).toBe('access-sandbox-relinked');
   });
 
-  it('setItemStatus reports the previous status and whether it changed', async () => {
+  // userId rides along so the webhook can emit item_state_changed without a
+  // second lookup: Plaid webhooks arrive keyed by item_id with no user context.
+  it('setItemStatus reports the previous status, whether it changed, and the owner', async () => {
     const { setItemStatus } = await import('../src/store/items.js');
 
     const first = await setItemStatus(TEST_ITEM_ID, 'reauth_required', { errorCode: 'ITEM_LOGIN_REQUIRED' });
-    expect(first).toEqual({ previous: 'healthy', changed: true });
+    expect(first).toEqual({ previous: 'healthy', changed: true, userId: testUserId });
 
     const second = await setItemStatus(TEST_ITEM_ID, 'reauth_required', { errorCode: 'ITEM_LOGIN_REQUIRED' });
-    expect(second).toEqual({ previous: 'reauth_required', changed: false });
+    expect(second).toEqual({ previous: 'reauth_required', changed: false, userId: testUserId });
 
     const missing = await setItemStatus('item_never_existed', 'healthy');
     expect(missing).toBeNull();
