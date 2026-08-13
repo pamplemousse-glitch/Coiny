@@ -739,4 +739,35 @@ export const analyticsEvents = pgTable(
     index('analytics_events_user_idx').on(t.userId),
     index('analytics_events_event_server_ts_idx').on(t.event, t.serverTs),
   ],
+
+// Nightly-computed pace per target goal (docs/prd.md R-7.8), one row per goal,
+// upserted by the goal-system refresh so read paths serve pace without a Plaid
+// fan-out (the same pattern as ladder_state.inputs). Every column except the
+// timestamps is nullable ON PURPOSE: null means "we do not know" (no target
+// date, unknown balance, under 30 days of contribution history) and must never
+// be rendered as zero or as "Off pace". Migration 0042.
+export const goalPace = pgTable(
+  'goal_pace',
+  {
+    goalId: integer('goal_id')
+      .primaryKey()
+      .references(() => goals.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    currentAmountUsd: numeric('current_amount_usd'),
+    monthsRemaining: numeric('months_remaining'),
+    requiredRunRateUsd: numeric('required_run_rate_usd'),
+    actualRunRateUsd: numeric('actual_run_rate_usd'),
+    contributionHistoryDays: integer('contribution_history_days'),
+    pace: numeric('pace'),
+    // ahead | on_pace | behind | off_pace, null while pace is unknowable.
+    paceBand: text('pace_band'),
+    // { type: 'add_monthly', amountUsd } | { type: 'push_date', weeks }
+    gapAction: jsonb('gap_action').$type<
+      { type: 'add_monthly'; amountUsd: number } | { type: 'push_date'; weeks: number }
+    >(),
+    computedAt: timestamp('computed_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('goal_pace_user_idx').on(t.userId)],
 );

@@ -281,6 +281,13 @@
       "when": 1786620612433,
       "tag": "0039_analytics_events",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1786620712433,
+      "tag": "0042_goals_crud",
+      "breakpoints": true
     }
   ]
 }
