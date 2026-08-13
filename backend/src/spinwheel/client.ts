@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { config } from '../config.js';
+import { fetchWithRetry } from '../util/fetch.js';
 
 export class SpinwheelError extends Error {
   constructor(
@@ -36,7 +37,7 @@ function envelopeSchema<T extends z.ZodTypeAny>(dataSchema: T) {
 }
 
 async function spinwheelPost<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
-  const res = await fetch(`${config.SPINWHEEL_BASE_URL}${path}`, {
+  const res = await fetchWithRetry(`${config.SPINWHEEL_BASE_URL}${path}`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(body),
@@ -52,7 +53,7 @@ async function spinwheelPost<T>(path: string, body: unknown, schema: z.ZodType<T
 }
 
 async function spinwheelGet<T>(path: string, schema: z.ZodType<T>): Promise<T> {
-  const res = await fetch(`${config.SPINWHEEL_BASE_URL}${path}`, {
+  const res = await fetchWithRetry(`${config.SPINWHEEL_BASE_URL}${path}`, {
     headers: { Authorization: `Bearer ${requireKey()}` },
   });
 
@@ -66,7 +67,7 @@ async function spinwheelGet<T>(path: string, schema: z.ZodType<T>): Promise<T> {
 }
 
 async function spinwheelDelete(path: string): Promise<void> {
-  const res = await fetch(`${config.SPINWHEEL_BASE_URL}${path}`, {
+  const res = await fetchWithRetry(`${config.SPINWHEEL_BASE_URL}${path}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${requireKey()}` },
   });

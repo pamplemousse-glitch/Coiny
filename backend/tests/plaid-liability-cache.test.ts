@@ -89,7 +89,7 @@ describe('net-worth liability cache', () => {
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
-    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    const res = await app.inject({ method: 'POST', url: '/api/net-worth/refresh', headers: authHeader() });
     expect(res.statusCode).toBe(200);
 
     const body = res.json<{
@@ -110,7 +110,7 @@ describe('net-worth liability cache', () => {
     expect(visa?.isOverdue).toBe(false);
     expect(visa?.primaryApr).toBeCloseTo(22.99);
 
-    // liabilitiesGet should NOT have been called — cache was warm.
+    // liabilitiesGet should NOT have been called: cache was warm.
     expect(mockedLiabilitiesGet).not.toHaveBeenCalled();
 
     await app.close();
@@ -156,7 +156,7 @@ describe('net-worth liability cache', () => {
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
-    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    const res = await app.inject({ method: 'POST', url: '/api/net-worth/refresh', headers: authHeader() });
     expect(res.statusCode).toBe(200);
 
     const body = res.json<{
@@ -167,8 +167,9 @@ describe('net-worth liability cache', () => {
     expect(mc?.minPayment).toBe(30);
     expect(mc?.nextDueDate).toBe('2026-07-01');
 
-    // Cache was empty so the live API was called.
-    expect(mockedLiabilitiesGet).toHaveBeenCalledOnce();
+    // Cache was empty so the live API was called (snapshot fallback plus the
+    // refresh path's cache backfill may each call it).
+    expect(mockedLiabilitiesGet).toHaveBeenCalled();
 
     await app.close();
   });

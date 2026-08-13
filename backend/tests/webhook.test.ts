@@ -176,6 +176,63 @@ describe('POST /webhooks/plaid', () => {
     await app.close();
   });
 
+  it('persists webhook-carried account balances to the cache (R-16.4)', async () => {
+    mockSync({
+      accounts: [
+        {
+          account_id: 'acc_bal_1',
+          balances: { current: 4321.5, available: 4000, iso_currency_code: 'USD', limit: null },
+          name: 'Checking',
+          official_name: null,
+          type: 'depository',
+          subtype: 'checking',
+        },
+        {
+          account_id: 'acc_bal_2',
+          balances: { current: null, available: 250, iso_currency_code: 'USD', limit: null },
+          name: 'Savings',
+          official_name: null,
+          type: 'depository',
+          subtype: 'savings',
+        },
+      ],
+      added: [],
+      modified: [],
+      removed: [],
+      next_cursor: 'cursor-bal-1',
+      has_more: false,
+      transactions_update_status: 'HISTORICAL_UPDATE_COMPLETE',
+      request_id: 'req_bal',
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const body = buildSyncEnvelope();
+    const signed = await signWebhook(body);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/webhooks/plaid',
+      headers: { 'content-type': 'application/json', 'plaid-verification': signed },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+    await flushAll();
+
+    const { getPlaidAccountBalances } = await import('../src/store/asset-cache.js');
+    const rows = await getPlaidAccountBalances(testUserId);
+    expect(rows.map((r) => r.accountId).sort()).toEqual(['acc_bal_1', 'acc_bal_2']);
+    const checking = rows.find((r) => r.accountId === 'acc_bal_1');
+    expect(parseFloat(checking!.balance!)).toBeCloseTo(4321.5);
+    expect(checking?.itemId).toBe(TEST_ITEM_ID);
+    expect(checking?.asOf).toBeInstanceOf(Date);
+    // current is null: falls back to available.
+    const savings = rows.find((r) => r.accountId === 'acc_bal_2');
+    expect(parseFloat(savings!.balance!)).toBe(250);
+
+    await app.close();
+  });
+
   it('dispatches reactions on second sync (post-initial)', async () => {
     const { markInitialSyncComplete } = await import('../src/store/items.js');
     await markInitialSyncComplete(TEST_ITEM_ID);

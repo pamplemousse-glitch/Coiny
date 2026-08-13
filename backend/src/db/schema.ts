@@ -448,6 +448,7 @@ export const truelayerConnections = pgTable('truelayer_connections', {
   refreshToken: text('refresh_token').notNull(), // AES-256-GCM encrypted
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   lastBalanceGbp: numeric('last_balance_gbp'), // value is USD post-conversion
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -585,6 +586,56 @@ export const notificationLog = pgTable(
     sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('notification_log_user_sent_idx').on(t.userId, t.sentAt)],
+);
+
+// Per-account Plaid balance cache (prd.md R-16.4). Fed by every
+// /transactions/sync webhook (the `accounts` array Plaid sends with each sync)
+// and by the explicit refresh path. The DB-only net-worth read serves bank
+// balances from here; `as_of` is the honest freshness timestamp per account.
+export const plaidAccountBalances = pgTable(
+  'plaid_account_balances',
+  {
+    accountId: text('account_id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    itemId: text('item_id').notNull(),
+    name: text('name').notNull(),
+    type: text('type').notNull(),
+    subtype: text('subtype'),
+    balance: numeric('balance'),
+    asOf: timestamp('as_of', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('plaid_account_balances_user_idx').on(t.userId), index('plaid_account_balances_item_idx').on(t.itemId)],
+);
+
+// Per-(user, class) cache for the asset classes that used to be fetched live
+// inside GET /api/net-worth (prd.md R-16.1): investments, crypto (Coinbase),
+// defi (Zerion), debts (Spinwheel), plus bookkeeping for `bank` (whose values
+// live in plaid_account_balances). A successful refresh writes value/asOf/
+// payload and resets the failure counters; a failed refresh keeps the last
+// good value and records the failure so the read path can answer `error`
+// instead of a silent zero (prd.md R-8.1). `payload` carries class detail
+// (holdings, positions, debt items) for the response's `accounts` sub-object.
+export const assetClassCache = pgTable(
+  'asset_class_cache',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    assetClass: text('asset_class').notNull(),
+    valueUsd: numeric('value_usd'),
+    asOf: timestamp('as_of', { withTimezone: true }),
+    payload: jsonb('payload').$type<Record<string, unknown>>(),
+    lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+    lastErrorClass: text('last_error_class'),
+    consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+    // The user-drivable Plaid balance pull is billed per call; capped 4/day
+    // (engineering-budgets.md section 2). Tracked on the `bank` row.
+    manualRefreshDate: date('manual_refresh_date'),
+    manualRefreshCount: integer('manual_refresh_count').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.assetClass] })],
 );
 
 // ---------------------------------------------------------------------------

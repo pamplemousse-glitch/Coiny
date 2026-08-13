@@ -46,6 +46,7 @@ import { runMigrations } from './db/migrate.js';
 import { registerAuthPlugin } from './plugins/auth.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
 import { loggerOptions } from './plugins/logger.js';
+import { getSchedulerStatus, isSchedulerStale, startScheduler } from './scheduler/index.js';
 import { registerAppStoreWebhook } from './webhook/appstore.js';
 import { registerPlaidWebhook } from './webhook/plaid.js';
 
@@ -96,8 +97,20 @@ async function buildApp() {
     },
   });
 
-  // Unauthenticated routes
-  app.get('/health', async () => ({ ok: true }));
+  // Unauthenticated routes. /health carries the scheduler heartbeat
+  // (prd.md R-16.2): 503 when the tick is older than 45 minutes routes
+  // scheduler death through the Fly health check and the external pinger.
+  // When the scheduler is not running (tests, one-off scripts) the fields are
+  // absent and the endpoint stays a plain liveness check.
+  app.get('/health', async (_req, reply) => {
+    const status = getSchedulerStatus();
+    if (!status.enabled) return { ok: true };
+    const lastTickAt = status.lastTickAt ? status.lastTickAt.toISOString() : null;
+    if (isSchedulerStale()) {
+      return reply.status(503).send({ ok: false, last_tick_at: lastTickAt });
+    }
+    return { ok: true, last_tick_at: lastTickAt };
+  });
   registerPlaidWebhook(app);
   // Unauthenticated in the session sense only: every request is JWS-verified
   // against Apple's pinned root before anything is read from it.
@@ -167,6 +180,10 @@ async function start() {
 
   try {
     await app.listen({ port: config.PORT, host: '0.0.0.0' });
+    // Started here, not in buildApp: tests build apps constantly and must not
+    // spawn timers. fly.toml's min_machines_running = 1 keeps this process,
+    // and therefore this interval, alive.
+    startScheduler(app.log);
     app.log.info('Coiny backend ready');
     if (!config.PLAID_CLIENT_ID || !config.PLAID_SECRET) {
       app.log.warn(

@@ -283,37 +283,44 @@
       "breakpoints": true
     },
     {
-      "idx": 41,
+      "idx": 40,
       "version": "7",
       "when": 1786620700000,
+      "tag": "0040_freshness",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1786620800000,
       "tag": "0041_item_health",
       "breakpoints": true
     },
     {
       "idx": 42,
       "version": "7",
-      "when": 1786620800000,
+      "when": 1786620900000,
       "tag": "0042_goals_crud",
       "breakpoints": true
     },
     {
       "idx": 43,
       "version": "7",
-      "when": 1786620900000,
+      "when": 1786621000000,
       "tag": "0043_device_timezone",
       "breakpoints": true
     },
     {
       "idx": 44,
       "version": "7",
-      "when": 1786621000000,
+      "when": 1786621100000,
       "tag": "0044_debt_accounts",
       "breakpoints": true
     },
     {
       "idx": 45,
       "version": "7",
-      "when": 1786621100000,
+      "when": 1786621200000,
       "tag": "0045_entitlements",
       "breakpoints": true
     }

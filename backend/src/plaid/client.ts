@@ -1,5 +1,5 @@
-import { request } from 'undici';
 import { config } from '../config.js';
+import { fetchWithRetry } from '../util/fetch.js';
 import {
   type AccountsBalanceGetResponse,
   type InvestmentsHoldingsGetResponse,
@@ -24,8 +24,11 @@ function baseUrl(): string {
   }
 }
 
+// fetchWithRetry gives every Plaid call the 5 s per-attempt timeout and
+// bounded retry the budgets doc mandates (R-16.5); undici's bare defaults let
+// one hung vendor pin a request for minutes.
 async function plaidPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
-  const res = await request(`${baseUrl()}${path}`, {
+  const res = await fetchWithRetry(`${baseUrl()}${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'plaid-version': '2020-09-14' },
     body: JSON.stringify({
@@ -35,9 +38,9 @@ async function plaidPost<T>(path: string, body: Record<string, unknown>): Promis
     }),
   });
 
-  const text = await res.body.text();
+  const text = await res.text();
 
-  if (res.statusCode >= 400) {
+  if (res.status >= 400) {
     let err: PlaidErrorResponse;
     try {
       err = JSON.parse(text) as PlaidErrorResponse;
@@ -50,7 +53,7 @@ async function plaidPost<T>(path: string, body: Record<string, unknown>): Promis
         request_id: '',
       };
     }
-    throw new PlaidApiError(res.statusCode, err);
+    throw new PlaidApiError(res.status, err);
   }
 
   return JSON.parse(text) as T;

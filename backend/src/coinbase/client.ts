@@ -2,6 +2,7 @@ import { createPrivateKey, randomBytes } from 'node:crypto';
 import { importJWK, SignJWT } from 'jose';
 import { z } from 'zod';
 import { config } from '../config.js';
+import { fetchWithRetry } from '../util/fetch.js';
 
 const BASE_URL = () => config.COINBASE_BASE_URL;
 
@@ -36,7 +37,9 @@ async function makeJwt(method: string, path: string): Promise<string> {
 
 async function coinbaseFetch(path: string, attempt = 0): Promise<Response> {
   const jwt = await makeJwt('GET', path);
-  const res = await fetch(`${BASE_URL()}${path}`, {
+  // fetchWithRetry adds the 5 s per-attempt timeout (R-16.5); the 429 loop
+  // below stays because it honours Coinbase's Retry-After header.
+  const res = await fetchWithRetry(`${BASE_URL()}${path}`, {
     headers: {
       Authorization: `Bearer ${jwt}`,
       'Content-Type': 'application/json',
@@ -226,7 +229,7 @@ export async function getSpotPrices(symbols: string[]): Promise<Map<string, numb
 
   const results = await Promise.allSettled(
     toFetch.map(async (sym) => {
-      const res = await fetch(`https://api.coinbase.com/v2/prices/${encodeURIComponent(sym)}-USD/spot`);
+      const res = await fetchWithRetry(`https://api.coinbase.com/v2/prices/${encodeURIComponent(sym)}-USD/spot`);
       if (!res.ok) throw new Error(`spot price ${sym} failed: ${res.status}`);
       const raw: unknown = await res.json();
       const parsed = SpotPriceResponseSchema.parse(raw);

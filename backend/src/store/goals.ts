@@ -1,6 +1,14 @@
 import { and, desc, eq, gte, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { derivedState, goalPeriods, ladderState, netWorthDaily, petProgression, transactions } from '../db/schema.js';
+import {
+  derivedState,
+  goalPeriods,
+  ladderState,
+  netWorthDaily,
+  petProgression,
+  transactions,
+  users,
+} from '../db/schema.js';
 import {
   computeDerivedState,
   type DerivedInputTransaction,
@@ -314,4 +322,17 @@ export async function netWorthPointCount(userId: string): Promise<number> {
     .from(netWorthDaily)
     .where(eq(netWorthDaily.userId, userId));
   return row?.count ?? 0;
+}
+
+/** User ids with no net_worth_daily row for the given date. The scheduler's
+ *  daily pass: a dormant user's series must not gap just because they never
+ *  opened the app (prd.md R-16.2). */
+export async function usersMissingDailyPoint(date: string): Promise<string[]> {
+  const rows = await db()
+    .select({ id: users.id })
+    .from(users)
+    .where(
+      sql`NOT EXISTS (SELECT 1 FROM ${netWorthDaily} WHERE ${netWorthDaily.userId} = ${users.id} AND ${netWorthDaily.date} = ${date})`,
+    );
+  return rows.map((r) => r.id);
 }

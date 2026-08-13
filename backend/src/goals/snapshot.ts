@@ -34,6 +34,11 @@ export type HoldingSummary = {
   value: number;
 };
 
+export type SyncedAccountBalances = {
+  itemId: string;
+  accounts: Array<{ accountId: string; name: string; type: string; subtype: string | null; balance: number | null }>;
+};
+
 export type PlaidSnapshot = {
   /** Sum of depository balances. Credit/loan balances are NOT subtracted here;
    *  the caller reconciles against Spinwheel to avoid double-counting. */
@@ -50,6 +55,17 @@ export type PlaidSnapshot = {
   /** True when at least one balance call succeeded, so `liquidDeposits` is a
    *  measurement. False means unknown, which must never be read as zero. */
   balancesLoaded: boolean;
+  /** Raw per-item account balances from the successful calls, so the refresh
+   *  path can persist them to the per-account cache (prd.md R-16.4). */
+  syncedAccounts: SyncedAccountBalances[];
+  /** True only when EVERY item's holdings call succeeded. A partial success
+   *  must not be persisted as the investments total: it would undercount. */
+  allHoldingsSucceeded: boolean;
+  /** First rejection reason from the balance calls, null when none failed.
+   *  Lets the refresh path record an honest error class instead of silence. */
+  balanceFailure: unknown;
+  /** First rejection reason from the holdings calls, null when none failed. */
+  holdingsFailure: unknown;
 };
 
 function emptyPlaidSnapshot(): PlaidSnapshot {
@@ -62,6 +78,10 @@ function emptyPlaidSnapshot(): PlaidSnapshot {
     investmentHoldings: [],
     hasConnectedAccount: false,
     balancesLoaded: false,
+    syncedAccounts: [],
+    allHoldingsSucceeded: false,
+    balanceFailure: null,
+    holdingsFailure: null,
   };
 }
 
@@ -132,13 +152,28 @@ export async function fetchPlaidSnapshot(userId: string): Promise<PlaidSnapshot>
     let plaidDebtTotal = 0;
     let liquidDeposits = 0;
     let balancesLoaded = false;
+    let balanceFailure: unknown = null;
     const bankAccounts: BankAccountSummary[] = [];
+    const syncedAccounts: SyncedAccountBalances[] = [];
 
     // Bank balances: depository adds; credit/loan accumulates separately
     // (reconciled against Spinwheel by the caller); investment/brokerage excluded.
-    for (const result of balanceResults) {
-      if (result.status === 'rejected') continue;
+    for (const [i, result] of balanceResults.entries()) {
+      if (result.status === 'rejected') {
+        if (balanceFailure === null) balanceFailure = result.reason;
+        continue;
+      }
       balancesLoaded = true;
+      syncedAccounts.push({
+        itemId: items[i]!.itemId,
+        accounts: result.value.accounts.map((acct) => ({
+          accountId: acct.account_id,
+          name: acct.name,
+          type: acct.type,
+          subtype: acct.subtype,
+          balance: acct.balances.current ?? acct.balances.available,
+        })),
+      });
       for (const acct of result.value.accounts) {
         if (acct.type === 'investment' || acct.type === 'brokerage') continue;
         const balance = acct.balances.current ?? acct.balances.available ?? 0;
@@ -164,9 +199,13 @@ export async function fetchPlaidSnapshot(userId: string): Promise<PlaidSnapshot>
 
     // Investment holdings: sum institution_value across all securities.
     let investmentsTotal = 0;
+    let holdingsFailure: unknown = null;
     const investmentHoldings: HoldingSummary[] = [];
     for (const result of holdingsResults) {
-      if (result.status === 'rejected') continue;
+      if (result.status === 'rejected') {
+        if (holdingsFailure === null) holdingsFailure = result.reason;
+        continue;
+      }
       const secMap = new Map(result.value.securities.map((s) => [s.security_id, s]));
       for (const h of result.value.holdings) {
         const value = h.institution_value ?? 0;
@@ -190,6 +229,10 @@ export async function fetchPlaidSnapshot(userId: string): Promise<PlaidSnapshot>
       investmentHoldings,
       hasConnectedAccount: true,
       balancesLoaded,
+      syncedAccounts,
+      allHoldingsSucceeded: holdingsFailure === null,
+      balanceFailure,
+      holdingsFailure,
     };
   } catch {
     // No bank linked, or the item store itself failed. Unknown, not zero.
@@ -210,6 +253,9 @@ export type DebtSnapshot = {
    *  loan balances. */
   spinwheelDebtsLoaded: boolean;
   debts: SpinwheelDebt[];
+  /** The bureau fetch's rejection reason when it failed, else null. Lets the
+   *  refresh path record an honest error class (prd.md R-8.1). */
+  fetchError: unknown;
 };
 
 function emptyDebtSnapshot(): DebtSnapshot {
@@ -219,6 +265,7 @@ function emptyDebtSnapshot(): DebtSnapshot {
     spinwheelConnected: false,
     spinwheelDebtsLoaded: false,
     debts: [],
+    fetchError: null,
   };
 }
 
@@ -241,8 +288,9 @@ export async function fetchDebtSnapshot(userId: string): Promise<DebtSnapshot> {
           monthlyPayment: debt.minimumPayment ?? 0,
         });
       }
-    } catch {
+    } catch (err) {
       // Bureau fetch failed; connected but not loaded.
+      snapshot.fetchError = err;
     }
     return snapshot;
   } catch {
