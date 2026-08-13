@@ -59,6 +59,7 @@ async function plaidPost<T>(path: string, body: Record<string, unknown>): Promis
 export function linkTokenCreate(args: {
   client_user_id: string;
   products?: string[];
+  required_if_supported_products?: string[];
   language?: string;
   country_codes?: string[];
   webhook?: string;
@@ -68,7 +69,17 @@ export function linkTokenCreate(args: {
     client_name: args.client_name ?? 'Coiny',
     language: args.language ?? 'en',
     country_codes: args.country_codes ?? ['US'],
-    products: args.products ?? ['transactions', 'investments', 'liabilities'],
+    // Only `transactions` is required. Plaid initializes and BILLS every product
+    // named in `products` at Item creation, "regardless of API calls made", and
+    // a product cannot be removed from an Item once initialized with it. Listing
+    // investments and liabilities here put three permanent monthly subscriptions
+    // on every linked item, including a checking-only one that has neither.
+    //
+    // `required_if_supported_products` bills them only when the institution and
+    // account type actually support the product.
+    // https://plaid.com/docs/api/link/
+    products: args.products ?? ['transactions'],
+    required_if_supported_products: args.required_if_supported_products ?? ['investments', 'liabilities'],
     user: { client_user_id: args.client_user_id },
     webhook: args.webhook ?? config.PLAID_WEBHOOK_URL,
   });

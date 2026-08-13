@@ -1,11 +1,17 @@
 import type { Reaction } from './types.js';
 
 // Generic event from non-Plaid data sources (Coinbase, Zerion, Spinwheel).
+//
+// PRINCIPLE: the pet reacts to what the user CONTROLS, never to the market.
+// Do not add price-movement events here (a coin surging or dumping, a holding
+// up or down N%). A creature that celebrates a pump and sulks at a dip punishes
+// the user for something they did not do, on a day they already feel bad, and
+// trains them to stop opening the app. It is also the mechanic Robinhood was
+// sanctioned over. Market moves belong on the Wealth tab, reported neutrally.
+// `crypto_price_surge` and `crypto_price_drop` were removed for this reason.
 export type ExternalEventType =
   | 'crypto_received'
   | 'crypto_sent'
-  | 'crypto_price_surge' // coin up >10% in 24h
-  | 'crypto_price_drop' // coin down >10% in 24h
   | 'defi_yield'
   | 'wallet_receive'
   | 'debt_paydown'
@@ -56,24 +62,6 @@ export function evaluateExternalEvent(event: ExternalEvent): Reaction | null {
         reason: `DeFi yield earned:${symbolStr}${amountStr}`,
       };
 
-    case 'crypto_price_surge':
-      return {
-        animation: 'celebrate',
-        sound: 'fanfare',
-        led: 'rainbow',
-        duration: 5000,
-        reason: `${event.symbol ?? 'Crypto'} surged >10% in 24h`,
-      };
-
-    case 'crypto_price_drop':
-      return {
-        animation: 'concerned',
-        sound: 'warning',
-        led: 'amber',
-        duration: 3000,
-        reason: `${event.symbol ?? 'Crypto'} dropped >10% in 24h`,
-      };
-
     case 'debt_paydown':
       return {
         animation: 'celebrate',
@@ -92,49 +80,48 @@ export function evaluateExternalEvent(event: ExternalEvent): Reaction | null {
         reason: `Missed debt payment:${amountStr}`,
       };
 
+    // R-7.23: neutral acknowledgment, not concern. Opening a card or taking a
+    // mortgage is a decision, not a moral failure, and a "new" liability is often
+    // just the bureau reporting an account that already existed. `neutral` is
+    // outside the push allowlist in dispatch.ts, so this never interrupts anyone.
     case 'new_liability':
       return {
-        animation: 'concerned',
-        sound: 'warning',
-        led: 'amber',
-        duration: 3000,
+        animation: 'neutral',
+        sound: 'off',
+        led: 'off',
+        duration: 1500,
         reason: `New liability detected:${amountStr}`,
       };
 
+    // Non-reacting by design. These three are not things the user did.
+    //
+    // net_worth_milestone is mostly market movement: a crypto rally can carry
+    // someone across $50k and the creature would celebrate a week in which they
+    // saved nothing. The ladder supplies the celebration moments instead, and a
+    // rung is only cleared by behaviour.
+    //
+    // credit_score_* moves on inquiries ageing off, a card issuer changing a
+    // limit, or an account closing, none of which the user chose. A sad pet on a
+    // score drop is the punishment mechanic this product exists to avoid.
+    //
+    // All three are still worth SHOWING on the Wealth tab, reported plainly.
+    // They just do not move the creature.
     case 'net_worth_milestone':
-      return {
-        animation: 'celebrate',
-        sound: 'fanfare',
-        led: 'rainbow',
-        duration: 5000,
-        reason: `Net worth milestone reached:${amountStr}`,
-      };
-
     case 'credit_score_improved':
-      return {
-        animation: 'celebrate',
-        sound: 'chime',
-        led: 'green',
-        duration: 4000,
-        reason: `Credit score improved${amountStr ? ` by ${Math.abs(event.amountUsd ?? 0).toFixed(0)} pts` : ''}`,
-      };
-
     case 'credit_score_dropped':
-      return {
-        animation: 'sad',
-        sound: 'warning',
-        led: 'red',
-        duration: 4000,
-        reason: `Credit score dropped${amountStr ? ` by ${Math.abs(event.amountUsd ?? 0).toFixed(0)} pts` : ''}`,
-      };
+      return null;
 
     case 'crypto_sent':
       return null;
 
     default: {
-      // Exhaustiveness guard — TypeScript should catch unhandled cases at compile time.
+      // Exhaustiveness guard: TypeScript catches unhandled cases at compile time.
+      // Returning null (rather than the value) keeps runtime safe if an unknown
+      // type ever arrives from an untyped caller, since callers branch on
+      // truthiness and a raw string would dispatch a malformed reaction.
       const _exhaustive: never = event.type;
-      return _exhaustive;
+      void _exhaustive;
+      return null;
     }
   }
 }

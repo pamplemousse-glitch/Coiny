@@ -5,6 +5,7 @@ struct SettingsView: View {
     @AppStorage("onboardingComplete") private var onboardingComplete: Bool = false
     @AppStorage("bankLinked") private var bankLinked: Bool = false
     @State private var showDeleteAlert = false
+    @State private var deleteFailed = false
     @State private var isUnlinkingBank = false
 
     var body: some View {
@@ -83,13 +84,26 @@ struct SettingsView: View {
                 .alert("Delete Account?", isPresented: $showDeleteAlert) {
                     Button("Delete", role: .destructive) {
                         Task {
-                            _ = try? await API.shared.deleteAccount()
-                            NotificationCenter.default.post(name: .coinySignedOut, object: nil)
+                            // Sign out only when the server confirms deletion. Swallowing the
+                            // error and signing out anyway told the user "this permanently
+                            // deletes your account and all data" while the data survived, which
+                            // is both false and an App Review 5.1.1(v) defect.
+                            do {
+                                _ = try await API.shared.deleteAccount()
+                                NotificationCenter.default.post(name: .coinySignedOut, object: nil)
+                            } catch {
+                                deleteFailed = true
+                            }
                         }
                     }
                     Button("Cancel", role: .cancel) {}
                 } message: {
                     Text("This permanently deletes your Coiny account and all data. This cannot be undone.")
+                }
+                .alert("Could not delete account", isPresented: $deleteFailed) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text("Your account was not deleted and you are still signed in. Check your connection and try again.")
                 }
 
                 Section("Debug") {

@@ -49,6 +49,9 @@ describe('GET /api/coinbase/performance', () => {
       totalCrypto: 9000.0,
     });
 
+    const { upsertCoinbaseDevKey } = await import('../src/store/coinbase.js');
+    await upsertCoinbaseDevKey(testUserId);
+
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
@@ -58,6 +61,26 @@ describe('GET /api/coinbase/performance', () => {
     expect(body.unrealizedPnl).toBe(1234.56);
     expect(body.totalCash).toBe(500.0);
     expect(body.totalCrypto).toBe(9000.0);
+
+    await app.close();
+  });
+
+  // Regression: this endpoint used to ignore the caller entirely and sign with
+  // the server's shared Coinbase key, so ANY authenticated user received the
+  // operator's portfolio. A caller with no connection must get nothing.
+  it('returns nulls when the caller has no Coinbase connection', async () => {
+    mockedGetPortfolioSummary.mockResolvedValue({
+      unrealizedPnl: 1234.56,
+      totalCash: 500.0,
+      totalCrypto: 9000.0,
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/coinbase/performance', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+    expect(res.json<{ unrealizedPnl: number | null }>().unrealizedPnl).toBeNull();
 
     await app.close();
   });

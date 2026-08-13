@@ -253,11 +253,13 @@ async function syncItem(
 
     const context: RuleContext = { weeklySpendByCategory: runningSpend };
     const match = evaluate(tx, goals, context);
+    // No `amount`: logging it puts financial detail in every log sink, which
+    // .claude/rules/security.md #2 forbids. transaction_id is pseudonymous and
+    // is enough to correlate; the amount can be read from the DB when debugging.
     app.log.info(
       {
         transaction_id: tx.id,
         category: tx.details?.category ?? null,
-        amount: tx.amount,
         rule_matched: match?.name ?? null,
       },
       'rule evaluation',

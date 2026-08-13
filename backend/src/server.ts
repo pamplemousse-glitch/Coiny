@@ -27,11 +27,9 @@ import { registerPlaidRecurringApi } from './api/plaid-recurring.js';
 import { registerPokemonCardsApi } from './api/pokemon-cards.js';
 import { registerPolymarketApi } from './api/polymarket.js';
 import { registerRealEstateApi } from './api/real-estate.js';
-import { registerSnaptradeApi } from './api/snaptrade.js';
 import { registerSneakersApi } from './api/sneakers.js';
 import { registerSpendingApi } from './api/spending.js';
 import { registerSpinwheelApi } from './api/spinwheel.js';
-import { registerSteamApi } from './api/steam.js';
 import { registerSubscriptionsApi } from './api/subscriptions.js';
 import { registerTradingCardsApi } from './api/trading-cards.js';
 import { registerTruelayerApi } from './api/truelayer.js';
@@ -45,6 +43,15 @@ import { registerAuthPlugin } from './plugins/auth.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
 import { loggerOptions } from './plugins/logger.js';
 import { registerPlaidWebhook } from './webhook/plaid.js';
+
+/** Debug routes are for local development and the iOS simulator only.
+ *  Both conditions must hold: not a production build, AND pointed at Plaid
+ *  sandbox data. Either alone is insufficient, which is the bug this replaces:
+ *  fly.toml ships NODE_ENV=production with PLAID_ENV=sandbox, so gating on
+ *  PLAID_ENV alone exposed an unauthenticated session-minting route publicly. */
+function isDebugBuild(): boolean {
+  return config.NODE_ENV !== 'production' && config.PLAID_ENV === 'sandbox';
+}
 
 async function buildApp() {
   await initDb();
@@ -91,7 +98,12 @@ async function buildApp() {
   // Public auth endpoints (no session required)
   app.register(async (scope) => {
     registerAuthApi(scope);
-    if (config.PLAID_ENV === 'sandbox') registerDebugSessionApi(scope);
+    // Gated on NODE_ENV, NOT on PLAID_ENV. PLAID_ENV describes which Plaid data
+    // environment we talk to; it says nothing about whether this process is
+    // publicly reachable. fly.toml ships NODE_ENV=production with
+    // PLAID_ENV=sandbox, so the old PLAID_ENV gate registered an
+    // UNAUTHENTICATED session-minting endpoint on the public internet.
+    if (isDebugBuild()) registerDebugSessionApi(scope);
   });
 
   // All other routes require a valid session token. The global rate-limiter
@@ -102,7 +114,7 @@ async function buildApp() {
 
     registerPlaidLinkApi(scope);
     registerPlaidRecurringApi(scope);
-    if (config.PLAID_ENV === 'sandbox') registerDebugApi(scope);
+    if (isDebugBuild()) registerDebugApi(scope);
     registerAccountApi(scope);
     registerPetsApi(scope);
     registerSpendingApi(scope);
@@ -113,10 +125,8 @@ async function buildApp() {
     registerDiscogsApi(scope);
     registerZerionApi(scope);
     registerSpinwheelApi(scope);
-    registerSnaptradeApi(scope);
     registerSneakersApi(scope);
     registerManualAssetsApi(scope);
-    registerSteamApi(scope);
     registerChainWalletsApi(scope);
     registerHyperliquidApi(scope);
     registerPolymarketApi(scope);

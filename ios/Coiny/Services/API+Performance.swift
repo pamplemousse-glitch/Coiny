@@ -16,11 +16,9 @@ struct NetWorthResponse: Decodable {
     let sneakers: Double
     let nft: Double?
     let manual: Double?
-    let steam: Double?
     let alpaca: Double?
     let truelayer: Double?
     let kraken: Double
-    let snaptrade: Double
     let ynab: Double
     let vinyl: Double?
     let kalshi: Double?
@@ -49,7 +47,6 @@ struct NetWorthConnections: Decodable {
     let zerion: Bool
     let spinwheel: Bool
     let kraken: Bool
-    let snaptrade: Bool
     let ynab: Bool
     let kalshi: Bool?
     let alpaca: Bool?

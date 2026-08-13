@@ -58,10 +58,6 @@ const configSchema = z
     // GoldAPI.io — precious metals spot prices.
     GOLDAPI_API_KEY: z.string().default(''),
 
-    // SnapTrade brokerage aggregator (Fidelity, Vanguard, Schwab, Robinhood, etc.)
-    SNAPTRADE_CLIENT_ID: z.string().default(''),
-    SNAPTRADE_CONSUMER_KEY: z.string().default(''),
-
     // Subscan API key for Polkadot (DOT) balance queries.
     SUBSCAN_API_KEY: z.string().default(''),
     // Blockfrost project ID for Cardano (ADA) balance queries.
@@ -163,3 +159,21 @@ function loadConfig(): Config {
 }
 
 export const config = loadConfig();
+
+/**
+ * Whether the SHARED, server-owned Coinbase API key may be used to serve a
+ * user's data.
+ *
+ * `coinbase_connections.mode = 'dev_key'` does not store per-user credentials:
+ * it is a flag meaning "sign with the operator's key". That is a local
+ * development convenience. In a multi-user deployment it means every user who
+ * connects Coinbase sees the OPERATOR's balances counted as their own, which is
+ * a cross-user data exposure and violates .claude/rules/security.md #6.
+ *
+ * Per-user Coinbase requires the OAuth path (the token columns exist in the
+ * schema but are never written). Until that is built, shared-key mode is
+ * confined to non-production.
+ */
+export function isSharedCoinbaseKeyAllowed(): boolean {
+  return config.NODE_ENV !== 'production';
+}

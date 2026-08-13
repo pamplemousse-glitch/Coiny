@@ -1,6 +1,73 @@
-# Coiny — Business Plan: Market Sizing & Investor Pitch
+# Coiny — Business Plan
 
-*Last updated: 2026-05-28. All market figures cited inline with sources.*
+*Last updated: June 2026. All market figures cited inline with sources.*
+
+---
+
+## 0. What This Is
+
+Coiny is a physical desk/pocket device that reacts to your real financial behavior. It connects to your bank via Plaid and responds in real time — overspend and your pet looks worried, hit a savings goal and it celebrates. No app to open. No dashboard to check.
+
+**The core insight:** 71% of budgeting app users abandon them within 90 days because opening the app requires willpower. A device sitting on your desk requires none. Physical presence solves the activation energy problem that has killed every budgeting app.
+
+No direct hardware competitor exists. The category is genuinely greenfield.
+
+---
+
+## Current Product State
+
+**What's already built:**
+- Backend (Node.js / Fastify): Plaid integration, transaction processing, financial rules engine, net worth calculation, 15+ data vendor integrations (investments, crypto, real estate, vehicles, metals, trading cards, energy, farmland). ~830 tests. Running on Fly.io.
+- iOS app (Swift / SwiftUI): auth, pet screen, activity feed, wealth dashboard — functional.
+- Android app (Kotlin / Compose): scaffold built, auth + wealth tab in progress.
+
+**What's not built yet:**
+- Hardware — parts sourced, firmware planned (nRF52840 + Zephyr RTOS). This is Phase 2.
+
+---
+
+## Team
+
+**Antoine Wiley** — product vision, full-stack development. Built the backend, iOS app, Android scaffold. Domain: product instincts, financial integrations, rules engine.
+
+**Jack [Last Name]** — technical cofounder. [Fill in: firmware, mobile, backend, infra — whatever Jack's lanes are.]
+
+**To incorporate, we need to agree on:**
+- Equity split
+- Vesting: standard is 4 years, 1-year cliff
+- Roles: who owns what area (firmware, mobile, backend, product, etc.)
+- The 6-month test: working hardware prototype + 20-person beta, then decide whether to go all-in
+
+Incorporate as Delaware C-Corp via Stripe Atlas or Clerky (~$500, a few days). This is the first action — not the last. We need it to split equity legally, open a business bank account, and be eligible for VC investment or accelerator programs.
+
+---
+
+## What We Need to Get to First Revenue
+
+In order:
+
+1. **Incorporate** — Delaware C-Corp via Stripe Atlas/Clerky. Do this now, before anything else.
+2. iOS + Android polished to demo quality
+3. Hardware prototype (first unit — proves the physical feedback loop)
+4. 20-person beta with structured feedback
+5. **Apply to SOSV/HAX** (hax.co) — $500K pre-seed for hardware+software startups at inception. The working demo is the pitch. This funds the manufacturing run so we don't depend on Kickstarter alone.
+6. **Kickstarter** ($300–500K goal) — after prototype exists. Community building + manufacturing validation. Not the primary capital source — supplements pre-seed.
+
+Steps 2–4 are buildable with what we have before raising anything.
+
+---
+
+## Risks
+
+| Risk | Mitigation |
+|------|-----------|
+| Hardware is hard | Start with 100–500 unit Kickstarter run. Don't over-commit to manufacturing before demand is validated. |
+| Plaid dependency | Plaid powers 8,000+ apps and 12,000+ institutions. Infrastructure-level, not a single vendor. |
+| Big tech copies the app layer | The physical device is the moat. An app is copyable in a week. A hardware product with community attachment is not. |
+| Pet reactions aren't compelling enough | This is the core design risk. Validated by 20-person beta before any manufacturing commitment. |
+| Regulatory | Coiny doesn't hold funds, give financial advice, or execute trades. Display layer only. Low surface. |
+
+---
 
 ---
 
@@ -26,13 +93,13 @@ Coiny's addressable segment is narrower: English-speaking markets (US, UK, Canad
 
 - Use at least one personal finance app or budgeting tool
 - Have expressed interest in financial wellness or gamified savings
-- Are open to purchasing a physical accessory priced $40–$120
+- Are open to purchasing a physical accessory priced $79–$129
 
 **US personal finance app users (18–35):** Approximately 80M Americans use mobile banking or budgeting apps. The 18–35 cohort represents roughly 30% of the adult population (≈75M people), with smartphone penetration near 98%. Even conservative estimates put active personal finance app users in the target age group at 20–25M.
 
 **Tamagotchi / collector gadget buyers:** Bandai's Tamagotchi reached 100M lifetime shipments in 2025, with 33% of global sales in the US, and 7–8M units sold annually by 2026. ([Japan Times](https://www.japantimes.co.jp/business/2025/09/02/companies/tamagotchi-100-million/), [NSS Magazine](https://www.nssmag.com/en/lifestyle/38204/tamagotchi-y2k-nostalgia-100-millions-sales)) This signals a proven, sustained demand for nostalgic physical companion devices — Coiny's closest analog in form factor.
 
-**SAM estimate:** ~8–12M US users willing to spend on a physical finance companion device, generating an SAM of roughly **$400M–1.2B** (at $50 one-time hardware + $36/year subscription per user across the addressable cohort). This scales to $1.5–2B including UK, Canada, and Australia.
+**SAM estimate:** ~8–12M US users willing to spend on a physical finance companion device, generating an SAM of roughly **$400M–1.2B** (at $79 early-bird hardware + $60/year subscription per user across the addressable cohort). This scales to $1.5–2B including UK, Canada, and Australia.
 
 ### 1.3 SOM — Serviceable Obtainable Market (3-year)
 
@@ -44,7 +111,7 @@ In the first three years (prototype → commercial launch → scale), a realisti
 | Y2 (retail + DTC) | 15,000–30,000 | $900K–$2.4M | DTC + 1–2 retail partners |
 | Y3 (scale) | 50,000–100,000 | $3M–$8M | B2B wellness pilots + scale |
 
-Assumptions: $60 hardware ASP (blended DTC/retail), $4/month subscription with ~40% attach rate in Y1 rising to 65% by Y3. These unit economics are conservative relative to Oura ($299–$499 hardware, $6/month subscription, 80% renewal rate after year 1).
+Assumptions: $99 hardware ASP blended (early-bird $79 / retail $129), $5/month subscription with ~40% attach rate in Y1 rising to 65% by Y3. These unit economics are conservative relative to Oura ($299–$499 hardware, $6/month subscription, 80% renewal rate after year 1).
 
 **SOM: $6–10M ARR by end of Year 3** is achievable without institutional-scale distribution.
 
@@ -97,10 +164,10 @@ Oura ($11B valuation, confidential IPO filed May 2026) and WHOOP ($10.1B valuati
 ## 4. Revenue Model Options
 
 ### Option A: Hardware Sale + Optional Subscription (Recommended Anchor)
-- **Hardware:** $59–$79 one-time purchase. Covers COGS (~$15–22 BOM) with healthy margin. Comparable to a Tamagotchi Smart ($60) or premium keychain accessory.
-- **Subscription:** $3–4/month for Plaid connection, cloud sync, pet customization, and advanced spending insights. Free tier: basic pet reactions, no history, no cloud.
+- **Hardware:** $79 early-bird / $129 retail. Covers COGS (~$25–35 BOM) with healthy margin. Early-bird pricing creates Kickstarter urgency; retail pricing anchors long-term value.
+- **Subscription:** $4.99–$7.99/month for Plaid connection, cloud sync, pet customization, and advanced spending insights. Free tier: basic pet reactions, no history, no cloud.
 - **Rationale:** Minimizes barrier to first purchase while building recurring revenue. Oura's 80% renewal rate demonstrates that users who engage with the physical device convert to subscribers. B2B license model (see below) can layer on top.
-- **Year 3 projection:** 100K devices at $69 ASP = $6.9M hardware revenue + 65K subscribers at $42/year = $2.7M ARR. Total: ~$9.6M.
+- **Year 3 projection:** 100K devices at $99 blended ASP = $9.9M hardware revenue + 65K subscribers at $60/year = $3.9M ARR. Total: ~$13.8M.
 
 ### Option B: Subscription-Only (WHOOP Model)
 - Device subsidized or included with annual subscription ($79–$99/year).

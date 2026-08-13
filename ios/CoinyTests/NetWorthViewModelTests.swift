@@ -37,11 +37,9 @@ final class NetWorthViewModelTests: XCTestCase {
             sneakers: 0,
             nft: nil,
             manual: nil,
-            steam: nil,
             alpaca: nil,
             truelayer: nil,
             kraken: 0,
-            snaptrade: 0,
             ynab: 0,
             vinyl: nil,
             kalshi: nil,
@@ -65,7 +63,6 @@ final class NetWorthViewModelTests: XCTestCase {
                 zerion: false,
                 spinwheel: false,
                 kraken: false,
-                snaptrade: false,
                 ynab: false,
                 kalshi: nil,
                 alpaca: nil,
@@ -102,11 +99,9 @@ final class NetWorthViewModelTests: XCTestCase {
             sneakers: 0,
             nft: nil,
             manual: nil,
-            steam: nil,
             alpaca: nil,
             truelayer: nil,
             kraken: 0,
-            snaptrade: 0,
             ynab: 0,
             vinyl: nil,
             kalshi: nil,
@@ -125,7 +120,7 @@ final class NetWorthViewModelTests: XCTestCase {
                 defi: DefiTotal(totalUSD: 0),
                 debts: []
             ),
-            connections: NetWorthConnections(coinbase: true, zerion: false, spinwheel: false, kraken: false, snaptrade: false, ynab: false, kalshi: nil, alpaca: nil, truelayer: nil)
+            connections: NetWorthConnections(coinbase: true, zerion: false, spinwheel: false, kraken: false, ynab: false, kalshi: nil, alpaca: nil, truelayer: nil)
         )
         fake.setResult(.success(response))
         let vm = NetWorthViewModel(api: fake)
@@ -172,11 +167,9 @@ final class NetWorthViewModelTests: XCTestCase {
             sneakers: 0,
             nft: nil,
             manual: nil,
-            steam: nil,
             alpaca: nil,
             truelayer: nil,
             kraken: 0,
-            snaptrade: 0,
             ynab: 0,
             vinyl: nil,
             kalshi: nil,
@@ -195,7 +188,7 @@ final class NetWorthViewModelTests: XCTestCase {
                 defi: DefiTotal(totalUSD: 0),
                 debts: [DebtItem(id: "d1", type: "credit_card", balance: 2000, monthlyPayment: 100)]
             ),
-            connections: NetWorthConnections(coinbase: false, zerion: false, spinwheel: true, kraken: false, snaptrade: false, ynab: false, kalshi: nil, alpaca: nil, truelayer: nil)
+            connections: NetWorthConnections(coinbase: false, zerion: false, spinwheel: true, kraken: false, ynab: false, kalshi: nil, alpaca: nil, truelayer: nil)
         )
         fake.setResult(.success(response))
         let vm = NetWorthViewModel(api: fake)
@@ -223,11 +216,9 @@ final class NetWorthViewModelTests: XCTestCase {
             sneakers: 1000,
             nft: 150,
             manual: 500,
-            steam: 75,
             alpaca: 3200,
             truelayer: 800,
             kraken: 0,
-            snaptrade: 0,
             ynab: 0,
             vinyl: 200,
             kalshi: 50,
@@ -240,7 +231,7 @@ final class NetWorthViewModelTests: XCTestCase {
             debts: -1250,
             liquidCashMonths: nil,
             accounts: NetWorthAccounts(bank: [], investments: [], crypto: [], defi: DefiTotal(totalUSD: 0), debts: []),
-            connections: NetWorthConnections(coinbase: false, zerion: false, spinwheel: false, kraken: true, snaptrade: true, ynab: false, kalshi: true, alpaca: true, truelayer: true)
+            connections: NetWorthConnections(coinbase: false, zerion: false, spinwheel: false, kraken: true, ynab: false, kalshi: true, alpaca: true, truelayer: true)
         )
         fake.setResult(.success(response))
         let vm = NetWorthViewModel(api: fake)
@@ -252,14 +243,12 @@ final class NetWorthViewModelTests: XCTestCase {
         XCTAssertEqual(vm.netWorth?.sneakers, 1000)
         XCTAssertEqual(vm.netWorth?.nft, 150)
         XCTAssertEqual(vm.netWorth?.manual, 500)
-        XCTAssertEqual(vm.netWorth?.steam, 75)
         XCTAssertEqual(vm.netWorth?.alpaca, 3200)
         XCTAssertEqual(vm.netWorth?.truelayer, 800)
         XCTAssertEqual(vm.netWorth?.vinyl, 200)
         XCTAssertEqual(vm.netWorth?.kalshi, 50)
         XCTAssertEqual(vm.netWorth?.polymarket, 125)
         XCTAssertTrue(vm.netWorth?.connections.kraken == true)
-        XCTAssertTrue(vm.netWorth?.connections.snaptrade == true)
         XCTAssertTrue(vm.netWorth?.connections.kalshi == true)
         XCTAssertTrue(vm.netWorth?.connections.alpaca == true)
         XCTAssertTrue(vm.netWorth?.connections.truelayer == true)
@@ -281,11 +270,9 @@ final class NetWorthViewModelTests: XCTestCase {
             sneakers: 0,
             nft: 2500,
             manual: 1000,
-            steam: 750,
             alpaca: 3000,
             truelayer: 1500,
             kraken: 0,
-            snaptrade: 0,
             ynab: 0,
             vinyl: nil,
             kalshi: nil,
@@ -298,7 +285,7 @@ final class NetWorthViewModelTests: XCTestCase {
             debts: 0,
             liquidCashMonths: nil,
             accounts: NetWorthAccounts(bank: [], investments: [], crypto: [], defi: DefiTotal(totalUSD: 0), debts: []),
-            connections: NetWorthConnections(coinbase: false, zerion: false, spinwheel: false, kraken: false, snaptrade: false, ynab: false, kalshi: nil, alpaca: nil, truelayer: nil)
+            connections: NetWorthConnections(coinbase: false, zerion: false, spinwheel: false, kraken: false, ynab: false, kalshi: nil, alpaca: nil, truelayer: nil)
         )
         fake.setResult(.success(response))
         let vm = NetWorthViewModel(api: fake)
@@ -307,7 +294,6 @@ final class NetWorthViewModelTests: XCTestCase {
 
         XCTAssertEqual(vm.netWorth?.nft, 2500)
         XCTAssertEqual(vm.netWorth?.manual, 1000)
-        XCTAssertEqual(vm.netWorth?.steam, 750)
         XCTAssertEqual(vm.netWorth?.alpaca, 3000)
         XCTAssertEqual(vm.netWorth?.truelayer, 1500)
         XCTAssertEqual(vm.netWorth?.pokemonCards, 800)

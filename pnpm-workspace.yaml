@@ -1,8 +1,25 @@
 packages:
   - 'backend'
   - 'shared'
-  - 'mobile'
+  # 'mobile' (Expo React Native) is removed from the workspace, not deleted.
+  # It was superseded by ios/ in May 2026 and last touched 2026-05-19. Keeping it
+  # installed pulled undici 6.25.0 through @expo/cli into the dependency graph,
+  # which the backend container scan flagged for four HIGH CVEs the backend does
+  # not otherwise carry. Dead code should not fail a live security gate.
+  # The source stays on disk; re-add this line to work on it again.
 
 allowBuilds:
   esbuild: true
   unrs-resolver: true
+
+# Audit exceptions. Each needs an advisory ID, why it does not reach production,
+# and what would let us remove it. Never add one to silence a production finding.
+auditConfig:
+  ignoreGhsas:
+    # vite <=6.4.2, reached only via vitest > @vitest/mocker. Test-time only: vite
+    # is never installed in the runtime image (backend/Dockerfile installs prod
+    # dependencies only) and never imported by src/. vitest 3.2.7 pins vite 5.x,
+    # so the fix is not available to us until vitest ships a vite 6.4.3+ peer.
+    # Remove this entry when `pnpm why vite` reports >=6.4.3.
+    - GHSA-fx2h-pf6j-xcff
+

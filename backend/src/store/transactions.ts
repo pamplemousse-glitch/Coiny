@@ -1,6 +1,7 @@
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { transactions } from '../db/schema.js';
+import { INCOME_CATEGORIES, NON_SPEND_CATEGORIES } from '../goals/categories.js';
 import type { Transaction } from '../types/transaction.js';
 
 export type StoredTransaction = typeof transactions.$inferSelect;
@@ -84,7 +85,8 @@ export interface SpendingSummary {
 }
 
 // 30-day income vs spend from the transactions table.
-// Inflows < $50 are excluded as petty transfers; outflows are all negative amounts.
+// Income counts only credits categorised as actual income; a positive amount
+// alone is not sufficient, since refunds and self-transfers are also positive.
 // savingsRate is null when there is no recorded income.
 export async function getSpendingSummary(userId: string): Promise<SpendingSummary> {
   const cutoff = new Date();
@@ -105,13 +107,16 @@ export async function getSpendingSummary(userId: string): Promise<SpendingSummar
 
   for (const row of rows) {
     const amount = parseFloat(row.amount ?? '0');
+    const category = row.category ?? null;
+
     if (amount < 0) {
+      if (category !== null && NON_SPEND_CATEGORIES.has(category)) continue;
       const abs = Math.abs(amount);
       monthlySpend += abs;
-      if (row.category) {
-        spendByCategory[row.category] = (spendByCategory[row.category] ?? 0) + abs;
+      if (category) {
+        spendByCategory[category] = (spendByCategory[category] ?? 0) + abs;
       }
-    } else if (amount >= 50) {
+    } else if (category !== null && INCOME_CATEGORIES.has(category)) {
       monthlyIncome += amount;
     }
   }

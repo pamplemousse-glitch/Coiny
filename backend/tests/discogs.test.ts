@@ -273,7 +273,11 @@ describe('GET /api/net-worth — discogs vinyl rollup', () => {
     await resetDatabase();
   });
 
-  it('includes vinyl total from discogs connection', async () => {
+  // R-17.3 / DR-10: Discogs marketplace prices are Restricted Data and may not be
+  // used commercially without written permission, which has been requested and not
+  // granted. The connection is still reported so the UI can explain itself, but no
+  // Discogs-derived value reaches the response or the total.
+  it('reports the discogs connection but serves no vinyl value', async () => {
     mockedGetRequestToken.mockResolvedValue({
       oauthToken: 'tok123',
       oauthTokenSecret: 'sec456',
@@ -298,7 +302,8 @@ describe('GET /api/net-worth — discogs vinyl rollup', () => {
     const nw = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
     expect(nw.statusCode).toBe(200);
     const body = nw.json<{ vinyl: number; connections: { discogs: boolean } }>();
-    expect(body.vinyl).toBe(320);
+    // Sync ran and stored 320, but the value must not be served.
+    expect(body.vinyl).toBe(0);
     expect(body.connections.discogs).toBe(true);
 
     await app.close();
