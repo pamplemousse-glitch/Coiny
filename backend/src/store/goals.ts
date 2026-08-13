@@ -88,6 +88,21 @@ export async function saveLadderState(userId: string, state: LadderState, now: D
   await db().insert(ladderState).values(values).onConflictDoUpdate({ target: ladderState.userId, set: values });
 }
 
+/** Persist the context the ladder was last evaluated against, so read paths can
+ *  report the active rung's live progress without re-running the financial
+ *  fan-out, and so a declaration change can re-evaluate immediately. */
+export async function saveLadderInputs(userId: string, ctx: LadderContext, now: Date): Promise<void> {
+  await db()
+    .insert(ladderState)
+    .values({ userId, inputs: ctx, updatedAt: now })
+    .onConflictDoUpdate({ target: ladderState.userId, set: { inputs: ctx, updatedAt: now } });
+}
+
+export async function getLadderInputs(userId: string): Promise<LadderContext | null> {
+  const [row] = await db().select().from(ladderState).where(eq(ladderState.userId, userId));
+  return row?.inputs ?? null;
+}
+
 /** Re-evaluate the ladder and advance the creature's stage.
  *
  *  The stage is written only when it INCREASES. It is a monotonic high-water mark,

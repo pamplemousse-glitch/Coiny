@@ -80,6 +80,11 @@ export function linkTokenCreate(args: {
     // https://plaid.com/docs/api/link/
     products: args.products ?? ['transactions'],
     required_if_supported_products: args.required_if_supported_products ?? ['investments', 'liabilities'],
+    // Two years of history instead of Plaid's 90-day default. The derived
+    // substrate needs 12 months for income volatility and 13 for the surplus
+    // streak (derived.ts, store/goals.ts), and recurring-transaction detection
+    // improves with depth; 90 days starves both for every new link.
+    transactions: { days_requested: 730 },
     user: { client_user_id: args.client_user_id },
     webhook: args.webhook ?? config.PLAID_WEBHOOK_URL,
   });
