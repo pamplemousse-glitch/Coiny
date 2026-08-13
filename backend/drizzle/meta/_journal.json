@@ -278,22 +278,29 @@
     {
       "idx": 39,
       "version": "7",
-      "when": 1786620612433,
+      "when": 1786620600000,
       "tag": "0039_analytics_events",
       "breakpoints": true
     },
     {
       "idx": 42,
       "version": "7",
-      "when": 1786620712433,
+      "when": 1786620700000,
       "tag": "0042_goals_crud",
       "breakpoints": true
     },
     {
       "idx": 43,
       "version": "7",
-      "when": 1786621012433,
+      "when": 1786620800000,
       "tag": "0043_device_timezone",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1786620900000,
+      "tag": "0044_debt_accounts",
       "breakpoints": true
     }
   ]

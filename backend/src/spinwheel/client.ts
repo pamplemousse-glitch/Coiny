@@ -123,6 +123,13 @@ export const SpinwheelDebtSchema = z.object({
   lastPaymentDate: z.string().nullable().optional(),
   openDate: z.string().nullable().optional(),
   paymentHistoryCodes: z.array(z.string()).nullable().optional(),
+  // Creditor identity fields used by the dedupe match key (R-7.13). Bureau
+  // payloads are inconsistent about which alias they use, so accept both
+  // spellings for each and normalize at ingest (store/debts.ts).
+  name: z.string().nullable().optional(),
+  creditorName: z.string().nullable().optional(),
+  last4: z.string().nullable().optional(),
+  accountNumberLast4: z.string().nullable().optional(),
 });
 
 export type SpinwheelDebt = z.infer<typeof SpinwheelDebtSchema>;

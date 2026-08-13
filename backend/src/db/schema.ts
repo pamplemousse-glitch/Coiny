@@ -775,3 +775,109 @@ export const goalPace = pgTable(
   },
   (t) => [index('goal_pace_user_idx').on(t.userId)],
 );
+
+// ---------------------------------------------------------------------------
+// Debt layer (docs/prd.md R-7.13, R-7.14). Migration 0044.
+//
+// Plaid Liabilities and Spinwheel both report debt; without dedupe a user who
+// connects both sees every shared card twice. `debt_source_accounts` holds the
+// normalized per-source rows, `debt_accounts` holds one row per real-world
+// debt, and `debt_merge_decisions` records the user's manual "same account" /
+// "not the same" verdicts so they survive every automatic rebuild.
+// ---------------------------------------------------------------------------
+
+// Normalized per-source debt rows. Replaced wholesale per (user, source) on
+// each sync, then `rebuildDebtAccounts` re-derives the merged records. Kept
+// separate from the merged table so a manual unmerge can be honoured without
+// re-fetching either provider.
+export const debtSourceAccounts = pgTable(
+  'debt_source_accounts',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    source: text('source').notNull(), // 'plaid' | 'spinwheel'
+    sourceAccountId: text('source_account_id').notNull(),
+    issuer: text('issuer'),
+    normalizedIssuer: text('normalized_issuer'),
+    last4: text('last4'),
+    openDate: text('open_date'), // YYYY-MM-DD
+    type: text('type').notNull(), // credit_card | student_loan | mortgage | auto_loan | personal_loan | loan | other
+    balance: numeric('balance'),
+    apr: numeric('apr'), // percent, 18 means 18%
+    minPayment: numeric('min_payment'),
+    creditLimit: numeric('credit_limit'),
+    dueDate: text('due_date'), // YYYY-MM-DD
+    accountStatus: text('account_status'), // 'open' | 'closed' | 'delinquent'
+    syncedAt: timestamp('synced_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('debt_source_accounts_user_source_account_idx').on(t.userId, t.source, t.sourceAccountId)],
+);
+
+// One row per real-world debt (R-7.13). Derived from debt_source_accounts by
+// the match key (normalized_issuer, last4 or open_date, credit_limit) plus the
+// user's merge decisions. Source precedence is asymmetric on purpose: Plaid
+// wins on balance (more current), Spinwheel wins on APR and credit limit
+// (bureau data more complete).
+//
+// `aprOverride`, `nickname`, `statementCloseDay` and the promo fields are
+// user-owned and preserved across rebuilds; everything else is recomputed.
+export const debtAccounts = pgTable(
+  'debt_accounts',
+  {
+    debtId: text('debt_id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    issuer: text('issuer').notNull(),
+    nickname: text('nickname'),
+    type: text('type').notNull(),
+    sourceIds: jsonb('source_ids').$type<string[]>().notNull().default([]), // 'plaid:<account_id>' | 'spinwheel:<debt_id>'
+    balance: numeric('balance'),
+    apr: numeric('apr'), // percent; resolved as aprOverride ?? spinwheel ?? plaid; null means unknown, never zero
+    aprOverride: numeric('apr_override'), // user-declared rate for accounts no source reports a rate for
+    minPayment: numeric('min_payment'),
+    creditLimit: numeric('credit_limit'),
+    dueDay: integer('due_day'), // 1-31
+    statementCloseDay: integer('statement_close_day'), // 1-31; the one manual input (R-7.17)
+    isPromotional: boolean('is_promotional').notNull().default(false),
+    promoEndDate: text('promo_end_date'), // YYYY-MM-DD
+    promoApr: numeric('promo_apr'), // percent
+    status: text('status').notNull().default('open'), // 'open' | 'delinquent' | 'closed'
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('debt_accounts_user_idx').on(t.userId)],
+);
+
+// Manual merge affordance. Keys are source keys ('plaid:<id>' etc.), stored
+// with sourceKeyA < sourceKeyB so each pair has one canonical row. 'same'
+// forces a merge fuzzy matching missed; 'different' vetoes a merge it got
+// wrong. Decisions outlive rebuilds and re-syncs.
+export const debtMergeDecisions = pgTable(
+  'debt_merge_decisions',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    sourceKeyA: text('source_key_a').notNull(),
+    sourceKeyB: text('source_key_b').notNull(),
+    decision: text('decision').notNull(), // 'same' | 'different'
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('debt_merge_decisions_user_pair_idx').on(t.userId, t.sourceKeyA, t.sourceKeyB)],
+);
+
+// Payoff strategy selection (R-7.14). Default is Blend; the pure strategies
+// are one tap away and the dollar cost of the choice is always computed, so
+// only the selection and the extra payment need storage.
+export const debtPlanSettings = pgTable('debt_plan_settings', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  strategy: text('strategy').notNull().default('blend'), // 'blend' | 'avalanche' | 'snowball'
+  extraMonthly: numeric('extra_monthly'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});

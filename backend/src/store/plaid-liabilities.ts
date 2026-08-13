@@ -2,10 +2,16 @@ import { eq, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { plaidLiabilityCache } from '../db/schema.js';
 import type { LiabilitiesGetResponse } from '../plaid/types.js';
+import { ingestPlaidLiabilities } from './debts.js';
 
 export type PlaidLiabilityCache = typeof plaidLiabilityCache.$inferSelect;
 
 export async function cacheLiabilities(userId: string, response: LiabilitiesGetResponse): Promise<void> {
+  // Keep the merged debt layer (R-7.13) in step with every liabilities sync,
+  // whether it came from the webhook or the link-time fetch. Runs first so a
+  // cache-write failure cannot leave the dedupe stale relative to the cache.
+  await ingestPlaidLiabilities(userId, response);
+
   const now = new Date();
 
   type LiabilityRow = typeof plaidLiabilityCache.$inferInsert;
