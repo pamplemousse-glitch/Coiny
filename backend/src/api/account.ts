@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { itemRemove } from '../plaid/client.js';
+import { revokeUpstreamGrants } from '../revoke/upstream.js';
 import { getItemsByUser } from '../store/items.js';
 import { deleteUser, updateDisplayName } from '../store/users.js';
 
@@ -17,9 +18,14 @@ export function registerAccountApi(app: FastifyInstance): void {
     return reply.status(200).send({ ok: true });
   });
 
-  // GLBA/CCPA right-to-delete. Removes all Plaid items (revokes Plaid's
-  // access on their side) and deletes the user row. All child tables
-  // cascade via FK constraints.
+  // GLBA/CCPA right-to-delete. Revokes every upstream authorization we can
+  // revoke, then deletes the user row. All child tables cascade via FK
+  // constraints.
+  //
+  // Revocation runs BEFORE the delete because the tokens live in the rows the
+  // cascade is about to destroy. Every revocation is best-effort and logged:
+  // the deletion right does not depend on a third party being reachable, so a
+  // provider outage must never block it.
   app.delete('/api/account', async (req: FastifyRequest, reply: FastifyReply) => {
     const userId = req.user!.id;
     const items = await getItemsByUser(userId);
@@ -34,8 +40,13 @@ export function registerAccountApi(app: FastifyInstance): void {
       }
     }
 
+    // Non-Plaid grants: TrueLayer is revocable, YNAB and Discogs are not.
+    // See revoke/upstream.ts for which providers offer an endpoint and which
+    // leave the user to revoke from their own settings.
+    const revocations = await revokeUpstreamGrants(userId, req.log);
+
     await deleteUser(userId);
-    req.log.info({ userId, removedItems: items.length }, 'account deleted');
+    req.log.info({ userId, removedItems: items.length, revocations }, 'account deleted');
     return reply.status(204).send();
   });
 }
