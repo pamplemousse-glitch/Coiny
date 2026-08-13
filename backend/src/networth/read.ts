@@ -200,6 +200,18 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
   const bankCacheRow = classCache.get('bank');
   const bankConnected = items.length > 0;
   const bankDisconnected = bankConnected && activeItemIds.size === 0;
+  // Worst lifecycle state across the user's live items (R-8.5). One broken bank
+  // out of three still means the number cannot be refreshed, so the class must
+  // say so rather than averaging the problem away. reauth_required outranks
+  // expiring: a lapsed login is happening now, a warning is about later.
+  const liveItems = items.filter((i) => !i.disabled);
+  const bankHealth: 'reauth_required' | 'expiring' | null = liveItems.some(
+    (i) => i.status === 'reauth_required',
+  )
+    ? 'reauth_required'
+    : liveItems.some((i) => i.status === 'expiring')
+      ? 'expiring'
+      : null;
   // A successful refresh that found zero accounts is a measured zero, not a
   // pending state; the bank bookkeeping row's asOf records that success.
   const bankSyncedEmpty = activeAccounts.length === 0 && bankCacheRow?.asOf != null;
@@ -213,6 +225,7 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
         value: 0,
         asOf: bankCacheRow?.asOf ?? null,
         failed: false,
+        health: bankHealth,
         policy: bankPolicy,
         now,
       });
@@ -227,6 +240,7 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
       value: bankDepositoryTotal,
       asOf: bankOldestAsOf,
       failed: false,
+      health: bankHealth,
       policy: bankPolicy,
       now,
     });
@@ -243,6 +257,7 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
   const invStatus = deriveStatus({
     connected: bankConnected && invRow !== undefined,
     disconnected: bankDisconnected,
+    health: bankHealth,
     value: num(invRow?.valueUsd ?? null),
     asOf: invRow?.asOf ?? null,
     failed: !!invRow?.lastErrorClass && invRow?.asOf === null,

@@ -161,3 +161,45 @@ describe('rollupRows', () => {
     expect(r.status).toBe('stale');
   });
 });
+
+// R-8.5 into R-8.4: the Plaid item lifecycle column now drives two statuses
+// that the read path previously could never emit, which left the Wealth screen
+// unable to show that a bank had broken.
+describe('provider lifecycle statuses', () => {
+  const policy = { freshMs: 24 * 60 * 60 * 1000, excludeMs: 7 * 24 * 60 * 60 * 1000 };
+  const now = new Date('2026-08-13T12:00:00Z');
+  const base = { connected: true, value: 1000, failed: false, policy, now };
+
+  it('reports reauth_required instead of ok while the value is still fresh', () => {
+    const status = deriveStatus({ ...base, asOf: now, health: 'reauth_required' });
+    expect(status).toBe('reauth_required');
+  });
+
+  // A broken login does not make the last known balance wrong, it makes it
+  // un-refreshable. Dropping it would swing the user's total for a reason that
+  // has nothing to do with their money.
+  it('keeps a reauth_required value in the total', () => {
+    expect(includedInTotal('reauth_required')).toBe(true);
+  });
+
+  it('drops a reauth_required value once it passes the never-show age', () => {
+    const old = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000);
+    expect(deriveStatus({ ...base, asOf: old, health: 'reauth_required' })).toBe('stale_excluded');
+  });
+
+  it('lets an expiring connection keep flowing normally', () => {
+    expect(deriveStatus({ ...base, asOf: now, health: 'expiring' })).toBe('expiring');
+    expect(includedInTotal('expiring')).toBe(true);
+  });
+
+  // Showing revoked data is wrong, not stale, so revocation outranks both.
+  it('does not let lifecycle state mask a revocation', () => {
+    const status = deriveStatus({ ...base, asOf: now, disconnected: true, health: 'expiring' });
+    expect(status).toBe('disconnected');
+  });
+
+  it('does not invent a value when the class has none', () => {
+    const status = deriveStatus({ ...base, value: null, asOf: null, failed: true, health: 'reauth_required' });
+    expect(status).toBe('error');
+  });
+});
