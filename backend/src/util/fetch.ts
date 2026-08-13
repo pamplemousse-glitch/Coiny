@@ -1,4 +1,11 @@
-const TIMEOUT_MS = 5_000;
+// 5s is the production per-attempt budget (engineering-budgets R-16.5).
+//
+// Overridable ONLY so tests can raise it. Under a loaded CI runner the event
+// loop can stall past 5s while a mocked response sits queued, so the abort
+// fires, every retry aborts too, and a test that never touched the network
+// fails as though the provider were down. That is the runner's speed being
+// asserted, not the code's behaviour. Production never sets this.
+const TIMEOUT_MS = Number(process.env.FETCH_TIMEOUT_MS) || 5_000;
 const RETRY_DELAYS_MS = [200, 400];
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 
