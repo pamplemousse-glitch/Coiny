@@ -1,236 +1,45 @@
 import LinkKit
 import SwiftUI
 
-/// Four-screen onboarding flow:
-/// 1. Welcome — introduce Coiny
-/// 2. Enter Name — pre-filled from Apple if available, otherwise required input
-/// 3. Link Bank — Plaid Link flow
-/// 4. Meet Pet — celebrate completion + segue to RootView
+/// The PRD section 5.2 onboarding flow. Screen 0 (Sign in with Apple) is
+/// `SignInView`; this container owns:
+///
+/// 1. The egg, 2. "What do you have?", 3. "Roughly how much?", 4. The number,
+/// 5. One connection (Plaid Link), 6. Found money (auto-skipped when empty,
+/// R-5.6), 7. The hatch, 8. Notifications.
+///
+/// Name entry is deleted per R-5.2; Sign in with Apple supplies identity.
+/// All state decisions live in `OnboardingViewModel`; this file owns only
+/// composition and the Plaid Link presentation.
 struct OnboardingView: View {
     @Binding var onboardingComplete: Bool
-    /// Pre-filled from Apple Sign In on first login; empty string on repeat logins.
+    /// Retained for call-site compatibility with `CoinyApp`. Unused: the name
+    /// entry screen no longer exists (R-5.2).
     var appleDisplayName: String = ""
 
-    @State private var step: OnboardingStep = .welcome
-
-    var body: some View {
-        TabView(selection: $step) {
-            WelcomePage(onNext: { step = .enterName })
-                .tag(OnboardingStep.welcome)
-
-            EnterNamePage(
-                initialName: appleDisplayName,
-                onNext: { step = .linkBank }
-            )
-            .tag(OnboardingStep.enterName)
-
-            LinkBankPage(
-                onNext: { step = .meetPet },
-                onSkip: { onboardingComplete = true }
-            )
-            .tag(OnboardingStep.linkBank)
-
-            MeetPetPage(onFinish: { onboardingComplete = true })
-                .tag(OnboardingStep.meetPet)
-        }
-        .tabViewStyle(.page(indexDisplayMode: .always))
-        .indexViewStyle(.page(backgroundDisplayMode: .always))
-        .background(Color(.systemGroupedBackground))
-    }
-}
-
-private enum OnboardingStep: Hashable {
-    case welcome
-    case enterName
-    case linkBank
-    case meetPet
-}
-
-// MARK: - Pages
-
-private struct WelcomePage: View {
-    let onNext: () -> Void
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Spacer()
-
-            Image(systemName: "face.smiling.inverse")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 140, height: 140)
-                .foregroundStyle(.purple, .pink)
-
-            VStack(spacing: 8) {
-                Text("Meet Coiny")
-                    .font(.largeTitle.bold())
-                Text("Your pocket-sized financial companion")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-
-            Spacer()
-
-            Button(action: onNext) {
-                Text("Get started")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .padding(.horizontal)
-            .padding(.bottom, 60)
-        }
-        .padding(.horizontal)
-    }
-}
-
-private struct EnterNamePage: View {
-    let initialName: String
-    let onNext: () -> Void
-
-    @State private var name: String = ""
-    @State private var isSaving = false
-    @State private var errorMessage: String?
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Spacer()
-
-            Image(systemName: "person.crop.circle.fill")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 100, height: 100)
-                .foregroundStyle(.purple)
-
-            VStack(spacing: 8) {
-                Text("What's your name?")
-                    .font(.largeTitle.bold())
-                Text("Coiny likes to know who it's living with.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-
-            TextField("Your name", text: $name)
-                .textContentType(.name)
-                .autocorrectionDisabled()
-                .padding()
-                .background(Color(.secondarySystemGroupedBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(.horizontal)
-
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            }
-
-            Spacer()
-
-            Button(action: save) {
-                Group {
-                    if isSaving {
-                        ProgressView().tint(.white)
-                    } else {
-                        Text("Continue")
-                    }
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
-            .padding(.horizontal)
-            .padding(.bottom, 60)
-        }
-        .padding(.horizontal)
-        .onAppear {
-            if name.isEmpty { name = initialName }
-        }
-    }
-
-    private func save() {
-        let trimmed = name.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
-        isSaving = true
-        errorMessage = nil
-        Task { @MainActor in
-            defer { isSaving = false }
-            do {
-                try await API.shared.updateDisplayName(trimmed)
-                onNext()
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-        }
-    }
-}
-
-private struct LinkBankPage: View {
-    let onNext: () -> Void
-    let onSkip: () -> Void
-
-    @State private var isLoading = false
+    @State private var viewModel = OnboardingViewModel()
     @State private var showLink = false
     @State private var linkHandler: Handler?
-    @State private var errorMessage: String?
+    // SwiftUI qualified: LinkKit also exports an `Environment` type.
+    @SwiftUI.Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @SwiftUI.Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        VStack(spacing: 24) {
-            Spacer()
-
-            Image(systemName: "building.columns.fill")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 120, height: 120)
-                .foregroundStyle(.blue)
-
-            VStack(spacing: 12) {
-                Text("Link your bank")
-                    .font(.largeTitle.bold())
-                Text("Coiny reacts to your spending in real time. We use bank-grade encryption through Plaid — " +
-                     "your credentials never touch our servers.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+        ZStack {
+            OnboardingPalette.screen.ignoresSafeArea()
+            content
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 8)))
+                .id(viewModel.step)
+        }
+        .animation(.easeOut(duration: 0.22), value: viewModel.step)
+        .task { await viewModel.start() }
+        .onChange(of: viewModel.completed) {
+            if viewModel.completed { onboardingComplete = true }
+        }
+        .onChange(of: scenePhase) {
+            if scenePhase == .background {
+                Task { await viewModel.flushTelemetry() }
             }
-            .padding(.horizontal)
-
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            }
-
-            Spacer()
-
-            VStack(spacing: 12) {
-                Button(action: startLinking) {
-                    Group {
-                        if isLoading {
-                            ProgressView()
-                                .tint(.white)
-                        } else {
-                            Label("Link with Plaid", systemImage: "link")
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .disabled(isLoading)
-
-                Button("Skip for now", action: onSkip)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal)
-            .padding(.bottom, 60)
         }
         .sheet(isPresented: $showLink) {
             if let handler = linkHandler {
@@ -240,86 +49,96 @@ private struct LinkBankPage: View {
         }
     }
 
-    private func startLinking() {
-        isLoading = true
-        errorMessage = nil
-        Task { @MainActor in
-            defer { isLoading = false }
-            do {
-                let token = try await API.shared.createLinkToken()
-                var cfg = LinkTokenConfiguration(token: token) { success in
-                    showLink = false
-                    Task { @MainActor in
-                        do {
-                            try await API.shared.exchangePublicToken(success.publicToken)
-                            UserDefaults.standard.set(true, forKey: "bankLinked")
-                            onNext()
-                        } catch {
-                            errorMessage = error.localizedDescription
-                        }
-                    }
-                }
-                cfg.onExit = { _ in showLink = false }
-                switch Plaid.create(cfg) {
-                case .success(let handler):
-                    linkHandler = handler
-                    showLink = true
-                case .failure(let error):
-                    errorMessage = error.localizedDescription
-                }
-            } catch {
-                errorMessage = error.localizedDescription
+    @ViewBuilder
+    private var content: some View {
+        switch viewModel.step {
+        case .egg:
+            OnboardingEggScreen {
+                Task { await viewModel.continueFromEgg() }
             }
+        case .declare:
+            OnboardingDeclareScreen(
+                viewModel: viewModel,
+                onContinue: { Task { await viewModel.continueFromDeclare() } },
+                onSkip: {
+                    viewModel.selectedClasses = []
+                    Task { await viewModel.continueFromDeclare() }
+                }
+            )
+        case .amounts:
+            OnboardingAmountsScreen(viewModel: viewModel) {
+                Task { await viewModel.continueFromAmounts() }
+            }
+        case .number:
+            OnboardingNumberScreen(sheet: viewModel.sheet) {
+                Task { await viewModel.continueFromNumber() }
+            }
+            .task { await viewModel.numberShown() }
+        case .connect:
+            if viewModel.isOffline {
+                OnboardingOfflineScreen {
+                    viewModel.retryAfterOffline()
+                }
+            } else {
+                OnboardingConnectScreen(
+                    isBusy: viewModel.isPreparingLink || viewModel.isExchangingToken,
+                    errorMessage: viewModel.linkErrorMessage,
+                    onConnect: { startLink() },
+                    onSkip: { Task { await viewModel.skipConnection() } }
+                )
+            }
+        case .reveal:
+            OnboardingRevealScreen(
+                items: viewModel.revealItems,
+                annualTotalUSD: viewModel.revealAnnualTotalUSD
+            ) {
+                Task { await viewModel.continueFromReveal() }
+            }
+        case .hatch:
+            OnboardingHatchScreen(
+                isDisconnected: viewModel.isDisconnectedHatch,
+                greeting: viewModel.hatchGreeting,
+                instruction: viewModel.hatchInstruction,
+                onConnect: { viewModel.connectFromHatch() },
+                onContinue: { Task { await viewModel.continueFromHatch() } }
+            )
+        case .notifications:
+            OnboardingNotificationsScreen(
+                onResolved: { granted in
+                    Task { await viewModel.notificationPermissionResolved(granted: granted) }
+                },
+                onSkip: { Task { await viewModel.skipNotifications() } }
+            )
         }
     }
-}
 
-private struct MeetPetPage: View {
-    let onFinish: () -> Void
+    // MARK: - Plaid Link
 
-    @State private var bounce: Bool = false
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Spacer(minLength: 24)
-
-            Image(systemName: "face.smiling.inverse")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 140, height: 140)
-                .foregroundStyle(.purple, .pink)
-                .scaleEffect(bounce ? 1.05 : 1.0)
-                .animation(.easeInOut(duration: 1.2).repeatForever(), value: bounce)
-                .onAppear { bounce = true }
-
-            Text("You're all set!")
-                .font(.largeTitle.bold())
-
-            TabView {
-                ForEach(coinyTips, id: \.title) { tip in
-                    TipCard(
-                        icon: tip.icon,
-                        iconColor: tip.color,
-                        title: tip.title,
-                        description: tip.description
-                    )
-                    .padding(.horizontal)
+    private func startLink() {
+        Task { @MainActor in
+            guard let token = await viewModel.prepareLink() else { return }
+            var config = LinkTokenConfiguration(token: token) { success in
+                showLink = false
+                Task { @MainActor in
+                    await viewModel.linkSucceeded(publicToken: success.publicToken)
                 }
             }
-            .tabViewStyle(.page)
-            .indexViewStyle(.page(backgroundDisplayMode: .always))
-            .frame(height: 220)
-
-            Spacer(minLength: 8)
-
-            Button(action: onFinish) {
-                Text("Let's go →")
-                    .frame(maxWidth: .infinity)
+            config.onExit = { exit in
+                showLink = false
+                Task { @MainActor in
+                    await viewModel.linkExited(
+                        hadError: exit.error != nil,
+                        exitStatus: exit.metadata.status?.description
+                    )
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .padding(.horizontal)
-            .padding(.bottom, 60)
+            switch Plaid.create(config) {
+            case .success(let handler):
+                linkHandler = handler
+                showLink = true
+            case .failure:
+                await viewModel.linkExited(hadError: true, exitStatus: "sdk_create_failed")
+            }
         }
     }
 }
