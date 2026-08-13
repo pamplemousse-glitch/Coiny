@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { petState, users } from '../db/schema.js';
 import { decryptString, encryptString } from '../util/crypto.js';
+import { trackServerEvent } from './analytics.js';
 
 export type UserRow = typeof users.$inferSelect;
 
@@ -30,6 +31,11 @@ export async function findOrCreateUser(args: FindOrCreateUserArgs): Promise<stri
     // Every user gets exactly one pet row, initialized with defaults.
     await tx.insert(petState).values({ userId: id });
   });
+
+  // Cohort day 0 for every retention metric (prd.md R-2.1). Emitted only on
+  // creation, never on a returning sign-in, and only after the transaction
+  // committed. Method only: never the sub, never the email.
+  await trackServerEvent(id, 'signup_completed', { method: args.appleSub ? 'apple' : 'google' });
 
   return id;
 }

@@ -7,6 +7,7 @@ import {
   linkTokenCreate,
   recurringTransactionsGet,
 } from '../plaid/client.js';
+import { trackServerEvent } from '../store/analytics.js';
 import { disableItem, getItemsByUser, upsertItem } from '../store/items.js';
 import { cacheLiabilities } from '../store/plaid-liabilities.js';
 import { upsertRecurringStreams } from '../store/plaid-recurring.js';
@@ -30,6 +31,12 @@ export function registerPlaidLinkApi(app: FastifyInstance): void {
     await upsertItem({ itemId: item_id, accessToken: access_token, userId: linkUserId });
 
     req.log.info({ item_id }, 'plaid item linked');
+
+    // Funnel instrumentation (prd.md R-24.2): the successful exchange is the
+    // server's view of a new connection. asset_class is unknown until the
+    // first data fetch, so it is omitted rather than guessed.
+    const nthConnection = (await getItemsByUser(linkUserId)).length;
+    await trackServerEvent(linkUserId, 'account_connected', { provider: 'plaid', nth_connection: nthConnection });
 
     // Seed recurring streams and liability cache in the background.
     // Non-fatal — will populate on the first webhook if this fails.

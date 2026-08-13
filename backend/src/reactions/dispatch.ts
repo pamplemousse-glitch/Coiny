@@ -1,4 +1,5 @@
 import { sendApnsPush } from '../push/apns.js';
+import { trackServerEvent } from '../store/analytics.js';
 import { listDeviceTokens } from '../store/devices.js';
 import { canSendPush, recordNotification } from '../store/notifications.js';
 import type { Reaction } from './types.js';
@@ -51,7 +52,12 @@ async function fanOutPush(userId: string, reaction: Reaction, eventType: string)
     const results = await Promise.allSettled(ios.map((t) => sendApnsPush(t.token, title, body)));
 
     const delivered = results.some((r) => r.status === 'fulfilled');
-    if (delivered) await recordNotification(userId, eventType);
+    if (delivered) {
+      await recordNotification(userId, eventType);
+      // Push budget audit signal (prd.md §9, R-24.2). Event type only, never
+      // title/body (which are generic anyway by rule #2).
+      await trackServerEvent(userId, 'push_sent', { type: eventType });
+    }
 
     for (const r of results) {
       if (r.status === 'rejected') {

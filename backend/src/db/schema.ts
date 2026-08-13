@@ -1,4 +1,5 @@
 import {
+  bigserial,
   boolean,
   date,
   index,
@@ -715,3 +716,27 @@ export const petProgression = pgTable('pet_progression', {
   stageEnteredAt: timestamp('stage_entered_at', { withTimezone: true }).notNull().defaultNow(),
   unlockedArtifacts: jsonb('unlocked_artifacts').$type<string[]>().notNull().default([]),
 });
+
+// First-party analytics events (docs/prd.md R-24.1, engineering-budgets §8).
+// Append-only; retention cohorts cannot be backfilled, so nothing ever updates
+// a row. Properties hold ONLY the whitelisted categorical/bucketed values from
+// src/analytics/events.ts: no amounts, no merchant names, no PII (R-22.6).
+// Rows cascade on user deletion so account deletion wipes the trail.
+export const analyticsEvents = pgTable(
+  'analytics_events',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    event: text('event').notNull(),
+    properties: jsonb('properties').$type<Record<string, unknown>>().notNull().default({}),
+    // Device clock at emission; informational only. Retention math uses server_ts.
+    clientTs: timestamp('client_ts', { withTimezone: true }),
+    serverTs: timestamp('server_ts', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('analytics_events_user_idx').on(t.userId),
+    index('analytics_events_event_server_ts_idx').on(t.event, t.serverTs),
+  ],
+);
