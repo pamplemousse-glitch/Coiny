@@ -72,6 +72,12 @@ struct CoinyApp: App {
     }
 
     private func requestPushPermission() async {
+        // A user who tapped "Not now" on the onboarding notifications screen
+        // never saw the system prompt, so their status is still .notDetermined
+        // and this would prompt them anyway, one screen later, against their
+        // stated answer. Push permission is not recoverable once denied, so
+        // honor the decline rather than spending the one prompt iOS grants.
+        if UserDefaults.standard.bool(forKey: "pushPromptDeclinedInOnboarding") { return }
         let center = UNUserNotificationCenter.current()
         let settings = await center.notificationSettings()
         guard settings.authorizationStatus == .notDetermined else { return }

@@ -47,6 +47,7 @@
 		390ED47A387E6FD84A512DA0 /* PerformanceViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8611F52E6CEAC6B7A81804A /* PerformanceViewModelTests.swift */; };
 		3B189E38086A93A2FF74DC40 /* WaitingForFirstReactionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44BB0C2BC76186A9613E3F3D /* WaitingForFirstReactionView.swift */; };
 		3C397BA178634116F5947E26 /* HomeTabUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9044185A2145890BDCC4E96E /* HomeTabUITests.swift */; };
+		422AB0006F04D017335BE212 /* API+Telemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63D1FEEDB72F10002BAC428F /* API+Telemetry.swift */; };
 		4697735618CC62AA1873D44E /* CoinbaseViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C89B7BBEFA53BE9D727F1A1 /* CoinbaseViewModelTests.swift */; };
 		4887E84F9604FB4286CD1F47 /* CoinyTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AE46D8172612594E679EF5A /* CoinyTheme.swift */; };
 		48A0B70757F046C4FEBCFDE4 /* OnboardingViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0336E1DC0E43C3546544A9 /* OnboardingViewModelTests.swift */; };
@@ -223,6 +224,7 @@
 		5E69C409A6001E059800119A /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		5EA22C9CCB74F58819DC9960 /* WealthTabUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WealthTabUITests.swift; sourceTree = "<group>"; };
 		618CA9077B0177F449506F80 /* Coiny.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Coiny.entitlements; sourceTree = "<group>"; };
+		63D1FEEDB72F10002BAC428F /* API+Telemetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Telemetry.swift"; sourceTree = "<group>"; };
 		65284E3BE19D29FB121805ED /* API+ManualAssets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+ManualAssets.swift"; sourceTree = "<group>"; };
 		658AD9ADB0EEB247C3F10450 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		65C1C51D5C4985B0BAE73002 /* NetWorthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetWorthViewModel.swift; sourceTree = "<group>"; };
@@ -400,6 +402,7 @@
 				1AFF7161BAE8ED517D1AF774 /* API+Performance.swift */,
 				AA7BBBE9DBF704764A61EDB0 /* API+Polymarket.swift */,
 				552CD4EF5B90F5013088AFD0 /* API+Recurring.swift */,
+				63D1FEEDB72F10002BAC428F /* API+Telemetry.swift */,
 				81CC75C64283FC4C17486D50 /* API+Wealth.swift */,
 				289A0FEEDF04BCEAF19628FE /* HTTPClient.swift */,
 				879471FBA14585F06C8CF171 /* Keychain.swift */,
@@ -720,6 +723,7 @@
 				B7D9EFF6F2021787259829DD /* API+Performance.swift in Sources */,
 				13E34CC2B6A97EC072111332 /* API+Polymarket.swift in Sources */,
 				034D1AFEC10BE47CFC858D63 /* API+Recurring.swift in Sources */,
+				422AB0006F04D017335BE212 /* API+Telemetry.swift in Sources */,
 				2DEB609DEA7DF5FC55C4547E /* API+Wealth.swift in Sources */,
 				071AE3704E1FA8543020F522 /* API.swift in Sources */,
 				7E7515B6F36304A89398060F /* AlpacaView.swift in Sources */,

@@ -148,13 +148,19 @@ struct DeclarationSheet: Codable, Equatable, Sendable {
     /// Telemetry properties for `onboarding_declared` per section 24: class
     /// list, count, and per-class bucketed value. Never the amounts themselves.
     var telemetryProperties: [String: TelemetryValue] {
+        var bands: [String: String] = [:]
+        for asset in assets {
+            guard let value = asset.bucketedValueUSD else { continue }
+            bands[asset.assetClass.telemetryKey] = TelemetryValue.usdBucketLabel(value)
+        }
         var props: [String: TelemetryValue] = [
             "classes": .strings(assets.map { $0.assetClass.telemetryKey }),
             "class_count": .int(assets.count),
         ]
-        for asset in assets {
-            guard let value = asset.bucketedValueUSD else { continue }
-            props["value_\(asset.assetClass.telemetryKey)"] = .usdBucket(value)
+        // Nested under one key, not flattened into the envelope: the server
+        // schema is a strict object and would reject value_<class> keys.
+        if !bands.isEmpty {
+            props["value_band_by_class"] = .bands(bands)
         }
         return props
     }

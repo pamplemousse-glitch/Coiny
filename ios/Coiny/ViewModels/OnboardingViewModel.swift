@@ -87,6 +87,8 @@ final class OnboardingViewModel {
 
     private var signupAt: Date?
     private var emittedFirstNumber = false
+    /// Monotonic position in the funnel, sent with every onboarding_step_completed.
+    private var stepIndex = 0
 
     init(
         api: OnboardingAPI = API.shared,
@@ -106,10 +108,14 @@ final class OnboardingViewModel {
 
     /// Called once when the flow appears, immediately after sign-in. Starts the
     /// R-5.1 clock.
+    ///
+    /// Deliberately emits nothing: `signup_completed` is a server-only event
+    /// (the backend emits it from findOrCreateUser) precisely so a device
+    /// cannot forge the cohort's day 0. This only anchors the local clock that
+    /// seconds_since_signup is measured against.
     func start() async {
         guard signupAt == nil else { return }
         signupAt = now()
-        await telemetry.emit("signup_completed", ["method": .string("apple")])
     }
 
     func continueFromEgg() async {
@@ -269,9 +275,8 @@ final class OnboardingViewModel {
         } else {
             revealItems = items
             step = .reveal
-            await telemetry.emit("subscription_reveal_shown", [
-                "subscription_count": .int(items.count),
-                "annual_total": .usdBucket(RevealBuilder.annualTotalUSD(items)),
+            await telemetry.emit("subscriptions_revealed", [
+                "subscription_count_band": .string(Self.countBand(items.count)),
             ])
         }
     }
@@ -299,14 +304,7 @@ final class OnboardingViewModel {
     private func goToHatch() async {
         guard step != .hatch else { return }
         step = .hatch
-        let seconds = secondsSinceSignup()
-        var props: [String: TelemetryValue] = [
-            "connected": .bool(connectionOutcome == .connected),
-        ]
-        if let seconds {
-            props["seconds_since_signup"] = .int(seconds)
-        }
-        await telemetry.emit("hatch_shown", props)
+        await telemetry.emit("pet_hatched", ["seconds_since_signup": .int(secondsSinceSignup() ?? 0)])
     }
 
     var isDisconnectedHatch: Bool {
@@ -356,10 +354,10 @@ final class OnboardingViewModel {
     }
 
     func skipNotifications() async {
-        // Recorded so the app shell can honor the decline. CoinyApp currently
-        // re-prompts on RootView appear (pre-existing behavior outside this
-        // flow's file scope); guarding that call on this flag is a one-line
-        // follow-up there.
+        // Recorded so the app shell honors the decline: CoinyApp checks this
+        // before its own request on RootView appear. Without it a user who
+        // tapped "Not now" here would be prompted anyway one screen later,
+        // because declining our screen leaves the system status .notDetermined.
         UserDefaults.standard.set(true, forKey: "pushPromptDeclinedInOnboarding")
         await completeStep("notifications_skipped")
         await finish()
@@ -379,17 +377,34 @@ final class OnboardingViewModel {
     // MARK: Helpers
 
     private func completeStep(_ name: String) async {
-        await telemetry.emit("onboarding_step_completed", ["step": .string(name)])
+        // step_index is required by the server schema, and it is what makes the
+        // funnel orderable without hard-coding the screen order in the query.
+        await telemetry.emit("onboarding_step_completed", [
+            "step": .string(name),
+            "step_index": .int(stepIndex),
+        ])
+        stepIndex += 1
+    }
+
+    /// Bands the count so the event carries a magnitude, never an exact tally
+    /// that could narrow down who a user is.
+    static func countBand(_ count: Int) -> String {
+        switch count {
+        case ..<1: return "0"
+        case ..<3: return "1-2"
+        case ..<6: return "3-5"
+        case ..<11: return "6-10"
+        default: return "11+"
+        }
     }
 
     private func emitFirstNumberIfNeeded(classCount: Int) async {
         guard !emittedFirstNumber else { return }
         emittedFirstNumber = true
-        var props: [String: TelemetryValue] = ["class_count": .int(classCount)]
-        if let seconds = secondsSinceSignup() {
-            props["seconds_since_signup"] = .int(seconds)
-        }
-        await telemetry.emit("first_number_shown", props)
+        await telemetry.emit("first_number_shown", [
+            "class_count": .int(classCount),
+            "seconds_since_signup": .int(secondsSinceSignup() ?? 0),
+        ])
     }
 
     private func secondsSinceSignup() -> Int? {

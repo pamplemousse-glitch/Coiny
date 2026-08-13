@@ -23,6 +23,9 @@ enum TelemetryValue: Equatable, Sendable {
     case int(Int)
     case bool(Bool)
     case strings([String])
+    /// A map of token to bucketed band, for events whose schema nests per-class
+    /// values under a single key rather than flattening them into the envelope.
+    case bands([String: String])
 
     /// Buckets a USD amount into the coarse enum the spec mandates instead of
     /// ever sending the amount itself.
@@ -47,6 +50,8 @@ enum TelemetryValue: Equatable, Sendable {
         case .int(let value): return String(value)
         case .bool(let value): return String(value)
         case .strings(let values): return "[" + values.joined(separator: ",") + "]"
+        case .bands(let map):
+            return "{" + map.sorted { $0.key < $1.key }.map { "\($0.key):\($0.value)" }.joined(separator: ",") + "}"
         }
     }
 }
@@ -59,6 +64,7 @@ extension TelemetryValue: Encodable {
         case .int(let value): try container.encode(value)
         case .bool(let value): try container.encode(value)
         case .strings(let values): try container.encode(values)
+        case .bands(let map): try container.encode(map)
         }
     }
 }
@@ -80,9 +86,9 @@ struct TelemetryEvent: Encodable, Equatable, Sendable {
 
 // MARK: - Transport
 
-/// The seam between the emitter and the wire. The production implementation
-/// will POST batches to `/api/telemetry` once that endpoint exists; until then
-/// `LogTelemetryTransport` stands in.
+/// The seam between the emitter and the wire. `APITelemetryTransport` (in
+/// API+Telemetry.swift) is the production implementation; `LogTelemetryTransport`
+/// is kept for tests and for reading the funnel in Console without a backend.
 protocol TelemetryTransport: Sendable {
     func send(_ events: [TelemetryEvent]) async throws
 }
@@ -111,7 +117,7 @@ struct LogTelemetryTransport: TelemetryTransport {
 /// demand (the onboarding flow flushes when it completes and when the app
 /// backgrounds). Failed flushes requeue so events are not dropped silently.
 actor TelemetryClient {
-    static let shared = TelemetryClient(transport: LogTelemetryTransport())
+    static let shared = TelemetryClient(transport: APITelemetryTransport())
 
     static let flushThreshold = 25
 
