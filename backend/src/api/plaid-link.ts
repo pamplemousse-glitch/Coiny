@@ -7,6 +7,7 @@ import {
   linkTokenCreate,
   recurringTransactionsGet,
 } from '../plaid/client.js';
+import { canAddConnection } from '../store/entitlements.js';
 import { disableItem, getItemsByUser, upsertItem } from '../store/items.js';
 import { cacheLiabilities } from '../store/plaid-liabilities.js';
 import { upsertRecurringStreams } from '../store/plaid-recurring.js';
@@ -16,7 +17,15 @@ const ExchangeBodySchema = z.object({
 });
 
 export function registerPlaidLinkApi(app: FastifyInstance): void {
-  app.post('/api/plaid/link-token', async (req: FastifyRequest) => {
+  app.post('/api/plaid/link-token', async (req: FastifyRequest, reply: FastifyReply) => {
+    // The connection gate (R-25.6, server-enforced so every client inherits
+    // it). Checked before the Link flow starts so the user is never walked
+    // through bank auth only to be refused; the 'connection_limit' code is the
+    // client's cue to show the paywall (R-25.3).
+    const gate = await canAddConnection(req.user!.id);
+    if (!gate.ok) {
+      return reply.status(403).send({ error: 'connection_limit', tier: gate.tier, limit: gate.limit });
+    }
     const res = await linkTokenCreate({ client_user_id: req.user!.id });
     return { link_token: res.link_token, expiration: res.expiration };
   });
@@ -24,6 +33,13 @@ export function registerPlaidLinkApi(app: FastifyInstance): void {
   app.post('/api/plaid/exchange-token', async (req: FastifyRequest, reply: FastifyReply) => {
     const parsed = ExchangeBodySchema.safeParse(req.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
+
+    // Backstop for the same gate: a link token minted before the limit was
+    // reached must not become an over-limit connection.
+    const gate = await canAddConnection(req.user!.id);
+    if (!gate.ok) {
+      return reply.status(403).send({ error: 'connection_limit', tier: gate.tier, limit: gate.limit });
+    }
 
     const { access_token, item_id } = await itemPublicTokenExchange(parsed.data.public_token);
     const linkUserId = req.user!.id;

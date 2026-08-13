@@ -19,7 +19,7 @@ export async function resetDatabase(): Promise<void> {
 
   // Truncate in FK-safe order (CASCADE handles children automatically).
   await db().execute(
-    sql`TRUNCATE sessions, reaction_history, processed_events, plaid_items, category_overrides, device_tokens, transactions, pet_state, users RESTART IDENTITY CASCADE`,
+    sql`TRUNCATE sessions, reaction_history, processed_events, plaid_items, category_overrides, device_tokens, transactions, pet_state, app_store_notifications, users RESTART IDENTITY CASCADE`,
   );
   _resetOverrideCache();
 

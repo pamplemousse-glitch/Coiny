@@ -704,6 +704,82 @@ export const goalPeriods = pgTable(
   (t) => [uniqueIndex('goal_periods_user_key_start_idx').on(t.userId, t.guardrailKey, t.periodStart)],
 );
 
+// ---------------------------------------------------------------------------
+// Subscription entitlements (docs/prd.md §25). The server is the authority on
+// whether a user has paid; the iOS client reports Apple's signed transaction
+// JWS and the App Store Server Notifications V2 webhook keeps this in sync
+// with renewals, billing retries, grace periods and refunds.
+// ---------------------------------------------------------------------------
+
+// One row per user. `appAccountToken` is minted server-side (crypto.randomUUID)
+// on first read and passed to StoreKit as Product.PurchaseOption.appAccountToken,
+// so server notifications can be matched back to a user even when the purchase
+// completed while the app was backgrounded and the client never phoned home.
+//
+// `tier`/`status` record the last known Apple-side state; whether the user is
+// currently entitled is always computed by resolveEntitlement() against the
+// clock, never trusted from a stored boolean.
+export const entitlements = pgTable(
+  'entitlements',
+  {
+    userId: text('user_id')
+      .primaryKey()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    appAccountToken: text('app_account_token').notNull(),
+    tier: text('tier').notNull().default('free'), // free | individual | household
+    status: text('status').notNull().default('none'), // none | active | grace | billing_retry | expired | revoked
+    productId: text('product_id'),
+    // Apple's stable subscription identifier. Bound to exactly one Coiny user;
+    // a second user presenting the same subscription is rejected (409).
+    originalTransactionId: text('original_transaction_id'),
+    environment: text('environment'), // Sandbox | Production, as reported by Apple
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    graceExpiresAt: timestamp('grace_expires_at', { withTimezone: true }),
+    autoRenew: boolean('auto_renew').notNull().default(false),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('entitlements_app_account_token_idx').on(t.appAccountToken),
+    uniqueIndex('entitlements_original_transaction_idx').on(t.originalTransactionId),
+  ],
+);
+
+// Household membership. The owner is the purchaser of the household tier; a
+// member inherits `household` entitlement while the owner's subscription
+// resolves to household. Capped at 5 people INCLUDING the owner (so at most 4
+// rows per owner), enforced in the store layer. A user can belong to at most
+// one household. The invite/consent flow is deliberately unbuilt: shipping the
+// tier requires the lawyer-reviewed two-party consent flow (obligations §2).
+export const householdMembers = pgTable(
+  'household_members',
+  {
+    id: serial('id').primaryKey(),
+    ownerUserId: text('owner_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    memberUserId: text('member_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('household_members_member_idx').on(t.memberUserId),
+    index('household_members_owner_idx').on(t.ownerUserId),
+  ],
+);
+
+// Idempotency ledger for App Store Server Notifications V2. Apple retries
+// delivery, so each notificationUUID is processed at most once.
+export const appStoreNotifications = pgTable('app_store_notifications', {
+  notificationUuid: text('notification_uuid').primaryKey(),
+  notificationType: text('notification_type').notNull(),
+  subtype: text('subtype'),
+  originalTransactionId: text('original_transaction_id'),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // The creature's progression. Stage is driven by the ladder and NEVER regresses.
 // Vitality and rest are computed, not stored, because they are derived from the
 // current period's guardrails and should never be stale.

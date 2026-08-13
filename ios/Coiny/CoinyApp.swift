@@ -44,6 +44,15 @@ struct CoinyApp: App {
             }
             .animation(.easeInOut, value: isSignedIn)
             .animation(.easeInOut, value: onboardingComplete)
+            // The Transaction.updates listener runs for the whole app lifetime:
+            // a purchase can complete while the app is backgrounded (ask-to-buy,
+            // billing recovery, another device) and must never be dropped.
+            .task {
+                StoreKitService.shared.start()
+                if isSignedIn && !CoinyApp.isUITesting {
+                    await StoreKitService.shared.refreshEntitlements()
+                }
+            }
             // Sign-out clears local state and returns to sign-in screen.
             .onReceive(NotificationCenter.default.publisher(for: .coinySignedOut)) { _ in
                 Task { await API.shared.signOut() }

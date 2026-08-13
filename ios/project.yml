@@ -126,6 +126,10 @@ schemes:
         CoinyUITests: [test]
     run:
       config: Debug
+      # Local StoreKit configuration: makes the subscription products, purchase
+      # flow and renewals testable in the simulator with no App Store Connect
+      # products (those are blocked on the org enrollment, R-27.1).
+      storeKitConfiguration: Coiny.storekit
     test:
       config: Debug
       targets:
