@@ -13,6 +13,7 @@ import { registerDebugApi, registerDebugSessionApi } from './api/debug.js';
 import { registerDevicesApi } from './api/devices.js';
 import { registerDiscogsApi } from './api/discogs.js';
 import { registerEnergyApi } from './api/energy.js';
+import { registerEntitlementsApi } from './api/entitlements.js';
 import { registerFarmlandApi } from './api/farmland.js';
 import { registerGoalsApi } from './api/goals.js';
 import { registerHyperliquidApi } from './api/hyperliquid.js';
@@ -45,6 +46,7 @@ import { runMigrations } from './db/migrate.js';
 import { registerAuthPlugin } from './plugins/auth.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
 import { loggerOptions } from './plugins/logger.js';
+import { registerAppStoreWebhook } from './webhook/appstore.js';
 import { registerPlaidWebhook } from './webhook/plaid.js';
 
 /** Debug routes are for local development and the iOS simulator only.
@@ -97,6 +99,9 @@ async function buildApp() {
   // Unauthenticated routes
   app.get('/health', async () => ({ ok: true }));
   registerPlaidWebhook(app);
+  // Unauthenticated in the session sense only: every request is JWS-verified
+  // against Apple's pinned root before anything is read from it.
+  registerAppStoreWebhook(app);
 
   // Public auth endpoints (no session required)
   app.register(async (scope) => {
@@ -119,6 +124,7 @@ async function buildApp() {
     registerPlaidRecurringApi(scope);
     if (isDebugBuild()) registerDebugApi(scope);
     registerAccountApi(scope);
+    registerEntitlementsApi(scope);
     registerPetsApi(scope);
     registerGoalsApi(scope);
     registerSpendingApi(scope);

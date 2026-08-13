@@ -1,0 +1,132 @@
+{
+  "identifier" : "8E2B6C1A-4C6F-4A5D-9A6B-3F0E2D7C5A11",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "B7A2A1F0-3C1D-4E7A-9A10-1A2B3C4D5E01",
+      "localizations" : [
+
+      ],
+      "name" : "Coiny",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "169.00",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "B7A2A1F0-3C1D-4E7A-9A10-1A2B3C4D5E12",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Up to 5 members, unlimited connections, portfolio guardrails, unlimited history",
+              "displayName" : "Coiny Household",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "app.coiny.household.annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Household Annual",
+          "subscriptionGroupID" : "B7A2A1F0-3C1D-4E7A-9A10-1A2B3C4D5E01",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "16.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "B7A2A1F0-3C1D-4E7A-9A10-1A2B3C4D5E13",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Up to 5 members, unlimited connections, portfolio guardrails, unlimited history",
+              "displayName" : "Coiny Household",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "app.coiny.household.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Household Monthly",
+          "subscriptionGroupID" : "B7A2A1F0-3C1D-4E7A-9A10-1A2B3C4D5E01",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "99.00",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "B7A2A1F0-3C1D-4E7A-9A10-1A2B3C4D5E10",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "12 connections, 3 goals, all guardrails, full debt tooling",
+              "displayName" : "Coiny Individual",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "app.coiny.individual.annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Individual Annual",
+          "subscriptionGroupID" : "B7A2A1F0-3C1D-4E7A-9A10-1A2B3C4D5E01",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "9.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "B7A2A1F0-3C1D-4E7A-9A10-1A2B3C4D5E11",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "12 connections, 3 goals, all guardrails, full debt tooling",
+              "displayName" : "Coiny Individual",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "app.coiny.individual.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Individual Monthly",
+          "subscriptionGroupID" : "B7A2A1F0-3C1D-4E7A-9A10-1A2B3C4D5E01",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

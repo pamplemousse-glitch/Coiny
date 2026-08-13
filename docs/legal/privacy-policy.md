@@ -66,10 +66,18 @@ snapshots, income and spending estimates, savings rate, cash runway, goal and
 ladder progress, and your creature's state. Reaction history is stored encrypted
 because its text can mention merchants and amounts.
 
-**Device data.** A push notification token for your device, and its platform,
-so we can deliver notifications. Notifications respect a strict budget (at most
+**Device data.** A push notification token for your device, its platform, and
+its time zone, so we can deliver notifications and avoid sending them overnight
+where you are. Notifications respect a strict budget (at most
 a few per week) and a log of notification event types (never their content) is
 kept to enforce it.
+
+**Subscription data.** If you subscribe, Apple tells us which plan you bought,
+when it expires, and an identifier for the purchase. We store that against your
+account because our server, not your phone, decides what you have access to,
+which is also what lets your subscription work on every device you sign in on.
+Apple is the merchant of record: we never see your card number, billing address,
+or any payment detail.
 
 **Usage data.** With your consent, we record product events like "app opened",
 "account connected", or "goal completed", so we can tell whether the product

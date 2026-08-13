@@ -32,11 +32,11 @@ same and are given in Step 2.
 | Identifiers | User ID | Apple/Google subject identifier + Coiny account id |
 | Identifiers | Device ID | APNs push token registered with the backend |
 | Usage Data | Product Interaction | First-party telemetry events (PRD section 24); bucketed, no amounts, no merchant names |
+| Purchases | Purchase History | Subscription product id, expiry and original transaction id, stored server-side against the account |
 | Other Data | Other Data Types | Date of birth, entered for Spinwheel identity verification; sent, not stored |
 
 Do **not** declare: Location, Contacts, User Content, Browsing History, Search
-History, Health & Fitness, Purchases (until StoreKit ships, then revisit),
-Diagnostics (no crash SDK is integrated), Sensitive Info, Payment Info (Apple
+History, Health & Fitness, Diagnostics (no crash SDK is integrated), Sensitive Info, Payment Info (Apple
 is merchant of record; we never see payment details).
 
 ## Step 2: per-type follow-up answers
@@ -73,7 +73,9 @@ keyed by user id.
    call: some apps omit push tokens under Apple's optional-disclosure carve
    out; the token is stored server-side and linked to the account, which fails
    the carve out's conditions, so declare it.
-3. **Purchases** must be added to the label when StoreKit subscriptions ship
-   (paid launch, not TestFlight).
+3. **Purchases** is declared: StoreKit subscriptions landed on 2026-08-13.
+   Apple remains merchant of record, so Payment Info stays undeclared; what
+   we store is the entitlement, not the card. The matching entry is in
+   `ios/Coiny/PrivacyInfo.xcprivacy` as `NSPrivacyCollectedDataTypePurchaseHistory`.
 4. If a crash-reporting or analytics SDK is ever added (PRD says revisit at
    1,000 users), redo this whole file.

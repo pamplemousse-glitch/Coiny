@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 
 struct SettingsView: View {
@@ -7,6 +8,8 @@ struct SettingsView: View {
     @State private var showDeleteAlert = false
     @State private var deleteFailed = false
     @State private var isUnlinkingBank = false
+    @State private var showManageSubscriptions = false
+    @State private var showRefundSheet = false
 
     var body: some View {
         NavigationStack {
@@ -62,6 +65,8 @@ struct SettingsView: View {
                     }
                 }
 
+                subscriptionSection
+
                 Section("About") {
                     LabeledContent("Backend") {
                         Text("coiny-backend.fly.dev")
@@ -113,7 +118,46 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .task {
+                await StoreKitService.shared.refreshEntitlements()
+            }
         }
+    }
+}
+
+// MARK: - Subscription (R-25.4: restore and refund are reachable from Settings)
+
+private extension SettingsView {
+    var subscriptionSection: some View {
+        Section("Subscription") {
+            LabeledContent("Plan") {
+                Text(planName)
+            }
+            NavigationLink("View plans") {
+                PaywallView()
+            }
+            Button("Restore purchases") {
+                Task { await StoreKitService.shared.restorePurchases() }
+            }
+            Button("Manage subscription") {
+                showManageSubscriptions = true
+            }
+            // Refunds route through Apple; this opens Apple's own sheet.
+            Button("Request a refund") {
+                showRefundSheet = true
+            }
+            .disabled(StoreKitService.shared.refundableTransactionID == nil)
+        }
+        .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
+        .refundRequestSheet(
+            for: StoreKitService.shared.refundableTransactionID ?? 0,
+            isPresented: $showRefundSheet
+        )
+    }
+
+    var planName: String {
+        guard let entitlements = StoreKitService.shared.entitlements else { return "Free" }
+        return SubscriptionCatalog.Tier(rawValue: entitlements.tier)?.displayName ?? "Free"
     }
 }
 
