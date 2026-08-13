@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { z } from 'zod';
 import { deltaForEvent } from '../health/score.js';
 import { plaidTxToInternal } from '../plaid/adapter.js';
 import { liabilitiesGet, recurringTransactionsGet, transactionsSync } from '../plaid/client.js';
@@ -8,13 +9,66 @@ import { dispatchReaction } from '../reactions/dispatch.js';
 import type { RuleContext } from '../rules/engine.js';
 import { evaluate } from '../rules/engine.js';
 import { claimEvent } from '../store/events.js';
-import { disableItem, getItem, markInitialSyncComplete, setCursor } from '../store/items.js';
+import {
+  disableItem,
+  getItem,
+  markInitialSyncComplete,
+  type PlaidItemStatus,
+  setCursor,
+  setItemStatus,
+  setNewAccountsAvailable,
+} from '../store/items.js';
 import { applyHealthDelta, getGoals, recordReaction } from '../store/pet.js';
 import { cacheLiabilities } from '../store/plaid-liabilities.js';
 import { upsertRecurringStreams } from '../store/plaid-recurring.js';
 import { getWeeklySpendByCategory, persistTransactions, upsertModifiedTransactions } from '../store/transactions.js';
 
 const SYNC_TRIGGERS = new Set(['SYNC_UPDATES_AVAILABLE', 'DEFAULT_UPDATE']);
+
+// ITEM webhook fields we act on (docs/context/plaid.md, Items > Webhooks).
+// The error object rides on ITEM/ERROR; only the programmatic code is read.
+const ItemWebhookSchema = z.object({
+  webhook_code: z.string(),
+  item_id: z.string().min(1),
+  error: z.object({ error_code: z.string() }).nullable().optional(),
+});
+
+/**
+ * Persist a lifecycle transition and, when the state actually changed, emit
+ * `item_state_changed` (docs/prd.md R-8.5, section 24).
+ *
+ * SEAM: this log line is the single place instrumentation hooks into item
+ * lifecycle events, and where a future "should we prompt the user?" decision
+ * would attach. Deliberately no push from here: the notification budget
+ * (2 per rolling 7 days, allowlisted animations) is owned by
+ * reactions/dispatch.ts, and recording state must never spend it.
+ */
+async function transitionItemStatus(
+  app: FastifyInstance,
+  itemId: string,
+  to: PlaidItemStatus,
+  opts?: { errorCode?: string | null; onlyIfCurrent?: readonly PlaidItemStatus[] },
+): Promise<void> {
+  const result = await setItemStatus(itemId, to, opts ?? {});
+  if (!result) {
+    app.log.warn({ item_id: itemId }, 'plaid item webhook for unknown item');
+    return;
+  }
+  if (!result.changed) {
+    app.log.info({ item_id: itemId, status: result.previous }, 'plaid item status unchanged');
+    return;
+  }
+  app.log.info(
+    {
+      event: 'item_state_changed',
+      item_id: itemId,
+      from: result.previous,
+      to,
+      error_code: opts?.errorCode ?? null,
+    },
+    'plaid item state changed',
+  );
+}
 
 export function registerPlaidWebhook(app: FastifyInstance): void {
   app.register(async (scope) => {
@@ -55,6 +109,18 @@ export function registerPlaidWebhook(app: FastifyInstance): void {
         try {
           await dispatch(app, envelope);
         } catch (err) {
+          // A data call (sync, liabilities, recurring) failing with
+          // ITEM_LOGIN_REQUIRED is detection in its own right: the item is
+          // broken even if the ITEM/ERROR webhook was missed or is delayed.
+          if (err instanceof PlaidApiError && err.body.error_code === 'ITEM_LOGIN_REQUIRED' && envelope.item_id) {
+            try {
+              await transitionItemStatus(app, envelope.item_id, 'reauth_required', {
+                errorCode: 'ITEM_LOGIN_REQUIRED',
+              });
+            } catch (transitionErr) {
+              app.log.error({ err: transitionErr }, 'failed to record item re-auth state');
+            }
+          }
           app.log.error({ err }, 'unhandled error processing plaid webhook');
         }
       });
@@ -62,24 +128,73 @@ export function registerPlaidWebhook(app: FastifyInstance): void {
   });
 }
 
+/**
+ * ITEM lifecycle webhooks (docs/prd.md R-8.5). Codes verified against
+ * docs/context/plaid.md, Items > Webhooks:
+ * - ERROR: item hit an error resolvable via Link update mode. The one that
+ *   matters most is error_code ITEM_LOGIN_REQUIRED (credentials changed).
+ * - PENDING_DISCONNECT (US/CA) and PENDING_EXPIRATION (UK/EU): access ends in
+ *   7 days; resolvable via update mode ahead of the break.
+ * - LOGIN_REPAIRED: the item healed without our update-mode flow (e.g. fixed
+ *   through another app). Stop reporting it broken.
+ * - NEW_ACCOUNTS_AVAILABLE: new account detected; flag it so the client can
+ *   offer update mode with account selection. Not a health problem.
+ * - USER_PERMISSION_REVOKED: user revoked access; item disabled and marked
+ *   revoked. Update mode MAY restore it, so the row is kept.
+ */
+async function handleItemWebhook(app: FastifyInstance, webhook: z.infer<typeof ItemWebhookSchema>): Promise<void> {
+  const { webhook_code, item_id } = webhook;
+
+  switch (webhook_code) {
+    case 'ERROR': {
+      const errorCode = webhook.error?.error_code ?? 'UNKNOWN';
+      app.log.warn({ item_id, error_code: errorCode }, 'plaid item error, re-auth required');
+      await transitionItemStatus(app, item_id, 'reauth_required', { errorCode });
+      return;
+    }
+    case 'PENDING_DISCONNECT':
+    case 'PENDING_EXPIRATION':
+      app.log.warn({ item_id, webhook_code }, 'plaid item consent expiring');
+      // Only a healthy item moves to expiring: an item already needing
+      // re-auth (or revoked) must not be downgraded to a softer state.
+      await transitionItemStatus(app, item_id, 'expiring', {
+        errorCode: webhook_code,
+        onlyIfCurrent: ['healthy'],
+      });
+      return;
+    case 'LOGIN_REPAIRED':
+      app.log.info({ item_id }, 'plaid item healed outside our update-mode flow');
+      // A revoked item stays revoked: LOGIN_REPAIRED covers recovery from
+      // ITEM_LOGIN_REQUIRED, not from revocation.
+      await transitionItemStatus(app, item_id, 'healthy', {
+        onlyIfCurrent: ['reauth_required', 'expiring'],
+      });
+      return;
+    case 'NEW_ACCOUNTS_AVAILABLE':
+      app.log.info({ item_id }, 'plaid new accounts available');
+      await setNewAccountsAvailable(item_id, true);
+      return;
+    case 'USER_PERMISSION_REVOKED':
+      app.log.warn({ item_id }, 'plaid item permission revoked, disabling');
+      await transitionItemStatus(app, item_id, 'revoked', { errorCode: 'USER_PERMISSION_REVOKED' });
+      await disableItem(item_id);
+      return;
+    default:
+      app.log.info({ webhook_code, item_id }, 'plaid item webhook, no-op');
+      return;
+  }
+}
+
 async function dispatch(app: FastifyInstance, envelope: PlaidWebhookEnvelope): Promise<void> {
   const { webhook_type, webhook_code, item_id } = envelope;
 
   if (webhook_type === 'ITEM') {
-    if (webhook_code === 'USER_PERMISSION_REVOKED' && item_id) {
-      app.log.warn({ item_id }, 'plaid item permission revoked — disabling');
-      await disableItem(item_id);
+    const parsed = ItemWebhookSchema.safeParse(envelope);
+    if (!parsed.success) {
+      app.log.warn({ webhook_code, item_id }, 'plaid ITEM webhook failed validation, ignoring');
       return;
     }
-    if (webhook_code === 'PENDING_EXPIRATION' && item_id) {
-      app.log.warn({ item_id }, 'plaid item pending expiration — re-auth required');
-      return;
-    }
-    if (webhook_code === 'NEW_ACCOUNTS_AVAILABLE' && item_id) {
-      app.log.info({ item_id }, 'plaid new accounts available');
-      return;
-    }
-    app.log.info({ webhook_type, webhook_code, item_id }, 'plaid item webhook — no-op');
+    await handleItemWebhook(app, parsed.data);
     return;
   }
 

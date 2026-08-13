@@ -82,6 +82,13 @@ export const processedEvents = pgTable('processed_events', {
   processedAt: timestamp('processed_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Item connection health (docs/prd.md R-8.5). `status` records where the item
+// sits in Plaid's lifecycle; `disabled` stays as the hard kill switch (revoked
+// or unlinked items are both disabled AND revoked). 'repaired' from the PRD's
+// transition list is an event, not a state: LOGIN_REPAIRED and a completed
+// update-mode flow both transition the item back to 'healthy'.
+export type PlaidItemStatus = 'healthy' | 'expiring' | 'reauth_required' | 'revoked';
+
 export const plaidItems = pgTable(
   'plaid_items',
   {
@@ -91,6 +98,15 @@ export const plaidItems = pgTable(
     cursor: text('cursor'),
     initialSyncComplete: boolean('initial_sync_complete').notNull().default(false),
     disabled: boolean('disabled').notNull().default(false),
+    // Lifecycle state, driven by ITEM webhooks and the repair endpoints.
+    status: text('status').$type<PlaidItemStatus>().notNull().default('healthy'),
+    statusChangedAt: timestamp('status_changed_at', { withTimezone: true }),
+    // Plaid error_code that caused the last unhealthy transition (e.g.
+    // ITEM_LOGIN_REQUIRED). Programmatic code only, never message text.
+    lastErrorCode: text('last_error_code'),
+    // Set by ITEM/NEW_ACCOUNTS_AVAILABLE; cleared when the item is repaired or
+    // relinked. Signals the client to run update mode with account selection.
+    newAccountsAvailable: boolean('new_accounts_available').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('plaid_items_user_idx').on(t.userId)],
