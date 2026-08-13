@@ -9,9 +9,18 @@ extension Notification.Name {
 @main
 struct CoinyApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @State private var petStore = PetStore()
+    @State private var petStore = CoinyApp.makePetStore()
 
     private static let isUITesting = CommandLine.arguments.contains("--ui-testing")
+
+    /// UI tests bypass sign-in, so live API calls would 401; serve a fixture
+    /// instead so the Home journey surface is deterministic under test.
+    private static func makePetStore() -> PetStore {
+        #if DEBUG
+        if isUITesting { return PetStore(api: UITestPetAPI()) }
+        #endif
+        return PetStore()
+    }
 
     // Auth state — seeded synchronously from Keychain on launch.
     // In UITest mode the Keychain is unavailable; bypass to land on RootView directly.

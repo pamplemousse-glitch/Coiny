@@ -49,11 +49,21 @@ final class ViewSmokeTests: XCTestCase {
         smoke(OnboardingView(onboardingComplete: .constant(false)))
     }
 
-    func testPetViewRenders() {
+    func testHomeViewRenders() {
         smoke(
-            PetView()
+            HomeView()
                 .environment(makeStore())
         )
+    }
+
+    func testHomeJourneyViewRenders() {
+        smoke(HomeJourneyView(rows: HomePresentation.journeyRows(for: nil)))
+    }
+
+    func testCoinyWindowRendersAtAllSizes() {
+        smoke(CoinyWindow(size: .full, condition: .idle, stage: 4))
+        smoke(CoinyWindow(size: .panel, condition: .disconnected, stage: 0))
+        smoke(CoinyWindow(size: .stamp, condition: .sleeping, stage: 7))
     }
 
     func testSpendingViewRenders() {
