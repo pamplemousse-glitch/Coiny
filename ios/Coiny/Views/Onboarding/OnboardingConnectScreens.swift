@@ -1,9 +1,9 @@
 import SwiftUI
 import UserNotifications
 
-/// Onboarding screens 4 to 8 (PRD section 5.2): the number, the connection
-/// ask, the subscription reveal, the hatch, and the notification pre-frame,
-/// plus the offline screen the section 8.3 matrix requires.
+// Onboarding screens 4 to 8 (PRD section 5.2): the number, the connection
+// ask, the subscription reveal, the hatch, and the notification pre-frame,
+// plus the offline screen the section 8.3 matrix requires.
 
 // MARK: - Screen 4: the number
 

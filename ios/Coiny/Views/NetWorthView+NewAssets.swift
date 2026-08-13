@@ -1,6 +1,6 @@
 import SwiftUI
 
-extension NetWorthView {
+extension ManageAccountsView {
 
     // MARK: - New asset class sections
 

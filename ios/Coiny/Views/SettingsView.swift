@@ -11,33 +11,12 @@ struct SettingsView: View {
     @State private var isUnlinkingBank = false
     @State private var showManageSubscriptions = false
     @State private var showRefundSheet = false
+    @State private var repairVM = ConnectionRepairViewModel()
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Bank account") {
-                    if bankLinked {
-                        LabeledContent("Status") {
-                            Label("Linked", systemImage: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                        }
-                        Button(isUnlinkingBank ? "Unlinking…" : "Unlink bank", role: .destructive) {
-                            Task {
-                                isUnlinkingBank = true
-                                _ = try? await API.shared.unlinkBank()
-                                bankLinked = false
-                                onboardingComplete = false
-                                isUnlinkingBank = false
-                            }
-                        }
-                        .disabled(isUnlinkingBank)
-                    } else {
-                        LabeledContent("Status") {
-                            Text("Not linked")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
+                bankSection
 
                 if let goals = store.pet?.goals {
                     Section("Current goals") {
@@ -81,6 +60,9 @@ struct SettingsView: View {
 
                 Section("Account") {
                     Button("Sign out", role: .destructive) {
+                        // Explicit sign-out wipes cached display data (R-18.1).
+                        // Session-expiry sign-out deliberately does not.
+                        NetWorthCache.shared.clear()
                         NotificationCenter.default.post(name: .coinySignedOut, object: nil)
                     }
                     Button("Delete account", role: .destructive) {
@@ -96,6 +78,7 @@ struct SettingsView: View {
                             // is both false and an App Review 5.1.1(v) defect.
                             do {
                                 _ = try await API.shared.deleteAccount()
+                                NetWorthCache.shared.clear()
                                 NotificationCenter.default.post(name: .coinySignedOut, object: nil)
                             } catch {
                                 deleteFailed = true
@@ -131,7 +114,95 @@ struct SettingsView: View {
             }
             .task {
                 await StoreKitService.shared.refreshEntitlements()
+                await repairVM.loadItems()
             }
+            .sheet(isPresented: Binding(
+                get: { repairVM.isPresentingLink },
+                set: { repairVM.isPresentingLink = $0 }
+            )) {
+                if let handler = repairVM.handler {
+                    PlaidLinkPresenter(handler: handler)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Bank connection health (R-8.5 to R-8.7)
+
+private extension SettingsView {
+    var bankSection: some View {
+        Section("Bank account") {
+            if bankLinked {
+                if repairVM.items.isEmpty {
+                    LabeledContent("Status") {
+                        Label("Linked", systemImage: "checkmark.circle.fill")
+                    }
+                } else {
+                    ForEach(repairVM.items) { item in
+                        bankItemRow(item)
+                    }
+                }
+                if let repairError = repairVM.errorMessage {
+                    Text(repairError)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Button(isUnlinkingBank ? "Unlinking…" : "Unlink bank", role: .destructive) {
+                    Task {
+                        isUnlinkingBank = true
+                        _ = try? await API.shared.unlinkBank()
+                        bankLinked = false
+                        onboardingComplete = false
+                        isUnlinkingBank = false
+                    }
+                }
+                .disabled(isUnlinkingBank)
+            } else {
+                LabeledContent("Status") {
+                    Text("Not linked")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    /// One row per Plaid item. Repair opens Link update mode: the existing
+    /// access token and history survive, unlike "Reset onboarding".
+    func bankItemRow(_ item: PlaidItemHealth) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Bank connection")
+                    .font(.subheadline)
+                Text(statusText(item))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if item.repairable {
+                Button("Repair") {
+                    Task { await repairVM.repair(item: item, source: .settings) }
+                }
+                .buttonStyle(.bordered)
+                .disabled(repairVM.isRepairing)
+            } else {
+                Label("Healthy", systemImage: "checkmark.circle.fill")
+                    .labelStyle(.iconOnly)
+                    .accessibilityLabel("Healthy")
+            }
+        }
+        .frame(minHeight: 44)
+        .accessibilityElement(children: .combine)
+    }
+
+    func statusText(_ item: PlaidItemHealth) -> String {
+        switch item.status {
+        case .healthy: return "Connected"
+        case .reauthRequired: return "Needs you to sign in again"
+        case .expiring: return "Access expires soon. Renew now"
+        case .revoked: return "Access revoked. Re-link to restore"
+        case .error: return "Connection error"
+        case .unknown: return "Needs attention"
         }
     }
 }

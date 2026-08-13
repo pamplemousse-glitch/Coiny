@@ -1,17 +1,17 @@
 import Foundation
 import os
 
-/// Client-side analytics emitter per PRD section 24 (R-24.1, R-24.2).
-///
-/// The backend endpoint (`POST /api/telemetry`) does not exist yet; it is being
-/// built in parallel. This client is therefore written against the wire shape
-/// section 24 specifies (a batch of `{event, properties, client_ts}` rows) and
-/// the transport is a stub that logs. Swapping in the real network transport is
-/// a one-line change at `Telemetry.shared`.
-///
-/// Privacy rule, inherited from engineering-budgets section 8 and R-22.6:
-/// no amounts, no merchant names, no emails, ever. Values are bucketed enums.
-/// `TelemetryValue.usdBucket` is the only sanctioned way to reference money.
+// Client-side analytics emitter per PRD section 24 (R-24.1, R-24.2).
+//
+// The backend endpoint (`POST /api/telemetry`) does not exist yet; it is being
+// built in parallel. This client is therefore written against the wire shape
+// section 24 specifies (a batch of `{event, properties, client_ts}` rows) and
+// the transport is a stub that logs. Swapping in the real network transport is
+// a one-line change at `Telemetry.shared`.
+//
+// Privacy rule, inherited from engineering-budgets section 8 and R-22.6:
+// no amounts, no merchant names, no emails, ever. Values are bucketed enums.
+// `TelemetryValue.usdBucket` is the only sanctioned way to reference money.
 
 // MARK: - Values
 
