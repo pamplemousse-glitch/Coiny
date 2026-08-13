@@ -83,6 +83,37 @@ async function transitionItemStatus(
   }
 }
 
+// Webhook processing deliberately happens after the 200 (Plaid retries on a
+// slow response, and a sync can take seconds). That makes the work invisible to
+// callers, so tests previously waited by yielding the event loop a fixed number
+// of times, which is a guess: each DB round trip is another async boundary, so
+// the guess held locally and failed on slower CI runners.
+//
+// Tracking the in-flight promises makes the wait exact. Nothing in production
+// awaits this; it exists so a test can ask "is the background work done" instead
+// of estimating.
+const inFlight = new Set<Promise<void>>();
+
+function trackWebhookWork(work: () => Promise<void>): void {
+  setImmediate(() => {
+    const promise = work().finally(() => {
+      inFlight.delete(promise);
+    });
+    inFlight.add(promise);
+  });
+}
+
+/** Resolves once every webhook currently being processed has finished. */
+export async function awaitWebhookWork(): Promise<void> {
+  // A yield first, so work queued by setImmediate but not yet started is
+  // registered before we look at the set.
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  while (inFlight.size > 0) {
+    await Promise.allSettled([...inFlight]);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+}
+
 export function registerPlaidWebhook(app: FastifyInstance): void {
   app.register(async (scope) => {
     scope.addContentTypeParser('application/json', { parseAs: 'buffer' }, (_req, body, done) => {
@@ -118,7 +149,7 @@ export function registerPlaidWebhook(app: FastifyInstance): void {
 
       reply.status(200).send({ ok: true });
 
-      setImmediate(async () => {
+      trackWebhookWork(async () => {
         try {
           await dispatch(app, envelope);
         } catch (err) {

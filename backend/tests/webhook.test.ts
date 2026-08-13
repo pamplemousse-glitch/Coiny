@@ -5,9 +5,13 @@ import { type Dispatcher, getGlobalDispatcher, MockAgent, setGlobalDispatcher } 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetDatabase, testUserId } from './db-helper.js';
 
-const flushImmediate = () => new Promise<void>((r) => setImmediate(r));
+// Waits for the actual background work rather than guessing at a number of
+// event-loop turns. The old version yielded five times, which held locally and
+// failed on slower CI runners because every DB round trip is another async
+// boundary.
 async function flushAll() {
-  for (let i = 0; i < 5; i++) await flushImmediate();
+  const { awaitWebhookWork } = await import('../src/webhook/plaid.js');
+  await awaitWebhookWork();
 }
 
 const TEST_KID = 'test-kid-1';

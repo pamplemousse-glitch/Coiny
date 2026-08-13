@@ -25,9 +25,11 @@ import { resetDatabase, testUserId } from './db-helper.js';
 // self-contained — no shared mutable state across test files.
 // ---------------------------------------------------------------------------
 
-const flushImmediate = () => new Promise<void>((r) => setImmediate(r));
+// Waits for the webhook's real background work instead of guessing at a number
+// of event-loop turns. See the same note in webhook.test.ts.
 async function flushAll() {
-  for (let i = 0; i < 5; i++) await flushImmediate();
+  const { awaitWebhookWork } = await import('../src/webhook/plaid.js');
+  await awaitWebhookWork();
 }
 
 const TEST_KID = 'e2e-kid-1';
