@@ -205,9 +205,7 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
   // say so rather than averaging the problem away. reauth_required outranks
   // expiring: a lapsed login is happening now, a warning is about later.
   const liveItems = items.filter((i) => !i.disabled);
-  const bankHealth: 'reauth_required' | 'expiring' | null = liveItems.some(
-    (i) => i.status === 'reauth_required',
-  )
+  const bankHealth: 'reauth_required' | 'expiring' | null = liveItems.some((i) => i.status === 'reauth_required')
     ? 'reauth_required'
     : liveItems.some((i) => i.status === 'expiring')
       ? 'expiring'

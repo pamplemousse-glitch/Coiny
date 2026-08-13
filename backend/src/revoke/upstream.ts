@@ -16,12 +16,7 @@ import { getTrueLayerAccessToken } from '../truelayer/tokens.js';
 // calls `itemRemove` per item, and moving it here would change the ordering
 // relative to the cascade delete for no gain.
 
-export type RevocationResult =
-  | 'revoked'
-  | 'no_connection'
-  | 'not_configured'
-  | 'unsupported_by_provider'
-  | 'failed';
+export type RevocationResult = 'revoked' | 'no_connection' | 'not_configured' | 'unsupported_by_provider' | 'failed';
 
 export interface RevocationOutcome {
   provider: string;

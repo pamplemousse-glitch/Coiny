@@ -5,10 +5,10 @@ import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { truelayerConnections } from '../db/schema.js';
 import { convertToUsd } from '../fx/client.js';
+import { revokeTrueLayer } from '../revoke/upstream.js';
 import type { TrueLayerEnv } from '../truelayer/client.js';
 import { buildAuthUrl, exchangeCode, getAccounts, getBalance } from '../truelayer/client.js';
 import { getTrueLayerAccessToken } from '../truelayer/tokens.js';
-import { revokeTrueLayer } from '../revoke/upstream.js';
 import { encryptString } from '../util/crypto.js';
 
 const REDIRECT_URI = 'coiny://truelayer/callback';

@@ -14,12 +14,14 @@ async function seedTrueLayer(expiresAt: Date = futureExpiry()): Promise<void> {
   const { db } = await import('../src/db/client.js');
   const { truelayerConnections } = await import('../src/db/schema.js');
   const { encryptString } = await import('../src/util/crypto.js');
-  await db().insert(truelayerConnections).values({
-    userId: testUserId,
-    accessToken: encryptString('tl-access'),
-    refreshToken: encryptString('tl-refresh'),
-    expiresAt,
-  });
+  await db()
+    .insert(truelayerConnections)
+    .values({
+      userId: testUserId,
+      accessToken: encryptString('tl-access'),
+      refreshToken: encryptString('tl-refresh'),
+      expiresAt,
+    });
 }
 
 describe('upstream grant revocation', () => {
@@ -142,13 +144,17 @@ describe('upstream grant revocation', () => {
     const { discogsConnections, ynabConnections } = await import('../src/db/schema.js');
     const { encryptString } = await import('../src/util/crypto.js');
 
-    await db().insert(ynabConnections).values({ userId: testUserId, apiKey: encryptString('pat') });
-    await db().insert(discogsConnections).values({
-      userId: testUserId,
-      username: 'someone',
-      accessToken: encryptString('a'),
-      accessTokenSecret: encryptString('b'),
-    });
+    await db()
+      .insert(ynabConnections)
+      .values({ userId: testUserId, apiKey: encryptString('pat') });
+    await db()
+      .insert(discogsConnections)
+      .values({
+        userId: testUserId,
+        username: 'someone',
+        accessToken: encryptString('a'),
+        accessTokenSecret: encryptString('b'),
+      });
 
     const { revokeUpstreamGrants } = await import('../src/revoke/upstream.js');
     const log = { warn: () => {}, info: () => {} } as unknown as import('fastify').FastifyBaseLogger;
