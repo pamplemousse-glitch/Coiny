@@ -11,3 +11,15 @@ packages:
 allowBuilds:
   esbuild: true
   unrs-resolver: true
+
+# Audit exceptions. Each needs an advisory ID, why it does not reach production,
+# and what would let us remove it. Never add one to silence a production finding.
+auditConfig:
+  ignoreGhsas:
+    # vite <=6.4.2, reached only via vitest > @vitest/mocker. Test-time only: vite
+    # is never installed in the runtime image (backend/Dockerfile installs prod
+    # dependencies only) and never imported by src/. vitest 3.2.7 pins vite 5.x,
+    # so the fix is not available to us until vitest ships a vite 6.4.3+ peer.
+    # Remove this entry when `pnpm why vite` reports >=6.4.3.
+    - GHSA-fx2h-pf6j-xcff
+
