@@ -3,8 +3,14 @@ import { resetDatabase, testUserId } from './db-helper.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 
+// One clock read for the whole file. Reading Date.now() per fixture made ages
+// land a millisecond short of a whole day, so Math.floor turned 90 into 89
+// whenever the two reads straddled a millisecond boundary. That happened under
+// CI load and not locally, which is the worst way for a test to be wrong.
+const NOW = new Date();
+
 function daysAgo(days: number): Date {
-  return new Date(Date.now() - days * DAY);
+  return new Date(NOW.getTime() - days * DAY);
 }
 
 describe('replaceDeclaredAssets', () => {
@@ -225,7 +231,7 @@ describe('declaredNetUsd', () => {
 describe('declaredNudgeCandidate', () => {
   it('picks the stalest valued line at or past 60 days', async () => {
     const { declaredNudgeCandidate } = await import('../src/store/declared-assets.js');
-    const now = new Date();
+    const now = NOW;
     const lines = [
       {
         assetClass: 'car' as const,
