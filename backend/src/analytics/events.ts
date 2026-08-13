@@ -136,6 +136,11 @@ export const SERVER_EVENT_SCHEMAS = {
   // Connection breakage/repair (R-8.5). state names are binding.
   item_state_changed: z.strictObject({
     state: z.enum(['healthy', 'reauth_required', 'expiring', 'revoked', 'repaired']),
+    // Plaid's own error code, lowercased. A closed vocabulary from Plaid, never
+    // message text, so it cannot carry an institution name or anything a user
+    // typed. Knowing WHICH failure dominates is what makes the breakage rate
+    // actionable rather than just alarming.
+    error_code: token.optional(),
   }),
   // Post-launch, fed by StoreKit server notifications (R-25.4); defined now so
   // the hardware gate query has a stable shape to land on.

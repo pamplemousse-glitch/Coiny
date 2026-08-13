@@ -8,6 +8,7 @@ import { type PlaidAccount, PlaidApiError, type PlaidWebhookEnvelope } from '../
 import { dispatchReaction } from '../reactions/dispatch.js';
 import type { RuleContext } from '../rules/engine.js';
 import { evaluate } from '../rules/engine.js';
+import { trackServerEvent } from '../store/analytics.js';
 import { claimEvent } from '../store/events.js';
 import {
   disableItem,
@@ -68,6 +69,17 @@ async function transitionItemStatus(
     },
     'plaid item state changed',
   );
+
+  // Connection breakage is the documented number one churn cause in this
+  // category, so every lifecycle transition is a measurable server-observed
+  // fact (R-24.2), not just the revoked edge that disableItem already emits.
+  // The Plaid error code is a closed vocabulary from Plaid, never message text.
+  if (result.userId) {
+    await trackServerEvent(result.userId, 'item_state_changed', {
+      state: to,
+      ...(opts?.errorCode ? { error_code: opts.errorCode.toLowerCase() } : {}),
+    });
+  }
 }
 
 export function registerPlaidWebhook(app: FastifyInstance): void {

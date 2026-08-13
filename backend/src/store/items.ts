@@ -7,7 +7,10 @@ import { trackServerEvent } from './analytics.js';
 export type PlaidItemRow = typeof plaidItems.$inferSelect;
 export type { PlaidItemStatus };
 
-export type ItemStatusTransition = { previous: PlaidItemStatus; changed: boolean };
+// userId rides along because Plaid webhooks arrive keyed by item_id with no
+// user context, and the caller needs it to emit item_state_changed (R-24.2)
+// without a second lookup.
+export type ItemStatusTransition = { previous: PlaidItemStatus; changed: boolean; userId: string | null };
 
 // Item-keyed lookups (getItem, setItemStatus, setCursor, ...) exist because
 // Plaid webhooks arrive keyed by item_id with no user context. Everything
@@ -72,12 +75,16 @@ export async function setItemStatus(
   status: PlaidItemStatus,
   opts?: { errorCode?: string | null; onlyIfCurrent?: readonly PlaidItemStatus[] },
 ): Promise<ItemStatusTransition | null> {
-  const rows = await db().select({ status: plaidItems.status }).from(plaidItems).where(eq(plaidItems.itemId, itemId));
+  const rows = await db()
+    .select({ status: plaidItems.status, userId: plaidItems.userId })
+    .from(plaidItems)
+    .where(eq(plaidItems.itemId, itemId));
   const row = rows[0];
   if (!row) return null;
   const previous = row.status;
-  if (previous === status) return { previous, changed: false };
-  if (opts?.onlyIfCurrent && !opts.onlyIfCurrent.includes(previous)) return { previous, changed: false };
+  const userId = row.userId ?? null;
+  if (previous === status) return { previous, changed: false, userId };
+  if (opts?.onlyIfCurrent && !opts.onlyIfCurrent.includes(previous)) return { previous, changed: false, userId };
   await db()
     .update(plaidItems)
     .set({
@@ -86,7 +93,7 @@ export async function setItemStatus(
       lastErrorCode: status === 'healthy' ? null : (opts?.errorCode ?? null),
     })
     .where(eq(plaidItems.itemId, itemId));
-  return { previous, changed: true };
+  return { previous, changed: true, userId };
 }
 
 export async function setNewAccountsAvailable(itemId: string, available: boolean): Promise<void> {
