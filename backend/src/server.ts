@@ -13,6 +13,7 @@ import { registerDevicesApi } from './api/devices.js';
 import { registerDiscogsApi } from './api/discogs.js';
 import { registerEnergyApi } from './api/energy.js';
 import { registerFarmlandApi } from './api/farmland.js';
+import { registerGoalsApi } from './api/goals.js';
 import { registerHyperliquidApi } from './api/hyperliquid.js';
 import { registerKalshiConnectApi } from './api/kalshi-connect.js';
 import { registerKrakenApi } from './api/kraken.js';
@@ -117,6 +118,7 @@ async function buildApp() {
     if (isDebugBuild()) registerDebugApi(scope);
     registerAccountApi(scope);
     registerPetsApi(scope);
+    registerGoalsApi(scope);
     registerSpendingApi(scope);
     registerOverridesApi(scope);
     registerDevicesApi(scope);

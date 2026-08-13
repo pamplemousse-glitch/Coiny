@@ -20,6 +20,7 @@ import {
   saveLadderInputs,
 } from '../store/goals.js';
 import type { DerivedState } from './derived.js';
+import { evaluateGoalSystem } from './evaluation.js';
 import {
   type LadderContext,
   type LadderState,
@@ -44,6 +45,12 @@ export type GoalRefreshInputs = {
   taxAdvantagedRate: number | null;
   /** Today's assembled net worth, or null to skip recording a daily point. */
   netWorth: { totalUsd: number; byClass: Record<string, number> } | null;
+  /** Live balance per Plaid account id (fetchPlaidSnapshot().bankAccounts),
+   *  for balance-counting target goals (R-7.8). Optional so existing callers
+   *  keep compiling; omitted or null means balances are unknown, and those
+   *  goals report a null pace, never a zero-based one. The nightly scheduler
+   *  should always pass this. */
+  accountBalances?: Record<string, number> | null;
 };
 
 export type GoalRefreshResult = {
@@ -88,6 +95,18 @@ export async function refreshGoalSystem(
 
   const ladder = await refreshLadder(userId, context, now);
   await saveLadderInputs(userId, context, now);
+
+  // Layer 2 and 3: target-goal pace (R-7.8) and guardrail periods (R-7.11,
+  // R-7.12). Runs inside this seam so the nightly job gets it by calling
+  // refreshGoalSystem, not a second pipeline.
+  await evaluateGoalSystem(
+    userId,
+    {
+      accountBalances: inputs.accountBalances ?? null,
+      surplusTargetRate: declarations.surplusTargetRate,
+    },
+    now,
+  );
 
   if (inputs.netWorth) {
     await recordNetWorthDaily(
