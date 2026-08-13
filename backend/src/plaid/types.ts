@@ -47,6 +47,9 @@ export type PlaidAccount = {
   official_name: string | null;
   type: string;
   subtype: string | null;
+  // Last 2-4 characters of the displayed account number; may be non-unique
+  // within an Item. Optional because older cached fixtures omit it.
+  mask?: string | null;
 };
 
 export type TransactionsSyncResponse = {

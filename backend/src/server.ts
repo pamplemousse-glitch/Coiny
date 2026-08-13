@@ -8,6 +8,7 @@ import { registerAuthApi } from './api/auth.js';
 import { registerChainWalletsApi } from './api/chain-wallets.js';
 import { registerCoinbaseApi } from './api/coinbase.js';
 import { registerCoinsApi } from './api/coins.js';
+import { registerDebtsApi } from './api/debts.js';
 import { registerDebugApi, registerDebugSessionApi } from './api/debug.js';
 import { registerDevicesApi } from './api/devices.js';
 import { registerDiscogsApi } from './api/discogs.js';
@@ -144,6 +145,7 @@ async function buildApp() {
     registerFarmlandApi(scope);
     registerTradingCardsApi(scope);
     registerCoinsApi(scope);
+    registerDebtsApi(scope);
     registerNetWorthApi(scope);
   });
 

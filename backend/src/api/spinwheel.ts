@@ -13,6 +13,7 @@ import {
   subscribeMonthly,
   verifySmsOtp,
 } from '../spinwheel/client.js';
+import { ingestSpinwheelDebts, upsertSourceDebts } from '../store/debts.js';
 import { recordReaction } from '../store/pet.js';
 
 const CREDIT_SCORE_REACTION_THRESHOLD = 20;
@@ -107,6 +108,11 @@ export function registerSpinwheelApi(app: FastifyInstance): void {
     }
 
     const debts = await getDebtProfile(connection.spinwheelUserId);
+
+    // Keep the merged debt layer (R-7.13) in step with every bureau fetch so
+    // a card visible through both Plaid and Spinwheel is counted once.
+    await ingestSpinwheelDebts(userId, debts);
+
     return { debts };
   });
 
@@ -161,6 +167,9 @@ export function registerSpinwheelApi(app: FastifyInstance): void {
     if (connection) {
       await deleteUser(connection.spinwheelUserId);
       await db().delete(spinwheelConnections).where(eq(spinwheelConnections.userId, userId));
+      // Drop the bureau's rows from the debt layer and rebuild, so merged
+      // records fall back to their Plaid halves instead of going stale.
+      await upsertSourceDebts(userId, 'spinwheel', []);
     }
 
     await db().delete(spinwheelPending).where(eq(spinwheelPending.userId, userId));
