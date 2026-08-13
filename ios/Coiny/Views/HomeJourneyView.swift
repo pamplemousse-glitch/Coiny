@@ -45,6 +45,9 @@ struct HomeJourneyView: View {
 
                 JourneyGoalsSection(store: journey)
                 JourneyGuardrailsSection(store: journey)
+                // The debt surface hangs off the journey (PRD 4 has no debt
+                // tab; three tabs only). One quiet row, data loads on push.
+                JourneyDebtSection()
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 32)
