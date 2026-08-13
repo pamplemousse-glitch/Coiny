@@ -120,12 +120,31 @@ export const plaidItems = pgTable(
   (t) => [index('plaid_items_user_idx').on(t.userId)],
 );
 
+// Encryption-at-rest decision for this table (PRD R-13.4, Appendix B item B8,
+// docs/obligations.md section 1):
+//
+//   merchant_name is AES-256-GCM encrypted at write (util/crypto.ts envelope,
+//   same as plaid_items.access_token). It is the identifying half of the
+//   behavioural profile: merchant + date reads as "where this person was and
+//   what they bought". No SQL query ever filtered, grouped or matched on it
+//   (all merchant matching lives in Node: subscriptions/detect.ts,
+//   goals/guardrails.ts), so encrypting it costs nothing in query capability.
+//
+//   amount is DELIBERATELY plaintext. getWeeklySpendByCategory runs
+//   SUM/GROUP BY and sign predicates on it inside webhook processing (the
+//   largest table, the hot path), and getRecentOutflows filters on its sign;
+//   encrypting it moves those aggregates into Node on every sync. An amount
+//   without a merchant is a magnitude, not a profile. Accepted residual risk,
+//   recorded per B8: a database dump still reveals per-user amounts, dates
+//   and coarse categories keyed to pseudonymous user ids (emails are
+//   encrypted in `users`). Rows written before migration 0048 are plaintext
+//   until scripts/backfill-encrypt-pii.ts runs; decryptString tolerates them.
 export const transactions = pgTable('transactions', {
   transactionId: text('transaction_id').primaryKey(),
   userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
   accountId: text('account_id').notNull(),
-  merchantName: text('merchant_name'),
-  amount: text('amount').notNull(),
+  merchantName: text('merchant_name'), // AES-256-GCM encrypted (see above)
+  amount: text('amount').notNull(), // plaintext ON PURPOSE (see above)
   date: text('date').notNull(),
   category: text('category'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -143,13 +162,24 @@ export const deviceTokens = pgTable('device_tokens', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Denormalised copy of transaction merchant names (the user's manual
+// recategorisations), covered by the same 0048 encryption decision as
+// `transactions`. The PK column needs SQL equality (getOverride runs once per
+// ingested transaction) and upsert dedupe, which random-IV ciphertext cannot
+// provide, so merchant_name holds a deterministic HMAC-SHA256 blind index
+// (util/crypto.ts blindIndex) and merchant_name_enc holds the AES-256-GCM
+// ciphertext of the normalized name for display (listOverrides). Rows written
+// before 0048 hold the plaintext normalized merchant in merchant_name and
+// null in merchant_name_enc; store/overrides.ts reads both forms until
+// scripts/backfill-encrypt-pii.ts rewrites them.
 export const categoryOverrides = pgTable(
   'category_overrides',
   {
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    merchantName: text('merchant_name').notNull(),
+    merchantName: text('merchant_name').notNull(), // blind index (legacy rows: plaintext)
+    merchantNameEnc: text('merchant_name_enc'), // AES-256-GCM encrypted display copy
     category: text('category').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -345,6 +375,10 @@ export const discogsPending = pgTable('discogs_pending', {
 });
 
 // Plaid recurring streams — upserted on RECURRING_TRANSACTIONS_UPDATE webhook.
+// merchant_name and description are AES-256-GCM encrypted at write (0048):
+// they are the same merchant PII as transactions.merchant_name, and no SQL
+// query filters or groups on either (reads are per-user selects filtered in
+// Node). Amount columns stay numeric, same rationale as `transactions`.
 export const plaidRecurringStreams = pgTable('plaid_recurring_streams', {
   streamId: text('stream_id').primaryKey(),
   userId: text('user_id')
@@ -352,8 +386,8 @@ export const plaidRecurringStreams = pgTable('plaid_recurring_streams', {
     .references(() => users.id, { onDelete: 'cascade' }),
   accountId: text('account_id').notNull(),
   direction: text('direction').notNull(), // 'inflow' | 'outflow'
-  merchantName: text('merchant_name'),
-  description: text('description').notNull(),
+  merchantName: text('merchant_name'), // AES-256-GCM encrypted
+  description: text('description').notNull(), // AES-256-GCM encrypted
   frequency: text('frequency').notNull(),
   averageAmount: numeric('average_amount'),
   lastAmount: numeric('last_amount'),

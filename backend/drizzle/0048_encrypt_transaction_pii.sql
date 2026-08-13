@@ -1,0 +1,21 @@
+-- 0048: encrypt transaction merchant PII at rest (PRD R-13.4, Appendix B B8,
+-- docs/obligations.md section 1).
+--
+-- The encryption itself happens in application code (AES-256-GCM via
+-- util/crypto.ts; the key never reaches Postgres, so SQL cannot encrypt or
+-- decrypt anything). This migration only adds the column the new
+-- category_overrides layout needs:
+--
+--   merchant_name_enc: AES-256-GCM ciphertext of the normalized merchant for
+--   display, while the existing merchant_name PK column moves to a
+--   deterministic HMAC blind index for lookups. Nullable: legacy rows keep
+--   plaintext in merchant_name and null here until the one-shot backfill
+--   (scripts/backfill-encrypt-pii.ts) rewrites them, and the store layer
+--   reads both forms, so there is no window where reads fail.
+--
+-- transactions.merchant_name and plaid_recurring_streams.merchant_name /
+-- .description keep their column types (text holds the ciphertext envelope);
+-- existing plaintext rows are tolerated by decryptString until the same
+-- backfill re-encrypts them. Written idempotently to match the convention
+-- established by 0033.
+ALTER TABLE "category_overrides" ADD COLUMN IF NOT EXISTS "merchant_name_enc" text;

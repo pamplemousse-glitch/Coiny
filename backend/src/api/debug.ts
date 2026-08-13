@@ -16,6 +16,7 @@ import { createSession } from '../store/sessions.js';
 import { getWeeklySpendByCategory } from '../store/transactions.js';
 import { findOrCreateUser } from '../store/users.js';
 import type { Transaction } from '../types/transaction.js';
+import { decryptNullable } from '../util/crypto.js';
 
 const DEBUG_PRESETS: Record<Animation, Omit<Reaction, 'reason'>> = {
   celebrate: { animation: 'celebrate', sound: 'fanfare', led: 'rainbow', duration: 3000 },
@@ -82,18 +83,21 @@ export function registerDebugApi(app: FastifyInstance): void {
 
     return {
       transactions: rows.map((row) => {
+        // merchant_name is encrypted at rest (0048); the rule engine and the
+        // response need the plaintext. Tolerant of pre-0048 plaintext rows.
+        const merchantName = decryptNullable(row.merchantName);
         const fakeTx: Transaction = {
           id: row.transactionId,
           account_id: row.accountId,
           amount: row.amount,
           date: row.date,
-          description: row.merchantName ?? '',
+          description: merchantName ?? '',
           status: 'posted',
           type: 'card_payment',
           running_balance: null,
           details: {
             category: row.category,
-            ...(row.merchantName ? { counterparty: { name: row.merchantName, type: 'organization' as const } } : {}),
+            ...(merchantName ? { counterparty: { name: merchantName, type: 'organization' as const } } : {}),
           },
         };
         // Collect-all (R-7.25): every matching rule, plus which one the
@@ -102,7 +106,7 @@ export function registerDebugApi(app: FastifyInstance): void {
         return {
           id: row.transactionId,
           date: row.date,
-          merchant: row.merchantName,
+          merchant: merchantName,
           amount: row.amount,
           category: row.category,
           rule_matched: matches[0]?.name ?? null,

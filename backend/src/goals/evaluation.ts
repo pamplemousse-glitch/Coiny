@@ -21,6 +21,7 @@ import {
   saveGoalPace,
   upsertGoalPeriod,
 } from '../store/target-goals.js';
+import { decryptNullable } from '../util/crypto.js';
 import {
   closedPeriods,
   evaluateGuardrail,
@@ -155,7 +156,9 @@ async function loadGuardrailTransactions(
       date: row.date,
       amount,
       category: row.category,
-      merchantName: row.merchantName,
+      // Encrypted at rest (0048); guardrail subscription matching needs the
+      // plaintext merchant. Tolerant of pre-0048 plaintext rows.
+      merchantName: decryptNullable(row.merchantName),
       accountId: row.accountId,
     });
   }
