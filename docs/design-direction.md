@@ -34,8 +34,8 @@ The Window appears at exactly three sizes:
 
 | Size | Dimensions | Where | Contents |
 |---|---|---|---|
-| **Full** | 192 x 192 pt | Pet tab, onboarding, stage-change moment | The creature, animated, plus its one line of speech below the frame |
-| **Panel** | 64 x 64 pt | Plan tab rung header, widgets, Watch | The creature, single idle frame, no speech |
+| **Full** | 192 x 192 pt | Home tab collapsed, onboarding, stage-change moment | The creature, animated, plus its one line of speech below the frame |
+| **Panel** | 64 x 64 pt | Pinned above the expanded journey on Home, widgets, Watch | The creature, single idle frame, no speech |
 | **Stamp** | 20 x 20 pt | Activity feed rows that triggered a reaction, tab bar | One face, one frame, 1-bit |
 
 Six rules make this work, and they are the whole design system in miniature:
@@ -51,7 +51,7 @@ Six rules make this work, and they are the whole design system in miniature:
 
 The instinct with a tension like this is to blend: soften the data a little, sharpen the creature a little, meet in the middle. That produces the exact mush described in failure mode one.
 
-The Window resolves the tension by **quarantine plus a shared substrate**. The two halves share a palette, a spacing scale, a corner-radius vocabulary, and a motion budget. They do not share a visual language. A user moving from the Pet tab to the Wealth tab should feel that they walked from a front room into a workshop in the same house: same floorboards, same light, completely different purpose.
+The Window resolves the tension by **quarantine plus a shared substrate**. The two halves share a palette, a spacing scale, a corner-radius vocabulary, and a motion budget. They do not share a visual language. A user moving from the Home tab to the Wealth tab should feel that they walked from a front room into a workshop in the same house: same floorboards, same light, completely different purpose.
 
 It also happens to be the cheapest possible resolution. One creature, drawn once, at three sizes, is a $3,000 to $6,000 commission. A fully illustrated app is $25,000 and a permanent maintenance liability every time you add the 41st asset class.
 
@@ -176,7 +176,7 @@ That single rule buys the entire Window system: the Full size can be six-color, 
 
 First, cost against the actual constraint. Antoine is solo and pre-revenue. Terrarium is a $15,000 to $30,000 commission with a multi-month timeline and a hard dependency on one artist staying available. Pocket Instrument is $3,000 to $6,000 with a four-to-six week timeline. That is not a preference, it is the difference between commissioning art this quarter and not commissioning it.
 
-Second, scale. The PRD's own information architecture requires the creature at Panel size in the Plan tab rung header, and §1.1 here requires it at Stamp size in the Activity feed. Terrarium cannot do 20pt. Choosing it means either abandoning the Stamp, which is the only bridge between the two halves of the product, or commissioning a second mark in a second style, which fractures the identity.
+Second, scale. The PRD's own information architecture requires the creature at Panel size pinned above the expanded journey, and §1.1 here requires it at Stamp size in the Activity feed. Terrarium cannot do 20pt. Choosing it means either abandoning the Stamp, which is the only bridge between the two halves of the product, or commissioning a second mark in a second style, which fractures the identity.
 
 Third, and most importantly: **Terrarium makes the central tension worse, not better.** The whole design problem is that a charming creature and a dense ledger fight each other. Painted gouache is the *most* charming and therefore the *most* in conflict with a $340,000 figure. Pixel art is charming in a register that is adjacent to instrumentation, so it sits next to hard numbers without either one apologizing. Direction A is chosen partly *because* it is less cuddly.
 

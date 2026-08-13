@@ -86,7 +86,7 @@ Trait words: **quietly competent, specific, unbothered, never disappointed in yo
 
 ### 3.1 In scope for paid launch
 
-The iOS app (four tabs per §4, onboarding per §5, goal system per §7, states per §8), the backend that serves it, notifications per §9, monetisation per §25, the compliance floor per §26 and §27, and the Android scaffold kept compiling as a second consumer of the same API (§14). Feature parity for Android is 6-month-block work (§30), not launch work.
+The iOS app (three tabs per §4, onboarding per §5, goal system per §7, states per §8), the backend that serves it, notifications per §9, monetisation per §25, the compliance floor per §26 and §27, and the Android scaffold kept compiling as a second consumer of the same API (§14). Feature parity for Android is 6-month-block work (§30), not launch work.
 
 ### 3.2 Out of scope, permanently or until a stated gate
 
@@ -120,18 +120,25 @@ The iOS app (four tabs per §4, onboarding per §5, goal system per §7, states 
 
 ## 4. Information architecture and navigation
 
-**R-4.1** [Partial] Four tabs: **Pet, Plan, Activity, Wealth**, with Settings behind a toolbar gear. Current code has three tabs, Pet / Activity / Wealth (`ios/Coiny/Views/RootView.swift:7-23`), and no `PlanView.swift` exists. The Plan tab is new construction (§7); goals leave Settings (`ios/Coiny/Views/SettingsView.swift:39-55` currently renders the four legacy goal fields, which are deprecated by §13).
+Per DR-27 there is no Plan tab. The creature and the journey are one surface at two resolutions: the creature is the collapsed view of the journey, and the journey is the creature's own detail. Splitting them into peer tabs would force the user to ask which one is the product.
+
+**R-4.1** [Partial] Three tabs: **Home, Activity, Wealth**, with Settings behind a toolbar gear. Current code has three tabs already, Pet / Activity / Wealth (`ios/Coiny/Views/RootView.swift:7-23`); Home is `PetView.swift` renamed and given the expansion below. No `PlanView.swift` is to be created. Goals leave Settings (`ios/Coiny/Views/SettingsView.swift:39-55` currently renders the four legacy goal fields, which are deprecated by §13).
 
 | Tab | Job | One-line contract |
 |---|---|---|
-| Pet | Answer "what do I do" | Non-scrolling. The Window, one speech line, the active rung with progress, at most one action button (design-direction §6.1) |
-| Plan | The goal system's home | Ladder, target goals, guardrails, years-to-freedom slider (design-direction §6.2) |
+| Home | Answer "what do I do" | Collapsed: non-scrolling. The Window, one speech line, the active rung with progress, at most one action button (design-direction §6.1) |
 | Activity | Cash-flow feed | Cash movements only, never unrealized gains (Design Decision A, preserved). Pet Stamp appears only on rows that moved the pet |
 | Wealth | The number and its composition | Six fixed groups, nothing empty ever rendered, one stacked bar, staleness timestamp always visible (§7.8) |
 
+**R-4.1a** [Unbuilt] Home has two resolutions on one surface, not two screens. Collapsed is the default and the state a user who has nothing to do never leaves. Tapping the creature expands the journey beneath it: the creature shrinks from Full to Panel and stays pinned at the top while the ladder, target goals, guardrails and the years-to-freedom slider scroll under it (the content design-direction §6.2 specifies). Expansion is a state change within one view, not a navigation push and not a modal sheet: back-swipe, tab switch and process death all return to collapsed. Verify: a UI test taps the creature, asserts the ladder is on screen and the creature is still on screen, then asserts the navigation stack depth is unchanged.
+
+**R-4.1b** [Unbuilt] The creature is the only affordance that opens the journey. No "View plan," no chevron, no tab. The active rung row in the collapsed state is itself part of the tap target. Rationale: a second entry point re-creates the two-surface problem DR-27 removes. Verify: the collapsed Home view exposes exactly one accessibility action that expands.
+
 **R-4.2** [Unbuilt] All connection affordances live on a single searchable "Add an account" screen reached from one button on Wealth. No connect buttons scattered through empty sections. Verify: a fresh account renders zero "Connect" calls-to-action outside that screen and onboarding.
 
-**R-4.3** [Unbuilt] The creature appears only inside the Window (Full 192pt on Pet, Panel 64pt on Plan's rung header, Stamp 20pt in Activity gutter rows and the tab bar). It never appears on a data surface otherwise; no other illustration exists anywhere in the app. Binding spec: design-direction §1.1.
+**R-4.3** [Unbuilt] The creature appears only inside the Window (Full 192pt on collapsed Home, Panel 64pt pinned above the expanded journey, Stamp 20pt in Activity gutter rows and the tab bar). It never appears on a data surface otherwise; no other illustration exists anywhere in the app. Binding spec: design-direction §1.1.
+
+**R-4.4** [Unbuilt] The hard rule of DR-27, and the thing most likely to erode under future edits: the creature never displays a number, and the journey never tries to be cute. The Full and Panel Windows carry no digits, no currency, no percentage. The expanded journey carries no animation, no speech line, no character art outside the pinned Panel. Verify: a snapshot test of the collapsed Home asserts no numeric glyph inside the Window bounds.
 
 ## 5. Onboarding and activation
 
@@ -228,7 +235,7 @@ The centerpiece. Engine exists and is tested (`backend/src/goals/ladder.ts`, pur
 
 **R-7.3** [Built] Cold-start: null means "we do not know" and is never treated as zero. An indeterminate input makes the rung indeterminate rather than satisfied (`ladder.ts:85-91`, `derived.ts:7-10`). Substrate minimums: `MIN_MONTHS_FOR_VOLATILITY` (`derived.ts:17`) and `MIN_DAYS_FOR_MONTHLY_RATE` (`derived.ts:21`); outflow rates scale by the observed history span, never a fixed divisor (`derived.ts:146-160`, fixed in `25c401e`). The minimum-window value itself is open decision B3. Every consumer of a null substrate field renders its no-data state (§8), reading "too early to say," never zero.
 
-**R-7.4** [Unbuilt] Any rung can be skipped with a stated reason, marking it `skipped` (user-reversible, `ladder.ts:253-256`) or `not_applicable` (structural, e.g. no employer plan, `ladder.ts:261-264`). The Plan tab must expose skip with a reason picker; no rung can be failed, so no failure UI exists.
+**R-7.4** [Unbuilt] Any rung can be skipped with a stated reason, marking it `skipped` (user-reversible, `ladder.ts:253-256`) or `not_applicable` (structural, e.g. no employer plan, `ladder.ts:261-264`). The expanded journey (§4 R-4.1a) must expose skip with a reason picker; no rung can be failed, so no failure UI exists.
 
 **R-7.5** [Unbuilt] Sub-stage progress: each rung shows percent complete; the creature visibly changes within a stage at each 10% decile of rung progress (endowed progress: existing balances count from the start, so most users open rung 1 well above zero). Emits `rung_progress` on decile crossings only (§24).
 
@@ -385,8 +392,8 @@ The highest-value section of this document. Broken connections are the documente
 
 | Screen | Empty (new user) | Loading | Error | Offline | Stale |
 |---|---|---|---|---|---|
-| **Pet** | No connection: creature in **Disconnected** state (present, patient, looking around, never distressed; sprite state 13, the state a new user sees most) with the one action "Connect an account" | Creature idle immediately from cached stage; never a spinner inside the Window | Speech line absent; creature idles. The pet never announces backend errors | Same as error: creature idles from cached state, offline banner at top | Pet state is computed nightly; no staleness label on the creature itself |
-| **Plan** | Ladder renders with rung 0 active; goals section shows one line inviting the first goal, not an empty-state illustration | Skeleton rows | Per-rung: an indeterminate rung shows "too early to say" plus what would resolve it ("Connect your 401k and I can check this one") | Last computed ladder renders; banner | Rung progress shows its computation date when older than 48h |
+| **Home, collapsed** | No connection: creature in **Disconnected** state (present, patient, looking around, never distressed; sprite state 13, the state a new user sees most) with the one action "Connect an account" | Creature idle immediately from cached stage; never a spinner inside the Window | Speech line absent; creature idles. The pet never announces backend errors | Same as error: creature idles from cached state, offline banner at top | Pet state is computed nightly; no staleness label on the creature itself |
+| **Home, expanded** | Ladder renders with rung 0 active; goals section shows one line inviting the first goal, not an empty-state illustration | Skeleton rows | Per-rung: an indeterminate rung shows "too early to say" plus what would resolve it ("Connect your 401k and I can check this one") | Last computed ladder renders; banner | Rung progress shows its computation date when older than 48h |
 | **Activity** | Day-one: "Transactions arrive within a day of connecting." Nothing else | System refresh control only | Feed shows last synced transactions with "through <date>" header | Same, banner | Header always reads "through <newest transaction date>" |
 | **Wealth** | Only declared lines and connected groups; zero empty sections (R-7.27) | Cached values render instantly; refresh is background | Per-class rows per the R-8.4 table; total renders with footnote "n accounts not included" | Entire last snapshot with timestamp and banner | Timestamp always visible (R-7.28) |
 | **Onboarding** | n/a | Screen 4 count-up begins only when the number is assembled | Link abandonment or error lands on the hatch flow with the Disconnected creature and a persistent connect affordance; never a dead end | Requires network; a clear "no connection" screen with retry, sign-in state preserved | n/a |
@@ -476,7 +483,7 @@ Load-bearing rather than a checklist: the product's core signal is a creature's 
 
 **R-11.5** [Unbuilt] Touch targets: 44x44pt minimum everywhere; the row primitive is 44pt tall by spec (design-direction §4.4). Reduce Motion: creature holds a static frame per state with instant frame-swap expression changes (the emotional information must survive), stage change becomes a 300ms crossfade, UI transitions become opacity-only. Reduce Transparency: glass falls back to opaque surface.
 
-**R-11.6** [Unbuilt] Verification gate: a manual VoiceOver pass of all four tabs plus onboarding before the first TestFlight build, repeated when a screen's structure changes. Android's equivalents (48dp targets, TalkBack) bind at Android parity and are listed in §27.
+**R-11.6** [Unbuilt] Verification gate: a manual VoiceOver pass of all three tabs, the expanded journey, and onboarding before the first TestFlight build, repeated when a screen's structure changes. Android's equivalents (48dp targets, TalkBack) bind at Android parity and are listed in §27.
 
 ## 12. Localisation and multi-currency
 
@@ -714,7 +721,7 @@ Sequenced by dependency; status verified against code at `5406a7b`. The bar for 
 | 4 | Wire the ladder: derived state nightly, `GET /api/pets` v2 with ladder + stage, `net_worth_daily` writer (R-7.6) | Engine Built and tested; wiring Unbuilt |
 | 5 | Plaid lifecycle + update mode (R-8.5, R-8.6) | Unbuilt |
 | 6 | Onboarding rewrite (§5): chips, sliders, `declared_assets`, the number, subscription reveal (R-5.5 to R-5.7), hatch | Unbuilt; detection itself Built |
-| 7 | Plan tab v1: ladder, one goal, two guardrails | Unbuilt |
+| 7 | Journey v1: tap-to-expand on Home, ladder, one goal, two guardrails | Unbuilt |
 | 8 | Notification day-cap, quiet hours + timezone capture, emoji-free copy (R-9.2, R-9.3, R-9.7) | Unbuilt |
 | 9 | Commission Phase 1 (paid character exploration, design-direction §7.2) started in parallel; it has lead time and nothing else does | Not started |
 
@@ -757,7 +764,7 @@ Append-only. Superseded rows are marked, never edited. A new decision gets the n
 | DR-24 | 2026-08-12 | **Both billing periods at launch**, annual presented first | Founder decision, overriding the annual-only recommendation. Every direct competitor offers monthly (Monarch, Copilot, YNAB all around \$13 to \$15), a monthly anchor is what makes \$99/yr read as cheap, and no published data isolates the conversion cost of annual-only. Note the PRD's original rationale was void anyway: the App Store Small Business Program pays 85% from the first transaction under \$1M, so Apple's cut does not drop at year two at this scale | Unbuilt (§25) |
 | DR-25 | 2026-08-12 | **The ladder stays preset.** No user reordering, no user-created rungs, no rung deletion. Autonomy is at parameter level (adjustable rates on rungs 5, 6, 7), via skip-with-reason, via structural not-applicable, and via Layer 2 target goals | Brown & Lahey (NBER w20125): the task ordering that best predicts completion is the ordering people choose LEAST often when given the choice, so a reorderable ladder is predictably worse, not neutrally different. Locke & Latham settled the autonomy dispute jointly: self-set goals are as effective but not more effective than assigned goals, and assigned goals only lose commitment when assigned tersely without a rationale. Duolingo moved FROM a choose-your-own tree TO a fixed path. No successful financial product lets users arrange a milestone ladder | Structure Built (`ladder.ts:115-226`); adjustable parameters Unbuilt |
 | DR-26 | 2026-08-12 | **Every rung surfaces its rationale and the source of its number**, inline on the journey, not buried in a tooltip | The single most evidence-backed engagement lever available: assigned goals only cost commitment when assigned tersely (Latham, Erez & Locke 1988). Rung 7 already does this with its withdrawal-rate citation; extend to all eight | Unbuilt |
-| DR-27 | 2026-08-12 | **The creature and the journey are one surface at two resolutions, not two tabs.** The creature is the home state; tapping it opens the journey beneath. Its form is the rung reached, its posture is the week's guardrails, sleeping means nothing needs doing, transforming means a rung cleared, the shelf behind it is what has been completed | Founder decision. Separate Pet and Plan tabs force the user to ask which one is the product. The creature is not decoration on the journey nor a report about it: it is the journey's outward form, readable at a glance without opening anything. The hard rule: the creature never displays a number and the journey never tries to be cute, enforced by the Window pattern in `design-direction.md` | Unbuilt. Supersedes the four-tab IA in §4 and the Plan tab spec in §7 |
+| DR-27 | 2026-08-12 | **The creature and the journey are one surface at two resolutions, not two tabs.** The creature is the home state; tapping it opens the journey beneath. Its form is the rung reached, its posture is the week's guardrails, sleeping means nothing needs doing, transforming means a rung cleared, the shelf behind it is what has been completed | Founder decision. Separate Pet and Plan tabs force the user to ask which one is the product. The creature is not decoration on the journey nor a report about it: it is the journey's outward form, readable at a glance without opening anything. The hard rule: the creature never displays a number and the journey never tries to be cute, enforced by the Window pattern in `design-direction.md` | Reconciled into §4 (R-4.1, R-4.1a, R-4.1b, R-4.4) and §7 on 2026-08-13. The superseded four-tab IA is gone from the body; this row is the record of why |
 | DR-28 | 2026-08-12 | **Sub-checkpoints within a rung.** The creature changes form eight times ever, so the journey shows quarter-marks inside the active rung, and rung 7 (Ascendant) gets internal states at 10/25/50/75% of the FI number. Artifacts are earned from sustained guardrail streaks as well as from rungs | Founder observation: eight rungs over a lifetime is too infrequent to sustain a creature. A well-off user auto-completes rungs 0 to 5 on day one and could then see nothing change for years. Rare stage changes are correct and become a feature only when something else moves weekly | Unbuilt |
 | DR-29 | 2026-08-12 | **Solo founder.** No cofounder. The equity-split, vesting and role-division sections of `business-plan.md` are void | Founder statement | Doc cleanup pending |
 | DR-30 | 2026-08-12 | **Home market: US first, UK second** | Founder decision, consistent with market-research §6.2. UK stays second on the strength of mature open banking, proven willingness to pay, and the Pensions Dashboards mandate, but it carries the unresolved FCA registration question (obligations §8 Q2) | Planning |
@@ -777,7 +784,7 @@ Each with a recommendation. An answered item becomes a DR row and is deleted fro
 
 **Vesting note (DR-22):** rung 2 is about capture, not ownership. A user controls whether they contribute enough to receive the match; vesting controls when the match becomes theirs. Vesting is deliberately not modelled, and no aggregator exposes it. Do not "fix" this by adding a vesting gate.
 
-**B2. Rung 2: does declaration alone complete a stage-gating rung?** Code says yes: `employerMatch: 'captured'` satisfies it with no verification (`ladder.ts:148-153`), and no producer of contribution-stream verification exists. *Recommend: ratify, with a soft verify: when an investment connection later shows no contribution stream, the rung stays completed (DR-15) but the Plan tab shows a quiet "want me to check this?" prompt. The alternative, blocking a rung on a connection most users will not have, kills early momentum.*
+**B2. Rung 2: does declaration alone complete a stage-gating rung?** Code says yes: `employerMatch: 'captured'` satisfies it with no verification (`ladder.ts:148-153`), and no producer of contribution-stream verification exists. *Recommend: ratify, with a soft verify: when an investment connection later shows no contribution stream, the rung stays completed (DR-15) but the expanded journey shows a quiet "want me to check this?" prompt. The alternative, blocking a rung on a connection most users will not have, kills early momentum.*
 
 > **Settled 2026-08-12: ratified, declaration completes the rung, with the soft-verify prompt. See also DR-22 on vesting.**
 
@@ -824,7 +831,10 @@ Verified by reading source at `5406a7b` on 2026-08-12. Built = behaves as specif
 | Req | Section | Status | Evidence (file:line) |
 |---|---|---|---|
 | R-2.1 to R-2.3 | North star | Unbuilt | No analytics symbols anywhere in `backend/src` or `ios/Coiny` |
-| R-4.1 | Four tabs | Partial | Three tabs, `RootView.swift:7-23`; no PlanView.swift |
+| R-4.1 | Three tabs, Home / Activity / Wealth | Partial | `RootView.swift:7-23`; Pet tab needs renaming to Home |
+| R-4.1a | Tap the creature to expand the journey | Unbuilt | |
+| R-4.1b | The creature is the only affordance that expands | Unbuilt | |
+| R-4.4 | Creature carries no numbers, journey carries no character | Unbuilt | |
 | R-4.2, R-4.3 | Add-account screen, Window | Unbuilt | 25 GroupBox sections with inline connects; no asset catalog, no sprites (`PetView.swift:85-88`) |
 | R-5.1 | 90s TTFV | Unbuilt | No timing events exist |
 | R-5.2 | Onboarding rewrite | Unbuilt | `EnterNamePage` live (`OnboardingView.swift:21,88`); purple styling (`:62,:104,:290`) |
