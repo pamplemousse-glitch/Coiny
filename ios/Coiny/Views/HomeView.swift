@@ -15,6 +15,10 @@ struct HomeView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
 
+    /// True while Home is the selected tab. Driven by RootView rather than
+    /// `onDisappear`, which does not fire reliably for a TabView child.
+    var isVisible: Bool = true
+
     @State private var isExpanded = false
     @State private var showSettings = false
     @State private var reactionOverride: CreatureCondition?
@@ -70,9 +74,12 @@ struct HomeView: View {
             guard let newValue, let oldValue, newValue != oldValue else { return }
             playReaction(store.pet?.reactionHistory.first?.reaction.animation ?? "neutral")
         }
-        .onDisappear {
+        .onChange(of: isVisible) { _, nowVisible in
             // Tab switch returns to collapsed (R-4.1a). No animation: the
-            // surface is offscreen.
+            // surface is offscreen when this fires.
+            if !nowVisible { isExpanded = false }
+        }
+        .onDisappear {
             isExpanded = false
         }
     }

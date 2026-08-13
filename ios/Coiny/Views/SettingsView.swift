@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(PetStore.self) private var store
+    @Environment(\.dismiss) private var dismiss
     @AppStorage("onboardingComplete") private var onboardingComplete: Bool = false
     @AppStorage("bankLinked") private var bankLinked: Bool = false
     @State private var showDeleteAlert = false
@@ -118,6 +119,16 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            // An explicit dismiss, not just swipe-to-dismiss. A sheet whose
+            // only exit is a drag gesture is unreachable for a VoiceOver user
+            // and hard for anyone with a motor impairment (§11), and it also
+            // stops working the moment the sheet's content scrolls, which it
+            // now does.
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
             .task {
                 await StoreKitService.shared.refreshEntitlements()
             }

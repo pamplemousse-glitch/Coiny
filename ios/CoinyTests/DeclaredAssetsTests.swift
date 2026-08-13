@@ -65,8 +65,10 @@ final class DeclaredAssetsTests: XCTestCase {
         let props = sheet.telemetryProperties
         XCTAssertEqual(props["class_count"], .int(2))
         XCTAssertEqual(props["classes"], .strings(["checking", "home"]))
-        XCTAssertEqual(props["value_checking"], .string("1k-10k"))
-        XCTAssertNil(props["value_home"], "a skipped line must not report a value")
+        // Nested under one key, not flattened: the server schema is a strict
+        // object and would reject value_<class> keys silently.
+        XCTAssertEqual(props["value_band_by_class"], .bands(["checking": "1k-10k"]))
+        XCTAssertNil(props["value_checking"], "per-class values must not be flattened into the envelope")
     }
 
     func testStoreRoundTrips() {

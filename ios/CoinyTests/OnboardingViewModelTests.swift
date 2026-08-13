@@ -135,12 +135,15 @@ final class OnboardingViewModelTests: XCTestCase {
 
     // MARK: Step flow
 
-    func testStartEmitsSignupCompletedOnce() async {
+    // signup_completed is a server-only event, emitted by the backend from
+    // findOrCreateUser so a device cannot forge a cohort's day 0. start() only
+    // anchors the local clock that seconds_since_signup is measured against.
+    func testStartNeverEmitsTheServerOnlySignupEvent() async {
         let viewModel = makeViewModel()
         await viewModel.start()
         await viewModel.start()
         let names = await flushedEventNames(viewModel)
-        XCTAssertEqual(names.filter { $0 == "signup_completed" }.count, 1)
+        XCTAssertFalse(names.contains("signup_completed"))
     }
 
     func testEmptyDeclarationSkipsAmountsAndNumber() async {
@@ -201,7 +204,7 @@ final class OnboardingViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.isDisconnectedHatch)
         let names = await flushedEventNames(viewModel)
         XCTAssertTrue(names.contains("link_result"))
-        XCTAssertTrue(names.contains("hatch_shown"))
+        XCTAssertTrue(names.contains("pet_hatched"))
     }
 
     func testOfflineLinkTokenFailureSetsOfflineNotDeadEnd() async {
@@ -221,7 +224,7 @@ final class OnboardingViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.isDisconnectedHatch)
         XCTAssertEqual(api.exchangeCalls, 1)
         let names = await flushedEventNames(viewModel)
-        XCTAssertFalse(names.contains("subscription_reveal_shown"))
+        XCTAssertFalse(names.contains("subscriptions_revealed"))
     }
 
     func testSuccessfulLinkWithSubscriptionsShowsReveal() async {
@@ -236,7 +239,7 @@ final class OnboardingViewModelTests: XCTestCase {
         await viewModel.continueFromReveal()
         XCTAssertEqual(viewModel.step, .hatch)
         let names = await flushedEventNames(viewModel)
-        XCTAssertTrue(names.contains("subscription_reveal_shown"))
+        XCTAssertTrue(names.contains("subscriptions_revealed"))
     }
 
     // MARK: Hatch copy
@@ -291,7 +294,9 @@ final class OnboardingViewModelTests: XCTestCase {
         await viewModel.start()
         await viewModel.skipNotifications()
         XCTAssertTrue(viewModel.completed)
-        XCTAssertTrue(transport.events.map(\.event).contains("signup_completed"))
+        // Flushing is what is under test: the queue must reach the transport
+        // rather than sit there when the flow ends.
+        XCTAssertTrue(transport.events.map(\.event).contains("onboarding_step_completed"))
     }
 
     func testNotificationResolutionEmitsPermissionChange() async {
