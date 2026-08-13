@@ -95,7 +95,7 @@ struct NetWorthView: View {
         if repairVM.needsRepair {
             // Proactive repair (R-8.7): surfaced on open, in-app only.
             WealthBannerView(
-                text: "Your bank needs you to sign in again. Two taps.",
+                text: repairVM.repairPromptText,
                 systemImage: "key.horizontal",
                 actionTitle: "Reconnect",
                 action: { Task { await repairVM.repairFirstBrokenItem(source: .prompt) } }
