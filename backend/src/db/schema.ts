@@ -112,6 +112,10 @@ export const deviceTokens = pgTable('device_tokens', {
   token: text('token').primaryKey(),
   userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
   platform: text('platform').notNull(),
+  // IANA timezone identifier captured at registration (R-9.3 quiet hours).
+  // Nullable: tokens from older app builds have none, and the dispatcher
+  // suppresses pushes rather than guessing a zone.
+  timezone: text('timezone'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
