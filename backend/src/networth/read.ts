@@ -53,6 +53,7 @@ import {
 } from '../goals/snapshot.js';
 import type { SpinwheelDebt } from '../spinwheel/client.js';
 import { getClassCache, getPlaidAccountBalances } from '../store/asset-cache.js';
+import { declaredNetUsd, listDeclaredAssets, oldestRefreshedAt } from '../store/declared-assets.js';
 import { getCachedLiabilities } from '../store/plaid-liabilities.js';
 import { getRecentOutflows } from '../store/transactions.js';
 import {
@@ -85,6 +86,7 @@ export type NetWorthResponse = {
   sneakers: number;
   nft: number;
   manual: number;
+  declared: number;
   pokemonCards: number;
   kalshi: number;
   kraken: number;
@@ -413,6 +415,22 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
     classes.manual = reading(manualSum, oldest, 'ok');
   }
 
+  // Declared values (the onboarding sheet, R-5.3) are the third data tier
+  // alongside connected and derived (register DR-21). The user told us, and
+  // the user is still the source, so the class is always labelled
+  // "self-reported <date>" and never excluded for age (R-8.2): no freshness
+  // policy is consulted. The value is the SIGNED net of the sheet (declared
+  // credit cards and student loans subtract), so the total adds it as-is.
+  // asOf is the OLDEST refreshedAt so the label never understates age. A sheet
+  // whose every line skipped the amount reads value null (a number we cannot
+  // compute is never rendered as zero), which contributes nothing to `total`.
+  const declaredLines = await listDeclaredAssets(userId);
+  if (declaredLines.length === 0) {
+    classes.declared = reading(null, null, 'not_connected');
+  } else {
+    classes.declared = reading(declaredNetUsd(declaredLines), oldestRefreshedAt(declaredLines), 'ok');
+  }
+
   const pokemonRows = await db().select().from(pokemonCardHoldings).where(eq(pokemonCardHoldings.userId, userId));
   classes.pokemonCards = rollupRows(
     pokemonRows.map(
@@ -632,6 +650,7 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
     sneakers: scalar('sneakers'),
     nft: scalar('nft'),
     manual: scalar('manual'),
+    declared: scalar('declared'),
     pokemonCards: scalar('pokemonCards'),
     kalshi: scalar('kalshi'),
     kraken: scalar('kraken'),

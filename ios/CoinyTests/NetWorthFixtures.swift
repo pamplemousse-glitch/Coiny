@@ -36,6 +36,7 @@ enum NetWorthFixtures {
             sneakers: 0,
             nft: nil,
             manual: nil,
+            declared: nil,
             alpaca: nil,
             truelayer: nil,
             kraken: 0,

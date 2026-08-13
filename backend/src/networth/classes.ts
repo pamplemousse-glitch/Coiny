@@ -80,6 +80,11 @@ export const FRESHNESS: Record<NetWorthClassName, FreshnessPolicy> = {
   realEstate: MONTHLY_KEEP,
   vehicles: MONTHLY_KEEP,
   manual: { freshMs: Number.POSITIVE_INFINITY, excludeMs: null },
+  // Declared values (the onboarding sheet, R-5.3) are self-reported: the user
+  // is the source and there is no fresher upstream, so like manual assets they
+  // are always labelled "self-reported <date>" and never excluded for age
+  // (R-8.2). Age drives the R-5.4 refresh nudge, never exclusion.
+  declared: { freshMs: Number.POSITIVE_INFINITY, excludeMs: null },
 };
 
 export const NET_WORTH_CLASS_NAMES = [
@@ -108,6 +113,7 @@ export const NET_WORTH_CLASS_NAMES = [
   'realEstate',
   'vehicles',
   'manual',
+  'declared',
 ] as const;
 
 export type NetWorthClassName = (typeof NET_WORTH_CLASS_NAMES)[number];

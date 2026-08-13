@@ -10,6 +10,7 @@ import { registerCoinbaseApi } from './api/coinbase.js';
 import { registerCoinsApi } from './api/coins.js';
 import { registerDebtsApi } from './api/debts.js';
 import { registerDebugApi, registerDebugSessionApi } from './api/debug.js';
+import { registerDeclaredAssetsApi } from './api/declared-assets.js';
 import { registerDevicesApi } from './api/devices.js';
 import { registerDiscogsApi } from './api/discogs.js';
 import { registerEnergyApi } from './api/energy.js';
@@ -150,6 +151,7 @@ async function buildApp() {
     registerSpinwheelApi(scope);
     registerSneakersApi(scope);
     registerManualAssetsApi(scope);
+    registerDeclaredAssetsApi(scope);
     registerChainWalletsApi(scope);
     registerHyperliquidApi(scope);
     registerPolymarketApi(scope);

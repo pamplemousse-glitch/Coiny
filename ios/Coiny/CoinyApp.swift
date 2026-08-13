@@ -43,6 +43,12 @@ struct CoinyApp: App {
                     RootView()
                         .environment(petStore)
                         .task {
+                            // Detached: cache repair for the declaration sheet
+                            // (fresh install pulls the server copy back) must
+                            // never delay the pet or the permission prompt.
+                            if !CoinyApp.isUITesting {
+                                Task { await DeclaredAssetsSyncService().reconcile() }
+                            }
                             await petStore.refresh()
                             await requestPushPermission()
                         }
