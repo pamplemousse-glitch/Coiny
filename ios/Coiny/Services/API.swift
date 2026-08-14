@@ -14,10 +14,25 @@ actor API {
     }()
 
     enum Endpoint {
+        /// Which backend this build talks to.
+        ///
+        /// Read from `COINY_API_BASE_URL` in Info.plist, which comes from the
+        /// build configuration, so a TestFlight build can point at staging and a
+        /// release build at production without a code change. It was previously
+        /// hardcoded to one host, which meant there was no way to test a build
+        /// against anything but production.
+        ///
+        /// Falling back to staging is deliberate: a misconfigured build should
+        /// hit the environment full of fake data, never the one with real
+        /// people's bank accounts.
         static let baseURL: URL = {
             #if targetEnvironment(simulator)
             return URL(string: "http://127.0.0.1:3000")!
             #else
+            let configured = Bundle.main.object(forInfoDictionaryKey: "COINY_API_BASE_URL") as? String
+            if let configured, let url = URL(string: configured), url.scheme == "https" {
+                return url
+            }
             return URL(string: "https://coiny-backend.fly.dev")!
             #endif
         }()

@@ -1,5 +1,10 @@
 name: Backend Deploy
 
+# Staging deploys automatically on merge. Production requires a human, and does
+# not exist yet: the production app is created only when there are real
+# credentials to put in it. Until then the production job is unreachable by
+# design, and that is the correct state.
+#
 # Triggers on PRs that touched backend paths once they merge into main.
 # We can't use `push: branches: [main]` here because the auto-merge workflow
 # completes merges via GITHUB_TOKEN, and GitHub does not fire downstream
@@ -12,8 +17,16 @@ on:
     paths:
       - 'backend/**'
       - 'fly.toml'
+      - 'fly.production.toml'
       - '.github/workflows/backend-deploy.yml'
   workflow_dispatch:
+    inputs:
+      environment:
+        description: Which environment to deploy
+        required: true
+        default: staging
+        type: choice
+        options: [staging, production]
 
 concurrency:
   group: backend-deploy
@@ -23,10 +36,17 @@ permissions:
   contents: read
 
 jobs:
-  deploy:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+  staging:
+    # Every merge lands here first. There is no path to production that does not
+    # pass through this job succeeding.
+    if: >-
+      github.event_name == 'pull_request' && github.event.pull_request.merged == true
+      || (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging')
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    environment:
+      name: staging
+      url: https://coiny-backend.fly.dev
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
@@ -34,6 +54,74 @@ jobs:
 
       - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1  # v1.6
 
-      - run: flyctl deploy --remote-only
+      # fly.toml IS staging, and is the default config, so a bare `fly deploy`
+      # from a laptop targets staging too. The unsafe thing takes the flag.
+      #
+      # release_command in it runs the migrations, so a migration that cannot
+      # apply aborts the release here and the previous version keeps serving.
+      - run: flyctl deploy --config fly.toml --remote-only
         env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_STAGING }}
+
+      - name: Verify staging is serving
+        run: |
+          for attempt in $(seq 1 10); do
+            if curl -fsS https://coiny-backend.fly.dev/health > /dev/null; then
+              echo "staging healthy"
+              exit 0
+            fi
+            echo "attempt $attempt: not healthy yet"
+            sleep 6
+          done
+          echo "staging did not become healthy"
+          exit 1
+
+  production:
+    # Gated on the `production` GitHub Environment, which carries a required
+    # reviewer. The job queues and waits for approval rather than deploying,
+    # so a merge can never reach real users on its own.
+    needs: staging
+    if: >-
+      always() && needs.staging.result == 'success'
+      && github.event_name == 'workflow_dispatch' && inputs.environment == 'production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://coiny-api.fly.dev
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          ref: main
+
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1  # v1.6
+
+      # Fails loudly rather than creating an app implicitly. Production is
+      # brought into existence deliberately, once, by a human with real keys.
+      - name: Refuse to deploy if the production app does not exist
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_PRODUCTION }}
+        run: |
+          if ! flyctl status --config fly.production.toml > /dev/null 2>&1; then
+            echo "The production app does not exist yet."
+            echo "That is expected until Plaid production access and the Apple"
+            echo "organization enrollment are in place. See docs/environments-setup.md."
+            exit 1
+          fi
+
+      - run: flyctl deploy --config fly.production.toml --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_PRODUCTION }}
+
+      - name: Verify production is serving
+        run: |
+          for attempt in $(seq 1 10); do
+            if curl -fsS https://coiny-api.fly.dev/health > /dev/null; then
+              echo "production healthy"
+              exit 0
+            fi
+            echo "attempt $attempt: not healthy yet"
+            sleep 6
+          done
+          echo "production did not become healthy"
+          exit 1

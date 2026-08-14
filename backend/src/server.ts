@@ -62,7 +62,14 @@ function isDebugBuild(): boolean {
 
 async function buildApp() {
   await initDb();
-  await runMigrations();
+  // Migrations run as a deploy step (fly.toml release_command), not here.
+  // On boot, every machine that starts races every other machine to migrate,
+  // and a release that fails to migrate still serves traffic against a schema
+  // it does not match. Tests keep the boot path because PGlite is per-process
+  // and has no deploy step.
+  if (config.NODE_ENV === 'test' || config.APP_ENV === 'local') {
+    await runMigrations();
+  }
 
   const app = Fastify({
     logger: {

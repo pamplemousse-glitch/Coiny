@@ -1,0 +1,120 @@
+name: Migration Rehearsal
+
+# Runs every pending migration against a throwaway copy of the REAL production
+# database, then deletes the copy.
+#
+# The unit test in backend/tests/migration-journal.test.ts already proves the
+# journal is ordered and that migrations apply onto a database seeded to
+# production's migration history. This job catches the class it cannot: things
+# that depend on the actual rows. A NOT NULL added to a column that has nulls in
+# it, a unique index on data that is not unique, a backfill that takes longer
+# than the release timeout.
+#
+# Requires NEON_API_KEY. Without it the job skips rather than fails, so a fork
+# or a contributor without the secret does not see a red X they cannot fix.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/drizzle/**'
+      - '.github/workflows/migration-rehearsal.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: migration-rehearsal-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NEON_PROJECT_ID: noisy-bonus-65551609
+  # Branch off production, not staging: production is the database whose rows
+  # the next deploy will actually touch.
+  PARENT_BRANCH: production
+
+jobs:
+  rehearse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Check for the Neon key
+        id: guard
+        # Via env, never interpolated into the shell: `${{ secrets.X }}` inside a
+        # run block puts the value into the command line itself.
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: |
+          if [ -z "$NEON_API_KEY" ]; then
+            echo "NEON_API_KEY is not set, skipping the rehearsal"
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444  # v5.0.0
+        if: steps.guard.outputs.available == 'true'
+        with:
+          node-version: '22'
+
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda  # v4.1.0
+        if: steps.guard.outputs.available == 'true'
+
+      - name: Install and build
+        if: steps.guard.outputs.available == 'true'
+        run: |
+          pnpm install --frozen-lockfile --filter coiny-backend...
+          pnpm --filter coiny-backend build
+
+      # A unique name per run, so two concurrent PRs never collide, and a
+      # timestamp so an orphan is obviously identifiable if cleanup ever fails.
+      - name: Create a disposable branch from production
+        if: steps.guard.outputs.available == 'true'
+        id: branch
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          NAME="ci-rehearsal-${RUN_ID}-${RUN_ATTEMPT}"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          # Output redirected to a file, so the connection string in the
+          # response never reaches the job log.
+          npx neonctl branches create \
+            --project-id "$NEON_PROJECT_ID" \
+            --parent "$PARENT_BRANCH" \
+            --name "$NAME" \
+            --output json > /tmp/branch.json
+          echo "created $NAME"
+
+      - name: Run the pending migrations against it
+        if: steps.guard.outputs.available == 'true'
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NODE_ENV: production
+          APP_ENV: staging
+          # Real, but only ever used to satisfy the config schema: this job runs
+          # migrations, it does not encrypt or decrypt anything.
+          DATA_ENCRYPTION_KEY: ${{ secrets.DATA_ENCRYPTION_KEY_CI || '0000000000000000000000000000000000000000000000000000000000000000' }}
+          BRANCH_NAME: ${{ steps.branch.outputs.name }}
+        run: |
+          # Captured into the environment and never echoed. Fly and GitHub both
+          # retain job logs, and this string carries a database password.
+          DATABASE_URL="$(npx neonctl connection-string "$BRANCH_NAME" \
+            --project-id "$NEON_PROJECT_ID" --pooled)"
+          export DATABASE_URL
+          cd backend && node dist/db/migrate-run.js
+
+      # always(), so a failed migration still cleans up. A rehearsal that leaves
+      # branches behind on failure is a rehearsal that quietly costs money.
+      - name: Delete the disposable branch
+        if: always() && steps.branch.outputs.name != ''
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          BRANCH_NAME: ${{ steps.branch.outputs.name }}
+        run: |
+          npx neonctl branches delete "$BRANCH_NAME" \
+            --project-id "$NEON_PROJECT_ID" || echo "cleanup failed, delete $BRANCH_NAME by hand"

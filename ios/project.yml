@@ -51,6 +51,9 @@ targets:
               - coiny
         CFBundleShortVersionString: "0.2.0"
         CFBundleVersion: "1"
+        # Which backend this build talks to. Set per configuration below, so a
+        # TestFlight build can point at staging without touching code.
+        COINY_API_BASE_URL: $(COINY_API_BASE_URL)
         UILaunchScreen:
           UIColorName: ""
         UISupportedInterfaceOrientations:
@@ -72,6 +75,14 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.coiny.ios
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        # Which backend a device build talks to. Staging, for every
+        # configuration, because production does not exist yet.
+        #
+        # When it does, add a `configs:` block overriding this for Release only.
+        # Staging stays the default so that a build which forgets to opt in
+        # reaches the environment full of fake data, never real bank accounts.
+        # ($() defeats Xcode's // comment stripping in build settings.)
+        COINY_API_BASE_URL: https:/$()/coiny-backend.fly.dev
         SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
         TARGETED_DEVICE_FAMILY: "1,2"
         SWIFT_TREAT_WARNINGS_AS_ERRORS: YES

@@ -1038,6 +1038,7 @@
 				CODE_SIGN_ENTITLEMENTS = Coiny/Coiny.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
+				COINY_API_BASE_URL = "https:/$()/coiny-backend.fly.dev";
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				INFOPLIST_FILE = Coiny/Info.plist;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -1128,6 +1129,7 @@
 				CODE_SIGN_ENTITLEMENTS = Coiny/Coiny.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
+				COINY_API_BASE_URL = "https:/$()/coiny-backend.fly.dev";
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				INFOPLIST_FILE = Coiny/Info.plist;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
