@@ -1,5 +1,31 @@
 # Environments: Setup Runbook
 
+> **CORRECTED 2026-08-14.** This runbook was written when the plan was to keep
+> `coiny-backend` as production and create a new app for staging. That was
+> wrong, and the reason it was wrong is the whole point of this exercise:
+> `coiny-backend` has only ever held sandbox keys and synthetic data, so it IS
+> staging.
+>
+> The original justification was that the hostname is baked into shipped device
+> builds. It is (`ios/Coiny/Services/API.swift`), but nothing has shipped:
+> TestFlight is blocked on the Apple organization enrollment. The constraint did
+> not apply.
+>
+> **What is true now:**
+>
+> | | App | Config | State |
+> |---|---|---|---|
+> | Staging | `coiny-backend` (exists) | `fly.toml`, the default | Live, sandbox keys, Neon `staging` branch |
+> | Production | `coiny-api` (name is a placeholder) | `fly.production.toml` | **Does not exist yet, deliberately** |
+>
+> So: **no staging app needs creating.** Wherever a step below says
+> `coiny-backend-stage`, it means the existing `coiny-backend`. Phase D's
+> `fly apps create` is not needed and Phase I's "wipe and promote" is replaced
+> by creating the production app fresh, with real keys, when they arrive.
+>
+> Everything else here (the secret inventory, the GitHub Environments, the
+> verification checklist, the drift detection) is unchanged and correct.
+
 The "how" companion to `docs/environments-research.md` (the "why"). Work the
 phases in order; each step is labelled **[Founder]** (dashboard or CLI work
 on accounts only he can touch) or **[Agent]** (repo changes done in a Claude
@@ -17,7 +43,8 @@ Known identifiers used throughout (safe to write down, none are secrets):
 |---|---|
 | GitHub repo | `pamplemousse-glitch/Coiny` (public) |
 | Fly app, production | `coiny-backend` (region `iad`) |
-| Fly app, staging (to create) | `coiny-backend-stage` |
+| Fly app, staging (ALREADY EXISTS) | `coiny-backend` |
+| Fly app, production (do not create yet) | `coiny-api` |
 | Neon project | `Coiny`, id `noisy-bonus-65551609`, aws-us-east-1, Postgres 17 |
 | Neon branch, production | `production` (default; currently NOT protected) |
 | Neon branch, staging (to create) | `staging` |

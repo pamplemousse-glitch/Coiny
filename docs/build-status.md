@@ -47,7 +47,30 @@ verified from an empty database.
 
 ---
 
-## The open CI failure
+## The CI failure, resolved 2026-08-14
+
+**Root cause: three Node versions.** Local 26, CI 22, Docker image 22. Nothing
+was testing what ships.
+
+The visible symptom was twenty tests passing locally and failing in CI while
+quietly making real HTTP requests to Plaid. MockAgent installs a dispatcher
+through the npm `undici` package, and whether the built-in global `fetch`
+honours it depends on Node's bundled undici matching the packaged one. It
+matched on the laptop and did not on the runner, silently, so
+`disableNetConnect` was never consulted.
+
+I chased the interop twice and both fixes traded one break for another. Fixed
+by pinning Node 26 in the four places that must agree (`.nvmrc`,
+`backend/package.json` engines, every workflow, the Dockerfile) plus a test that
+asserts the interception itself, including that an unmocked request is refused
+rather than reaching the network.
+
+Follow-on caught by CI: `node:26-alpine` dropped corepack, so the image build
+failed on `corepack enable`. pnpm now installs from npm, version still pinned.
+
+<details><summary>Original diagnosis, kept for the record</summary>
+
+
 
 **Symptom.** Twenty tests fail in CI and pass locally. Every failing test makes
 a mocked Plaid HTTP call. Every webhook test that only touches the database
@@ -74,10 +97,9 @@ the MockAgent tests and breaks the Coinbase and Zerion tests, which stub the
 22, production `node:22-alpine`. Nothing was testing what ships. Fixing the
 symptom without fixing that just moves the failure.
 
-**Recommended fix, not yet done:** pin one Node version everywhere (production
-is 22, so 22), add `.nvmrc` and `engines`, then make the mocking strategy
-uniform across test files rather than half MockAgent and half `vi.stubGlobal`.
-Verify under Node 22 via Docker rather than by reasoning about it.
+**Recommended fix, not yet done:** pin one Node version everywhere.
+
+</details>
 
 ---
 
@@ -114,9 +136,17 @@ Verify under Node 22 via Docker rather than by reasoning about it.
 
 ## Environments: the current truth
 
-There is **one** environment. It is `NODE_ENV=production` with sandbox keys
-throughout, so the thing named production is really staging. There is no
-staging, no preview environment, and one database.
+**Corrected 2026-08-14.** `coiny-backend` is staging, and always was: it has
+only ever held sandbox keys and synthetic data. Production is a separate app
+that does not exist yet and is created only when real credentials arrive.
+
+| | App | Config | State |
+|---|---|---|---|
+| Staging | `coiny-backend` | `fly.toml` (the default) | Live, sandbox keys, Neon `staging` branch |
+| Production | `coiny-api` (placeholder name) | `fly.production.toml` | Does not exist yet, deliberately |
+
+Neon has both branches: `production` (holds the migration history, currently at
+0037) and `staging` (copy-on-write child).
 
 Two documents now exist:
 - `docs/environments-research.md` (the decision document, with a mermaid diagram
