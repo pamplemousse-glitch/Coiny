@@ -21,7 +21,10 @@
 FROM node:26-alpine AS builder
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@11.1.3 --activate
+# node:26-alpine no longer ships corepack, so pnpm comes from npm instead. The
+# version stays pinned: an unpinned package manager is a supply-chain surface,
+# and this is the tool that resolves every other dependency.
+RUN npm install -g pnpm@11.1.3
 
 # Workspace manifests + lockfile first for layer cache
 COPY pnpm-workspace.yaml pnpm-lock.yaml ./
@@ -41,7 +44,10 @@ RUN pnpm --filter coiny-backend build
 FROM node:26-alpine AS deps
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@11.1.3 --activate
+# node:26-alpine no longer ships corepack, so pnpm comes from npm instead. The
+# version stays pinned: an unpinned package manager is a supply-chain surface,
+# and this is the tool that resolves every other dependency.
+RUN npm install -g pnpm@11.1.3
 
 COPY pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY backend/package.json ./backend/
@@ -56,12 +62,12 @@ COPY shared/package.json ./shared/
 RUN pnpm install --frozen-lockfile --filter coiny-backend... --prod --node-linker=hoisted
 
 # ── Stage 3: runtime ─────────────────────────────────────────────────────────
-# No corepack, no pnpm, no compilers. Just node, the resolved dependency tree,
+# No pnpm, no npm, no compilers. Just node, the resolved dependency tree,
 # and compiled output.
 FROM node:26-alpine AS runtime
 WORKDIR /app
 
-# node:22-alpine bundles npm, which the entrypoint never invokes and which
+# node:26-alpine bundles npm, which the entrypoint never invokes and which
 # carries its own transitive advisories (brace-expansion, ip-address, sigstore,
 # tar at last scan). Removing it drops those findings and shrinks the attack
 # surface of a container whose only job is to exec one node process.
