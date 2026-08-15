@@ -12,6 +12,15 @@ struct SettingsView: View {
     @State private var showManageSubscriptions = false
     @State private var showRefundSheet = false
     @State private var repairVM = ConnectionRepairViewModel()
+    @State private var presentedDocument: LegalDocument?
+    /// The "Share usage data" toggle (docs/legal/consent-copy.md section 2).
+    /// Defaults on because consent was given at sign-in; the same key is what
+    /// `TelemetryConsent` reads before enqueuing anything.
+    @AppStorage(TelemetryConsent.shareUsageDataKey) private var shareUsageData: Bool = true
+    /// Persisted, not `@State`: a change that never reached the server has to
+    /// outlive this sheet, or the next open would pull the stale server value
+    /// back over the user's decision.
+    @AppStorage("shareUsageDataPendingSync") private var usageDataSyncFailed: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -46,6 +55,10 @@ struct SettingsView: View {
                 }
 
                 subscriptionSection
+
+                privacySection
+
+                legalSection
 
                 Section("About") {
                     LabeledContent("Backend") {
@@ -115,6 +128,7 @@ struct SettingsView: View {
             .task {
                 await StoreKitService.shared.refreshEntitlements()
                 await repairVM.loadItems()
+                await loadConsent()
             }
             .sheet(isPresented: Binding(
                 get: { repairVM.isPresentingLink },
@@ -123,6 +137,98 @@ struct SettingsView: View {
                 if let handler = repairVM.handler {
                     PlaidLinkPresenter(handler: handler)
                 }
+            }
+        }
+        // Attached to the NavigationStack rather than the Form: the Plaid Link
+        // sheet above already owns the Form's slot.
+        .sheet(item: $presentedDocument) { document in
+            LegalDocumentView(document: document)
+        }
+    }
+}
+
+// MARK: - Consent (docs/legal/consent-copy.md section 2)
+
+private extension SettingsView {
+    var privacySection: some View {
+        Section {
+            Toggle("Share usage data", isOn: $shareUsageData)
+                .accessibilityIdentifier("settings.shareUsageData")
+                .onChange(of: shareUsageData) { _, isOn in
+                    Task { await syncUsageData(isOn: isOn) }
+                }
+            if usageDataSyncFailed {
+                Text(Self.usageDataSyncNotice)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } footer: {
+            Text(Self.usageDataFooter)
+        }
+    }
+
+    /// Footer copy from `docs/legal/consent-copy.md:39-41`, verbatim.
+    static var usageDataFooter: String {
+        """
+        Anonymous-style product events tied to your account, like 'app opened' \
+        or 'goal completed'. Never amounts, never merchant names. Used only to \
+        improve Coiny.
+        """
+    }
+
+    static var usageDataSyncNotice: String {
+        """
+        Saved on this device, but we could not reach Coiny to apply it to your \
+        account. It will sync next time you open Settings.
+        """
+    }
+
+    /// The server keeps its own copy of this flag, because the client queue is
+    /// only half of the telemetry: the backend emits signup, ladder, guardrail,
+    /// item and push events with no client involved. A local toggle that never
+    /// reached the server would silence the visible half and leave the rest
+    /// running, which is the shape of the finding this closes.
+    func syncUsageData(isOn: Bool) async {
+        do {
+            try await API.shared.setAnalyticsOptOut(!isOn)
+            usageDataSyncFailed = false
+        } catch {
+            usageDataSyncFailed = true
+        }
+    }
+
+    /// Reconciles with the account on open, so a reinstall does not silently
+    /// re-enable collection the user turned off.
+    func loadConsent() async {
+        // A local change that never landed wins: it is the user's most recent
+        // instruction, and pulling the server copy over it would quietly undo
+        // the one thing this toggle exists to do.
+        if usageDataSyncFailed {
+            await syncUsageData(isOn: shareUsageData)
+            return
+        }
+        guard let consent = try? await API.shared.getConsent() else { return }
+        let serverValue = !consent.analyticsOptOut
+        if serverValue != shareUsageData {
+            shareUsageData = serverValue
+        }
+    }
+}
+
+// MARK: - Legal (Apple requires both links in the binary for subscriptions)
+
+private extension SettingsView {
+    var legalSection: some View {
+        Section("Legal") {
+            ForEach(LegalDocument.allCases) { document in
+                Button(document.title) { presentedDocument = document }
+                    .foregroundStyle(.primary)
+                    .frame(minHeight: 44)
+                    .accessibilityIdentifier("settings.legal.\(document.rawValue)")
+            }
+            LabeledContent("Contact") {
+                Link("coiny@athanorworks.com", destination: URL(string: "mailto:coiny@athanorworks.com")!)
+                    .font(.callout)
             }
         }
     }

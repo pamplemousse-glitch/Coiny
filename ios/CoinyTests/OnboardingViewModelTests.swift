@@ -135,7 +135,7 @@ final class OnboardingViewModelTests: XCTestCase {
         defaults.removePersistentDomain(forName: "OnboardingViewModelTests")
         return OnboardingViewModel(
             api: api,
-            telemetry: TelemetryClient(transport: transport),
+            telemetry: TelemetryClient(transport: transport, isGranted: { true }),
             store: DeclaredAssetsStore(defaults: defaults),
             revealWaitBudget: .milliseconds(200)
         )

@@ -25,6 +25,16 @@ export const users = pgTable(
     googleSub: text('google_sub'),
     email: text('email'),
     displayName: text('display_name'),
+    // Reg P 1016.9(b)(1)(iii) delivers the privacy notice by requiring the
+    // consumer to acknowledge it as a necessary step to obtaining the service.
+    // The sign-in screen is that step; these two columns are the record of it.
+    // Null means the user predates the consent surface, not that they refused.
+    legalAcceptedAt: timestamp('legal_accepted_at', { withTimezone: true }),
+    legalVersion: text('legal_version'),
+    // The server half of the "Share usage data" toggle
+    // (docs/legal/consent-copy.md §2). A client-only flag would stop the client
+    // queue and leave every server-emitted event still writing.
+    analyticsOptOut: boolean('analytics_opt_out').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('users_apple_sub_idx').on(t.appleSub), uniqueIndex('users_google_sub_idx').on(t.googleSub)],

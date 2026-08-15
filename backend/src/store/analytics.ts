@@ -11,7 +11,7 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { SERVER_EVENT_SCHEMAS, type ServerEventName } from '../analytics/events.js';
 import { db } from '../db/client.js';
-import { analyticsEvents } from '../db/schema.js';
+import { analyticsEvents, users } from '../db/schema.js';
 
 export type AnalyticsEventRow = typeof analyticsEvents.$inferSelect;
 
@@ -21,12 +21,28 @@ export type AnalyticsEventInput = {
   clientTs: Date | null;
 };
 
+/** The consent gate, read fresh on every write.
+ *
+ *  The check lives here rather than in the two callers because the client
+ *  toggle only ever silenced the client queue: `trackServerEvent` has no client
+ *  and would keep writing signup, ladder, guardrail, item and push events for a
+ *  user who turned collection off. This is the one function both paths share.
+ *
+ *  Reads the column directly rather than going through store/users.ts, which
+ *  imports this module for `trackServerEvent`. */
+async function isAnalyticsOptedOut(userId: string): Promise<boolean> {
+  const rows = await db().select({ optOut: users.analyticsOptOut }).from(users).where(eq(users.id, userId));
+  return rows[0]?.optOut ?? false;
+}
+
 /** Insert a pre-validated batch for one user. Returns the number of rows
- *  written. Callers validate against the catalog BEFORE calling; this function
- *  trusts its input shape but always stamps the given userId, so a payload can
- *  never write into another user's history. */
+ *  written, which is zero when the user has usage sharing switched off.
+ *  Callers validate against the catalog BEFORE calling; this function trusts
+ *  its input shape but always stamps the given userId, so a payload can never
+ *  write into another user's history. */
 export async function insertAnalyticsEvents(userId: string, events: AnalyticsEventInput[]): Promise<number> {
   if (events.length === 0) return 0;
+  if (await isAnalyticsOptedOut(userId)) return 0;
   const rows = await db()
     .insert(analyticsEvents)
     .values(

@@ -51,6 +51,42 @@ export async function getUserById(id: string): Promise<UserRow | null> {
   return { ...row, email: row.email ? decryptString(row.email) : null };
 }
 
+export type ConsentState = {
+  legalAcceptedAt: Date | null;
+  legalVersion: string | null;
+  analyticsOptOut: boolean;
+};
+
+/** Reads the consent record so the client can restore the Settings toggle after
+ *  a reinstall, and so support can answer "did this user ever see the notice".
+ *  Returns null for an unknown user. */
+export async function getConsent(userId: string): Promise<ConsentState | null> {
+  const rows = await db()
+    .select({
+      legalAcceptedAt: users.legalAcceptedAt,
+      legalVersion: users.legalVersion,
+      analyticsOptOut: users.analyticsOptOut,
+    })
+    .from(users)
+    .where(eq(users.id, userId));
+  return rows[0] ?? null;
+}
+
+/** Records that the user acknowledged the Terms and the privacy notice, and
+ *  which version they were shown. Reg P 1016.9(b)(1)(iii): the acknowledgement
+ *  is the delivery, so what has to survive is the timestamp and the version.
+ *  Overwrites any earlier acknowledgement; the current version is the one that
+ *  binds, and a re-acknowledgement of the same version is a no-op in effect. */
+export async function recordLegalAcceptance(userId: string, version: string, acceptedAt = new Date()): Promise<void> {
+  await db().update(users).set({ legalAcceptedAt: acceptedAt, legalVersion: version }).where(eq(users.id, userId));
+}
+
+/** Flips the "Share usage data" toggle. Read on every analytics write by
+ *  store/analytics.ts, so this one column stops the server-emitted trail too. */
+export async function setAnalyticsOptOut(userId: string, optOut: boolean): Promise<void> {
+  await db().update(users).set({ analyticsOptOut: optOut }).where(eq(users.id, userId));
+}
+
 // Deletes the user row. All child tables (sessions, pet_state, plaid_items,
 // transactions, reaction_history, device_tokens, category_overrides) cascade.
 export async function deleteUser(id: string): Promise<void> {

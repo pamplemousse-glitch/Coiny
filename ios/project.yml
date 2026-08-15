@@ -41,6 +41,17 @@ targets:
       - path: Coiny
         excludes:
           - "**/*.md"
+      # The Terms and the privacy notice ship IN the binary: Apple requires
+      # functional links to both for auto-renewable subscriptions, and Reg P
+      # 1016.9(a) requires the notice to be delivered rather than merely
+      # hosted. There is no domain yet (runbook G1.2), so the app renders these
+      # two files directly. They are referenced out of docs/legal rather than
+      # copied, so the shipped text and the reviewed text cannot drift.
+      # When a hosted URL exists, see LegalDocument.hostedURL.
+      - path: ../docs/legal/privacy-policy.md
+        buildPhase: resources
+      - path: ../docs/legal/terms-of-service.md
+        buildPhase: resources
     info:
       path: Coiny/Info.plist
       properties:

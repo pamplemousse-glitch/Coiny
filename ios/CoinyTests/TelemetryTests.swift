@@ -28,6 +28,19 @@ final class RecordingTelemetryTransport: TelemetryTransport, @unchecked Sendable
     }
 }
 
+/// A consent flag a `@Sendable` closure can read and a test can flip mid-run.
+final class ConsentFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Bool
+
+    init(value: Bool) { stored = value }
+
+    var value: Bool {
+        get { lock.lock(); defer { lock.unlock() }; return stored }
+        set { lock.lock(); defer { lock.unlock() }; stored = newValue }
+    }
+}
+
 final class TelemetryTests: XCTestCase {
     func testUsdBucketLabels() {
         XCTAssertEqual(TelemetryValue.usdBucketLabel(500), "0-1k")
@@ -40,7 +53,7 @@ final class TelemetryTests: XCTestCase {
 
     func testEventsQueueUntilFlush() async {
         let transport = RecordingTelemetryTransport()
-        let client = TelemetryClient(transport: transport)
+        let client = TelemetryClient(transport: transport, isGranted: { true })
 
         await client.emit("signup_completed", ["method": .string("apple")])
         let pendingBefore = await client.pendingCount
@@ -55,7 +68,7 @@ final class TelemetryTests: XCTestCase {
 
     func testAutoFlushAtThreshold() async {
         let transport = RecordingTelemetryTransport()
-        let client = TelemetryClient(transport: transport)
+        let client = TelemetryClient(transport: transport, isGranted: { true })
 
         for index in 0..<TelemetryClient.flushThreshold {
             await client.emit("app_open", ["index": .int(index)])
@@ -65,7 +78,7 @@ final class TelemetryTests: XCTestCase {
 
     func testFailedFlushRequeuesEvents() async {
         let transport = RecordingTelemetryTransport()
-        let client = TelemetryClient(transport: transport)
+        let client = TelemetryClient(transport: transport, isGranted: { true })
 
         await client.emit("first_number_shown")
         transport.setFailNext()
@@ -76,6 +89,53 @@ final class TelemetryTests: XCTestCase {
 
         await client.flush()
         XCTAssertEqual(transport.events.map(\.event), ["first_number_shown"])
+    }
+
+    // MARK: - Consent (docs/legal/consent-copy.md, rows 2.6.3 and 5.7.7)
+
+    func testNothingIsEnqueuedWithoutConsent() async {
+        let transport = RecordingTelemetryTransport()
+        let client = TelemetryClient(transport: transport, isGranted: { false })
+
+        await client.emit("app_open")
+        let pending = await client.pendingCount
+        XCTAssertEqual(pending, 0, "an event must not even be queued before consent")
+        await client.flush()
+        XCTAssertTrue(transport.events.isEmpty)
+    }
+
+    func testWithdrawingConsentDiscardsTheQueue() async {
+        let transport = RecordingTelemetryTransport()
+        let granted = ConsentFlag(value: true)
+        let client = TelemetryClient(transport: transport, isGranted: { granted.value })
+
+        await client.emit("app_open")
+        granted.value = false
+        await client.flush()
+
+        XCTAssertTrue(transport.events.isEmpty, "turning the toggle off must not deliver one last batch")
+        let pending = await client.pendingCount
+        XCTAssertEqual(pending, 0, "the queue is dropped, not held for later")
+    }
+
+    func testConsentRequiresBothSignInAndTheToggle() {
+        let defaults = UserDefaults.standard
+        let originalAcknowledged = defaults.object(forKey: TelemetryConsent.acknowledgedKey)
+        let originalShare = defaults.object(forKey: TelemetryConsent.shareUsageDataKey)
+        defer {
+            defaults.set(originalAcknowledged, forKey: TelemetryConsent.acknowledgedKey)
+            defaults.set(originalShare, forKey: TelemetryConsent.shareUsageDataKey)
+        }
+
+        defaults.removeObject(forKey: TelemetryConsent.acknowledgedKey)
+        defaults.removeObject(forKey: TelemetryConsent.shareUsageDataKey)
+        XCTAssertFalse(TelemetryConsent.isGranted, "no sign-in means no disclosure was shown")
+
+        TelemetryConsent.recordAcknowledgement()
+        XCTAssertTrue(TelemetryConsent.isGranted, "absent toggle means on: consent was given at sign-in")
+
+        defaults.set(false, forKey: TelemetryConsent.shareUsageDataKey)
+        XCTAssertFalse(TelemetryConsent.isGranted)
     }
 
     func testWireShapeMatchesSection24() throws {
