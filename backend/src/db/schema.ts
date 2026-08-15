@@ -139,16 +139,25 @@ export const plaidItems = pgTable(
 //   and coarse categories keyed to pseudonymous user ids (emails are
 //   encrypted in `users`). Rows written before migration 0048 are plaintext
 //   until scripts/backfill-encrypt-pii.ts runs; decryptString tolerates them.
-export const transactions = pgTable('transactions', {
-  transactionId: text('transaction_id').primaryKey(),
-  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
-  accountId: text('account_id').notNull(),
-  merchantName: text('merchant_name'), // AES-256-GCM encrypted (see above)
-  amount: text('amount').notNull(), // plaintext ON PURPOSE (see above)
-  date: text('date').notNull(),
-  category: text('category'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const transactions = pgTable(
+  'transactions',
+  {
+    transactionId: text('transaction_id').primaryKey(),
+    userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    accountId: text('account_id').notNull(),
+    merchantName: text('merchant_name'), // AES-256-GCM encrypted (see above)
+    amount: text('amount').notNull(), // plaintext ON PURPOSE (see above)
+    date: text('date').notNull(),
+    category: text('category'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  // The comment above calls this the largest table and the hot path, and every
+  // caller filters by user_id (three of them additionally by date). Until 0049
+  // the only index was the primary key on transaction_id, so those queries were
+  // sequential scans. Measured on 1M rows: 148.8ms seq scan against 0.688ms
+  // index scan, shared buffers 10201 against 184.
+  (t) => [index('transactions_user_date_idx').on(t.userId, t.date)],
+);
 
 export const deviceTokens = pgTable('device_tokens', {
   token: text('token').primaryKey(),
