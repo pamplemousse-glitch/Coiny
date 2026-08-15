@@ -20,7 +20,7 @@ struct KrakenInlineView: View {
                 disconnectedView
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
+                CoinyErrorLine(message: error)
             }
         }
     }
@@ -69,7 +69,7 @@ struct YnabInlineView: View {
                 disconnectedView
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
+                CoinyErrorLine(message: error)
             }
         }
     }
@@ -121,7 +121,7 @@ struct KalshiInlineView: View {
                 disconnectedView
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
+                CoinyErrorLine(message: error)
             }
         }
         .sheet(isPresented: $showingSetup) { setupSheet }
@@ -164,7 +164,7 @@ struct KalshiInlineView: View {
                             .font(.system(.caption2, design: .monospaced))
                             .textSelection(.enabled)
                     } else {
-                        Text("Key generation failed").font(.caption).foregroundStyle(CoinyTheme.negative)
+                        CoinyErrorLine(message: "Key generation failed")
                     }
                 } header: {
                     Text("Step 1 — Your Public Key")
@@ -229,7 +229,7 @@ struct DiscogsInlineView: View {
                 disconnectedView
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
+                CoinyErrorLine(message: error)
             }
         }
         .onChange(of: vm.authorizeUrl) { _, url in
@@ -313,7 +313,7 @@ struct PolymarketInlineView: View {
                 accountsList
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
+                CoinyErrorLine(message: error)
             }
         }
     }
@@ -435,7 +435,7 @@ struct KrakenKeyEntryView: View {
                 }
 
                 if let error = vm.errorMessage {
-                    Text(error).font(.caption).foregroundStyle(CoinyTheme.negative)
+                    CoinyErrorLine(message: error)
                 }
             }
             .navigationTitle("Connect Kraken")

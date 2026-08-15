@@ -38,9 +38,11 @@ struct SpinwheelInlineView: View {
                     }
                     Spacer()
                     if let balance = debt.balance {
+                        // A debt is a fact, in ink with its sign, never red
+                        // (design-direction 4.3 rule 5).
                         Text(-balance, format: .currency(code: "USD"))
                             .font(.subheadline.monospacedDigit())
-                            .foregroundStyle(CoinyTheme.negative)
+                            .foregroundStyle(CoinyTheme.ink)
                     }
                 }
                 .padding(.vertical, 2)
@@ -71,7 +73,7 @@ struct PhoneInlineView: View {
                 .keyboardType(.numbersAndPunctuation)
                 .textFieldStyle(.roundedBorder)
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative)
+                CoinyErrorLine(message: error)
             }
             Button("Send code") {
                 let p = phone; let d = dob
@@ -98,7 +100,7 @@ struct OtpInlineView: View {
                 .textContentType(.oneTimeCode)
                 .textFieldStyle(.roundedBorder)
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative)
+                CoinyErrorLine(message: error)
             }
             Button("Verify") {
                 let c = code

@@ -132,14 +132,11 @@ struct ManageAccountsView: View {
             }
 
         case let .failed(message):
-            ContentUnavailableView {
-                Label("Couldn't load", systemImage: "exclamationmark.triangle")
-            } description: {
-                Text(message)
-            } actions: {
-                Button("Retry") { Task { await reload() } }
-                    .buttonStyle(.coinyFilledInline)
+            CoinyErrorLine(message: message, actionTitle: "Try again") {
+                Task { await reload() }
             }
+            .padding(.horizontal)
+            .frame(maxHeight: .infinity, alignment: .top)
         }
     }
 }

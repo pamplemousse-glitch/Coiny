@@ -67,8 +67,7 @@ private struct PhoneEntryView: View {
 
             if let error = vm.errorMessage {
                 Section {
-                    Text(error)
-                        .foregroundStyle(CoinyTheme.negative)
+                    CoinyErrorLine(message: error)
                         .font(.caption)
                 }
             }
@@ -102,8 +101,7 @@ private struct OtpEntryView: View {
 
             if let error = vm.errorMessage {
                 Section {
-                    Text(error)
-                        .foregroundStyle(CoinyTheme.negative)
+                    CoinyErrorLine(message: error)
                         .font(.caption)
                 }
             }

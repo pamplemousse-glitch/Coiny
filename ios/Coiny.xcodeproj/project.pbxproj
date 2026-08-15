@@ -31,6 +31,7 @@
 		165B5A3A66C4DBE2F9753417 /* PetStateDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5043ACB1718911F675E13C0 /* PetStateDecodingTests.swift */; };
 		173CE273EA515CF593B3A218 /* JourneyStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C984EF3F9DF6DB25768C476 /* JourneyStoreTests.swift */; };
 		185390C82627A45169723582 /* ManageAccountsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 315683BED7C1D1F7784C6EE9 /* ManageAccountsView.swift */; };
+		19468B4AECB775A370C6395C /* CoinyComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 982E0A754BE9D8EBEAA8759B /* CoinyComponents.swift */; };
 		195301201303A4F49867C7BA /* LegalMarkdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 989AA717FF67991167C2039A /* LegalMarkdown.swift */; };
 		19F631E6ED46E8A8F4EF1552 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E69C409A6001E059800119A /* OnboardingView.swift */; };
 		1A6E5EF1B36D5F5A4D3189AD /* DiscogsViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42FEB4D1AEE92851D560B0C6 /* DiscogsViewModelTests.swift */; };
@@ -313,6 +314,7 @@
 		95D6D369B4F0BA4CB7E65864 /* YnabViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YnabViewModel.swift; sourceTree = "<group>"; };
 		97860DA5A47F1E3F54D72E14 /* JourneyPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JourneyPresentation.swift; sourceTree = "<group>"; };
 		97AA2C381CDE92EFC7F64E9E /* PetState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetState.swift; sourceTree = "<group>"; };
+		982E0A754BE9D8EBEAA8759B /* CoinyComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoinyComponents.swift; sourceTree = "<group>"; };
 		989AA717FF67991167C2039A /* LegalMarkdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegalMarkdown.swift; sourceTree = "<group>"; };
 		99BEF3ADB4D0ED3C67701140 /* ZerionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZerionView.swift; sourceTree = "<group>"; };
 		9ABFBF4FEA310EB336444E6C /* TabNavigationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabNavigationUITests.swift; sourceTree = "<group>"; };
@@ -568,6 +570,7 @@
 				EA9C3CC56A6004773A1AA2F2 /* AlpacaView.swift */,
 				6AF73651E65C599901D32475 /* ChainWalletsView.swift */,
 				DDD31B08C041475EBBE3534B /* CoinbaseView.swift */,
+				982E0A754BE9D8EBEAA8759B /* CoinyComponents.swift */,
 				9AE46D8172612594E679EF5A /* CoinyTheme.swift */,
 				45CCA2994B67365F13AE2F32 /* ConnectAccountFlow.swift */,
 				5CF3B9CB6ADCE331E98E1D43 /* CreaturePlaceholderArt.swift */,
@@ -934,6 +937,7 @@
 				8E1C9F4FA6B6E66DE8D0DB9E /* CoinbaseViewModel.swift in Sources */,
 				8CE69BC29AA540C1C0ABB97A /* CoinsViewModel.swift in Sources */,
 				6DE861F623ABA8C4373FBE52 /* CoinyApp.swift in Sources */,
+				19468B4AECB775A370C6395C /* CoinyComponents.swift in Sources */,
 				4887E84F9604FB4286CD1F47 /* CoinyTheme.swift in Sources */,
 				AC0574D2EB9BDEFFE07F88FB /* ConnectAccountFlow.swift in Sources */,
 				AD4B609E5537D4EFE2EE7D93 /* ConnectionRepairViewModel.swift in Sources */,
