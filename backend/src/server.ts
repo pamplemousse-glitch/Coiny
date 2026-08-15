@@ -39,6 +39,7 @@ import { registerTelemetryApi } from './api/telemetry.js';
 import { registerTradingCardsApi } from './api/trading-cards.js';
 import { registerTruelayerApi } from './api/truelayer.js';
 import { registerVehiclesApi } from './api/vehicles.js';
+import { registerWellKnownApi } from './api/well-known.js';
 import { registerYnabApi } from './api/ynab.js';
 import { registerZerionApi } from './api/zerion.js';
 import { config } from './config.js';
@@ -47,6 +48,7 @@ import { runMigrations } from './db/migrate.js';
 import { registerAuthPlugin } from './plugins/auth.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
 import { loggerOptions } from './plugins/logger.js';
+import { registerSecurityHeaders } from './plugins/security-headers.js';
 import { getSchedulerStatus, isSchedulerStale, startScheduler } from './scheduler/index.js';
 import { registerAppStoreWebhook } from './webhook/appstore.js';
 import { registerPlaidWebhook } from './webhook/plaid.js';
@@ -79,6 +81,7 @@ async function buildApp() {
   });
 
   registerErrorHandler(app);
+  registerSecurityHeaders(app);
 
   // Per-user rate limiting (with IP fallback for unauthenticated requests).
   //
@@ -119,6 +122,8 @@ async function buildApp() {
     }
     return { ok: true, last_tick_at: lastTickAt };
   });
+  // RFC 9116 disclosure channel. Public by requirement, see api/well-known.ts.
+  registerWellKnownApi(app);
   registerPlaidWebhook(app);
   // Unauthenticated in the session sense only: every request is JWS-verified
   // against Apple's pinned root before anything is read from it.
