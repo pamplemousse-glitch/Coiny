@@ -24,7 +24,7 @@ struct MetalsView: View {
             if let error = vm.errorMessage {
                 Text(error)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(CoinyTheme.negative)
                     .padding(.top, 4)
             }
         }
@@ -35,7 +35,7 @@ struct MetalsView: View {
         HStack {
             Text("No metals added")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
             Spacer()
             Button { showingAdd = true } label: {
                 Label("Add", systemImage: "plus.circle").font(.caption)
@@ -54,7 +54,7 @@ struct MetalsView: View {
                             .font(.subheadline)
                         Text("\(holding.weightOz, specifier: "%.3f") oz \(holding.metal)")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(CoinyTheme.ink2)
                     }
                     Spacer()
                     if let value = holding.lastValueUsd {
@@ -63,7 +63,7 @@ struct MetalsView: View {
                     } else {
                         Text("—")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(CoinyTheme.ink2)
                     }
                 }
                 .swipeActions {

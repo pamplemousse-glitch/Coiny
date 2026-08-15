@@ -37,6 +37,12 @@ struct RootView: View {
                 }
                 .accessibilityIdentifier("tab.wealth")
         }
+        // There is no AccentColor asset, so this resolves to system blue at
+        // 4.02:1 on white, below AA for the tab bar's own labels. The fix is the
+        // asset catalog (runbook G1.7), not a `.tint(CoinyTheme.signal)` here:
+        // tint propagates down the whole tab tree into PaywallView's filled
+        // purchase button, whose white label on dark amber would be 2.16:1.
+        // swiftlint:disable:next design_system_color
         .tint(.accentColor)
     }
 }

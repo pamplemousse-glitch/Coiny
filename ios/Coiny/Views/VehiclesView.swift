@@ -20,7 +20,7 @@ struct VehiclesView: View {
             if let error = vm.errorMessage {
                 Text(error)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(CoinyTheme.negative)
                     .padding(.top, 4)
             }
         }
@@ -31,7 +31,7 @@ struct VehiclesView: View {
         HStack {
             Text("No vehicles added")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
             Spacer()
             Button { showingAdd = true } label: {
                 Label("Add", systemImage: "plus.circle").font(.caption)
@@ -52,7 +52,7 @@ struct VehiclesView: View {
                         if asset.label != nil {
                             Text(asset.vin)
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(CoinyTheme.ink2)
                         }
                     }
                     Spacer()
@@ -62,7 +62,7 @@ struct VehiclesView: View {
                     } else {
                         Text("—")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(CoinyTheme.ink2)
                     }
                 }
                 .swipeActions {

@@ -27,7 +27,7 @@ struct SubscriptionsView: View {
                                     .font(.subheadline.weight(.medium))
                                 Text("Every ~\(sub.cadenceDays) days · \(sub.count) payments")
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(CoinyTheme.ink2)
                             }
                             Spacer()
                             Text(sub.amount, format: .currency(code: "USD"))
@@ -48,7 +48,7 @@ struct SubscriptionsView: View {
             if let err = errorMessage {
                 Text(err)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(CoinyTheme.ink2)
                     .padding()
             }
         }
