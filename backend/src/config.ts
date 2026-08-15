@@ -1,5 +1,25 @@
 import { z } from 'zod';
 
+// 32 raw bytes, lowercase hex. Anything else is a malformed key, and a
+// malformed key must fail the boot rather than the first createCipheriv call,
+// which would be the first write of a real user's token.
+const HEX_KEY_RE = /^[0-9a-f]{64}$/;
+
+// "<version>:<64 hex>" pairs, comma separated. Versions are the same integers
+// the ciphertext envelope carries (util/crypto.ts).
+const KEYRING_RE = /^[0-9]{1,3}:[0-9a-f]{64}(,[0-9]{1,3}:[0-9a-f]{64})*$/;
+
+// Env vars are strings, and z.coerce.boolean() reads the string 'false' as
+// true, which is exactly the wrong failure mode for a flag that disables
+// encryption. Accept the four spellings that mean something and reject the
+// rest.
+function envBool(defaultValue: boolean) {
+  return z
+    .enum(['true', 'false', '1', '0'])
+    .default(defaultValue ? 'true' : 'false')
+    .transform((v) => v === 'true' || v === '1');
+}
+
 const configSchema = z
   .object({
     PORT: z.coerce.number().int().positive().default(3000),
@@ -28,9 +48,45 @@ const configSchema = z
     APNS_KEY: z.string().default(''),
     APNS_BUNDLE_ID: z.string().default('app.coiny.ios'),
 
-    // 64-char hex string (32 raw bytes) for AES-256-GCM encryption of Plaid access_token.
-    // Required in production. If empty in dev/test, access tokens are stored plaintext.
-    DATA_ENCRYPTION_KEY: z.string().default(''),
+    // 64-char hex string (32 raw bytes) for AES-256-GCM encryption of every
+    // PII and credential column. Required in production. Shape is checked here
+    // rather than at first use: a key of the wrong length used to pass boot and
+    // throw on the first real write.
+    DATA_ENCRYPTION_KEY: z
+      .string()
+      .default('')
+      .refine((v) => v === '' || HEX_KEY_RE.test(v), 'must be 64 lowercase hex characters (32 bytes)'),
+
+    // Key version stamped into every envelope this process writes. Rotation is:
+    // move the outgoing key into DATA_ENCRYPTION_KEYS_PREVIOUS under its own
+    // version, put the new key in DATA_ENCRYPTION_KEY, bump this, deploy, then
+    // run scripts/rotate-encryption-key.ts to sweep the stored rows.
+    DATA_ENCRYPTION_KEY_VERSION: z.coerce.number().int().min(1).max(999).default(1),
+
+    // Decrypt-only keyring: keys that no longer write but still have rows,
+    // as "<version>:<64 hex>" pairs. Empty until the first rotation. Envelopes
+    // written before versioning existed are read at version 1, so a rotation
+    // away from version 1 must keep the version-1 key listed here until the
+    // sweep reports zero rows left.
+    DATA_ENCRYPTION_KEYS_PREVIOUS: z
+      .string()
+      .default('')
+      .refine((v) => v === '' || KEYRING_RE.test(v), 'must be comma-separated <version>:<64 hex> pairs'),
+
+    // Opt-in, deliberately loud: with no key set, field encryption becomes a
+    // no-op and PII is stored as it arrives. This exists so tests and a first
+    // local run work without a key. It is rejected in production below, and
+    // config load fails outright when neither this nor a key is present, so
+    // the no-op can never be the quiet default a staging box drifts into.
+    ALLOW_PLAINTEXT_FIELDS: envBool(false),
+
+    // Bounded tolerance for rows written before migration 0048 encrypted their
+    // column: a stored value that is not a ciphertext envelope is returned as
+    // it was found. True by default because those rows exist and must stay
+    // readable. Set false once scripts/backfill-encrypt-pii.ts reports zero
+    // rewrites for a deployment; after that a non-envelope value is a defect,
+    // not a legacy row, and reading it should fail loudly.
+    ALLOW_LEGACY_PLAINTEXT_READS: envBool(true),
 
     // Apple bundle ID used to verify the `aud` claim in Apple identity tokens.
     APPLE_BUNDLE_ID: z.string().default('app.coiny.ios'),
@@ -166,6 +222,42 @@ const configSchema = z
           message: 'DATA_ENCRYPTION_KEY required in production',
         });
       }
+      // NODE_ENV is 'production' on staging too (see APP_ENV above), which is
+      // the point: staging carries production-shaped data and must not be one
+      // config edit away from storing it in the clear.
+      if (data.ALLOW_PLAINTEXT_FIELDS) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['ALLOW_PLAINTEXT_FIELDS'],
+          message: 'ALLOW_PLAINTEXT_FIELDS must not be set in production',
+        });
+      }
+    }
+
+    // Storing PII unencrypted is a decision someone has to make on purpose.
+    if (!data.DATA_ENCRYPTION_KEY && !data.ALLOW_PLAINTEXT_FIELDS) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['DATA_ENCRYPTION_KEY'],
+        message: 'DATA_ENCRYPTION_KEY is empty; set it, or set ALLOW_PLAINTEXT_FIELDS=true to store fields in clear',
+      });
+    }
+
+    // A keyring that redefines the writing version would make the envelope's
+    // version meaningless: the same tag would name two different keys.
+    if (data.DATA_ENCRYPTION_KEYS_PREVIOUS) {
+      const seen = new Set<number>([data.DATA_ENCRYPTION_KEY_VERSION]);
+      for (const entry of data.DATA_ENCRYPTION_KEYS_PREVIOUS.split(',')) {
+        const version = Number(entry.split(':')[0]);
+        if (seen.has(version)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['DATA_ENCRYPTION_KEYS_PREVIOUS'],
+            message: `duplicate key version ${version}`,
+          });
+        }
+        seen.add(version);
+      }
     }
   });
 
@@ -174,7 +266,8 @@ export type Config = z.infer<typeof configSchema>;
 function loadConfig(): Config {
   const result = configSchema.safeParse(process.env);
   if (!result.success) {
-    const missing = result.error.issues.map((i) => i.path.join('.')).join(', ');
+    // Path plus message, never the offending value: these are secrets.
+    const missing = result.error.issues.map((i) => `${i.path.join('.')} (${i.message})`).join(', ');
     throw new Error(`Invalid configuration: ${missing}`);
   }
   return result.data;

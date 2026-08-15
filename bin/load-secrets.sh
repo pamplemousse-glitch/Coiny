@@ -9,6 +9,11 @@ set -e
 export PLAID_CLIENT_ID=$(security find-generic-password -a "$USER" -s "coiny-plaid-sandbox-client-id" -w)
 export PLAID_SECRET=$(security find-generic-password -a "$USER" -s "coiny-plaid-sandbox-secret" -w)
 export PLAID_ENV=sandbox
+# Field encryption key. Optional here on purpose: with no key the server now
+# refuses to boot unless ALLOW_PLAINTEXT_FIELDS=true is set deliberately, which
+# is the point (audit 1.3.5). Generate one with `openssl rand -hex 32` and store
+# it as "coiny-data-encryption-key".
+export DATA_ENCRYPTION_KEY=$(security find-generic-password -a coiny -s coiny-data-encryption-key -w 2>/dev/null || true)
 export PLAID_WEBHOOK_URL="${PLAID_WEBHOOK_URL:-http://localhost:3000/webhooks/plaid}"
 export COINBASE_API_KEY_ID=$(security find-generic-password -a "$USER" -s "coiny-coinbase-sandbox-api-key-id" -w)
 export COINBASE_API_KEY_SECRET=$(security find-generic-password -a "$USER" -s "coiny-coinbase-sandbox-api-key-secret" -w)

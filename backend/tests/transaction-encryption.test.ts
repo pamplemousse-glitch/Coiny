@@ -6,7 +6,9 @@ import { resetDatabase, testUserId } from './db-helper.js';
 // .merchant_name/.description and category_overrides merchant data are
 // encrypted at rest. amount stays plaintext on purpose (see db/schema.ts).
 
-const ENVELOPE = /^[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]*$/;
+// v<n> names the key that wrote the row (util/crypto.ts); rows written before
+// versioning existed carry no prefix and are read at version 1.
+const ENVELOPE = /^v[0-9]{1,3}:[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]*$/;
 
 function plaidTx(overrides: Partial<{ id: string; amount: string; date: string; merchant: string }> = {}) {
   const { id = 'tx_1', amount = '-42.17', date = '2026-08-01', merchant = 'Starbucks' } = overrides;
