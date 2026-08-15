@@ -11,10 +11,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Detects whether the PR touches any code (not just docs/markdown).
+  # Detects whether the change touches any code (not just documentation).
   # Downstream jobs use `needs.has-code.outputs.result` to skip themselves
-  # on docs-only PRs. Skipped jobs via `if:` count as passing for required
-  # status checks — so merge gates are never blocked by a skipped scan.
+  # on docs-only changes. Skipped jobs via `if:` count as passing for required
+  # status checks, so anything this job calls "not code" is a change that
+  # merges with zero scanners having run. Two consequences follow, and both
+  # are load-bearing:
+  #   1. Only documentation is exempt. Everything under .github/, workflows
+  #      included, is code. A PR that swaps an action for a malicious one has
+  #      to face Semgrep, Trivy and the SBOM job like any other PR.
+  #   2. When the base of the comparison cannot be trusted, this job answers
+  #      "code" and lets everything run. It fails toward scanning.
   has-code:
     name: Detect code changes
     runs-on: ubuntu-latest
@@ -27,9 +34,29 @@ jobs:
         with:
           fetch-depth: 0
       - id: check
+        env:
+          # On a pull_request the base SHA is exact. On a push, github.event.before
+          # is the ref's previous head, which covers every commit in the push. The
+          # old fallback was HEAD~1, which judged a five-commit push by its last
+          # commit alone.
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          BASE=${{ github.event.pull_request.base.sha || 'HEAD~1' }}
-          if git diff --name-only "$BASE"...HEAD | grep -qvE '^(docs/|\.github/workflows/|.*\.md$)'; then
+          set -uo pipefail
+          # An empty, all-zero or unreachable base means a new branch, the first
+          # push, or a force-push that orphaned the old head. There is no honest
+          # range to diff, so treat the change as code.
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "${BASE}^{commit}" 2>/dev/null; then
+            echo "No usable base ref ('$BASE'); treating the change as code."
+            echo "result=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          CHANGED=$(git diff --name-only "$BASE"...HEAD)
+          echo "Changed files:"
+          printf '%s\n' "$CHANGED"
+          # Not code: anything under docs/, and any markdown file anywhere.
+          # Everything else, .github/ included, is code.
+          if printf '%s\n' "$CHANGED" | grep -qvE '^(docs/|.*\.md$)'; then
             echo "result=true" >> "$GITHUB_OUTPUT"
           else
             echo "result=false" >> "$GITHUB_OUTPUT"
@@ -67,6 +94,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Gitleaks defaults are sensible; .gitleaks.toml at repo root overrides.
+          # Pin the scanner too. Unset, the action installs its own hardcoded
+          # default (8.24.3), so the rules CI runs drift from the rules
+          # `gitleaks git --log-opts=--all -c .gitleaks.toml` runs locally.
+          GITLEAKS_VERSION: 8.30.1
+      # NOTE: on a pull_request this action scans only the PR's own commits, not
+      # all history. The full-history scan that matches the local invocation is
+      # .github/workflows/secret-scan-history.yml, on a schedule.
 
   trivy:
     name: Trivy container scan
@@ -99,7 +133,10 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: '1'
           ignore-unfixed: true
-          trivyignores: .trivyignore
+          # `.trivyignore.yaml` rather than the plain list, so every suppression
+          # has to carry a statement and an `expired_at` date. The pinned action
+          # accepts a single YAML ignorefile and exports it as TRIVY_IGNOREFILE.
+          trivyignores: .trivyignore.yaml
 
   sbom:
     name: SBOM (CycloneDX)
@@ -107,6 +144,13 @@ jobs:
     if: needs.has-code.outputs.result == 'true'
     runs-on: ubuntu-latest
     # PCI DSS 4.0 §6.3.2 — generate and retain a SBOM for every build.
+    #
+    # Be honest about what this is. Nothing reads this artifact: it is not a
+    # control, it is evidence, produced so the Plaid and Apple security
+    # questionnaires can be answered with a file rather than a promise. The
+    # control that actually catches a bad dependency is the Trivy job above.
+    # Wire this to a per-PR diff when a second engineer joins and "who added
+    # that package" stops being answerable from memory.
     permissions:
       contents: read
     steps:
