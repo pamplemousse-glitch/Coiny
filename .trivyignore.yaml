@@ -1,0 +1,34 @@
+# Trivy suppressions for the backend container scan (.github/workflows/security.yml).
+#
+# Empty on purpose. The four entries that used to live here were all removed on
+# 2026-08-15, because each named a CVE that the resolved dependency tree is not
+# affected by. They were not loosening the gate against a real finding; they were
+# suppressing findings that Trivy would never have raised, which made the
+# HIGH/CRITICAL gate look far looser than it actually is.
+#
+#   CVE-2026-6321   fast-uri path traversal    fixed 3.1.1   tree has 3.1.5 and 4.1.2
+#   CVE-2026-6322   fast-uri host confusion    fixed 3.1.2   tree has 3.1.5 and 4.1.2
+#   CVE-2026-25223  fastify validation bypass  fixed 5.7.2   tree has 5.11.3
+#   CVE-2026-33671  picomatch ReDoS            fixed 4.0.4   tree has 4.0.5
+#
+# The stated grounds were false as well: there is no Go rewrite, `docs/tech-stack.md`
+# is on CLAUDE.md's do-not-cite list, and the backend has run Fastify 5 since well
+# before the file was written.
+#
+# To add an entry, fill in all three fields. `expired_at` is not optional: a
+# suppression with no end date is a permanent hole that nobody re-reads.
+#
+#   vulnerabilities:
+#     - id: CVE-0000-00000
+#       statement: >-
+#         <package>@<version resolved in pnpm-lock.yaml>. Why the vulnerable code
+#         path is not reachable here, stated so it can be checked against the
+#         lockfile rather than taken on trust, and what would let this be removed.
+#       expired_at: 2026-11-15
+#
+# Same rule as the `auditConfig` block in pnpm-workspace.yaml: never add one to
+# silence a production finding. Fix it, or let the build fail.
+#
+# Format: https://trivy.dev/latest/docs/configuration/filtering/
+
+vulnerabilities: []

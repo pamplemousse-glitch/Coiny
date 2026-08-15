@@ -1,5 +1,13 @@
-# Gitleaks config. Defaults are sensible; this file just adds Coiny-specific
-# allowlist rules so legitimate test fixtures don't trip false positives.
+# Gitleaks config. The upstream default rules do the work; this file only adds
+# Coiny-specific allowlists so known-safe fixtures do not fail the scan.
+#
+# Rule for adding an entry: name the exact thing you are excusing. Prefer a
+# regex that matches the literal placeholder over a path that excuses a whole
+# file, and prefer a single path over a directory. Anything allowlisted here is
+# allowlisted for all of history, not just for today's diff, because
+# `.github/workflows/secret-scan-history.yml` runs this same config over
+# `--log-opts=--all`.
+#
 # Docs: https://github.com/gitleaks/gitleaks
 
 title = "Coiny gitleaks config"
@@ -7,20 +15,45 @@ title = "Coiny gitleaks config"
 [extend]
 useDefault = true
 
-[allowlist]
-description = "Allowlist for known-safe test fixtures"
-
-# Test JWT keys in backend/tests are generated on the fly via webcrypto;
-# they never represent real credentials. Allowlist the test files where they
-# appear so the regex scanner doesn't false-positive on PEM/JWK fragments.
+[[allowlists]]
+description = "backend/tests JWT/JWK/PEM material is generated at test time by webcrypto; it never represents a credential"
 paths = [
   '''backend/tests/.*\.test\.ts''',
-  '''docs/.*\.md''',        # docs may include example strings like ExponentPushToken[xxxxxxxx]
-  '''docs/openapi\.yaml''', # OpenAPI spec has example request/response values, not real secrets
 ]
 
-# Allow Expo push token placeholders in tests + docs.
+[[allowlists]]
+description = "docs/context is 26 MB of vendored third-party API documentation (Coinbase, Plaid, Alchemy, Helius, ...). Its examples are shaped like credentials because vendors write them that way. Nothing in this directory is authored here, so nothing in it can be our secret."
+paths = [
+  '''docs/context/.*''',
+]
+
+[[allowlists]]
+description = "Synthetic appAccountToken UUID in the iOS entitlements test fixtures (ios/CoinyTests/EntitlementsAPITests.swift). Matches the JSON key, not a bare UUID, so a real token pasted anywhere else still fires."
+regexTarget = "line"
+regexes = [
+  '''"appAccountToken"\s*:\s*"[0-9a-fA-F-]{36}"''',
+]
+
+[[allowlists]]
+description = "Placeholder push token in the OpenAPI example (docs/openapi.yaml, PushTokenRequest)"
+regexes = [
+  '''^a1b2c3d4e5f6\.\.\.$''',
+]
+
+[[allowlists]]
+description = "generic-api-key false positive on prose in a superseded revision of docs/tech-stack.md; the string is the name of a Bluetooth stack, not a key"
+regexes = [
+  '''^NimBLE/Bluedroid$''',
+]
+
+[[allowlists]]
+description = "Expo push token placeholders in tests and docs"
 regexes = [
   '''ExponentPushToken\[[a-zA-Z0-9-]+\]''',
+]
+
+[[allowlists]]
+description = "Documented placeholder credentials in fixtures and runbooks"
+regexes = [
   '''test_(client_id|secret|webhook-secret)''',
 ]
