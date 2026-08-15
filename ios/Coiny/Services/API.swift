@@ -26,9 +26,25 @@ actor API {
         /// hit the environment full of fake data, never the one with real
         /// people's bank accounts.
         static let baseURL: URL = {
+            // An explicit override always wins, on simulator and device alike.
+            // Set COINY_API_BASE_URL in the scheme's environment variables to
+            // point a simulator run at staging without editing code or touching
+            // the build configuration.
+            if let override = ProcessInfo.processInfo.environment["COINY_API_BASE_URL"],
+               let url = URL(string: override), url.scheme == "https" || url.scheme == "http" {
+                return url
+            }
+
             #if targetEnvironment(simulator)
+            // Localhost by default, because the common simulator case is a
+            // developer running the backend on the same machine. Overriding via
+            // the scheme is how you reach staging.
             return URL(string: "http://127.0.0.1:3000")!
             #else
+            // Device builds take the value baked in by the build configuration
+            // (ios/project.yml), falling back to staging. Falling back to
+            // staging is deliberate: a misconfigured build should reach the
+            // environment full of fake data, never real people's bank accounts.
             let configured = Bundle.main.object(forInfoDictionaryKey: "COINY_API_BASE_URL") as? String
             if let configured, let url = URL(string: configured), url.scheme == "https" {
                 return url
