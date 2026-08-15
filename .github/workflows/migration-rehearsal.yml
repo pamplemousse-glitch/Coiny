@@ -99,11 +99,20 @@ jobs:
         if: steps.guard.outputs.available == 'true'
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          # production on purpose, so the rehearsal runs the same driver and the
+          # same code path a real deploy will. The values below exist only to
+          # satisfy the config guard that comes with it.
           NODE_ENV: production
           APP_ENV: staging
-          # Real, but only ever used to satisfy the config schema: this job runs
-          # migrations, it does not encrypt or decrypt anything.
-          DATA_ENCRYPTION_KEY: ${{ secrets.DATA_ENCRYPTION_KEY_CI || '0000000000000000000000000000000000000000000000000000000000000000' }}
+          # Placeholders. Migrations touch neither Plaid nor the encryption key,
+          # and these are deliberately obvious nonsense so that a log line
+          # containing one can never be mistaken for a real credential. If a
+          # migration ever genuinely needs the key, this job needs a real one
+          # and that is a decision worth making explicitly.
+          DATA_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+          PLAID_CLIENT_ID: not-used-by-migrations
+          PLAID_SECRET: not-used-by-migrations
+          PLAID_WEBHOOK_URL: https://example.invalid/not-used-by-migrations
           BRANCH_NAME: ${{ steps.branch.outputs.name }}
         run: |
           # Captured into the environment and never echoed. Fly and GitHub both
