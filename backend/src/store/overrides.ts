@@ -1,7 +1,7 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { categoryOverrides } from '../db/schema.js';
-import { blindIndex, decryptString, encryptString } from '../util/crypto.js';
+import { blindIndex, blindIndexLegacy, decryptString, encryptString } from '../util/crypto.js';
 
 // Merchant names here are the same PII as transactions.merchant_name and are
 // covered by the same 0048 encryption decision (see db/schema.ts). The PK
@@ -10,21 +10,24 @@ import { blindIndex, decryptString, encryptString } from '../util/crypto.js';
 // lives AES-256-GCM encrypted in merchant_name_enc.
 //
 // Legacy rows (written before 0048) hold the plaintext normalized merchant in
-// merchant_name and null in merchant_name_enc. Reads match both forms and
-// setOverride migrates a legacy row on rewrite, so nothing breaks before the
-// one-shot backfill (scripts/backfill-encrypt-pii.ts) has run. In dev/test
-// without DATA_ENCRYPTION_KEY, blindIndex and encryptString pass through and
-// behaviour is identical to the pre-0048 code.
+// merchant_name and null in merchant_name_enc; rows written between 0048 and
+// the index-key separation hold an index keyed on the AES key itself. Reads
+// match all three forms and setOverride migrates an older row on rewrite, so
+// nothing breaks before the one-shot backfill (scripts/backfill-encrypt-pii.ts)
+// or the rotation sweep (scripts/rotate-encryption-key.ts) has run. With
+// ALLOW_PLAINTEXT_FIELDS and no key, blindIndex and encryptString pass through
+// and behaviour is identical to the pre-0048 code.
 
 function key(merchant: string): string {
   return merchant.trim().toLowerCase();
 }
 
-/** Both storable forms of the lookup key: blind index first, legacy plaintext
- *  second. Deduplicated because they coincide when no key is configured. */
+/** Every storable form of the lookup key: the current blind index, the index
+ *  as it was computed before the index key was separated from the AES key, and
+ *  the pre-0048 plaintext. Deduplicated because all three coincide when no key
+ *  is configured. */
 function lookupKeys(k: string): string[] {
-  const idx = blindIndex(k);
-  return idx === k ? [k] : [idx, k];
+  return [...new Set([blindIndex(k), blindIndexLegacy(k), k])];
 }
 
 export async function getOverride(userId: string, merchant: string | undefined): Promise<string | null> {
@@ -40,12 +43,14 @@ export async function getOverride(userId: string, merchant: string | undefined):
 export async function setOverride(userId: string, merchant: string, category: string): Promise<void> {
   const k = key(merchant);
   const idx = blindIndex(k);
-  // A legacy plaintext row would not conflict with the blind-index PK and the
-  // merchant would end up with two override rows; migrate it out first.
-  if (idx !== k) {
+  // A row stored under an older key form would not conflict with the current
+  // blind-index PK and the merchant would end up with two override rows;
+  // migrate them out first.
+  const superseded = lookupKeys(k).filter((form) => form !== idx);
+  if (superseded.length > 0) {
     await db()
       .delete(categoryOverrides)
-      .where(and(eq(categoryOverrides.userId, userId), eq(categoryOverrides.merchantName, k)));
+      .where(and(eq(categoryOverrides.userId, userId), inArray(categoryOverrides.merchantName, superseded)));
   }
   await db()
     .insert(categoryOverrides)
