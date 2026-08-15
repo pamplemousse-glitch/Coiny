@@ -32,3 +32,41 @@ file_length:
 excluded:
   - .spm-cache
   - DerivedData
+
+# The design system, enforced by something other than attention.
+#
+# Colour in this app is acquired by typing `CoinyTheme.ink`. A view that does
+# nothing gets `.primary`, `.secondary` and system blue, so before these rules
+# the default outcome for any new file was the untokenised one, and that is why
+# the palette split reappeared after the rewrite: 31 of 46 view files used no
+# palette at all and 23 of 25 section headings sat below 4.5:1.
+#
+# `Color.clear` and `Color(uiColor:)` are deliberately not matched.
+custom_rules:
+  design_system_color:
+    name: "Raw system colour"
+    message: "Use a CoinyTheme token. System colours bypass the design-direction 4.2 palette and most of them fail WCAG AA in one scheme or the other."
+    included: ".*/Coiny/.*\\.swift"
+    excluded:
+      # The palette itself, and the three files another branch is mid-edit on.
+      - ".*/Coiny/Views/CoinyTheme\\.swift"
+      - ".*/Coiny/Views/PaywallView\\.swift"
+      - ".*/Coiny/Views/SignInView\\.swift"
+      - ".*/Coiny/Views/SettingsView\\.swift"
+    regex: '(?:foregroundStyle|foregroundColor|tint|background|fill|stroke|strokeBorder|listRowBackground|shadow)\(\s*(?:Color\.)?\.(?:primary|secondary|tertiary|quaternary|white|black|red|orange|yellow|green|mint|teal|cyan|blue|indigo|purple|pink|brown|gray|grey|accentColor)\b'
+    severity: error
+
+  design_system_hex:
+    name: "Hardcoded colour hex"
+    message: "Colour literals belong in CoinyTheme.swift. A hex anywhere else is a token that nobody can find, recompute or flip for dark mode."
+    included: ".*/Coiny/.*\\.swift"
+    excluded: ".*/Coiny/Views/CoinyTheme\\.swift"
+    regex: '0x[0-9A-Fa-f]{6}\b'
+    severity: error
+
+  design_system_material:
+    name: "Material on content"
+    message: "Use CoinyTheme.surface. Materials are translucent, so their contrast depends on whatever is behind them, and nothing in the app honours Reduce Transparency."
+    included: ".*/Coiny/.*\\.swift"
+    regex: '\.(?:ultraThin|thin|regular|thick|ultraThick|bar)Material\b'
+    severity: error
