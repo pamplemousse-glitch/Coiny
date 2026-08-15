@@ -1308,6 +1308,13 @@ and no restating in Part 7 what Part 1 already established. Judge a section by
 whether a reader could act on every row, not by how much of the page it fills.
 No filler sections, no redundant summaries, no preamble explaining what the
 section is about to do before it does it.
+
+This governs how you write a row, never whether a row exists. Never resolve a
+length concern by dropping an item, only by tightening the sentence.
+Completeness is counted in rows present; brevity is counted in words per row.
+Before you finish, confirm every part has a table, every bullet listed under a
+part has produced at least one row, and Part 7 references items by number
+instead of restating them.
 </length>
 
 <delegation>
