@@ -2,7 +2,16 @@ import { eq } from 'drizzle-orm';
 import type { FastifyBaseLogger } from 'fastify';
 import { config } from '../config.js';
 import { db } from '../db/client.js';
-import { discogsConnections, truelayerConnections, ynabConnections } from '../db/schema.js';
+import {
+  alpacaConnections,
+  discogsConnections,
+  kalshiConnections,
+  krakenConnections,
+  spinwheelConnections,
+  truelayerConnections,
+  ynabConnections,
+} from '../db/schema.js';
+import { deleteUser as deleteSpinwheelUser } from '../spinwheel/client.js';
 import type { TrueLayerEnv } from '../truelayer/client.js';
 import { deleteCredential } from '../truelayer/client.js';
 import { getTrueLayerAccessToken } from '../truelayer/tokens.js';
@@ -23,7 +32,7 @@ export interface RevocationOutcome {
   result: RevocationResult;
 }
 
-// Providers whose OAuth grant we hold but cannot programmatically revoke.
+// Providers whose credential we hold but cannot programmatically revoke.
 //
 // YNAB: personal access tokens are revocable from the user's Developer Settings
 //   screen, but no API endpoint exists for an app to revoke its own OAuth grant.
@@ -31,6 +40,13 @@ export interface RevocationOutcome {
 // Discogs: OAuth 1.0a, no documented revocation endpoint. Users revoke from
 //   their Discogs account settings. Verified against docs/context/discogs.md and
 //   the developer docs 2026-08-13.
+// Kraken, Kalshi, Alpaca: the user pastes an API key they minted themselves in
+//   the provider's dashboard. No provider offers an endpoint that lets a key
+//   holder delete that key, so the only revocation is the user's own dashboard.
+//   These are also the three grants that can carry trade rights, which is why
+//   they are named here rather than left out: the deletion audit line has to say
+//   a credential existed and was not revocable, and the privacy policy's
+//   "revoke at the source" paragraph has to name them.
 // Coinbase: `POST https://login.coinbase.com/oauth2/revoke` exists, but no
 //   Coinbase OAuth flow is wired in this codebase. `coinbase_connections.mode`
 //   is only ever 'dev_key' today (api/coinbase.ts exposes connect/dev-key and
@@ -38,9 +54,19 @@ export interface RevocationOutcome {
 //   so there is nothing user-authorized to revoke. Wire the revoke call at the
 //   same time as the OAuth flow, not before: an unused code path against an
 //   unconfigured client secret would rot silently.
-const UNSUPPORTED: ReadonlyArray<{ provider: string; table: 'ynab' | 'discogs' }> = [
-  { provider: 'ynab', table: 'ynab' },
-  { provider: 'discogs', table: 'discogs' },
+type UnsupportedTable =
+  | typeof ynabConnections
+  | typeof discogsConnections
+  | typeof krakenConnections
+  | typeof kalshiConnections
+  | typeof alpacaConnections;
+
+const UNSUPPORTED: ReadonlyArray<{ provider: string; table: UnsupportedTable }> = [
+  { provider: 'ynab', table: ynabConnections },
+  { provider: 'discogs', table: discogsConnections },
+  { provider: 'kraken', table: krakenConnections },
+  { provider: 'kalshi', table: kalshiConnections },
+  { provider: 'alpaca', table: alpacaConnections },
 ];
 
 // Best-effort revocation of every upstream grant we can end programmatically.
@@ -50,10 +76,10 @@ const UNSUPPORTED: ReadonlyArray<{ provider: string; table: 'ynab' | 'discogs' }
 // party being reachable, so every failure is logged and stepped over. The
 // returned outcomes let the caller log what actually happened.
 export async function revokeUpstreamGrants(userId: string, log: FastifyBaseLogger): Promise<RevocationOutcome[]> {
-  const outcomes: RevocationOutcome[] = [await revokeTrueLayer(userId, log)];
+  const outcomes: RevocationOutcome[] = [await revokeTrueLayer(userId, log), await revokeSpinwheel(userId, log)];
 
   for (const { provider, table } of UNSUPPORTED) {
-    const present = table === 'ynab' ? await hasYnab(userId) : await hasDiscogs(userId);
+    const present = await hasConnection(table, userId);
     outcomes.push({ provider, result: present ? 'unsupported_by_provider' : 'no_connection' });
   }
 
@@ -82,18 +108,31 @@ export async function revokeTrueLayer(userId: string, log: FastifyBaseLogger): P
   }
 }
 
-async function hasYnab(userId: string): Promise<boolean> {
-  const rows = await db()
-    .select({ userId: ynabConnections.userId })
-    .from(ynabConnections)
-    .where(eq(ynabConnections.userId, userId));
-  return rows.length > 0;
+// Spinwheel is the one provider where deletion is the whole point: connecting
+// hands over a phone number and a date of birth and triggers an Equifax pull,
+// so a Coiny account deletion that left the Spinwheel user standing would leave
+// the highest-sensitivity record we ever create sitting at a credit-bureau
+// aggregator. `DELETE /api/spinwheel/connect` already calls this; account
+// deletion must do at least as much as disconnecting one connection.
+export async function revokeSpinwheel(userId: string, log: FastifyBaseLogger): Promise<RevocationOutcome> {
+  const [conn] = await db().select().from(spinwheelConnections).where(eq(spinwheelConnections.userId, userId));
+  if (!conn) return { provider: 'spinwheel', result: 'no_connection' };
+
+  if (!config.SPINWHEEL_SECRET_KEY) {
+    log.warn({ userId }, 'spinwheel revocation skipped, secret key not configured');
+    return { provider: 'spinwheel', result: 'not_configured' };
+  }
+
+  try {
+    await deleteSpinwheelUser(conn.spinwheelUserId);
+    return { provider: 'spinwheel', result: 'revoked' };
+  } catch (err) {
+    log.warn({ err, userId }, 'spinwheel user deletion failed, continuing');
+    return { provider: 'spinwheel', result: 'failed' };
+  }
 }
 
-async function hasDiscogs(userId: string): Promise<boolean> {
-  const rows = await db()
-    .select({ userId: discogsConnections.userId })
-    .from(discogsConnections)
-    .where(eq(discogsConnections.userId, userId));
+async function hasConnection(table: UnsupportedTable, userId: string): Promise<boolean> {
+  const rows = await db().select({ userId: table.userId }).from(table).where(eq(table.userId, userId));
   return rows.length > 0;
 }

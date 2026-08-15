@@ -179,6 +179,23 @@ export async function disableItem(itemId: string): Promise<void> {
   }
 }
 
+/**
+ * Deletes the item row, and with it the encrypted access token, the sync
+ * cursor and the institution identity. Called when the user unlinks: every
+ * other provider drops its credential row at disconnect, and
+ * `docs/legal/data-disposal-schedule.md` says nothing retains a revoked
+ * credential.
+ *
+ * Nothing has a foreign key to `plaid_items`, so this deletes exactly one row.
+ * Transactions, recurring streams and the balance cache are keyed by user, not
+ * by item, and stay for their own retention window; the net-worth read already
+ * ignores balances whose item is not present and not disabled, so a deleted
+ * item contributes nothing to any total.
+ */
+export async function deleteItem(itemId: string): Promise<void> {
+  await db().delete(plaidItems).where(eq(plaidItems.itemId, itemId));
+}
+
 export async function resetCursor(itemId: string): Promise<void> {
   await db().update(plaidItems).set({ cursor: null }).where(eq(plaidItems.itemId, itemId));
 }

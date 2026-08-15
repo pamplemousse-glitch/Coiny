@@ -2,9 +2,10 @@
 // in-process 15-minute tick started from server boot. Node built-ins only, no
 // queue infrastructure. Per tick it (a) refreshes classes whose cache is older
 // than their section-2 interval, with per-user jitter and a concurrency cap,
-// and (b) runs the daily goal refresh (net_worth_daily point, ladder
+// (b) runs the daily goal refresh (net_worth_daily point, ladder
 // re-evaluation, milestone baseline) for users with no point today, so a
-// dormant user's series has no gaps.
+// dormant user's series has no gaps, and (c) once a day runs the retention
+// purge that executes docs/legal/data-disposal-schedule.md.
 //
 // Cost shape: the tick sleeps between runs, so the Neon endpoint suspends
 // between ticks instead of being kept awake 24/7 (the difference between
@@ -34,6 +35,7 @@ import { coinbaseConnections, plaidItems, spinwheelConnections, zerionWallets } 
 import { refreshScheduledClass, runGoalRefreshFromCache, type ScheduledClass } from '../networth/refresh.js';
 import { getClassCacheForUsers } from '../store/asset-cache.js';
 import { usersMissingDailyPoint } from '../store/goals.js';
+import { isPurgeDue, type PurgeSummary, runRetentionPurge } from './purge.js';
 
 const HOUR = 60 * 60 * 1000;
 
@@ -117,6 +119,8 @@ export type TickSummary = {
   refreshed: number;
   failed: number;
   goalRefreshes: number;
+  /** Null on the ticks that were not the day's purge tick. */
+  purge: PurgeSummary | null;
 };
 
 export async function runSchedulerTick(
@@ -125,10 +129,10 @@ export async function runSchedulerTick(
 ): Promise<TickSummary> {
   if (inFlight) {
     log.info({}, 'scheduler_tick_skipped');
-    return { skipped: true, refreshed: 0, failed: 0, goalRefreshes: 0 };
+    return { skipped: true, refreshed: 0, failed: 0, goalRefreshes: 0, purge: null };
   }
   inFlight = true;
-  const summary: TickSummary = { skipped: false, refreshed: 0, failed: 0, goalRefreshes: 0 };
+  const summary: TickSummary = { skipped: false, refreshed: 0, failed: 0, goalRefreshes: 0, purge: null };
   const startedTick = Date.now();
 
   try {
@@ -154,6 +158,18 @@ export async function runSchedulerTick(
         log.warn({ user_id: userId, err }, 'daily goal refresh failed');
       }
     });
+
+    // Retention purge, once a day. Counts only, never contents. A failing
+    // purge is an operational problem and must not cost the tick its
+    // refreshes, so it is caught here like every other unit of work.
+    if (isPurgeDue(now)) {
+      try {
+        summary.purge = await runRetentionPurge(now);
+        log.info({ ...summary.purge }, 'retention_purge_completed');
+      } catch (err) {
+        log.warn({ err }, 'retention purge failed');
+      }
+    }
 
     lastTickAt = new Date();
     log.info(

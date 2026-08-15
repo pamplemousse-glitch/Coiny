@@ -76,6 +76,86 @@ describe('DELETE /api/account', () => {
     await app.close();
   });
 
+  // processed_events is keyed by the Plaid transaction id, not by user, so the
+  // cascade cannot reach it. Deleting the account used to leave a deleted
+  // user's transaction identifiers in the table until 10,000 newer events
+  // pushed them out.
+  it('clears the processed-event ids belonging to the deleted user', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const { db } = await import('../src/db/client.js');
+    const { processedEvents, transactions } = await import('../src/db/schema.js');
+    const { claimEvent } = await import('../src/store/events.js');
+
+    await db().insert(transactions).values({
+      transactionId: 'txn_deleted_user',
+      userId: testUserId,
+      accountId: 'acct_1',
+      amount: '12.34',
+      date: '2026-08-01',
+    });
+    expect(await claimEvent('txn_deleted_user')).toBe(true);
+    // An event belonging to nobody in this test must survive: the purge is
+    // scoped to the user, not a truncate.
+    expect(await claimEvent('txn_someone_else')).toBe(true);
+
+    const app = await buildApp();
+    const res = await app.inject({ method: 'DELETE', url: '/api/account', headers: authHeader() });
+    expect(res.statusCode).toBe(204);
+
+    const remaining = await db().select({ id: processedEvents.id }).from(processedEvents);
+    expect(remaining.map((r) => r.id)).toEqual(['txn_someone_else']);
+
+    await app.close();
+  });
+
+  // app_store_notifications is the replay guard, keyed by Apple's
+  // notificationUUID with no user column, so the row has to outlive the
+  // account. Apple's stable per-subscriber id must not.
+  it('forgets the Apple subscriber id on the notification ledger', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const { db } = await import('../src/db/client.js');
+    const { appStoreNotifications } = await import('../src/db/schema.js');
+    const { ensureEntitlementRow, updateEntitlement } = await import('../src/store/entitlements.js');
+    const { eq } = await import('drizzle-orm');
+    const { entitlements } = await import('../src/db/schema.js');
+
+    await ensureEntitlementRow(testUserId);
+    await updateEntitlement(testUserId, { tier: 'individual', status: 'active' });
+    await db()
+      .update(entitlements)
+      .set({ originalTransactionId: 'orig_tx_1' })
+      .where(eq(entitlements.userId, testUserId));
+
+    await db()
+      .insert(appStoreNotifications)
+      .values([
+        {
+          notificationUuid: 'uuid-mine',
+          notificationType: 'DID_RENEW',
+          originalTransactionId: 'orig_tx_1',
+        },
+        {
+          notificationUuid: 'uuid-theirs',
+          notificationType: 'DID_RENEW',
+          originalTransactionId: 'orig_tx_2',
+        },
+      ]);
+
+    const app = await buildApp();
+    const res = await app.inject({ method: 'DELETE', url: '/api/account', headers: authHeader() });
+    expect(res.statusCode).toBe(204);
+
+    const rows = await db().select().from(appStoreNotifications);
+    const mine = rows.find((r) => r.notificationUuid === 'uuid-mine');
+    const theirs = rows.find((r) => r.notificationUuid === 'uuid-theirs');
+    // The ledger row survives so a redelivery is still recognised as a
+    // duplicate; the identifier does not.
+    expect(mine?.originalTransactionId).toBeNull();
+    expect(theirs?.originalTransactionId).toBe('orig_tx_2');
+
+    await app.close();
+  });
+
   it('still deletes the user when Plaid item/remove fails', async () => {
     const { buildApp } = await import('../src/server.js');
     const { upsertItem } = await import('../src/store/items.js');
