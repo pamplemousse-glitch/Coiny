@@ -105,19 +105,42 @@ async function buildApp() {
     },
   });
 
-  // Unauthenticated routes. /health carries the scheduler heartbeat
-  // (prd.md R-16.2): 503 when the tick is older than 45 minutes routes
-  // scheduler death through the Fly health check and the external pinger.
-  // When the scheduler is not running (tests, one-off scripts) the fields are
-  // absent and the endpoint stays a plain liveness check.
-  app.get('/health', async (_req, reply) => {
+  // Unauthenticated routes.
+  //
+  // /health is LIVENESS ONLY and must never 503 on the health of a background
+  // job. It previously 503'd whenever the scheduler tick was older than 45
+  // minutes, which took the entire API offline for a reason unrelated to its
+  // ability to serve requests. On this configuration that was not a rare
+  // failure but a guaranteed one: fly.toml runs `auto_stop_machines = 'suspend'`
+  // with `min_machines_running = 0`, suspend preserves process memory, and
+  // setInterval does not fire while suspended. So any machine idle for longer
+  // than TICK_STALE_MS resumed with an already-stale lastTickAt and served 503
+  // to Fly's own check until the next tick, up to TICK_INTERVAL_MS later.
+  // Observed live on staging: 503, 503, 200 across three probes.
+  //
+  // The scheduler heartbeat that R-16.2 actually wants lives at
+  // /health/scheduler below, where an external pinger can watch it without
+  // holding the API hostage.
+  app.get('/health', async () => {
     const status = getSchedulerStatus();
-    if (!status.enabled) return { ok: true };
+    return {
+      ok: true,
+      scheduler_enabled: status.enabled,
+      last_tick_at: status.lastTickAt ? status.lastTickAt.toISOString() : null,
+    };
+  });
+
+  // Readiness of the background scheduler, for an external monitor. 503 here
+  // means "the tick has stopped", which is worth paging about, and it is
+  // deliberately NOT the path in fly.toml's [[http_service.checks]].
+  app.get('/health/scheduler', async (_req, reply) => {
+    const status = getSchedulerStatus();
     const lastTickAt = status.lastTickAt ? status.lastTickAt.toISOString() : null;
+    if (!status.enabled) return { ok: true, scheduler_enabled: false };
     if (isSchedulerStale()) {
-      return reply.status(503).send({ ok: false, last_tick_at: lastTickAt });
+      return reply.status(503).send({ ok: false, scheduler_enabled: true, last_tick_at: lastTickAt });
     }
-    return { ok: true, last_tick_at: lastTickAt };
+    return { ok: true, scheduler_enabled: true, last_tick_at: lastTickAt };
   });
   registerPlaidWebhook(app);
   // Unauthenticated in the session sense only: every request is JWS-verified
