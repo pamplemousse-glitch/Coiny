@@ -15,16 +15,16 @@ struct TruelayerInlineView: View {
                 disconnectedView
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
             }
         }
     }
 
     private var disconnectedView: some View {
         HStack {
-            Text("Connect UK/EU bank account").font(.caption).foregroundStyle(.secondary)
+            Text("Connect UK/EU bank account").font(.caption).foregroundStyle(CoinyTheme.ink2)
             Spacer()
-            Text("Via TrueLayer").font(.caption2).foregroundStyle(.tertiary)
+            Text("Via TrueLayer").font(.caption2).foregroundStyle(CoinyTheme.ink2)
         }
         .padding(.top, 4)
     }
@@ -59,7 +59,7 @@ struct PokemonCardsInlineView: View {
                 holdingsList
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
             }
         }
         .sheet(isPresented: $showingAdd) { addSheet }
@@ -67,7 +67,7 @@ struct PokemonCardsInlineView: View {
 
     private var emptyView: some View {
         HStack {
-            Text("No cards added").font(.caption).foregroundStyle(.secondary)
+            Text("No cards added").font(.caption).foregroundStyle(CoinyTheme.ink2)
             Spacer()
             Button { showingAdd = true } label: { Label("Add", systemImage: "plus.circle").font(.caption) }
         }
@@ -82,16 +82,16 @@ struct PokemonCardsInlineView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(holding.label ?? holding.cardName).font(.subheadline).lineLimit(1)
                         HStack(spacing: 4) {
-                            if let set = holding.setName { Text(set).font(.caption).foregroundStyle(.secondary) }
-                            if let v = holding.variant { Text(v).font(.caption).foregroundStyle(.secondary) }
-                            if holding.quantity > 1 { Text("×\(holding.quantity)").font(.caption).foregroundStyle(.secondary) }
+                            if let set = holding.setName { Text(set).font(.caption).foregroundStyle(CoinyTheme.ink2) }
+                            if let v = holding.variant { Text(v).font(.caption).foregroundStyle(CoinyTheme.ink2) }
+                            if holding.quantity > 1 { Text("×\(holding.quantity)").font(.caption).foregroundStyle(CoinyTheme.ink2) }
                         }
                     }
                     Spacer()
                     if let value = holding.valueUsd {
                         Text(value, format: .currency(code: "USD")).font(.subheadline.monospacedDigit())
                     } else {
-                        Text("—").font(.subheadline).foregroundStyle(.secondary)
+                        Text("—").font(.subheadline).foregroundStyle(CoinyTheme.ink2)
                     }
                 }
                 .swipeActions {
@@ -165,7 +165,7 @@ struct EnergyInlineView: View {
                 positionsList
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
             }
         }
         .sheet(isPresented: $showingAdd) { addSheet }
@@ -173,7 +173,7 @@ struct EnergyInlineView: View {
 
     private var emptyView: some View {
         HStack {
-            Text("No energy positions added").font(.caption).foregroundStyle(.secondary)
+            Text("No energy positions added").font(.caption).foregroundStyle(CoinyTheme.ink2)
             Spacer()
             Button { showingAdd = true } label: { Label("Add", systemImage: "plus.circle").font(.caption) }
         }
@@ -187,13 +187,13 @@ struct EnergyInlineView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(pos.label ?? commodityName(pos.commodity)).font(.subheadline).lineLimit(1)
-                        Text("\(pos.quantity, specifier: "%.2f") \(pos.quantityUnit)").font(.caption).foregroundStyle(.secondary)
+                        Text("\(pos.quantity, specifier: "%.2f") \(pos.quantityUnit)").font(.caption).foregroundStyle(CoinyTheme.ink2)
                     }
                     Spacer()
                     if let value = pos.valueUsd {
                         Text(value, format: .currency(code: "USD")).font(.subheadline.monospacedDigit())
                     } else {
-                        Text("—").font(.subheadline).foregroundStyle(.secondary)
+                        Text("—").font(.subheadline).foregroundStyle(CoinyTheme.ink2)
                     }
                 }
                 .swipeActions {
@@ -268,7 +268,7 @@ struct FarmlandInlineView: View {
                 parcelsList
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
             }
         }
         .sheet(isPresented: $showingAdd) { addSheet }
@@ -276,7 +276,7 @@ struct FarmlandInlineView: View {
 
     private var emptyView: some View {
         HStack {
-            Text("No farmland parcels added").font(.caption).foregroundStyle(.secondary)
+            Text("No farmland parcels added").font(.caption).foregroundStyle(CoinyTheme.ink2)
             Spacer()
             Button { showingAdd = true } label: { Label("Add", systemImage: "plus.circle").font(.caption) }
         }
@@ -292,13 +292,13 @@ struct FarmlandInlineView: View {
                         Text(parcel.label ?? String(format: "%.1f ac, %@", parcel.acres, parcel.stateCode))
                             .font(.subheadline).lineLimit(1)
                         Text("\(parcel.acres, specifier: "%.1f") acres in \(parcel.stateCode)")
-                            .font(.caption).foregroundStyle(.secondary)
+                            .font(.caption).foregroundStyle(CoinyTheme.ink2)
                     }
                     Spacer()
                     if let value = parcel.valueUsd {
                         Text(value, format: .currency(code: "USD")).font(.subheadline.monospacedDigit())
                     } else {
-                        Text("—").font(.subheadline).foregroundStyle(.secondary)
+                        Text("—").font(.subheadline).foregroundStyle(CoinyTheme.ink2)
                     }
                 }
                 .swipeActions {

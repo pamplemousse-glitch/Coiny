@@ -9,7 +9,8 @@ struct PerformanceView: View {
                 HStack {
                     Label("Performance", systemImage: "chart.line.uptrend.xyaxis")
                         .font(.headline)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(CoinyTheme.ink)
+                        .accessibilityAddTraits(.isHeader)
                     Spacer()
                 }
 
@@ -42,10 +43,10 @@ struct PerformanceView: View {
                                         .font(.subheadline.weight(.semibold))
                                     Text(position.name)
                                         .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(CoinyTheme.ink2)
                                     Text("\(position.quantity, specifier: "%.4f") \(position.symbol)")
                                         .font(.caption2)
-                                        .foregroundStyle(.tertiary)
+                                        .foregroundStyle(CoinyTheme.ink2)
                                 }
                                 Spacer()
                                 Text(position.valueUsd, format: .currency(code: "USD"))
@@ -63,11 +64,16 @@ struct PerformanceView: View {
         HStack {
             Text(label)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
             Spacer()
-            Text(value, format: .currency(code: "USD"))
+            // A gain or a loss is a delta, so it may be coloured, but the sign
+            // has to be printed too: colour is never the only channel
+            // (design-direction 4.3 rule 3). `.currency` emits a minus for
+            // negatives and nothing for positives, which left a gain
+            // indistinguishable from a level once colour was removed.
+            Text(value, format: .currency(code: "USD").sign(strategy: .always()))
                 .font(.caption.monospacedDigit().weight(.semibold))
-                .foregroundStyle(value >= 0 ? .green : .red)
+                .foregroundStyle(value >= 0 ? CoinyTheme.positive : CoinyTheme.negative)
         }
     }
 }

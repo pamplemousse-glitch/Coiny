@@ -12,7 +12,7 @@ struct CoinbaseView: View {
                 if let reacted = vm.lastSyncReacted {
                     Text("\(reacted) reaction\(reacted == 1 ? "" : "s") fired on last sync")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(CoinyTheme.ink2)
                 }
                 Button("Disconnect Coinbase", role: .destructive) {
                     Task { await vm.disconnect() }
@@ -24,13 +24,13 @@ struct CoinbaseView: View {
                 } label: {
                     Label("Connect via dev key", systemImage: "link")
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.coinyFilledInline)
             }
 
             if let error = vm.errorMessage {
                 Text(error)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(CoinyTheme.negative)
             }
         }
         .disabled(vm.isLoading)
@@ -44,12 +44,15 @@ struct CoinbaseView: View {
             if vm.isLoading {
                 ProgressView()
             } else if vm.status?.connected == true {
+                // Status is carried by the word and the glyph. Green is
+                // reserved for positive deltas (design-direction 4.3 rule 4),
+                // and a connection is not a delta.
                 Label("Connected", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
+                    .foregroundStyle(CoinyTheme.ink)
                     .font(.subheadline)
             } else {
                 Label("Not connected", systemImage: "xmark.circle")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(CoinyTheme.ink2)
                     .font(.subheadline)
             }
         }
