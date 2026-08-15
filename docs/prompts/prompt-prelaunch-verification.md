@@ -114,10 +114,20 @@ So, binding rules for every row you mark VERIFIED:
    asserted pre-existing lint errors on a tree that had none.
 5. **A source that will not load is not evidence.** Mark the row UNVERIFIED
    with what would settle it.
+6. **Quote before you rule.** Never write a verdict about code or a document you
+   have not opened. Before judging an item, pull the specific lines it turns on
+   and put them in the Evidence column. This is the reading counterpart of rule
+   1: the same failure that produces a wrong command result produces a wrong
+   recollection of what a file says, and the whole document is worthless if its
+   rows rest on memory. If you cannot find the line, the row is UNVERIFIED, not
+   FAILS.
 </verification_discipline>
 
 <the_document>
-Write `docs/prelaunch-verification.md`. Create no other file. Do not modify code.
+Write `docs/prelaunch-verification.md`. That is the only file you create, and
+you build it up part by part as you go rather than holding the whole thing in
+your head and writing it at the end. Do not modify code. Do not create planning
+notes, scratch files or a summary document alongside it.
 
 Every item in every section takes the same shape, and the shape is the point:
 
@@ -129,6 +139,37 @@ is wrong), **UNVERIFIED** (needs a device, an account, or a human), or
 
 Evidence is a `file:line`, a command and its output, or a link. "Looks fine" is
 not evidence.
+
+**Rows are dense, not discursive.** One sentence per cell. The Evidence column
+is a reference, not a paragraph: the anchor plus the few words that make it
+legible. Where an item needs argument rather than a verdict, the argument goes
+in prose under the table, once, not spread across three cells. A row that runs
+to five lines is two rows or a paragraph.
+
+Three worked rows, so the bar is unambiguous:
+
+<examples>
+<example status="VERIFIED">
+| 1.2.1 | The session token is in the Keychain, not UserDefaults, under a device-only class | Read the Keychain wrapper and every call site that persists the token | VERIFIED | `ios/Coiny/Services/Keychain.swift:19` sets `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly`; `grep -rn "UserDefaults" ios/Coiny` returns no token write |
+
+Note what makes this a VERIFIED rather than an assertion: a named attribute at a
+named line, plus the negative check that would have falsified it.
+</example>
+
+<example status="FAILS">
+| 1.3.4 | Ciphertext cannot silently degrade to plaintext | Read `decryptString` and ask what it does with a value that fails the envelope shape | FAILS | `backend/src/util/crypto.ts:46` returns any non-envelope value unchanged, so a row written during a key-unset window stays readable forever and is indistinguishable from an encrypted one. MAJOR |
+
+Note the shape: what the code actually does, why that is the finding, and a
+severity from the PRD's scale. Not "encryption could be stronger".
+</example>
+
+<example status="UNVERIFIED">
+| 4.1.1 | Cold start to first frame is under budget on the oldest supported device | MetricKit `MXAppLaunchMetric` from a TestFlight build, or the Instruments App Launch template on device | UNVERIFIED | No device, no TestFlight build, and no MetricKit subscriber in the app today. Settles when R-15.7 unblocks TestFlight; `docs/engineering-budgets.md` §1 holds the target |
+
+Note that UNVERIFIED still carries work: the exact instrument, the exact reason
+it cannot run today, and the event that would change that.
+</example>
+</examples>
 
 ---
 
@@ -1258,12 +1299,54 @@ Do not pad. Length is not thoroughness.
 No em dashes (U+2014). No emoji.
 </anti_patterns>
 
-Budget: up to 400 tool calls. This is a large document and the reading alone is
-substantial. Reserve enough headroom to write it in full; running out mid-write
-wastes the run.
+<length>
+This document is long because the surface is wide, not because rows are wordy.
+Cover every part in full; that is not negotiable, and a short document that
+skips Part 5 is a failure. But write to the density of the worked examples
+above: one sentence per cell, prose only where an argument is genuinely needed,
+and no restating in Part 7 what Part 1 already established. Judge a section by
+whether a reader could act on every row, not by how much of the page it fills.
+No filler sections, no redundant summaries, no preamble explaining what the
+section is about to do before it does it.
+</length>
+
+<delegation>
+Delegate rarely. Each subagent re-establishes context, re-explores, reports
+back, and you then re-read the report, and the thing that gets lost in that
+round trip is exactly what this document is made of: the specific line, the
+exact command output, the reason a verdict is what it is. A summary from a
+subagent is not evidence, and a row built on one is an assertion wearing a
+citation.
+
+Use a subagent for genuinely independent, sizeable tracks: a wide sweep across
+many files where the output is a list of locations you will then read yourself.
+Do not use one for work you could finish in a handful of tool calls, and do not
+use one to verify, review or double-check your own findings. Verification
+belongs in your main loop, where you can see the file. Keep spawn counts low; if
+one subagent would do, use one. Brief it precisely the first time rather than
+launching, waiting, and re-briefing. If you do delegate, commit to it: do not
+re-derive its findings afterwards.
+</delegation>
+
+<persistence>
+Your context window is compacted automatically as it fills, so you can keep
+working from where you left off. Do not stop early, trim scope, or wrap up
+because of token or context concerns, and do not tell the reader you did. Work
+through the parts in order and write each one into
+`docs/prelaunch-verification.md` as you finish it, so a context refresh costs
+you nothing and progress is always on disk rather than only in your head. When
+you resume after a refresh, read what you have already written before
+continuing, and pick up at the first part that is missing.
+
+Before you end your turn, check your last paragraph. If it is a plan, a list of
+next steps, or a promise about work you have not done, do that work now. End
+only when every part is written or you are blocked on something only a human can
+provide.
+</persistence>
 
 You are autonomous; nobody will answer questions mid-run. Where you must choose,
-choose and say what you chose.
+choose and say what you chose. For reversible things that follow from this
+brief, proceed without asking.
 
 Your final message is read by someone who saw none of your working: how many
 items are VERIFIED against FAILS against UNVERIFIED, the three most serious
