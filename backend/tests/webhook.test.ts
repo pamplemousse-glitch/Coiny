@@ -832,6 +832,170 @@ describe('POST /webhooks/plaid', () => {
     await app.close();
   });
 
+  it('does not re-apply the bill_overdue side effect when the same LIABILITIES body is redelivered', async () => {
+    // 1.7.4: the signature stays valid for five minutes and Plaid redelivers,
+    // so without a body-hash claim the health penalty and the push land twice.
+    let liabilityCalls = 0;
+    mockAgent
+      .get('https://sandbox.plaid.com')
+      .intercept({ path: '/liabilities/get', method: 'POST' })
+      .reply(200, () => {
+        liabilityCalls++;
+        return {
+          liabilities: {
+            credit: [{ account_id: 'acc-cc-overdue', is_overdue: true }],
+            student: [],
+            mortgage: [],
+          },
+          accounts: [],
+          item: {},
+          request_id: 'req_liab_replay',
+        };
+      })
+      .times(2);
+
+    const dispatchModule = await import('../src/reactions/dispatch.js');
+    const spy = vi.spyOn(dispatchModule, 'dispatchReaction');
+    spy.mockClear();
+
+    const { getState } = await import('../src/store/pet.js');
+    const before = await getState(testUserId);
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const body = JSON.stringify({
+      webhook_type: 'LIABILITIES',
+      webhook_code: 'DEFAULT_UPDATE',
+      item_id: TEST_ITEM_ID,
+    });
+    const signed = await signWebhook(body);
+    const deliver = () =>
+      app.inject({
+        method: 'POST',
+        url: '/webhooks/plaid',
+        headers: { 'content-type': 'application/json', 'plaid-verification': signed },
+        body,
+      });
+
+    expect((await deliver()).statusCode).toBe(200);
+    await flushAll();
+    const afterFirst = await getState(testUserId);
+
+    expect((await deliver()).statusCode).toBe(200);
+    await flushAll();
+    const afterSecond = await getState(testUserId);
+
+    expect(liabilityCalls).toBe(1);
+    expect(spy).toHaveBeenCalledOnce();
+    expect(afterFirst.healthScore).toBe(before.healthScore - 5);
+    expect(afterSecond.healthScore).toBe(afterFirst.healthScore);
+
+    await app.close();
+  });
+
+  it('does not re-run the ITEM handler when the same body is redelivered', async () => {
+    const itemsModule = await import('../src/store/items.js');
+    const statusSpy = vi.spyOn(itemsModule, 'setItemStatus');
+    statusSpy.mockClear();
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const body = JSON.stringify({
+      webhook_type: 'ITEM',
+      webhook_code: 'ERROR',
+      item_id: TEST_ITEM_ID,
+      error: { error_type: 'ITEM_ERROR', error_code: 'ITEM_LOGIN_REQUIRED' },
+    });
+    const signed = await signWebhook(body);
+    const deliver = () =>
+      app.inject({
+        method: 'POST',
+        url: '/webhooks/plaid',
+        headers: { 'content-type': 'application/json', 'plaid-verification': signed },
+        body,
+      });
+
+    expect((await deliver()).statusCode).toBe(200);
+    await flushAll();
+    expect((await deliver()).statusCode).toBe(200);
+    await flushAll();
+
+    expect(statusSpy).toHaveBeenCalledOnce();
+    const { getItem } = await import('../src/store/items.js');
+    expect((await getItem(TEST_ITEM_ID))?.status).toBe('reauth_required');
+
+    statusSpy.mockRestore();
+    await app.close();
+  });
+
+  it('still syncs on a redelivered TRANSACTIONS body — the replay guard skips the idempotent path', async () => {
+    // The guard must never gate the sync path: `claimEvent` per transaction id
+    // and the cursor already make it idempotent, and a redelivery is a normal
+    // way for the next batch of transactions to arrive.
+    const { markInitialSyncComplete } = await import('../src/store/items.js');
+    await markInitialSyncComplete(TEST_ITEM_ID);
+
+    const accounts = [
+      {
+        account_id: 'acc_test_1',
+        balances: { current: 5000, available: 5000, iso_currency_code: 'USD', limit: null },
+        name: 'Checking',
+        official_name: null,
+        type: 'depository',
+        subtype: 'checking',
+      },
+    ];
+    mockSync({
+      accounts,
+      added: [buildAddedTx({ transaction_id: 'txn_redeliver_1' })],
+      modified: [],
+      removed: [],
+      next_cursor: 'cursor-redeliver-1',
+      has_more: false,
+      transactions_update_status: 'HISTORICAL_UPDATE_COMPLETE',
+      request_id: 'req_redeliver_1',
+    });
+    mockSync({
+      accounts,
+      added: [buildAddedTx({ transaction_id: 'txn_redeliver_2' })],
+      modified: [],
+      removed: [],
+      next_cursor: 'cursor-redeliver-2',
+      has_more: false,
+      transactions_update_status: 'HISTORICAL_UPDATE_COMPLETE',
+      request_id: 'req_redeliver_2',
+    });
+
+    const dispatchModule = await import('../src/reactions/dispatch.js');
+    const spy = vi.spyOn(dispatchModule, 'dispatchReaction');
+    spy.mockClear();
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const body = buildSyncEnvelope();
+    const signed = await signWebhook(body);
+    const deliver = () =>
+      app.inject({
+        method: 'POST',
+        url: '/webhooks/plaid',
+        headers: { 'content-type': 'application/json', 'plaid-verification': signed },
+        body,
+      });
+
+    await deliver();
+    await flushAll();
+    await deliver();
+    await flushAll();
+
+    // The second delivery ran a full sync: the cursor advanced past the first.
+    const { getItem } = await import('../src/store/items.js');
+    expect((await getItem(TEST_ITEM_ID))?.cursor).toBe('cursor-redeliver-2');
+    // And both transactions reacted, one per unique transaction id.
+    expect(spy).toHaveBeenCalledTimes(2);
+
+    await app.close();
+  });
+
   it('calls recurringTransactionsGet and logs summary on RECURRING_TRANSACTIONS_UPDATE', async () => {
     mockAgent
       .get('https://sandbox.plaid.com')
