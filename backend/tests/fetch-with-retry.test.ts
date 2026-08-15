@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-function makeResponse(status: number): Response {
+function makeResponse(status: number, headers: Record<string, string> = {}): Response {
   return {
     ok: status >= 200 && status < 300,
     status,
     statusText: String(status),
+    headers: new Headers(headers),
     json: async () => ({}),
   } as unknown as Response;
 }
@@ -53,6 +54,65 @@ describe('fetchWithRetry', () => {
     const res = await promise;
 
     expect(res.status).toBe(200);
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
+  });
+
+  // The amplification that matters. Plaid's tightest per-Item ceiling is
+  // /accounts/balance/get at 5 a minute
+  // (https://plaid.com/data/rate-limits.json), so a wrapper that spent three
+  // attempts on a rate-limited call burned three fifths of the minute's budget
+  // in 600 ms and made the next call likelier to 429 too.
+  it('spends at most two attempts on a persistent 429', async () => {
+    vi.mocked(fetch).mockResolvedValue(makeResponse(429));
+
+    const { fetchWithRetry } = await import('../src/util/fetch.js');
+    const promise = fetchWithRetry('https://example.com');
+    await vi.runAllTimersAsync();
+
+    await expect(promise).resolves.toMatchObject({ status: 429 });
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
+  });
+
+  it('honours a Retry-After it can afford to wait for', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(makeResponse(429, { 'Retry-After': '1' }))
+      .mockResolvedValueOnce(makeResponse(200));
+
+    const { fetchWithRetry } = await import('../src/util/fetch.js');
+    const promise = fetchWithRetry('https://example.com');
+
+    // The 200 ms ladder would have retried by now; the vendor asked for 1 s.
+    await vi.advanceTimersByTimeAsync(500);
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+
+    await vi.runAllTimersAsync();
+    await expect(promise).resolves.toMatchObject({ status: 200 });
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
+  });
+
+  // Retry-After is an instruction, not a hint to try again sooner. A vendor
+  // asking for a minute gets no second request at all.
+  it('does not retry when Retry-After is longer than it will wait', async () => {
+    vi.mocked(fetch).mockResolvedValue(makeResponse(429, { 'Retry-After': '60' }));
+
+    const { fetchWithRetry } = await import('../src/util/fetch.js');
+    const promise = fetchWithRetry('https://example.com');
+    await vi.runAllTimersAsync();
+
+    await expect(promise).resolves.toMatchObject({ status: 429 });
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to the backoff ladder when Retry-After is unparseable', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(makeResponse(429, { 'Retry-After': 'soon' }))
+      .mockResolvedValueOnce(makeResponse(200));
+
+    const { fetchWithRetry } = await import('../src/util/fetch.js');
+    const promise = fetchWithRetry('https://example.com');
+    await vi.runAllTimersAsync();
+
+    await expect(promise).resolves.toMatchObject({ status: 200 });
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
   });
 

@@ -1,9 +1,10 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { z } from 'zod';
+import { exchangeAuthorizationCode, isAppleRevocationConfigured } from '../apple/client.js';
 import { config } from '../config.js';
 import { createSession, deleteSession } from '../store/sessions.js';
-import { findOrCreateUser } from '../store/users.js';
+import { findOrCreateUser, setAppleRefreshToken } from '../store/users.js';
 
 // Cache the Apple JWKS fetcher (it internally caches with a 15-min TTL).
 const appleJwks = createRemoteJWKSet(new URL('https://appleid.apple.com/auth/keys'));
@@ -18,6 +19,12 @@ const AppleSignInSchema = z.object({
   email: z.string().email().nullish(),
   // Optional: Apple provides fullName only on first sign-in.
   display_name: z.string().max(100).nullish(),
+  // Optional: ASAuthorizationAppleIDCredential.authorizationCode, exchanged
+  // here for the refresh token that account deletion needs in order to revoke
+  // the grant (TN3194). Single-use and expires in five minutes, which is why it
+  // is spent at sign-in rather than kept. Optional because the shipped iOS
+  // build does not send it and must keep signing in.
+  authorization_code: z.string().min(1).max(2048).nullish(),
 });
 
 const GoogleSignInSchema = z.object({
@@ -25,12 +32,27 @@ const GoogleSignInSchema = z.object({
   id_token: z.string().min(1),
 });
 
+async function storeAppleRefreshToken(req: FastifyRequest, userId: string, code: string | null): Promise<void> {
+  if (!code || !isAppleRevocationConfigured()) return;
+
+  try {
+    const refreshToken = await exchangeAuthorizationCode(code);
+    if (!refreshToken) {
+      req.log.warn({ userId }, 'apple authorization code exchange returned no refresh token');
+      return;
+    }
+    await setAppleRefreshToken(userId, refreshToken);
+  } catch (err) {
+    req.log.warn({ err, userId }, 'apple authorization code exchange failed, continuing sign-in');
+  }
+}
+
 export function registerAuthApi(app: FastifyInstance): void {
   app.post('/api/auth/apple', async (req: FastifyRequest, reply: FastifyReply) => {
     const parsed = AppleSignInSchema.safeParse(req.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
-    const { identity_token, user_id, email, display_name } = parsed.data;
+    const { identity_token, user_id, email, display_name, authorization_code } = parsed.data;
 
     let sub: string;
     try {
@@ -50,6 +72,14 @@ export function registerAuthApi(app: FastifyInstance): void {
     }
 
     const userId = await findOrCreateUser({ appleSub: sub, email: email ?? null, displayName: display_name ?? null });
+
+    // Best-effort, and deliberately after the user exists but before the
+    // session is returned, so a stored token is never attributed to the wrong
+    // row. Nothing in here may fail a sign-in: the whole point of holding the
+    // refresh token is to make a future deletion cleaner, and a person who
+    // cannot sign in has a worse problem than a grant that outlives them.
+    await storeAppleRefreshToken(req, userId, authorization_code ?? null);
+
     const { rawToken } = await createSession(userId);
 
     req.log.info({ userId }, 'apple sign-in success');
@@ -89,7 +119,21 @@ export function registerAuthApi(app: FastifyInstance): void {
   });
 
   // Logout: invalidate the session token passed in the Authorization header.
-  // Protected by auth plugin when registered inside the protected scope.
+  //
+  // This route is UNAUTHENTICATED. `registerAuthApi` is registered in
+  // server.ts's public scope, alongside the two sign-in routes, so the auth
+  // plugin never runs for it. The previous comment here claimed the opposite
+  // ("Protected by auth plugin when registered inside the protected scope"),
+  // which is what Part 1 row 1.4.10 recorded: not a vulnerability, but a
+  // comment asserting the reverse of the behaviour, which is how a later reader
+  // ends up trusting `req.user` in a handler that never has one.
+  //
+  // It does not need the plugin. The route authenticates itself by construction:
+  // deleting a row by `sha256(token)` requires holding the token, an unknown
+  // token deletes nothing, and the reply is a constant `{ ok: true }` either
+  // way, so it cannot be used to test whether a token is live. Anything here
+  // that ever needs to know WHO is calling belongs in the protected scope
+  // instead, which is where the revoke-all route lives (`api/account.ts`).
   app.post('/api/auth/logout', async (req: FastifyRequest, reply: FastifyReply) => {
     const rawToken = (req.headers.authorization ?? '').slice(7).trim();
     await deleteSession(rawToken);

@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { tradingCardHoldings } from '../db/schema.js';
 import { getTradingCardPrice } from '../tcgapi/client.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const AddCardBodySchema = z.object({
   game: z.string().min(1).max(50),
@@ -101,7 +102,7 @@ export function registerTradingCardsApi(app: FastifyInstance): void {
   });
 
   // POST /api/trading-cards/sync
-  app.post('/api/trading-cards/sync', async (req: FastifyRequest) => {
+  app.post('/api/trading-cards/sync', SYNC_LIMIT, async (req: FastifyRequest) => {
     const userId = req.user!.id;
     const rows = await db().select().from(tradingCardHoldings).where(eq(tradingCardHoldings.userId, userId));
 

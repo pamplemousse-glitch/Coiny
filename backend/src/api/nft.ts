@@ -6,6 +6,7 @@ import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { nftWallets } from '../db/schema.js';
 import { getNftPortfolioValue } from '../nft/client.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const AddWalletBodySchema = z.object({
   address: z.string().min(1).max(200),
@@ -60,7 +61,7 @@ export function registerNftApi(app: FastifyInstance): void {
   );
 
   // POST /api/nft/sync — sync all wallets, update lastValueUsd + lastSyncedAt
-  app.post('/api/nft/sync', async (req: FastifyRequest) => {
+  app.post('/api/nft/sync', SYNC_LIMIT, async (req: FastifyRequest) => {
     const userId = req.user!.id;
     const rows = await db().select().from(nftWallets).where(eq(nftWallets.userId, userId));
 

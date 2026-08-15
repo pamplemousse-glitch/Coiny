@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { hyperliquidAccounts } from '../db/schema.js';
 import { getHyperliquidState } from '../hyperliquid/client.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const AddAccountBodySchema = z.object({
   address: z.string().min(1).max(200),
@@ -59,7 +60,7 @@ export function registerHyperliquidApi(app: FastifyInstance): void {
 
   // POST /api/hyperliquid/sync
   // Fetches live account values from Hyperliquid and persists them.
-  app.post('/api/hyperliquid/sync', async (req: FastifyRequest) => {
+  app.post('/api/hyperliquid/sync', SYNC_LIMIT, async (req: FastifyRequest) => {
     const userId = req.user!.id;
     const rows = await db().select().from(hyperliquidAccounts).where(eq(hyperliquidAccounts.userId, userId));
 

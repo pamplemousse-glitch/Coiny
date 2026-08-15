@@ -112,12 +112,24 @@ actor API {
 
     var isSignedIn: Bool { sessionToken != nil }
 
-    func signInWithApple(identityToken: String, userId: String, email: String?, displayName: String?) async throws {
+    /// - Parameter authorizationCode: `ASAuthorizationAppleIDCredential.authorizationCode`,
+    ///   decoded to a string. The server exchanges it for the refresh token that
+    ///   account deletion needs in order to revoke the Sign in with Apple grant
+    ///   (TN3194). It is single-use and expires in five minutes, so it is sent
+    ///   here and nowhere else. Optional, and a nil never blocks sign-in.
+    func signInWithApple(
+        identityToken: String,
+        userId: String,
+        email: String?,
+        displayName: String?,
+        authorizationCode: String? = nil
+    ) async throws {
         struct Body: Encodable {
             let identity_token: String
             let user_id: String
             let email: String?
             let display_name: String?
+            let authorization_code: String?
         }
         struct Response: Decodable {
             let token: String
@@ -126,7 +138,13 @@ actor API {
         let res: Response = try await request(
             method: "POST",
             path: "/api/auth/apple",
-            body: Body(identity_token: identityToken, user_id: userId, email: email, display_name: displayName),
+            body: Body(
+                identity_token: identityToken,
+                user_id: userId,
+                email: email,
+                display_name: displayName,
+                authorization_code: authorizationCode
+            ),
             requiresAuth: false
         )
         try sessionStore.save(res.token)
@@ -206,6 +224,17 @@ actor API {
     @discardableResult
     func deleteAccount() async throws -> EmptyResponse {
         try await delete("/api/account")
+    }
+
+    /// Ends every session except this device's, and returns how many were ended.
+    ///
+    /// The answer to losing a phone: sign in on a replacement, then run this.
+    /// Deliberately does not sign this device out, so the person running it
+    /// keeps the device they are holding.
+    func revokeOtherSessions() async throws -> Int {
+        struct Response: Decodable { let revoked: Int }
+        let res: Response = try await post("/api/account/sessions/revoke-all")
+        return res.revoked
     }
 
     // MARK: - Coinbase

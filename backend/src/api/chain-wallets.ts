@@ -18,6 +18,7 @@ import { getSpotPrices } from '../coinbase/client.js';
 import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { chainWallets } from '../db/schema.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 // Maps chain identifier to the Coinbase spot price symbol.
 export const CHAIN_SYMBOLS: Record<string, string> = {
@@ -150,7 +151,7 @@ export function registerChainWalletsApi(app: FastifyInstance): void {
 
   // POST /api/chain-wallets/sync
   // Fetches live native balances via chain-specific clients, converts to USD, and persists.
-  app.post('/api/chain-wallets/sync', async (req: FastifyRequest) => {
+  app.post('/api/chain-wallets/sync', SYNC_LIMIT, async (req: FastifyRequest) => {
     const userId = req.user!.id;
     const rows = await db().select().from(chainWallets).where(eq(chainWallets.userId, userId));
 

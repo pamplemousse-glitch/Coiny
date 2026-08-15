@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { farmlandParcels } from '../db/schema.js';
 import { getFarmlandPricePerAcre } from '../usda/client.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const AddParcelBodySchema = z.object({
   stateCode: z.string().length(2),
@@ -92,7 +93,7 @@ export function registerFarmlandApi(app: FastifyInstance): void {
   });
 
   // POST /api/farmland/sync
-  app.post('/api/farmland/sync', async (req: FastifyRequest) => {
+  app.post('/api/farmland/sync', SYNC_LIMIT, async (req: FastifyRequest) => {
     const userId = req.user!.id;
     const rows = await db().select().from(farmlandParcels).where(eq(farmlandParcels.userId, userId));
 

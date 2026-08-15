@@ -1,0 +1,16 @@
+-- 0051: hold the Sign in with Apple refresh token so account deletion can
+-- revoke the grant (TN3194, Part 1 row 1.4.13, Part 2 row 2.3.4).
+--
+-- Apple's `POST https://appleid.apple.com/auth/revoke` needs a token. The
+-- identity token the app already sends is not one: it is an assertion about
+-- who signed in, not a grant, and it is not accepted by the revoke endpoint.
+-- The refresh token comes from exchanging the authorization code the client
+-- receives alongside the identity token, and that code is single-use and
+-- expires in five minutes, so it has to be exchanged at sign-in and the result
+-- stored, or asked for again at deletion time.
+--
+-- Encrypted at rest by application code (AES-256-GCM via util/crypto.ts; the
+-- key never reaches Postgres). Nullable: every existing row has no token, and
+-- revocation reports `no_token` for those rather than failing. Deleted with the
+-- user row, no cascade needed. Written idempotently to match 0033 and 0048.
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "apple_refresh_token" text;

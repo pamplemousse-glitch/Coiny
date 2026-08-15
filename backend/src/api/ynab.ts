@@ -12,6 +12,7 @@ import {
   getTotalNetWorth,
   refreshAccessToken,
 } from '../ynab/client.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const REDIRECT_URI = 'coiny://ynab/callback';
 const REFRESH_BUFFER_MS = 5 * 60 * 1000; // refresh when < 5 min to expiry
@@ -140,7 +141,7 @@ export function registerYnabApi(app: FastifyInstance): void {
   });
 
   // POST /api/ynab/sync — cache total net worth from YNAB
-  app.post('/api/ynab/sync', async (req: FastifyRequest, reply: FastifyReply) => {
+  app.post('/api/ynab/sync', SYNC_LIMIT, async (req: FastifyRequest, reply: FastifyReply) => {
     const userId = req.user!.id;
     const [conn] = await db().select().from(ynabConnections).where(eq(ynabConnections.userId, userId));
     if (!conn) return reply.status(404).send({ error: 'not connected' });

@@ -5,6 +5,7 @@ import { db } from '../db/client.js';
 import { discogsConnections, discogsPending } from '../db/schema.js';
 import { getAccessToken, getRequestToken, getUsername, syncCollection } from '../discogs/client.js';
 import { decryptString, encryptString } from '../util/crypto.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const VerifyBodySchema = z.object({
   oauthToken: z.string().min(1),
@@ -90,7 +91,7 @@ export function registerDiscogsApi(app: FastifyInstance): void {
   });
 
   // POST /api/discogs/sync — fetch collection, price each record, store total
-  app.post('/api/discogs/sync', async (req: FastifyRequest, reply: FastifyReply) => {
+  app.post('/api/discogs/sync', SYNC_LIMIT, async (req: FastifyRequest, reply: FastifyReply) => {
     const userId = req.user!.id;
     const [conn] = await db().select().from(discogsConnections).where(eq(discogsConnections.userId, userId));
     if (!conn) return reply.status(404).send({ error: 'not connected' });
