@@ -181,7 +181,7 @@ private struct JourneyRowView: View {
             } else {
                 Text("ACTIVE")
                     .font(.system(.caption2, design: .monospaced).weight(.semibold))
-                    .foregroundStyle(CoinyTheme.screen)
+                    .foregroundStyle(CoinyTheme.onSignal)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(CoinyTheme.signal, in: Capsule())

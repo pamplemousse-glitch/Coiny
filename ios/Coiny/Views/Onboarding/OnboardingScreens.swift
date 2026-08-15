@@ -16,7 +16,7 @@ struct PetSpeechText: View {
     var body: some View {
         Text(text)
             .font(.system(size: speechSize, weight: .medium, design: .monospaced))
-            .foregroundStyle(OnboardingPalette.ink)
+            .foregroundStyle(CoinyTheme.ink)
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -33,17 +33,14 @@ struct OnboardingPrimaryButton: View {
         Button(action: action) {
             Group {
                 if isBusy {
-                    ProgressView().tint(.white)
+                    ProgressView().tint(CoinyTheme.onSignal)
                 } else {
-                    Text(title).fontWeight(.semibold)
+                    Text(title)
                 }
             }
-            .font(.body)
-            .frame(maxWidth: .infinity, minHeight: 50)
+            .frame(minHeight: 50)
         }
-        .background(OnboardingPalette.signalFill)
-        .foregroundStyle(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .buttonStyle(.coinyFilled)
         .disabled(isBusy)
     }
 }
@@ -58,7 +55,7 @@ struct OnboardingNotNowLink: View {
         Button(action: action) {
             Text(title)
                 .font(.body)
-                .foregroundStyle(OnboardingPalette.inkSecondary)
+                .foregroundStyle(CoinyTheme.ink2)
                 .frame(minWidth: 44, minHeight: 44)
         }
         .buttonStyle(.plain)
@@ -103,10 +100,10 @@ struct OnboardingDeclareScreen: View {
             VStack(spacing: 8) {
                 Text("What do you have?")
                     .font(.title2.weight(.semibold))
-                    .foregroundStyle(OnboardingPalette.ink)
+                    .foregroundStyle(CoinyTheme.ink)
                 Text("Tap everything that applies. No amounts yet.")
                     .font(.subheadline)
-                    .foregroundStyle(OnboardingPalette.inkSecondary)
+                    .foregroundStyle(CoinyTheme.ink2)
             }
             .multilineTextAlignment(.center)
             .padding(.top, 32)
@@ -141,13 +138,13 @@ struct OnboardingDeclareScreen: View {
         } label: {
             Text(assetClass.label)
                 .font(.body.weight(isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? Color.white : OnboardingPalette.ink)
+                .foregroundStyle(isSelected ? CoinyTheme.onSignal : CoinyTheme.ink)
                 .frame(maxWidth: .infinity, minHeight: 44)
-                .background(isSelected ? OnboardingPalette.signalFill : OnboardingPalette.surface)
+                .background(isSelected ? CoinyTheme.signalFill : CoinyTheme.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 4))
                 .overlay(
                     RoundedRectangle(cornerRadius: 4)
-                        .stroke(isSelected ? OnboardingPalette.signalFill : OnboardingPalette.rule, lineWidth: 1)
+                        .stroke(isSelected ? CoinyTheme.signalFill : CoinyTheme.rule, lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)
@@ -167,10 +164,10 @@ struct OnboardingAmountsScreen: View {
             VStack(spacing: 8) {
                 Text("Roughly how much?")
                     .font(.title2.weight(.semibold))
-                    .foregroundStyle(OnboardingPalette.ink)
+                    .foregroundStyle(CoinyTheme.ink)
                 Text("A rough slide is plenty. Skip anything you are not sure about.")
                     .font(.subheadline)
-                    .foregroundStyle(OnboardingPalette.inkSecondary)
+                    .foregroundStyle(CoinyTheme.ink2)
             }
             .multilineTextAlignment(.center)
             .padding(.top, 32)
@@ -213,24 +210,24 @@ private struct DeclaredAmountRow: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(assetClass.label)
                     .font(.body)
-                    .foregroundStyle(OnboardingPalette.ink)
+                    .foregroundStyle(CoinyTheme.ink)
                 Spacer()
                 Text(valueLabel)
                     .font(.body.weight(.medium).monospacedDigit())
-                    .foregroundStyle(value == nil ? OnboardingPalette.inkSecondary : OnboardingPalette.ink)
+                    .foregroundStyle(value == nil ? CoinyTheme.ink2 : CoinyTheme.ink)
             }
             HStack(spacing: 12) {
                 Slider(value: $position, in: 0...1) { _ in
                     commit()
                 }
                 .onChange(of: position) { commit() }
-                .tint(OnboardingPalette.signal)
+                .tint(CoinyTheme.signal)
                 .accessibilityLabel("\(assetClass.label) rough amount")
                 .accessibilityValue(valueLabel)
                 if value != nil {
                     Button("Skip") { onValue(nil) }
                         .font(.caption)
-                        .foregroundStyle(OnboardingPalette.inkSecondary)
+                        .foregroundStyle(CoinyTheme.ink2)
                         .frame(minWidth: 44, minHeight: 44)
                         .buttonStyle(.plain)
                         .accessibilityLabel("Skip \(assetClass.label)")
@@ -239,7 +236,7 @@ private struct DeclaredAmountRow: View {
         }
         .padding(.vertical, 8)
         .overlay(alignment: .bottom) {
-            Rectangle().fill(OnboardingPalette.rule).frame(height: 1)
+            Rectangle().fill(CoinyTheme.rule).frame(height: 1)
         }
     }
 

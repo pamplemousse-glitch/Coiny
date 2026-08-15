@@ -15,38 +15,6 @@ import SwiftUI
 // shapes on purpose (R-7.21 bans stock SF Symbols standing in for the
 // creature).
 
-// MARK: - Palette
-
-/// Design-direction section 4.2 tokens, scoped to onboarding to avoid
-/// colliding with whatever token set the Pet tab rebuild introduces.
-enum OnboardingPalette {
-    static let screen = dynamic(light: 0xEDEFE7, dark: 0x151711)
-    static let surface = dynamic(light: 0xF8F9F4, dark: 0x1E211A)
-    static let field = dynamic(light: 0xE4E7DA, dark: 0x1C1F16)
-    static let ink = dynamic(light: 0x191C17, dark: 0xE8EBE0)
-    static let inkSecondary = dynamic(light: 0x4E534A, dark: 0xA8AEA0)
-    static let rule = dynamic(light: 0xD3D8C9, dark: 0x2E3229)
-    static let signal = dynamic(light: 0x9C5310, dark: 0xE8A33D)
-    static let signalFill = dynamic(light: 0xA85B14, dark: 0xE8A33D)
-
-    private static func dynamic(light: UInt32, dark: UInt32) -> Color {
-        Color(UIColor { traits in
-            traits.userInterfaceStyle == .dark ? UIColor(rgb: dark) : UIColor(rgb: light)
-        })
-    }
-}
-
-private extension UIColor {
-    convenience init(rgb: UInt32) {
-        self.init(
-            red: CGFloat((rgb >> 16) & 0xFF) / 255,
-            green: CGFloat((rgb >> 8) & 0xFF) / 255,
-            blue: CGFloat(rgb & 0xFF) / 255,
-            alpha: 1
-        )
-    }
-}
-
 // MARK: - States
 
 enum OnboardingCreatureState: Equatable {
@@ -75,10 +43,10 @@ struct OnboardingCreatureWindow: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 2)
-                .fill(OnboardingPalette.field)
+                .fill(CoinyTheme.field)
             RoundedRectangle(cornerRadius: 2)
                 .inset(by: 3)
-                .stroke(OnboardingPalette.rule, lineWidth: 1)
+                .stroke(CoinyTheme.rule, lineWidth: 1)
             creature
                 .frame(width: size * 0.45, height: size * 0.55)
                 .scaleEffect(breathScale)
@@ -144,22 +112,22 @@ private struct EggShape: View {
             let height = geo.size.height
             ZStack {
                 Ellipse()
-                    .fill(OnboardingPalette.surface.opacity(dimmed ? 0.55 : 1))
+                    .fill(CoinyTheme.surface.opacity(dimmed ? 0.55 : 1))
                 Ellipse()
-                    .stroke(OnboardingPalette.ink.opacity(dimmed ? 0.5 : 1), lineWidth: 2)
+                    .stroke(CoinyTheme.ink.opacity(dimmed ? 0.5 : 1), lineWidth: 2)
                 if cracked {
                     CrackLine()
-                        .stroke(OnboardingPalette.ink, lineWidth: 2)
+                        .stroke(CoinyTheme.ink, lineWidth: 2)
                         .frame(width: width * 0.7, height: height * 0.22)
                         .offset(y: -height * 0.1)
                 }
                 // Two speckles so the egg reads as drawn, not generated.
                 Circle()
-                    .fill(OnboardingPalette.ink.opacity(dimmed ? 0.25 : 0.4))
+                    .fill(CoinyTheme.ink.opacity(dimmed ? 0.25 : 0.4))
                     .frame(width: 4, height: 4)
                     .offset(x: -width * 0.18, y: height * 0.12)
                 Circle()
-                    .fill(OnboardingPalette.ink.opacity(dimmed ? 0.25 : 0.4))
+                    .fill(CoinyTheme.ink.opacity(dimmed ? 0.25 : 0.4))
                     .frame(width: 3, height: 3)
                     .offset(x: width * 0.15, y: height * 0.22)
             }
@@ -188,30 +156,30 @@ private struct HatchlingShape: View {
             let height = geo.size.height
             ZStack {
                 RoundedRectangle(cornerRadius: width * 0.3)
-                    .fill(OnboardingPalette.surface)
+                    .fill(CoinyTheme.surface)
                     .frame(height: height * 0.75)
                     .offset(y: height * 0.12)
                 RoundedRectangle(cornerRadius: width * 0.3)
-                    .stroke(OnboardingPalette.ink, lineWidth: 2)
+                    .stroke(CoinyTheme.ink, lineWidth: 2)
                     .frame(height: height * 0.75)
                     .offset(y: height * 0.12)
                 // Eyes.
                 Circle()
-                    .fill(OnboardingPalette.ink)
+                    .fill(CoinyTheme.ink)
                     .frame(width: 6, height: 6)
                     .offset(x: -width * 0.15, y: height * 0.02)
                 Circle()
-                    .fill(OnboardingPalette.ink)
+                    .fill(CoinyTheme.ink)
                     .frame(width: 6, height: 6)
                     .offset(x: width * 0.15, y: height * 0.02)
                 // A flat, slightly odd mouth.
                 Rectangle()
-                    .fill(OnboardingPalette.ink)
+                    .fill(CoinyTheme.ink)
                     .frame(width: width * 0.22, height: 2)
                     .offset(y: height * 0.18)
                 // Shell fragment still on its head.
                 CrackLine()
-                    .stroke(OnboardingPalette.ink, lineWidth: 2)
+                    .stroke(CoinyTheme.ink, lineWidth: 2)
                     .frame(width: width * 0.4, height: height * 0.1)
                     .offset(y: -height * 0.28)
             }
@@ -226,5 +194,5 @@ private struct HatchlingShape: View {
         OnboardingCreatureWindow(state: .hatched, size: 120)
     }
     .padding()
-    .background(OnboardingPalette.screen)
+    .background(CoinyTheme.screen)
 }
