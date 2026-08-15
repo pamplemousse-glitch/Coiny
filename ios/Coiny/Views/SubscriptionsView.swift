@@ -44,12 +44,15 @@ struct SubscriptionsView: View {
         .navigationTitle("Subscriptions")
         .refreshable { await load() }
         .task { await load() }
-        .overlay {
-            if let err = errorMessage {
-                Text(err)
-                    .font(.caption)
-                    .foregroundStyle(CoinyTheme.ink2)
-                    .padding()
+        .safeAreaInset(edge: .top) {
+            // In the flow, not floating over the list: an overlay covered the
+            // rows it was explaining and had no way to be retried.
+            if let errorMessage {
+                CoinyErrorLine(message: errorMessage, actionTitle: "Try again") {
+                    Task { await load() }
+                }
+                .padding(.horizontal)
+                .background(CoinyTheme.screen)
             }
         }
     }

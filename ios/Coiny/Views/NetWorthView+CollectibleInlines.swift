@@ -22,7 +22,7 @@ struct TradingCardsInlineView: View {
                 holdingsList
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
+                CoinyErrorLine(message: error)
             }
         }
         .sheet(isPresented: $showingAdd) { addSheet }
@@ -127,7 +127,7 @@ struct CoinsInlineView: View {
                 holdingsList
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
+                CoinyErrorLine(message: error)
             }
         }
         .sheet(isPresented: $showingAdd) { addSheet }

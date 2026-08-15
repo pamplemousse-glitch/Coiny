@@ -39,9 +39,7 @@ struct PaywallView: View {
                     unavailableNotice
                 }
                 if let message = service.lastErrorMessage {
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
+                    CoinyErrorLine(message: message)
                 }
             }
             .padding()

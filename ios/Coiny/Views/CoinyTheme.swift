@@ -36,7 +36,9 @@ enum CoinyTheme {
     static let onSignal = dynamic(light: 0xFFFFFF, dark: 0x151711)
     /// Positive delta only, never a level (design-direction 4.3 rules 1, 2, 4).
     static let positive = dynamic(light: 0x3D6B44, dark: 0x8FBF8A)
-    /// Negative delta, and the error text color. Never debt (4.3 rule 5).
+    /// Negative delta, and the low band of the three graded health metrics.
+    /// Never debt (4.3 rule 5), and never an error: design-direction 4.3 spends
+    /// this pair on deltas, and `CoinyErrorLine` carries a failure in words.
     static let negative = dynamic(light: 0x9A3B32, dark: 0xE39B92)
 
     private static func dynamic(light: UInt32, dark: UInt32) -> Color {

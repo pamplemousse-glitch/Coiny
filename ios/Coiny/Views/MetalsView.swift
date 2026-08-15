@@ -22,9 +22,7 @@ struct MetalsView: View {
                 holdingsList
             }
             if let error = vm.errorMessage {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(CoinyTheme.negative)
+                CoinyErrorLine(message: error)
                     .padding(.top, 4)
             }
         }

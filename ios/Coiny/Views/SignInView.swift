@@ -63,12 +63,8 @@ struct SignInView: View {
 
             VStack(spacing: 12) {
                 if let errorMessage {
-                    Text(errorMessage)
-                        .font(.callout)
-                        .foregroundStyle(CoinyTheme.ink)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityAddTraits(.isStaticText)
+                    CoinyErrorLine(message: errorMessage)
+                        .padding(.horizontal)
                 }
 
                 signInControl

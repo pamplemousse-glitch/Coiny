@@ -15,7 +15,7 @@ struct TruelayerInlineView: View {
                 disconnectedView
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
+                CoinyErrorLine(message: error)
             }
         }
     }
@@ -59,7 +59,7 @@ struct PokemonCardsInlineView: View {
                 holdingsList
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
+                CoinyErrorLine(message: error)
             }
         }
         .sheet(isPresented: $showingAdd) { addSheet }
@@ -165,7 +165,7 @@ struct EnergyInlineView: View {
                 positionsList
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
+                CoinyErrorLine(message: error)
             }
         }
         .sheet(isPresented: $showingAdd) { addSheet }
@@ -268,7 +268,7 @@ struct FarmlandInlineView: View {
                 parcelsList
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
+                CoinyErrorLine(message: error)
             }
         }
         .sheet(isPresented: $showingAdd) { addSheet }
