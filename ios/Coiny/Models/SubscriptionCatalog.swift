@@ -30,14 +30,45 @@ enum SubscriptionCatalog {
             }
         }
 
-        /// What the tier includes, per section 25.1. Also the "contents" part
-        /// of the pre-purchase disclosure (S-30).
+        /// What the tier includes. Also the "contents" part of the
+        /// pre-purchase disclosure (S-30), which is why this list is the one
+        /// piece of copy in the app that may only ever name things the server
+        /// actually enforces: Apple 3.1.2(c) requires the purchase screen to
+        /// describe what the user gets for the price, and selling four things
+        /// and delivering one is the exposure.
+        ///
+        /// PRD section 25.1 sells more than this. The gap is deliberate and it
+        /// is the copy that moved, not the plan. Each line comes back the day
+        /// its gate lands in the backend:
+        ///
+        ///   "3 goals": `MAX_ACTIVE_GOALS` is 3 for every tier including free
+        ///     (`backend/src/store/target-goals.ts`), so goals are not a paid
+        ///     difference today. `TIER_LIMITS.activeGoals` exists and nothing
+        ///     reads it.
+        ///   "all guardrails": all seven guardrails are evaluated and returned
+        ///     for every tier, free included (`GUARDRAILS` in
+        ///     `backend/src/goals/guardrails.ts`, evaluated by
+        ///     `evaluateGuardrailPeriods`, served unfiltered by
+        ///     `guardrailViews`). `TIER_LIMITS.guardrails` caps free at 2 and
+        ///     nothing reads it, so "all" is what everybody already has.
+        ///   "2 years of history" / "unlimited history": there is no history
+        ///     endpoint. `getNetWorthSeries` has no callers.
+        ///   "full debt tooling": the debt layer is available on every tier.
+        ///   "up to 5 members": `addHouseholdMember` enforces the cap of 5,
+        ///     but no invite or consent flow is exposed over HTTP, so nobody
+        ///     can be added to a household. Household therefore sells only the
+        ///     connection limit today, which is a product question as much as
+        ///     a copy one.
+        ///
+        /// "Bank connections", not "connections": `countLiveConnections`
+        /// counts Plaid items only, so Coinbase, Kraken and YNAB do not
+        /// consume the allowance and the word has to say so.
         var features: [String] {
             switch self {
             case .individual:
-                return ["12 connections", "3 goals", "all guardrails", "full debt tooling", "2 years of history"]
+                return ["12 live bank connections"]
             case .household:
-                return ["up to 5 members", "unlimited connections", "portfolio guardrails", "unlimited history"]
+                return ["unlimited bank connections"]
             }
         }
     }

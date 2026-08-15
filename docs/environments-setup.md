@@ -181,6 +181,7 @@ Plain config (committed in the toml files, differs as shown):
 | COINBASE_BASE_URL | default (`https://api.coinbase.com`) | default | toml (omit) |
 | APNS_BUNDLE_ID | `app.coiny.ios` | `app.coiny.ios` | toml (default already correct) |
 | APPLE_BUNDLE_ID | `app.coiny.ios` | `app.coiny.ios` | toml (default) |
+| APPLE_ALLOW_SANDBOX_ENTITLEMENTS | irrelevant (staging accepts sandbox transactions because `APP_ENV` is not `production`) | `false`, except during an App Review window | toml. Production rejects StoreKit Sandbox transactions: they carry the same Apple certificate chain and bundle id as real ones, so without the check a sandbox tester account is a free subscription (`backend/src/appstore/environment.ts`). App Review buys with sandbox accounts against production, so set `true` when a build goes into review and back to `false` on approval. Every sandbox transaction it admits is logged at warn |
 | RATE_LIMIT_MAX / RATE_LIMIT_WINDOW | defaults | defaults | toml (omit) |
 
 Secrets (Fly secrets, per app):
