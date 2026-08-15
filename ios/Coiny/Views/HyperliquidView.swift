@@ -26,7 +26,7 @@ struct HyperliquidView: View {
                 .padding(.top, 4)
             } else {
                 ForEach(vm.accounts) { account in
-                    Divider().padding(.vertical, 6)
+                    CoinyHairline().padding(.vertical, 8)
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(account.label ?? account.address)

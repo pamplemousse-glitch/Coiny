@@ -64,13 +64,16 @@ struct NetWorthView: View {
                 if sections.isEmpty {
                     emptyState
                 }
-                ForEach(sections) { section in
-                    WealthGroupBoxView(
-                        section: section,
-                        bankNeedsRepair: repairVM.needsRepair,
-                        onRefresh: { Task { await vm.refresh() } },
-                        onRepairBank: { Task { await repairVM.repairFirstBrokenItem(source: .prompt) } }
-                    )
+                // Zero spacing: CoinySection carries its own leading gap.
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(sections) { section in
+                        WealthGroupSectionView(
+                            section: section,
+                            bankNeedsRepair: repairVM.needsRepair,
+                            onRefresh: { Task { await vm.refresh() } },
+                            onRepairBank: { Task { await repairVM.repairFirstBrokenItem(source: .prompt) } }
+                        )
+                    }
                 }
                 manageAccountsLink
                 footer(data)

@@ -45,7 +45,7 @@ struct MetalsView: View {
     private var holdingsList: some View {
         VStack(spacing: 0) {
             ForEach(vm.holdings) { holding in
-                Divider().padding(.vertical, 6)
+                CoinyHairline().padding(.vertical, 8)
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(holding.label ?? metalNames[holding.metal] ?? holding.metal)

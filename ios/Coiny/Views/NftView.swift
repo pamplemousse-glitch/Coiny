@@ -26,7 +26,7 @@ struct NftView: View {
                 .padding(.top, 4)
             } else {
                 ForEach(vm.wallets) { wallet in
-                    Divider().padding(.vertical, 6)
+                    CoinyHairline().padding(.vertical, 8)
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(wallet.label ?? wallet.address)

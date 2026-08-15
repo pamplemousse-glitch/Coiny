@@ -354,7 +354,7 @@ struct PolymarketInlineView: View {
                 }
                 .padding(.vertical, 2)
             }
-            Divider().padding(.vertical, 4)
+            CoinyHairline().padding(.vertical, 8)
             HStack {
                 Button(vm.isSyncing ? "Syncing…" : "Sync") {
                     Task { await vm.sync() }

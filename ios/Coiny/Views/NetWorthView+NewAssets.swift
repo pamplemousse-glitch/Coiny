@@ -5,62 +5,38 @@ extension ManageAccountsView {
     // MARK: - New asset class sections
 
     func truelayerSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "UK/EU Bank", total: data.truelayer ?? 0, icon: "building.columns")
-                Divider().padding(.vertical, 6)
-                TruelayerInlineView(vm: truelayerVM)
-            }
+        CoinySection(title: "UK/EU bank", total: data.truelayer ?? 0) {
+            TruelayerInlineView(vm: truelayerVM)
         }
     }
 
     func pokemonCardsSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Pokemon Cards", total: data.pokemonCards ?? 0, icon: "menucard.fill")
-                Divider().padding(.vertical, 6)
-                PokemonCardsInlineView(vm: pokemonCardsVM)
-            }
+        CoinySection(title: "Pokemon cards", total: data.pokemonCards ?? 0) {
+            PokemonCardsInlineView(vm: pokemonCardsVM)
         }
     }
 
     func energySection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Energy", total: data.energy ?? 0, icon: "bolt.circle.fill")
-                Divider().padding(.vertical, 6)
-                EnergyInlineView(vm: energyVM)
-            }
+        CoinySection(title: "Energy", total: data.energy ?? 0) {
+            EnergyInlineView(vm: energyVM)
         }
     }
 
     func farmlandSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Farmland", total: data.farmland ?? 0, icon: "leaf.fill")
-                Divider().padding(.vertical, 6)
-                FarmlandInlineView(vm: farmlandVM)
-            }
+        CoinySection(title: "Farmland", total: data.farmland ?? 0) {
+            FarmlandInlineView(vm: farmlandVM)
         }
     }
 
     func tradingCardsSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Trading Cards", total: data.tradingCards ?? 0, icon: "rectangle.stack.fill")
-                Divider().padding(.vertical, 6)
-                TradingCardsInlineView(vm: tradingCardsVM)
-            }
+        CoinySection(title: "Trading cards", total: data.tradingCards ?? 0) {
+            TradingCardsInlineView(vm: tradingCardsVM)
         }
     }
 
     func coinsSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Graded Coins", total: data.coins ?? 0, icon: "circle.fill")
-                Divider().padding(.vertical, 6)
-                CoinsInlineView(vm: coinsVM)
-            }
+        CoinySection(title: "Graded coins", total: data.coins ?? 0) {
+            CoinsInlineView(vm: coinsVM)
         }
     }
 }
