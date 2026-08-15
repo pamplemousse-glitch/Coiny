@@ -1,88 +1,34 @@
 import SwiftUI
 
+/// The Wealth tab (PRD section 7.8): six fixed groups, one stacked composition
+/// bar, per-class status per the R-8.4 table, the staleness timestamp always
+/// visible, and the "n accounts not included" footnote whenever the server
+/// excluded anything from the total. The GET is a cached DB read; pull to
+/// refresh is the only thing that costs a vendor call.
 struct NetWorthView: View {
     @Environment(NetWorthViewModel.self) private var vm
-    @State private var coinbaseVM = CoinbaseViewModel()
-    @State private var zerionVM = ZerionViewModel()
-    @State private var spinwheelVM = SpinwheelViewModel()
-    @State private var performanceVM = PerformanceViewModel()
-    @State private var chainWalletsVM = ChainWalletsViewModel()
-    @State private var hyperliquidVM = HyperliquidViewModel()
-    @State private var metalsVM = MetalsViewModel()
-    @State private var sneakersVM = SneakersViewModel()
-    @State private var realEstateVM = RealEstateViewModel()
-    @State private var vehiclesVM = VehiclesViewModel()
-    @State private var krakenVM = KrakenViewModel()
-    @State private var showKrakenKeyEntry = false
-    @State private var ynabVM = YnabViewModel()
-    @State private var kalshiVM = KalshiViewModel()
-    @State private var discogsVM = DiscogsViewModel()
-    @State private var polymarketVM = PolymarketViewModel()
-    @State private var alpacaVM = AlpacaViewModel()
-    @State private var nftVM = NftViewModel()
-    @State private var manualAssetsVM = ManualAssetsViewModel()
-    @State var truelayerVM = TruelayerViewModel()
-    @State var pokemonCardsVM = PokemonCardsViewModel()
-    @State var energyVM = EnergyViewModel()
-    @State var farmlandVM = FarmlandViewModel()
-    @State var tradingCardsVM = TradingCardsViewModel()
-    @State var coinsVM = CoinsViewModel()
+    @State private var repairVM = ConnectionRepairViewModel()
+    @State private var showExcludedList = false
 
     var body: some View {
         NavigationStack {
             content
                 .navigationTitle("Wealth")
-                .refreshable { await reload() }
+                .refreshable { await vm.refresh() }
         }
-        .task { await reload() }
-        .environment(coinbaseVM)
-        .environment(zerionVM)
-        .environment(performanceVM)
-        .environment(chainWalletsVM)
-        .environment(hyperliquidVM)
-        .environment(metalsVM)
-        .environment(sneakersVM)
-        .environment(realEstateVM)
-        .environment(vehiclesVM)
-        .environment(alpacaVM)
-        .environment(nftVM)
-        .environment(manualAssetsVM)
-        .environment(truelayerVM)
-        .environment(pokemonCardsVM)
-        .environment(energyVM)
-        .environment(farmlandVM)
-        .environment(tradingCardsVM)
-        .environment(coinsVM)
-    }
-
-    private func reload() async {
-        async let netWorth: () = vm.load()
-        async let coinbase: () = coinbaseVM.loadStatus()
-        async let zerion: () = zerionVM.loadWallets()
-        async let spinwheel: () = spinwheelVM.loadStatus()
-        async let performance: () = performanceVM.load()
-        async let chainWallets: () = chainWalletsVM.loadWallets()
-        async let hyperliquid: () = hyperliquidVM.loadAccounts()
-        async let metals: () = metalsVM.loadHoldings()
-        async let sneakers: () = sneakersVM.loadHoldings()
-        async let realEstate: () = realEstateVM.loadAssets()
-        async let vehicles: () = vehiclesVM.loadAssets()
-        async let kalshi: () = kalshiVM.loadStatus()
-        async let discogs: () = discogsVM.loadStatus()
-        async let polymarket: () = polymarketVM.loadAccounts()
-        async let alpaca: () = alpacaVM.loadStatus()
-        async let nft: () = nftVM.loadWallets()
-        async let manualAssets: () = manualAssetsVM.loadAssets()
-        async let truelayer: () = truelayerVM.loadStatus()
-        async let pokemonCards: () = pokemonCardsVM.loadHoldings()
-        async let energy: () = energyVM.loadPositions()
-        async let farmland: () = farmlandVM.loadParcels()
-        async let tradingCards: () = tradingCardsVM.loadHoldings()
-        async let coins: () = coinsVM.loadHoldings()
-        _ = await (netWorth, coinbase, zerion, spinwheel, performance, chainWallets,
-                   hyperliquid, metals, sneakers, realEstate, vehicles, kalshi, discogs,
-                   polymarket, alpaca, nft, manualAssets, truelayer, pokemonCards,
-                   energy, farmland, tradingCards, coins)
+        .task {
+            repairVM.onRepaired = { [vm] in Task { await vm.load() } }
+            await vm.load()
+            await repairVM.loadItems()
+        }
+        .sheet(isPresented: Binding(
+            get: { repairVM.isPresentingLink },
+            set: { repairVM.isPresentingLink = $0 }
+        )) {
+            if let handler = repairVM.handler {
+                PlaidLinkPresenter(handler: handler)
+            }
+        }
     }
 
     @ViewBuilder
@@ -93,40 +39,7 @@ struct NetWorthView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case let .loaded(data):
-            ScrollView {
-                VStack(spacing: 24) {
-                    netWorthHeader(data)
-                    bankSection(data)
-                    investmentsSection(data)
-                    cryptoSection(data)
-                    defiSection(data)
-                    chainWalletsSection(data)
-                    hyperliquidSection(data)
-                    nftSection(data)
-                    alpacaSection(data)
-                    manualAssetsSection(data)
-                    metalsSection(data)
-                    realEstateSection(data)
-                    vehiclesSection(data)
-                    sneakersSection(data)
-                    discogsSection(data)
-                    krakenSection(data)
-                    ynabSection(data)
-                    kalshiSection(data)
-                    polymarketSection(data)
-                    truelayerSection(data)
-                    pokemonCardsSection(data)
-                    energySection(data)
-                    farmlandSection(data)
-                    tradingCardsSection(data)
-                    coinsSection(data)
-                    debtsSection(data)
-                    performanceSection()
-                    Spacer(minLength: 32)
-                }
-                .padding(.horizontal)
-                .padding(.top, 8)
-            }
+            loadedContent(data)
 
         case let .failed(message):
             ContentUnavailableView {
@@ -134,345 +47,152 @@ struct NetWorthView: View {
             } description: {
                 Text(message)
             } actions: {
-                Button("Retry") { Task { await reload() } }
+                Button("Retry") { Task { await vm.load() } }
                     .buttonStyle(.borderedProminent)
             }
         }
     }
 
+    private func loadedContent(_ data: NetWorthResponse) -> some View {
+        let sections = WealthPresenter.sections(from: data)
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                banners
+                totalHeader(data)
+                CompositionBarView(segments: WealthPresenter.compositionSegments(from: sections))
+                if sections.isEmpty {
+                    emptyState
+                }
+                ForEach(sections) { section in
+                    WealthGroupBoxView(
+                        section: section,
+                        bankNeedsRepair: repairVM.needsRepair,
+                        onRefresh: { Task { await vm.refresh() } },
+                        onRepairBank: { Task { await repairVM.repairFirstBrokenItem(source: .prompt) } }
+                    )
+                }
+                manageAccountsLink
+                footer(data)
+            }
+            .padding(.horizontal)
+            .padding(.top, 8)
+        }
+    }
+
+    // MARK: - Banners
+
+    @ViewBuilder
+    private var banners: some View {
+        if vm.isOffline {
+            WealthBannerView(
+                text: "Offline. Showing your last numbers.",
+                systemImage: "wifi.slash"
+            )
+        }
+        if let message = vm.refreshErrorMessage {
+            WealthBannerView(text: message, systemImage: "exclamationmark.circle")
+        }
+        if repairVM.needsRepair {
+            // Proactive repair (R-8.7): surfaced on open, in-app only.
+            WealthBannerView(
+                text: repairVM.repairPromptText,
+                systemImage: "key.horizontal",
+                actionTitle: "Reconnect",
+                action: { Task { await repairVM.repairFirstBrokenItem(source: .prompt) } }
+            )
+        }
+        if let repairError = repairVM.errorMessage {
+            WealthBannerView(text: repairError, systemImage: "exclamationmark.circle")
+        }
+    }
+
     // MARK: - Header
 
-    private func netWorthHeader(_ data: NetWorthResponse) -> some View {
+    private func totalHeader(_ data: NetWorthResponse) -> some View {
         VStack(spacing: 4) {
             Text("Net Worth")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+            // Absolute values are always ink, never coloured (design rule:
+            // only deltas are coloured, and status never rides on colour).
             Text(data.total, format: .currency(code: "USD"))
                 .font(.system(size: 48, weight: .bold, design: .rounded))
-                .foregroundStyle(data.total >= 0 ? .green : .red)
+                .foregroundStyle(.primary)
+                .accessibilityLabel(Text("Net worth \(data.total, format: .currency(code: "USD"))"))
+            if !data.excluded.classes.isEmpty {
+                excludedFootnote(data)
+            }
         }
-        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
     }
-}
 
-// MARK: - Section builders
-
-extension NetWorthView {
-
-    // MARK: - Plaid sections
-
-    private func bankSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Bank", total: data.bank, icon: "building.columns.fill", color: .blue)
-                if let months = data.liquidCashMonths {
-                    Divider().padding(.vertical, 6)
-                    HStack {
-                        Label("Emergency runway", systemImage: "shield.fill")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Text("\(months, specifier: "%.1f") mo")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(months >= 3 ? .green : months >= 1 ? .orange : .red)
-                    }
-                }
-                if data.accounts.bank.isEmpty {
-                    Text("No bank accounts linked")
-                        .font(.caption)
+    /// S-19: "2 accounts not included", tappable, lists them.
+    private func excludedFootnote(_ data: NetWorthResponse) -> some View {
+        VStack(spacing: 4) {
+            Button {
+                showExcludedList.toggle()
+            } label: {
+                Text(excludedFootnoteText(data.excluded.count))
+                    .font(.footnote)
+                    .underline()
+                    .foregroundStyle(.secondary)
+                    .frame(minHeight: 44)
+            }
+            .accessibilityHint("Shows which accounts are not included in the total.")
+            if showExcludedList {
+                ForEach(WealthPresenter.excludedDisplayNames(data.excluded), id: \.self) { name in
+                    Text(name)
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
-                        .padding(.top, 8)
-                } else {
-                    ForEach(data.accounts.bank) { account in
-                        Divider().padding(.vertical, 6)
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(account.name).font(.subheadline)
-                                Text(account.type.capitalized).font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Text(account.balance, format: .currency(code: "USD"))
-                                .font(.subheadline.monospacedDigit())
-                        }
-                    }
                 }
             }
         }
     }
 
-    private func investmentsSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Investments", total: data.investments, icon: "chart.bar.fill", color: .green)
-                if data.accounts.investments.isEmpty {
-                    Text("No investment accounts linked")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 8)
-                } else {
-                    ForEach(data.accounts.investments) { holding in
-                        Divider().padding(.vertical, 6)
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(holding.name ?? holding.ticker ?? "Holding").font(.subheadline)
-                                if let ticker = holding.ticker {
-                                    Text(ticker).font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
-                            Spacer()
-                            Text(holding.value, format: .currency(code: "USD"))
-                                .font(.subheadline.monospacedDigit())
-                        }
-                    }
-                }
+    private func excludedFootnoteText(_ count: Int) -> String {
+        count == 1 ? "1 account not included" : "\(count) accounts not included"
+    }
+
+    // MARK: - Empty, manage, footer
+
+    private var emptyState: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Nothing connected yet.")
+                .font(.subheadline)
+            Text("Connect an account and your wealth shows up here, grouped and honest about its age.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 8)
+    }
+
+    private var manageAccountsLink: some View {
+        NavigationLink {
+            ManageAccountsView()
+        } label: {
+            Label("Add or manage accounts", systemImage: "plus.circle")
+                .font(.subheadline)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        }
+        .accessibilityIdentifier("wealth.manageAccounts")
+    }
+
+    /// R-7.28: the staleness timestamp renders at the bottom of Wealth always.
+    private func footer(_ data: NetWorthResponse) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(WealthPresenter.generatedLabel(data.generatedAt))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if vm.bankRefreshCapped {
+                Text("Daily bank refresh limit reached. Other accounts updated.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
-    }
-
-    // MARK: - Crypto sections
-
-    private func cryptoSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Crypto", total: data.crypto, icon: "bitcoinsign.circle.fill", color: .orange)
-                if !data.accounts.crypto.isEmpty {
-                    ForEach(data.accounts.crypto) { position in
-                        Divider().padding(.vertical, 6)
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(position.name).font(.subheadline)
-                                Text("\(position.amount, specifier: "%.4f") \(position.symbol)")
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Text(position.valueUSD, format: .currency(code: "USD"))
-                                .font(.subheadline.monospacedDigit())
-                        }
-                    }
-                }
-                Divider().padding(.vertical, 6)
-                CoinbaseView()
-            }
-        }
-    }
-
-    private func defiSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "DeFi", total: data.defi, icon: "link.circle.fill", color: .purple)
-                Divider().padding(.vertical, 6)
-                ZerionView()
-            }
-        }
-    }
-
-    private func chainWalletsSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "On-chain", total: data.chainWallets, icon: "bitcoinsign.square.fill", color: .yellow)
-                Divider().padding(.vertical, 6)
-                ChainWalletsView()
-            }
-        }
-    }
-
-    private func hyperliquidSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Hyperliquid", total: data.hyperliquid, icon: "chart.line.uptrend.xyaxis", color: .indigo)
-                Divider().padding(.vertical, 6)
-                HyperliquidView()
-            }
-        }
-    }
-
-    private func nftSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "NFT Wallets", total: data.nft ?? 0, icon: "photo.stack", color: .purple)
-                Divider().padding(.vertical, 6)
-                NftView()
-            }
-        }
-    }
-
-    private func alpacaSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Alpaca", total: data.alpaca ?? 0, icon: "chart.bar.xaxis", color: .green)
-                Divider().padding(.vertical, 6)
-                AlpacaView()
-            }
-        }
-    }
-
-    private func manualAssetsSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Other Assets", total: data.manual ?? 0, icon: "archivebox.fill", color: .brown)
-                Divider().padding(.vertical, 6)
-                ManualAssetsView()
-            }
-        }
-    }
-
-    // MARK: - Add-your-own asset sections
-
-    private func metalsSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Precious Metals", total: data.metals, icon: "sparkles", color: .yellow)
-                Divider().padding(.vertical, 6)
-                MetalsView()
-            }
-        }
-    }
-
-    private func realEstateSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Real Estate", total: data.realEstate, icon: "house.fill", color: .brown)
-                Divider().padding(.vertical, 6)
-                RealEstateView()
-            }
-        }
-    }
-
-    private func vehiclesSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Vehicles", total: data.vehicles, icon: "car.fill", color: .teal)
-                Divider().padding(.vertical, 6)
-                VehiclesView()
-            }
-        }
-    }
-
-    private func sneakersSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Sneakers", total: data.sneakers, icon: "figure.walk", color: .pink)
-                Divider().padding(.vertical, 6)
-                SneakersView()
-            }
-        }
-    }
-
-    // MARK: - Connect-style sections
-
-    private func discogsSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Vinyl", total: data.vinyl ?? 0, icon: "music.note", color: .purple)
-                Divider().padding(.vertical, 6)
-                DiscogsInlineView(vm: discogsVM)
-            }
-        }
-    }
-
-    private func krakenSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Kraken", total: data.kraken, icon: "chart.line.uptrend.xyaxis.circle.fill", color: .cyan)
-                Divider().padding(.vertical, 6)
-                KrakenInlineView(vm: krakenVM, isConnected: data.connections.kraken, onConnect: {
-                    showKrakenKeyEntry = true
-                })
-            }
-        }
-        .sheet(isPresented: $showKrakenKeyEntry) {
-            KrakenKeyEntryView(vm: krakenVM)
-        }
-    }
-
-    private func ynabSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "YNAB", total: data.ynab, icon: "dollarsign.circle.fill", color: .green)
-                Divider().padding(.vertical, 6)
-                YnabInlineView(vm: ynabVM, isConnected: data.connections.ynab)
-            }
-        }
-    }
-
-    private func kalshiSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Kalshi", total: data.kalshi ?? 0, icon: "chart.pie.fill", color: .indigo)
-                Divider().padding(.vertical, 6)
-                KalshiInlineView(vm: kalshiVM, isConnected: kalshiVM.isConnected || (data.connections.kalshi ?? false))
-            }
-        }
-    }
-
-    private func polymarketSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Polymarket", total: data.polymarket ?? 0, icon: "chart.xyaxis.line", color: .purple)
-                Divider().padding(.vertical, 6)
-                PolymarketInlineView(vm: polymarketVM)
-            }
-        }
-    }
-
-    // MARK: - Debts + Performance
-
-    private func debtsSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Debts", total: data.debts, icon: "creditcard.fill", color: .red)
-                if spinwheelVM.isConnected {
-                    if let score = spinwheelVM.creditScore {
-                        Divider().padding(.vertical, 6)
-                        HStack {
-                            Label("Credit score", systemImage: "chart.bar.fill")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text("\(score)")
-                                .font(.caption.monospacedDigit().weight(.semibold))
-                                .foregroundStyle(score >= 740 ? .green : score >= 670 ? .orange : .red)
-                        }
-                    }
-                    if let utilization = spinwheelVM.creditUtilization {
-                        Divider().padding(.vertical, 6)
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Label("Credit utilization", systemImage: "percent")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Text("\(utilization, specifier: "%.1f")%")
-                                    .font(.caption.monospacedDigit())
-                                    .foregroundStyle(utilization <= 30 ? .green : utilization <= 50 ? .orange : .red)
-                            }
-                            ProgressView(value: min(utilization / 100, 1))
-                                .tint(utilization <= 30 ? .green : utilization <= 50 ? .orange : .red)
-                        }
-                    }
-                }
-                Divider().padding(.vertical, 6)
-                SpinwheelInlineView(vm: spinwheelVM)
-            }
-        }
-    }
-
-    private func performanceSection() -> some View {
-        PerformanceView()
-    }
-
-    // MARK: - Shared header helper
-
-    func sectionHeader(title: String, total: Double, icon: String, color: Color) -> some View {
-        HStack {
-            Label(title, systemImage: icon)
-                .font(.headline)
-                .foregroundStyle(color)
-            Spacer()
-            Text(total, format: .currency(code: "USD"))
-                .font(.headline.monospacedDigit())
-                .foregroundStyle(total < 0 ? .red : .primary)
-        }
+        .padding(.vertical, 12)
+        .accessibilityElement(children: .combine)
     }
 }
 

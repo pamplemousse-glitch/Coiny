@@ -1,4 +1,5 @@
 import {
+  bigserial,
   boolean,
   date,
   index,
@@ -82,6 +83,13 @@ export const processedEvents = pgTable('processed_events', {
   processedAt: timestamp('processed_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Item connection health (docs/prd.md R-8.5). `status` records where the item
+// sits in Plaid's lifecycle; `disabled` stays as the hard kill switch (revoked
+// or unlinked items are both disabled AND revoked). 'repaired' from the PRD's
+// transition list is an event, not a state: LOGIN_REPAIRED and a completed
+// update-mode flow both transition the item back to 'healthy'.
+export type PlaidItemStatus = 'healthy' | 'expiring' | 'reauth_required' | 'revoked';
+
 export const plaidItems = pgTable(
   'plaid_items',
   {
@@ -91,17 +99,52 @@ export const plaidItems = pgTable(
     cursor: text('cursor'),
     initialSyncComplete: boolean('initial_sync_complete').notNull().default(false),
     disabled: boolean('disabled').notNull().default(false),
+    // Lifecycle state, driven by ITEM webhooks and the repair endpoints.
+    status: text('status').$type<PlaidItemStatus>().notNull().default('healthy'),
+    statusChangedAt: timestamp('status_changed_at', { withTimezone: true }),
+    // Plaid error_code that caused the last unhealthy transition (e.g.
+    // ITEM_LOGIN_REQUIRED). Programmatic code only, never message text.
+    lastErrorCode: text('last_error_code'),
+    // Set by ITEM/NEW_ACCOUNTS_AVAILABLE; cleared when the item is repaired or
+    // relinked. Signals the client to run update mode with account selection.
+    newAccountsAvailable: boolean('new_accounts_available').notNull().default(false),
+    // Institution identity from /item/get, captured at link time (it never
+    // changes for the life of an item) so the repair prompt can name the bank
+    // (S-17). Nullable: Plaid returns null for items created without an
+    // institution connection. Displayable user financial data: may appear in
+    // API responses, never in a log line or an analytics property.
+    institutionId: text('institution_id'),
+    institutionName: text('institution_name'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('plaid_items_user_idx').on(t.userId)],
 );
 
+// Encryption-at-rest decision for this table (PRD R-13.4, Appendix B item B8,
+// docs/obligations.md section 1):
+//
+//   merchant_name is AES-256-GCM encrypted at write (util/crypto.ts envelope,
+//   same as plaid_items.access_token). It is the identifying half of the
+//   behavioural profile: merchant + date reads as "where this person was and
+//   what they bought". No SQL query ever filtered, grouped or matched on it
+//   (all merchant matching lives in Node: subscriptions/detect.ts,
+//   goals/guardrails.ts), so encrypting it costs nothing in query capability.
+//
+//   amount is DELIBERATELY plaintext. getWeeklySpendByCategory runs
+//   SUM/GROUP BY and sign predicates on it inside webhook processing (the
+//   largest table, the hot path), and getRecentOutflows filters on its sign;
+//   encrypting it moves those aggregates into Node on every sync. An amount
+//   without a merchant is a magnitude, not a profile. Accepted residual risk,
+//   recorded per B8: a database dump still reveals per-user amounts, dates
+//   and coarse categories keyed to pseudonymous user ids (emails are
+//   encrypted in `users`). Rows written before migration 0048 are plaintext
+//   until scripts/backfill-encrypt-pii.ts runs; decryptString tolerates them.
 export const transactions = pgTable('transactions', {
   transactionId: text('transaction_id').primaryKey(),
   userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
   accountId: text('account_id').notNull(),
-  merchantName: text('merchant_name'),
-  amount: text('amount').notNull(),
+  merchantName: text('merchant_name'), // AES-256-GCM encrypted (see above)
+  amount: text('amount').notNull(), // plaintext ON PURPOSE (see above)
   date: text('date').notNull(),
   category: text('category'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -111,17 +154,32 @@ export const deviceTokens = pgTable('device_tokens', {
   token: text('token').primaryKey(),
   userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
   platform: text('platform').notNull(),
+  // IANA timezone identifier captured at registration (R-9.3 quiet hours).
+  // Nullable: tokens from older app builds have none, and the dispatcher
+  // suppresses pushes rather than guessing a zone.
+  timezone: text('timezone'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Denormalised copy of transaction merchant names (the user's manual
+// recategorisations), covered by the same 0048 encryption decision as
+// `transactions`. The PK column needs SQL equality (getOverride runs once per
+// ingested transaction) and upsert dedupe, which random-IV ciphertext cannot
+// provide, so merchant_name holds a deterministic HMAC-SHA256 blind index
+// (util/crypto.ts blindIndex) and merchant_name_enc holds the AES-256-GCM
+// ciphertext of the normalized name for display (listOverrides). Rows written
+// before 0048 hold the plaintext normalized merchant in merchant_name and
+// null in merchant_name_enc; store/overrides.ts reads both forms until
+// scripts/backfill-encrypt-pii.ts rewrites them.
 export const categoryOverrides = pgTable(
   'category_overrides',
   {
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    merchantName: text('merchant_name').notNull(),
+    merchantName: text('merchant_name').notNull(), // blind index (legacy rows: plaintext)
+    merchantNameEnc: text('merchant_name_enc'), // AES-256-GCM encrypted display copy
     category: text('category').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -317,6 +375,10 @@ export const discogsPending = pgTable('discogs_pending', {
 });
 
 // Plaid recurring streams — upserted on RECURRING_TRANSACTIONS_UPDATE webhook.
+// merchant_name and description are AES-256-GCM encrypted at write (0048):
+// they are the same merchant PII as transactions.merchant_name, and no SQL
+// query filters or groups on either (reads are per-user selects filtered in
+// Node). Amount columns stay numeric, same rationale as `transactions`.
 export const plaidRecurringStreams = pgTable('plaid_recurring_streams', {
   streamId: text('stream_id').primaryKey(),
   userId: text('user_id')
@@ -324,8 +386,8 @@ export const plaidRecurringStreams = pgTable('plaid_recurring_streams', {
     .references(() => users.id, { onDelete: 'cascade' }),
   accountId: text('account_id').notNull(),
   direction: text('direction').notNull(), // 'inflow' | 'outflow'
-  merchantName: text('merchant_name'),
-  description: text('description').notNull(),
+  merchantName: text('merchant_name'), // AES-256-GCM encrypted
+  description: text('description').notNull(), // AES-256-GCM encrypted
   frequency: text('frequency').notNull(),
   averageAmount: numeric('average_amount'),
   lastAmount: numeric('last_amount'),
@@ -413,6 +475,34 @@ export const manualAssets = pgTable('manual_assets', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Declared assets: the onboarding "what do you have / roughly how much" sheet
+// (prd.md R-5.3). One row per declared line, at most one line per asset class
+// per user. Values are the log-slider's bucketed magnitudes (two significant
+// digits), always stored as positive numbers; whether a class subtracts from
+// net worth (credit_cards, student_loans) is a property of the class, not the
+// sign of the stored value. bucketedValueUsd null means "has it, skipped the
+// amount". declaredAt is when the line was first declared; refreshedAt moves
+// every time the user re-confirms or edits the value, and is what the R-5.4
+// nudge ("your car estimate is 2 months old") is computed from. Declared
+// values are never auto-refreshed and never excluded for age (R-8.2): the
+// user is the source, so there is no fresher upstream to prefer.
+export const declaredAssets = pgTable(
+  'declared_assets',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    assetClass: text('asset_class').notNull(),
+    bucketedValueUsd: numeric('bucketed_value_usd'),
+    confidence: text('confidence').notNull().default('declared'),
+    declaredAt: timestamp('declared_at', { withTimezone: true }).notNull(),
+    refreshedAt: timestamp('refreshed_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('declared_assets_user_class_idx').on(t.userId, t.assetClass)],
+);
+
 // TrueLayer Open Banking connections — one per user; covers UK + EU banks.
 // accessToken / refreshToken are AES-256-GCM encrypted.
 // lastBalanceGbp caches the most-recently synced total (column name kept for compat);
@@ -427,6 +517,7 @@ export const truelayerConnections = pgTable('truelayer_connections', {
   refreshToken: text('refresh_token').notNull(), // AES-256-GCM encrypted
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   lastBalanceGbp: numeric('last_balance_gbp'), // value is USD post-conversion
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -564,6 +655,56 @@ export const notificationLog = pgTable(
     sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('notification_log_user_sent_idx').on(t.userId, t.sentAt)],
+);
+
+// Per-account Plaid balance cache (prd.md R-16.4). Fed by every
+// /transactions/sync webhook (the `accounts` array Plaid sends with each sync)
+// and by the explicit refresh path. The DB-only net-worth read serves bank
+// balances from here; `as_of` is the honest freshness timestamp per account.
+export const plaidAccountBalances = pgTable(
+  'plaid_account_balances',
+  {
+    accountId: text('account_id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    itemId: text('item_id').notNull(),
+    name: text('name').notNull(),
+    type: text('type').notNull(),
+    subtype: text('subtype'),
+    balance: numeric('balance'),
+    asOf: timestamp('as_of', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('plaid_account_balances_user_idx').on(t.userId), index('plaid_account_balances_item_idx').on(t.itemId)],
+);
+
+// Per-(user, class) cache for the asset classes that used to be fetched live
+// inside GET /api/net-worth (prd.md R-16.1): investments, crypto (Coinbase),
+// defi (Zerion), debts (Spinwheel), plus bookkeeping for `bank` (whose values
+// live in plaid_account_balances). A successful refresh writes value/asOf/
+// payload and resets the failure counters; a failed refresh keeps the last
+// good value and records the failure so the read path can answer `error`
+// instead of a silent zero (prd.md R-8.1). `payload` carries class detail
+// (holdings, positions, debt items) for the response's `accounts` sub-object.
+export const assetClassCache = pgTable(
+  'asset_class_cache',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    assetClass: text('asset_class').notNull(),
+    valueUsd: numeric('value_usd'),
+    asOf: timestamp('as_of', { withTimezone: true }),
+    payload: jsonb('payload').$type<Record<string, unknown>>(),
+    lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+    lastErrorClass: text('last_error_class'),
+    consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+    // The user-drivable Plaid balance pull is billed per call; capped 4/day
+    // (engineering-budgets.md section 2). Tracked on the `bank` row.
+    manualRefreshDate: date('manual_refresh_date'),
+    manualRefreshCount: integer('manual_refresh_count').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.assetClass] })],
 );
 
 // ---------------------------------------------------------------------------
@@ -704,6 +845,82 @@ export const goalPeriods = pgTable(
   (t) => [uniqueIndex('goal_periods_user_key_start_idx').on(t.userId, t.guardrailKey, t.periodStart)],
 );
 
+// ---------------------------------------------------------------------------
+// Subscription entitlements (docs/prd.md §25). The server is the authority on
+// whether a user has paid; the iOS client reports Apple's signed transaction
+// JWS and the App Store Server Notifications V2 webhook keeps this in sync
+// with renewals, billing retries, grace periods and refunds.
+// ---------------------------------------------------------------------------
+
+// One row per user. `appAccountToken` is minted server-side (crypto.randomUUID)
+// on first read and passed to StoreKit as Product.PurchaseOption.appAccountToken,
+// so server notifications can be matched back to a user even when the purchase
+// completed while the app was backgrounded and the client never phoned home.
+//
+// `tier`/`status` record the last known Apple-side state; whether the user is
+// currently entitled is always computed by resolveEntitlement() against the
+// clock, never trusted from a stored boolean.
+export const entitlements = pgTable(
+  'entitlements',
+  {
+    userId: text('user_id')
+      .primaryKey()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    appAccountToken: text('app_account_token').notNull(),
+    tier: text('tier').notNull().default('free'), // free | individual | household
+    status: text('status').notNull().default('none'), // none | active | grace | billing_retry | expired | revoked
+    productId: text('product_id'),
+    // Apple's stable subscription identifier. Bound to exactly one Coiny user;
+    // a second user presenting the same subscription is rejected (409).
+    originalTransactionId: text('original_transaction_id'),
+    environment: text('environment'), // Sandbox | Production, as reported by Apple
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    graceExpiresAt: timestamp('grace_expires_at', { withTimezone: true }),
+    autoRenew: boolean('auto_renew').notNull().default(false),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('entitlements_app_account_token_idx').on(t.appAccountToken),
+    uniqueIndex('entitlements_original_transaction_idx').on(t.originalTransactionId),
+  ],
+);
+
+// Household membership. The owner is the purchaser of the household tier; a
+// member inherits `household` entitlement while the owner's subscription
+// resolves to household. Capped at 5 people INCLUDING the owner (so at most 4
+// rows per owner), enforced in the store layer. A user can belong to at most
+// one household. The invite/consent flow is deliberately unbuilt: shipping the
+// tier requires the lawyer-reviewed two-party consent flow (obligations §2).
+export const householdMembers = pgTable(
+  'household_members',
+  {
+    id: serial('id').primaryKey(),
+    ownerUserId: text('owner_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    memberUserId: text('member_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('household_members_member_idx').on(t.memberUserId),
+    index('household_members_owner_idx').on(t.ownerUserId),
+  ],
+);
+
+// Idempotency ledger for App Store Server Notifications V2. Apple retries
+// delivery, so each notificationUUID is processed at most once.
+export const appStoreNotifications = pgTable('app_store_notifications', {
+  notificationUuid: text('notification_uuid').primaryKey(),
+  notificationType: text('notification_type').notNull(),
+  subtype: text('subtype'),
+  originalTransactionId: text('original_transaction_id'),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // The creature's progression. Stage is driven by the ladder and NEVER regresses.
 // Vitality and rest are computed, not stored, because they are derived from the
 // current period's guardrails and should never be stale.
@@ -714,4 +931,166 @@ export const petProgression = pgTable('pet_progression', {
   stage: integer('stage').notNull().default(0),
   stageEnteredAt: timestamp('stage_entered_at', { withTimezone: true }).notNull().defaultNow(),
   unlockedArtifacts: jsonb('unlocked_artifacts').$type<string[]>().notNull().default([]),
+});
+
+// First-party analytics events (docs/prd.md R-24.1, engineering-budgets §8).
+// Append-only; retention cohorts cannot be backfilled, so nothing ever updates
+// a row. Properties hold ONLY the whitelisted categorical/bucketed values from
+// src/analytics/events.ts: no amounts, no merchant names, no PII (R-22.6).
+// Rows cascade on user deletion so account deletion wipes the trail.
+export const analyticsEvents = pgTable(
+  'analytics_events',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    event: text('event').notNull(),
+    properties: jsonb('properties').$type<Record<string, unknown>>().notNull().default({}),
+    // Device clock at emission; informational only. Retention math uses server_ts.
+    clientTs: timestamp('client_ts', { withTimezone: true }),
+    serverTs: timestamp('server_ts', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('analytics_events_user_idx').on(t.userId),
+    index('analytics_events_event_server_ts_idx').on(t.event, t.serverTs),
+  ],
+);
+
+// Nightly-computed pace per target goal (docs/prd.md R-7.8), one row per goal,
+// upserted by the goal-system refresh so read paths serve pace without a Plaid
+// fan-out (the same pattern as ladder_state.inputs). Every column except the
+// timestamps is nullable ON PURPOSE: null means "we do not know" (no target
+// date, unknown balance, under 30 days of contribution history) and must never
+// be rendered as zero or as "Off pace". Migration 0042.
+export const goalPace = pgTable(
+  'goal_pace',
+  {
+    goalId: integer('goal_id')
+      .primaryKey()
+      .references(() => goals.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    currentAmountUsd: numeric('current_amount_usd'),
+    monthsRemaining: numeric('months_remaining'),
+    requiredRunRateUsd: numeric('required_run_rate_usd'),
+    actualRunRateUsd: numeric('actual_run_rate_usd'),
+    contributionHistoryDays: integer('contribution_history_days'),
+    pace: numeric('pace'),
+    // ahead | on_pace | behind | off_pace, null while pace is unknowable.
+    paceBand: text('pace_band'),
+    // { type: 'add_monthly', amountUsd } | { type: 'push_date', weeks }
+    gapAction: jsonb('gap_action').$type<
+      { type: 'add_monthly'; amountUsd: number } | { type: 'push_date'; weeks: number }
+    >(),
+    computedAt: timestamp('computed_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('goal_pace_user_idx').on(t.userId)],
+);
+
+// ---------------------------------------------------------------------------
+// Debt layer (docs/prd.md R-7.13, R-7.14). Migration 0044.
+//
+// Plaid Liabilities and Spinwheel both report debt; without dedupe a user who
+// connects both sees every shared card twice. `debt_source_accounts` holds the
+// normalized per-source rows, `debt_accounts` holds one row per real-world
+// debt, and `debt_merge_decisions` records the user's manual "same account" /
+// "not the same" verdicts so they survive every automatic rebuild.
+// ---------------------------------------------------------------------------
+
+// Normalized per-source debt rows. Replaced wholesale per (user, source) on
+// each sync, then `rebuildDebtAccounts` re-derives the merged records. Kept
+// separate from the merged table so a manual unmerge can be honoured without
+// re-fetching either provider.
+export const debtSourceAccounts = pgTable(
+  'debt_source_accounts',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    source: text('source').notNull(), // 'plaid' | 'spinwheel'
+    sourceAccountId: text('source_account_id').notNull(),
+    issuer: text('issuer'),
+    normalizedIssuer: text('normalized_issuer'),
+    last4: text('last4'),
+    openDate: text('open_date'), // YYYY-MM-DD
+    type: text('type').notNull(), // credit_card | student_loan | mortgage | auto_loan | personal_loan | loan | other
+    balance: numeric('balance'),
+    apr: numeric('apr'), // percent, 18 means 18%
+    minPayment: numeric('min_payment'),
+    creditLimit: numeric('credit_limit'),
+    dueDate: text('due_date'), // YYYY-MM-DD
+    accountStatus: text('account_status'), // 'open' | 'closed' | 'delinquent'
+    syncedAt: timestamp('synced_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('debt_source_accounts_user_source_account_idx').on(t.userId, t.source, t.sourceAccountId)],
+);
+
+// One row per real-world debt (R-7.13). Derived from debt_source_accounts by
+// the match key (normalized_issuer, last4 or open_date, credit_limit) plus the
+// user's merge decisions. Source precedence is asymmetric on purpose: Plaid
+// wins on balance (more current), Spinwheel wins on APR and credit limit
+// (bureau data more complete).
+//
+// `aprOverride`, `nickname`, `statementCloseDay` and the promo fields are
+// user-owned and preserved across rebuilds; everything else is recomputed.
+export const debtAccounts = pgTable(
+  'debt_accounts',
+  {
+    debtId: text('debt_id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    issuer: text('issuer').notNull(),
+    nickname: text('nickname'),
+    type: text('type').notNull(),
+    sourceIds: jsonb('source_ids').$type<string[]>().notNull().default([]), // 'plaid:<account_id>' | 'spinwheel:<debt_id>'
+    balance: numeric('balance'),
+    apr: numeric('apr'), // percent; resolved as aprOverride ?? spinwheel ?? plaid; null means unknown, never zero
+    aprOverride: numeric('apr_override'), // user-declared rate for accounts no source reports a rate for
+    minPayment: numeric('min_payment'),
+    creditLimit: numeric('credit_limit'),
+    dueDay: integer('due_day'), // 1-31
+    statementCloseDay: integer('statement_close_day'), // 1-31; the one manual input (R-7.17)
+    isPromotional: boolean('is_promotional').notNull().default(false),
+    promoEndDate: text('promo_end_date'), // YYYY-MM-DD
+    promoApr: numeric('promo_apr'), // percent
+    status: text('status').notNull().default('open'), // 'open' | 'delinquent' | 'closed'
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('debt_accounts_user_idx').on(t.userId)],
+);
+
+// Manual merge affordance. Keys are source keys ('plaid:<id>' etc.), stored
+// with sourceKeyA < sourceKeyB so each pair has one canonical row. 'same'
+// forces a merge fuzzy matching missed; 'different' vetoes a merge it got
+// wrong. Decisions outlive rebuilds and re-syncs.
+export const debtMergeDecisions = pgTable(
+  'debt_merge_decisions',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    sourceKeyA: text('source_key_a').notNull(),
+    sourceKeyB: text('source_key_b').notNull(),
+    decision: text('decision').notNull(), // 'same' | 'different'
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('debt_merge_decisions_user_pair_idx').on(t.userId, t.sourceKeyA, t.sourceKeyB)],
+);
+
+// Payoff strategy selection (R-7.14). Default is Blend; the pure strategies
+// are one tap away and the dollar cost of the choice is always computed, so
+// only the selection and the extra payment need storage.
+export const debtPlanSettings = pgTable('debt_plan_settings', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  strategy: text('strategy').notNull().default('blend'), // 'blend' | 'avalanche' | 'snowball'
+  extraMonthly: numeric('extra_monthly'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

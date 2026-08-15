@@ -62,28 +62,35 @@ export function evaluateExternalEvent(event: ExternalEvent): Reaction | null {
         reason: `DeFi yield earned:${symbolStr}${amountStr}`,
       };
 
+    // R-7.24: a payment toward debt is the extra_debt_payment treatment, happy
+    // and routine. Celebration is reserved for debt_cleared, which needs the
+    // debt_accounts merge (R-7.13) to detect honestly and has no producer yet.
     case 'debt_paydown':
       return {
-        animation: 'celebrate',
+        animation: 'happy',
         sound: 'chime',
         led: 'green',
-        duration: 4000,
+        duration: 3000,
         reason: `Debt paid down:${amountStr}`,
       };
 
+    // The bill_overdue treatment (R-7.24): concerned and amber, never sad and
+    // red. Sad is not in the target taxonomy at all; distress is reserved for
+    // sustained multi-week vitality failure (R-7.20), not a single event. The
+    // contract lets this push once (it is actionable), then goes quiet.
     case 'debt_missed_payment':
       return {
-        animation: 'sad',
+        animation: 'concerned',
         sound: 'warning',
-        led: 'red',
-        duration: 4000,
+        led: 'amber',
+        duration: 3000,
         reason: `Missed debt payment:${amountStr}`,
       };
 
     // R-7.23: neutral acknowledgment, not concern. Opening a card or taking a
     // mortgage is a decision, not a moral failure, and a "new" liability is often
-    // just the bureau reporting an account that already existed. `neutral` is
-    // outside the push allowlist in dispatch.ts, so this never interrupts anyone.
+    // just the bureau reporting an account that already existed. Its contract
+    // row (reactions/contract.ts) is push 'never', so this never interrupts anyone.
     case 'new_liability':
       return {
         animation: 'neutral',

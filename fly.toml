@@ -1,13 +1,41 @@
+# STAGING.
+#
+# This app has only ever held sandbox keys and synthetic data, so it is staging
+# and always was. Naming it production was the mislabelling that made "are we
+# live?" unanswerable.
+#
+# It keeps the name `coiny-backend` because Fly cannot rename an app, and the
+# name is not worth rebuilding an environment over. Production will be a
+# separate app created when real credentials exist: see fly.production.toml.
+#
+# This is also the default config, so a bare `fly deploy` targets staging. The
+# unsafe thing should require the extra flag, not the safe one.
 app = 'coiny-backend'
 primary_region = 'iad'
 
 [build]
   dockerfile = 'backend/Dockerfile'
 
+# Migrations run once per release, before any new machine takes traffic. A
+# non-zero exit aborts the deploy and the previous version keeps serving, which
+# is the behaviour boot-time migration cannot give you.
+[deploy]
+  release_command = 'node /app/backend/dist/db/migrate-run.js'
+
 [env]
   NODE_ENV = 'production'
+  # 'production' even though this is staging: Fastify, Node and every library
+  # must behave here exactly as they will in production, or this environment
+  # rehearses something other than the release. APP_ENV carries the identity.
+  APP_ENV = 'staging'
   LOG_LEVEL = 'info'
   PORT = '3000'
+  # Sandbox forever. Staging never holds a real credential or a real person's
+  # data, so a mistake here can only ever affect synthetic data.
+  #
+  # Note that production will ALSO run sandbox until Plaid's production review
+  # clears, which is exactly why nothing may read PLAID_ENV to decide whether it
+  # is in production. Read APP_ENV.
   PLAID_ENV = 'sandbox'
   PLAID_WEBHOOK_URL = 'https://coiny-backend.fly.dev/webhooks/plaid'
 
@@ -16,7 +44,8 @@ primary_region = 'iad'
   force_https = true
   auto_stop_machines = 'suspend'
   auto_start_machines = true
-  min_machines_running = 1
+  # Staging is idle almost all the time and nobody is watching a cold start.
+  min_machines_running = 0
 
   [[http_service.checks]]
     grace_period = '15s'

@@ -242,3 +242,24 @@ export async function getTransactions(
     classification: t.transaction_classification,
   }));
 }
+
+// ---------------------------------------------------------------------------
+// Credential deletion
+// ---------------------------------------------------------------------------
+
+// DELETE {auth_base}/api/delete revokes the connection to the user's accounts:
+// the access token, its paired refresh token, and TrueLayer's own stored
+// consent all go together. Deleting only our row would leave the user
+// authorized at TrueLayer with no way for them to see it from our side.
+// https://docs.truelayer.com/reference/deletecredential
+export async function deleteCredential(accessToken: string, env: TrueLayerEnv = 'sandbox'): Promise<void> {
+  const res = await fetch(`${authBase(env)}/api/delete`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  // 401 means the token is already dead, which is the state we were trying to
+  // reach. Anything else is a real failure the caller should see.
+  if (!res.ok && res.status !== 401) {
+    throw new Error(`TrueLayer DELETE /api/delete failed with ${res.status}`);
+  }
+}

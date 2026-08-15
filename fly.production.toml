@@ -1,0 +1,55 @@
+# PRODUCTION.
+#
+# This app DOES NOT EXIST YET, and deliberately so. It is created only when
+# there are real credentials to put in it: Plaid production access and the
+# Apple organization enrollment. Until then there is nothing for it to serve
+# and nothing worth protecting, and standing it up early would just recreate
+# an environment called production that holds sandbox data.
+#
+# Born clean, with real keys, on the Neon `production` branch. Not a staging
+# environment that was wiped and promoted.
+#
+# The app name is a placeholder: `coiny-backend` is taken by staging and Fly
+# cannot rename. Change it here before the first `fly apps create`.
+app = 'coiny-api'
+primary_region = 'iad'
+
+[build]
+  dockerfile = 'backend/Dockerfile'
+
+# Migrations run once per release, before any new machine takes traffic. A
+# non-zero exit aborts the deploy and the previous version keeps serving, which
+# is the behaviour boot-time migration cannot give you.
+[deploy]
+  release_command = 'node /app/backend/dist/db/migrate-run.js'
+
+[env]
+  NODE_ENV = 'production'
+  # Matches staging, which is the point: staging rehearses this exact config.
+  APP_ENV = 'production'
+  LOG_LEVEL = 'info'
+  PORT = '3000'
+  # Set to 'production' only once Plaid's production review has cleared. Until
+  # then this app should not exist at all, so if you are reading this in a
+  # deployed environment something has gone wrong.
+  PLAID_ENV = 'production'
+  PLAID_WEBHOOK_URL = 'https://coiny-api.fly.dev/webhooks/plaid'
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = 'suspend'
+  auto_start_machines = true
+  # Always warm. A cold start on a real user's first request is a bad trade.
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = '15s'
+    interval = '30s'
+    method = 'GET'
+    path = '/health'
+    timeout = '5s'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '256mb'

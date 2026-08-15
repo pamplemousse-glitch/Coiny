@@ -4,6 +4,16 @@ const configSchema = z
   .object({
     PORT: z.coerce.number().int().positive().default(3000),
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+    // Which deployed environment this is. Distinct from NODE_ENV, which stays
+    // 'production' in BOTH staging and production so that Fastify, Node and
+    // every library behave identically in the environment that rehearses
+    // releases and the one that serves them.
+    //
+    // Never infer the environment from PLAID_ENV: staging and production both
+    // run Plaid sandbox today, and production will keep running sandbox until
+    // the production credentials clear review. That is exactly the trap
+    // .claude/rules and CLAUDE.md warn about.
+    APP_ENV: z.enum(['local', 'staging', 'production']).default('local'),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 
     PLAID_CLIENT_ID: z.string().default(''),

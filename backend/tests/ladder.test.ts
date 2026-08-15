@@ -7,7 +7,9 @@ import {
   RUNGS,
   reopenedRungs,
   SURPLUS_SAVINGS_RATE,
+  skipRung,
   stageForLadder,
+  unskipRung,
 } from '../src/goals/ladder.js';
 
 const NOW = new Date('2026-08-12T00:00:00Z');
@@ -180,5 +182,70 @@ describe('rung definitions', () => {
 
   it('gives every rung a place name rather than a number', () => {
     for (const r of RUNGS) expect(r.name).not.toMatch(/^Rung/);
+  });
+});
+
+describe('skipRung (R-7.4)', () => {
+  // Rungs 0, 2 and 3 complete (connected, match captured, no high-APR debt);
+  // rung 1 active (liquidCash 0); rungs 4 to 7 pending.
+  const base = () => evaluateLadder(ctx({ liquidCash: 0 }), null, NOW);
+
+  it('marks a rung skipped with its stated reason', () => {
+    const next = skipRung(base(), 4, 'skipped', 'handled_elsewhere');
+    expect(next?.rungs['4']).toEqual({ status: 'skipped', skippedReason: 'handled_elsewhere' });
+  });
+
+  it('re-elects the active rung when the active one is skipped', () => {
+    const next = skipRung(base(), 1, 'skipped', 'not_now');
+    expect(next?.currentRung).toBe(4);
+    expect(next?.rungs['4']?.status).toBe('active');
+  });
+
+  it('refuses to skip a completed rung: the completion stands', () => {
+    expect(skipRung(base(), 0, 'skipped', 'not_relevant')).toBeNull();
+  });
+
+  it('refuses an unknown rung id', () => {
+    expect(skipRung(base(), 9, 'skipped', 'not_now')).toBeNull();
+  });
+
+  it('marks not_applicable without requiring a reason', () => {
+    const next = skipRung(base(), 4, 'not_applicable', null);
+    expect(next?.rungs['4']).toEqual({ status: 'not_applicable' });
+  });
+
+  it('does not change the creature stage', () => {
+    const before = base();
+    const next = skipRung(before, 1, 'skipped', 'not_now');
+    expect(stageForLadder(next ?? before)).toBe(stageForLadder(before));
+  });
+
+  it('survives a later refresh: an explicit skip is never overwritten', () => {
+    const skipped = skipRung(base(), 1, 'skipped', 'handled_elsewhere');
+    const refreshed = evaluateLadder(ctx({ liquidCash: 0 }), skipped, NOW);
+    expect(refreshed.rungs['1']).toEqual({ status: 'skipped', skippedReason: 'handled_elsewhere' });
+  });
+});
+
+describe('unskipRung (R-7.4)', () => {
+  const base = () => evaluateLadder(ctx({ liquidCash: 0 }), null, NOW);
+
+  it('returns a skipped rung to pending and re-elects it as active', () => {
+    const skipped = skipRung(base(), 1, 'skipped', 'not_now');
+    const next = unskipRung(skipped ?? base(), 1);
+    expect(next?.rungs['1']?.status).toBe('active');
+    expect(next?.currentRung).toBe(1);
+  });
+
+  it('lets the next refresh complete a formerly skipped, now satisfied rung', () => {
+    const skipped = skipRung(base(), 1, 'skipped', 'not_now');
+    const unskipped = unskipRung(skipped ?? base(), 1);
+    const refreshed = evaluateLadder(ctx({ liquidCash: 50_000 }), unskipped, NOW);
+    expect(refreshed.rungs['1']?.status).toBe('completed');
+  });
+
+  it('refuses a rung that is not opted out', () => {
+    expect(unskipRung(base(), 1)).toBeNull();
+    expect(unskipRung(base(), 0)).toBeNull();
   });
 });

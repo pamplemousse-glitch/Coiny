@@ -49,11 +49,42 @@ final class ViewSmokeTests: XCTestCase {
         smoke(OnboardingView(onboardingComplete: .constant(false)))
     }
 
-    func testPetViewRenders() {
+    func testHomeViewRenders() {
         smoke(
-            PetView()
+            HomeView()
                 .environment(makeStore())
         )
+    }
+
+    func testHomeJourneyViewRenders() {
+        smoke(
+            HomeJourneyView(
+                rows: HomePresentation.journeyRows(for: nil),
+                journey: JourneyStore(api: NeverJourneyAPI())
+            )
+        )
+    }
+
+    func testJourneySectionsRender() {
+        let store = JourneyStore(api: NeverJourneyAPI())
+        smoke(JourneyGoalsSection(store: store))
+        smoke(JourneyGuardrailsSection(store: store))
+    }
+
+    func testGoalEditorRenders() {
+        smoke(
+            GoalEditorView(
+                store: JourneyStore(api: NeverJourneyAPI()),
+                draft: GoalDraft(),
+                onDone: {}
+            )
+        )
+    }
+
+    func testCoinyWindowRendersAtAllSizes() {
+        smoke(CoinyWindow(size: .full, condition: .idle, stage: 4))
+        smoke(CoinyWindow(size: .panel, condition: .disconnected, stage: 0))
+        smoke(CoinyWindow(size: .stamp, condition: .sleeping, stage: 7))
     }
 
     func testSpendingViewRenders() {
@@ -110,4 +141,23 @@ extension APITests {
     }
 
     static let never: PetStoreAPI = NeverAPI()
+}
+
+/// A `JourneyAPI` that hangs forever, keeping `JourneyStore` in `.loading`
+/// for the duration of a smoke test.
+final class NeverJourneyAPI: JourneyAPI, @unchecked Sendable {
+    private func hang<T>() async throws -> T {
+        try await Task.sleep(for: .seconds(3600))
+        throw CancellationError()
+    }
+
+    func getGoals() async throws -> GoalsListResponse { try await hang() }
+    func getGuardrails() async throws -> GuardrailsResponse { try await hang() }
+    func createGoal(_ body: GoalCreateBody) async throws -> TargetGoal { try await hang() }
+    func updateGoal(id: Int, body: GoalPatchBody) async throws -> TargetGoal { try await hang() }
+    func archiveGoal(id: Int) async throws { let _: Bool = try await hang() }
+    func skipLadderRung(
+        _ rungId: Int, status: RungSkipStatus, reason: RungSkipReason?
+    ) async throws -> LadderSnapshot { try await hang() }
+    func unskipLadderRung(_ rungId: Int) async throws -> LadderSnapshot { try await hang() }
 }

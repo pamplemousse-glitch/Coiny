@@ -9,9 +9,18 @@ extension Notification.Name {
 @main
 struct CoinyApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @State private var petStore = PetStore()
+    @State private var petStore = CoinyApp.makePetStore()
 
     private static let isUITesting = CommandLine.arguments.contains("--ui-testing")
+
+    /// UI tests bypass sign-in, so live API calls would 401; serve a fixture
+    /// instead so the Home journey surface is deterministic under test.
+    private static func makePetStore() -> PetStore {
+        #if DEBUG
+        if isUITesting { return PetStore(api: UITestPetAPI()) }
+        #endif
+        return PetStore()
+    }
 
     // Auth state — seeded synchronously from Keychain on launch.
     // In UITest mode the Keychain is unavailable; bypass to land on RootView directly.
@@ -34,6 +43,12 @@ struct CoinyApp: App {
                     RootView()
                         .environment(petStore)
                         .task {
+                            // Detached: cache repair for the declaration sheet
+                            // (fresh install pulls the server copy back) must
+                            // never delay the pet or the permission prompt.
+                            if !CoinyApp.isUITesting {
+                                Task { await DeclaredAssetsSyncService().reconcile() }
+                            }
                             await petStore.refresh()
                             await requestPushPermission()
                         }
@@ -44,6 +59,15 @@ struct CoinyApp: App {
             }
             .animation(.easeInOut, value: isSignedIn)
             .animation(.easeInOut, value: onboardingComplete)
+            // The Transaction.updates listener runs for the whole app lifetime:
+            // a purchase can complete while the app is backgrounded (ask-to-buy,
+            // billing recovery, another device) and must never be dropped.
+            .task {
+                StoreKitService.shared.start()
+                if isSignedIn && !CoinyApp.isUITesting {
+                    await StoreKitService.shared.refreshEntitlements()
+                }
+            }
             // Sign-out clears local state and returns to sign-in screen.
             .onReceive(NotificationCenter.default.publisher(for: .coinySignedOut)) { _ in
                 Task { await API.shared.signOut() }
@@ -54,6 +78,12 @@ struct CoinyApp: App {
     }
 
     private func requestPushPermission() async {
+        // A user who tapped "Not now" on the onboarding notifications screen
+        // never saw the system prompt, so their status is still .notDetermined
+        // and this would prompt them anyway, one screen later, against their
+        // stated answer. Push permission is not recoverable once denied, so
+        // honor the decline rather than spending the one prompt iOS grants.
+        if UserDefaults.standard.bool(forKey: "pushPromptDeclinedInOnboarding") { return }
         let center = UNUserNotificationCenter.current()
         let settings = await center.notificationSettings()
         guard settings.authorizationStatus == .notDetermined else { return }

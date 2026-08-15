@@ -264,9 +264,9 @@ describe('GET /api/spending/summary', () => {
     expect(res.statusCode).toBe(200);
 
     const body = res.json<{ spendByCategory: Record<string, number> }>();
-    expect(body.spendByCategory['groceries']).toBe(120);
-    expect(body.spendByCategory['gas']).toBe(60);
-    expect(body.spendByCategory['uncategorized']).toBeUndefined();
+    expect(body.spendByCategory.groceries).toBe(120);
+    expect(body.spendByCategory.gas).toBe(60);
+    expect(body.spendByCategory.uncategorized).toBeUndefined();
 
     await app.close();
   });

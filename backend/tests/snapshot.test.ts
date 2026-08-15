@@ -205,6 +205,7 @@ describe('highAprDebtBalances', () => {
     spinwheelConnected: true,
     spinwheelDebtsLoaded: true,
     debts,
+    fetchError: null,
   });
 
   const notLoaded = {
@@ -213,6 +214,7 @@ describe('highAprDebtBalances', () => {
     spinwheelConnected: false,
     spinwheelDebtsLoaded: false,
     debts: [],
+    fetchError: null,
   };
 
   it('takes bureau balances above the threshold when spinwheel loaded', () => {

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=26"
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
@@ -16,6 +16,7 @@
     "lint": "biome check src tests",
     "lint:fix": "biome check --write src tests",
     "format": "biome format --write src tests",
+    "db:migrate": "node dist/db/migrate-run.js",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio"
   },

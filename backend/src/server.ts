@@ -8,11 +8,15 @@ import { registerAuthApi } from './api/auth.js';
 import { registerChainWalletsApi } from './api/chain-wallets.js';
 import { registerCoinbaseApi } from './api/coinbase.js';
 import { registerCoinsApi } from './api/coins.js';
+import { registerDebtsApi } from './api/debts.js';
 import { registerDebugApi, registerDebugSessionApi } from './api/debug.js';
+import { registerDeclaredAssetsApi } from './api/declared-assets.js';
 import { registerDevicesApi } from './api/devices.js';
 import { registerDiscogsApi } from './api/discogs.js';
 import { registerEnergyApi } from './api/energy.js';
+import { registerEntitlementsApi } from './api/entitlements.js';
 import { registerFarmlandApi } from './api/farmland.js';
+import { registerGoalsApi } from './api/goals.js';
 import { registerHyperliquidApi } from './api/hyperliquid.js';
 import { registerKalshiConnectApi } from './api/kalshi-connect.js';
 import { registerKrakenApi } from './api/kraken.js';
@@ -31,6 +35,7 @@ import { registerSneakersApi } from './api/sneakers.js';
 import { registerSpendingApi } from './api/spending.js';
 import { registerSpinwheelApi } from './api/spinwheel.js';
 import { registerSubscriptionsApi } from './api/subscriptions.js';
+import { registerTelemetryApi } from './api/telemetry.js';
 import { registerTradingCardsApi } from './api/trading-cards.js';
 import { registerTruelayerApi } from './api/truelayer.js';
 import { registerVehiclesApi } from './api/vehicles.js';
@@ -42,6 +47,8 @@ import { runMigrations } from './db/migrate.js';
 import { registerAuthPlugin } from './plugins/auth.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
 import { loggerOptions } from './plugins/logger.js';
+import { getSchedulerStatus, isSchedulerStale, startScheduler } from './scheduler/index.js';
+import { registerAppStoreWebhook } from './webhook/appstore.js';
 import { registerPlaidWebhook } from './webhook/plaid.js';
 
 /** Debug routes are for local development and the iOS simulator only.
@@ -55,7 +62,14 @@ function isDebugBuild(): boolean {
 
 async function buildApp() {
   await initDb();
-  await runMigrations();
+  // Migrations run as a deploy step (fly.toml release_command), not here.
+  // On boot, every machine that starts races every other machine to migrate,
+  // and a release that fails to migrate still serves traffic against a schema
+  // it does not match. Tests keep the boot path because PGlite is per-process
+  // and has no deploy step.
+  if (config.NODE_ENV === 'test' || config.APP_ENV === 'local') {
+    await runMigrations();
+  }
 
   const app = Fastify({
     logger: {
@@ -91,9 +105,24 @@ async function buildApp() {
     },
   });
 
-  // Unauthenticated routes
-  app.get('/health', async () => ({ ok: true }));
+  // Unauthenticated routes. /health carries the scheduler heartbeat
+  // (prd.md R-16.2): 503 when the tick is older than 45 minutes routes
+  // scheduler death through the Fly health check and the external pinger.
+  // When the scheduler is not running (tests, one-off scripts) the fields are
+  // absent and the endpoint stays a plain liveness check.
+  app.get('/health', async (_req, reply) => {
+    const status = getSchedulerStatus();
+    if (!status.enabled) return { ok: true };
+    const lastTickAt = status.lastTickAt ? status.lastTickAt.toISOString() : null;
+    if (isSchedulerStale()) {
+      return reply.status(503).send({ ok: false, last_tick_at: lastTickAt });
+    }
+    return { ok: true, last_tick_at: lastTickAt };
+  });
   registerPlaidWebhook(app);
+  // Unauthenticated in the session sense only: every request is JWS-verified
+  // against Apple's pinned root before anything is read from it.
+  registerAppStoreWebhook(app);
 
   // Public auth endpoints (no session required)
   app.register(async (scope) => {
@@ -116,7 +145,9 @@ async function buildApp() {
     registerPlaidRecurringApi(scope);
     if (isDebugBuild()) registerDebugApi(scope);
     registerAccountApi(scope);
+    registerEntitlementsApi(scope);
     registerPetsApi(scope);
+    registerGoalsApi(scope);
     registerSpendingApi(scope);
     registerOverridesApi(scope);
     registerDevicesApi(scope);
@@ -127,6 +158,7 @@ async function buildApp() {
     registerSpinwheelApi(scope);
     registerSneakersApi(scope);
     registerManualAssetsApi(scope);
+    registerDeclaredAssetsApi(scope);
     registerChainWalletsApi(scope);
     registerHyperliquidApi(scope);
     registerPolymarketApi(scope);
@@ -144,7 +176,9 @@ async function buildApp() {
     registerFarmlandApi(scope);
     registerTradingCardsApi(scope);
     registerCoinsApi(scope);
+    registerDebtsApi(scope);
     registerNetWorthApi(scope);
+    registerTelemetryApi(scope);
   });
 
   return app;
@@ -155,6 +189,10 @@ async function start() {
 
   try {
     await app.listen({ port: config.PORT, host: '0.0.0.0' });
+    // Started here, not in buildApp: tests build apps constantly and must not
+    // spawn timers. fly.toml's min_machines_running = 1 keeps this process,
+    // and therefore this interval, alive.
+    startScheduler(app.log);
     app.log.info('Coiny backend ready');
     if (!config.PLAID_CLIENT_ID || !config.PLAID_SECRET) {
       app.log.warn(

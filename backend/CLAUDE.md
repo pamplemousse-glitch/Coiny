@@ -1,6 +1,6 @@
 # Backend — Coiny API Server
 
-Fastify + TypeScript + Drizzle ORM. Deployed on Fly.io (Sydney). Postgres via Neon in prod, PGlite in tests.
+Fastify + TypeScript + Drizzle ORM. Deployed on Fly.io (`iad`). Postgres via Neon in prod, PGlite in tests.
 
 ## Key commands
 
@@ -8,8 +8,13 @@ Fastify + TypeScript + Drizzle ORM. Deployed on Fly.io (Sydney). Postgres via Ne
 # Dev (from repo root — loads Keychain secrets)
 source bin/load-secrets.sh && pnpm --filter coiny-backend dev
 
-# Tests (56 Vitest tests, all must pass before PR)
-pnpm --filter coiny-backend test
+# Tests (all must pass before PR). Use --maxWorkers=3 locally: at full
+# parallelism PGlite's first migration per file exceeds the 60s hook timeout
+# and produces dozens of failures that are machine load, not real.
+pnpm --filter coiny-backend test -- --maxWorkers=3
+
+# What CI actually runs. Catches races that reduced parallelism hides.
+pnpm --filter coiny-backend test:coverage
 
 # Lint + format
 pnpm --filter coiny-backend check        # Biome check
@@ -28,7 +33,7 @@ pnpm biome check --write backend/src/   # auto-fix
 | `src/api/` | Route handlers (auth, pets, plaid, devices, spending, debug) |
 | `src/webhook/plaid.ts` | HMAC-verified Plaid webhook handler |
 | `src/reactions/` | Rule engine + APNs dispatch |
-| `migrations/` | Drizzle migration SQL files |
+| `drizzle/` | Migration SQL files and `meta/_journal.json` |
 
 ## TypeScript conventions
 
@@ -55,5 +60,10 @@ pnpm biome check --write backend/src/   # auto-fix
 ## Drizzle patterns
 
 - Always define relations in `schema.ts` alongside the table.
-- Migrations live in `migrations/`; generate with `pnpm drizzle-kit generate`.
+- Migrations live in `drizzle/`. Hand-write them; they must be idempotent.
+- **The journal is the trap.** `drizzle/meta/_journal.json` entries must have a
+  `when` strictly above every entry before them and be present-dated. The
+  migrator SILENTLY SKIPS an out-of-order entry: no error, just a missing
+  table in production. Verify a new migration applies against an empty
+  database, never just that tests pass.
 - Never hand-edit migration files after they've been applied to prod.

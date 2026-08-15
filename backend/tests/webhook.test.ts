@@ -1,12 +1,17 @@
 import { createHash, webcrypto } from 'node:crypto';
+import type { FastifyInstance } from 'fastify';
 import { exportJWK, type JWK, SignJWT } from 'jose';
 import { type Dispatcher, getGlobalDispatcher, MockAgent, setGlobalDispatcher } from 'undici';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetDatabase, testUserId } from './db-helper.js';
 
-const flushImmediate = () => new Promise<void>((r) => setImmediate(r));
+// Waits for the actual background work rather than guessing at a number of
+// event-loop turns. The old version yielded five times, which held locally and
+// failed on slower CI runners because every DB round trip is another async
+// boundary.
 async function flushAll() {
-  for (let i = 0; i < 5; i++) await flushImmediate();
+  const { awaitWebhookWork } = await import('../src/webhook/plaid.js');
+  await awaitWebhookWork();
 }
 
 const TEST_KID = 'test-kid-1';
@@ -175,6 +180,63 @@ describe('POST /webhooks/plaid', () => {
     await app.close();
   });
 
+  it('persists webhook-carried account balances to the cache (R-16.4)', async () => {
+    mockSync({
+      accounts: [
+        {
+          account_id: 'acc_bal_1',
+          balances: { current: 4321.5, available: 4000, iso_currency_code: 'USD', limit: null },
+          name: 'Checking',
+          official_name: null,
+          type: 'depository',
+          subtype: 'checking',
+        },
+        {
+          account_id: 'acc_bal_2',
+          balances: { current: null, available: 250, iso_currency_code: 'USD', limit: null },
+          name: 'Savings',
+          official_name: null,
+          type: 'depository',
+          subtype: 'savings',
+        },
+      ],
+      added: [],
+      modified: [],
+      removed: [],
+      next_cursor: 'cursor-bal-1',
+      has_more: false,
+      transactions_update_status: 'HISTORICAL_UPDATE_COMPLETE',
+      request_id: 'req_bal',
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const body = buildSyncEnvelope();
+    const signed = await signWebhook(body);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/webhooks/plaid',
+      headers: { 'content-type': 'application/json', 'plaid-verification': signed },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+    await flushAll();
+
+    const { getPlaidAccountBalances } = await import('../src/store/asset-cache.js');
+    const rows = await getPlaidAccountBalances(testUserId);
+    expect(rows.map((r) => r.accountId).sort()).toEqual(['acc_bal_1', 'acc_bal_2']);
+    const checking = rows.find((r) => r.accountId === 'acc_bal_1');
+    expect(parseFloat(checking!.balance!)).toBeCloseTo(4321.5);
+    expect(checking?.itemId).toBe(TEST_ITEM_ID);
+    expect(checking?.asOf).toBeInstanceOf(Date);
+    // current is null: falls back to available.
+    const savings = rows.find((r) => r.accountId === 'acc_bal_2');
+    expect(parseFloat(savings!.balance!)).toBe(250);
+
+    await app.close();
+  });
+
   it('dispatches reactions on second sync (post-initial)', async () => {
     const { markInitialSyncComplete } = await import('../src/store/items.js');
     await markInitialSyncComplete(TEST_ITEM_ID);
@@ -217,7 +279,10 @@ describe('POST /webhooks/plaid', () => {
 
     await flushAll();
     expect(spy).toHaveBeenCalledOnce();
-    expect(spy.mock.calls[0]?.[1]?.animation).toBe('celebrate');
+    // R-7.24: a paycheck is routine (happy), not a celebration. Celebrate is
+    // reserved for rungs, cleared debts and achieved goals.
+    expect(spy.mock.calls[0]?.[1]?.animation).toBe('happy');
+    expect(spy.mock.calls[0]?.[2]).toBe('paycheck_received');
 
     await app.close();
   });
@@ -304,7 +369,7 @@ describe('POST /webhooks/plaid', () => {
     await app.close();
   });
 
-  it('disables the item on USER_PERMISSION_REVOKED', async () => {
+  it('disables the item and marks it revoked on USER_PERMISSION_REVOKED', async () => {
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
     const body = JSON.stringify({
@@ -326,6 +391,8 @@ describe('POST /webhooks/plaid', () => {
     const { getItem } = await import('../src/store/items.js');
     const item = await getItem(TEST_ITEM_ID);
     expect(item?.disabled).toBe(true);
+    expect(item?.status).toBe('revoked');
+    expect(item?.statusChangedAt).not.toBeNull();
 
     await app.close();
   });
@@ -373,14 +440,144 @@ describe('POST /webhooks/plaid', () => {
     await app.close();
   });
 
-  it('no-ops for ITEM webhook with non-USER_PERMISSION_REVOKED code', async () => {
-    const { buildApp } = await import('../src/server.js');
-    const app = await buildApp();
+  async function postItemWebhook(
+    app: FastifyInstance,
+    webhookCode: string,
+    extra: Record<string, unknown> = {},
+  ): Promise<number> {
     const body = JSON.stringify({
       webhook_type: 'ITEM',
-      webhook_code: 'PENDING_EXPIRATION',
+      webhook_code: webhookCode,
       item_id: TEST_ITEM_ID,
+      ...extra,
     });
+    const signed = await signWebhook(body);
+    const res = await app.inject({
+      method: 'POST',
+      url: '/webhooks/plaid',
+      headers: { 'content-type': 'application/json', 'plaid-verification': signed },
+      body,
+    });
+    await flushAll();
+    return res.statusCode;
+  }
+
+  it('marks the item reauth_required on ITEM/ERROR with ITEM_LOGIN_REQUIRED', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const status = await postItemWebhook(app, 'ERROR', {
+      error: {
+        error_type: 'ITEM_ERROR',
+        error_code: 'ITEM_LOGIN_REQUIRED',
+        error_message: 'the login details of this item have changed',
+      },
+    });
+    expect(status).toBe(200);
+
+    const { getItem } = await import('../src/store/items.js');
+    const item = await getItem(TEST_ITEM_ID);
+    expect(item?.status).toBe('reauth_required');
+    expect(item?.lastErrorCode).toBe('ITEM_LOGIN_REQUIRED');
+    // Broken, not dead: the item stays enabled so a repair can restore sync.
+    expect(item?.disabled).toBe(false);
+
+    await app.close();
+  });
+
+  it('marks the item expiring on PENDING_EXPIRATION', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const status = await postItemWebhook(app, 'PENDING_EXPIRATION');
+    expect(status).toBe(200);
+
+    const { getItem } = await import('../src/store/items.js');
+    const item = await getItem(TEST_ITEM_ID);
+    expect(item?.status).toBe('expiring');
+    expect(item?.disabled).toBe(false);
+
+    await app.close();
+  });
+
+  it('marks the item expiring on PENDING_DISCONNECT', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const status = await postItemWebhook(app, 'PENDING_DISCONNECT');
+    expect(status).toBe(200);
+
+    const { getItem } = await import('../src/store/items.js');
+    const item = await getItem(TEST_ITEM_ID);
+    expect(item?.status).toBe('expiring');
+
+    await app.close();
+  });
+
+  it('does not downgrade reauth_required to expiring', async () => {
+    const { setItemStatus } = await import('../src/store/items.js');
+    await setItemStatus(TEST_ITEM_ID, 'reauth_required', { errorCode: 'ITEM_LOGIN_REQUIRED' });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    await postItemWebhook(app, 'PENDING_EXPIRATION');
+
+    const { getItem } = await import('../src/store/items.js');
+    const item = await getItem(TEST_ITEM_ID);
+    expect(item?.status).toBe('reauth_required');
+
+    await app.close();
+  });
+
+  it('returns a reauth_required item to healthy on LOGIN_REPAIRED', async () => {
+    const { setItemStatus } = await import('../src/store/items.js');
+    await setItemStatus(TEST_ITEM_ID, 'reauth_required', { errorCode: 'ITEM_LOGIN_REQUIRED' });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const status = await postItemWebhook(app, 'LOGIN_REPAIRED');
+    expect(status).toBe(200);
+
+    const { getItem } = await import('../src/store/items.js');
+    const item = await getItem(TEST_ITEM_ID);
+    expect(item?.status).toBe('healthy');
+    expect(item?.lastErrorCode).toBeNull();
+
+    await app.close();
+  });
+
+  it('does not resurrect a revoked item on LOGIN_REPAIRED', async () => {
+    const { setItemStatus, disableItem } = await import('../src/store/items.js');
+    await setItemStatus(TEST_ITEM_ID, 'revoked', { errorCode: 'USER_PERMISSION_REVOKED' });
+    await disableItem(TEST_ITEM_ID);
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    await postItemWebhook(app, 'LOGIN_REPAIRED');
+
+    const { getItem } = await import('../src/store/items.js');
+    const item = await getItem(TEST_ITEM_ID);
+    expect(item?.status).toBe('revoked');
+    expect(item?.disabled).toBe(true);
+
+    await app.close();
+  });
+
+  it('marks the item reauth_required when a sync fails with ITEM_LOGIN_REQUIRED', async () => {
+    mockAgent.get('https://sandbox.plaid.com').intercept({ path: '/transactions/sync', method: 'POST' }).reply(400, {
+      error_type: 'ITEM_ERROR',
+      error_code: 'ITEM_LOGIN_REQUIRED',
+      error_message: 'the login details of this item have changed',
+      display_message: null,
+      request_id: 'req_broken',
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const body = buildSyncEnvelope();
     const signed = await signWebhook(body);
 
     const res = await app.inject({
@@ -392,9 +589,46 @@ describe('POST /webhooks/plaid', () => {
     expect(res.statusCode).toBe(200);
     await flushAll();
 
-    // Item should NOT be disabled — code was not USER_PERMISSION_REVOKED
     const { getItem } = await import('../src/store/items.js');
     const item = await getItem(TEST_ITEM_ID);
+    expect(item?.status).toBe('reauth_required');
+    expect(item?.lastErrorCode).toBe('ITEM_LOGIN_REQUIRED');
+
+    await app.close();
+  });
+
+  it('ignores an ITEM webhook without an item_id', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const body = JSON.stringify({ webhook_type: 'ITEM', webhook_code: 'ERROR' });
+    const signed = await signWebhook(body);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/webhooks/plaid',
+      headers: { 'content-type': 'application/json', 'plaid-verification': signed },
+      body,
+    });
+    expect(res.statusCode).toBe(200);
+    await flushAll();
+
+    const { getItem } = await import('../src/store/items.js');
+    const item = await getItem(TEST_ITEM_ID);
+    expect(item?.status).toBe('healthy');
+
+    await app.close();
+  });
+
+  it('no-ops for unrecognized ITEM webhook codes without changing status', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const status = await postItemWebhook(app, 'WEBHOOK_UPDATE_ACKNOWLEDGED');
+    expect(status).toBe(200);
+
+    const { getItem } = await import('../src/store/items.js');
+    const item = await getItem(TEST_ITEM_ID);
+    expect(item?.status).toBe('healthy');
     expect(item?.disabled).toBe(false);
 
     await app.close();
@@ -638,28 +872,18 @@ describe('POST /webhooks/plaid', () => {
     await app.close();
   });
 
-  it('no-ops gracefully for ITEM/NEW_ACCOUNTS_AVAILABLE without disabling item', async () => {
+  it('flags NEW_ACCOUNTS_AVAILABLE without touching health or disabling the item', async () => {
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
-    const body = JSON.stringify({
-      webhook_type: 'ITEM',
-      webhook_code: 'NEW_ACCOUNTS_AVAILABLE',
-      item_id: TEST_ITEM_ID,
-    });
-    const signed = await signWebhook(body);
 
-    const res = await app.inject({
-      method: 'POST',
-      url: '/webhooks/plaid',
-      headers: { 'content-type': 'application/json', 'plaid-verification': signed },
-      body,
-    });
-    expect(res.statusCode).toBe(200);
-    await flushAll();
+    const status = await postItemWebhook(app, 'NEW_ACCOUNTS_AVAILABLE');
+    expect(status).toBe(200);
 
     const { getItem } = await import('../src/store/items.js');
     const item = await getItem(TEST_ITEM_ID);
     expect(item?.disabled).toBe(false);
+    expect(item?.status).toBe('healthy');
+    expect(item?.newAccountsAvailable).toBe(true);
 
     await app.close();
   });

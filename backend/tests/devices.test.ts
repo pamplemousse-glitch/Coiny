@@ -64,4 +64,98 @@ describe('POST /api/devices/push-token', () => {
     expect(res.statusCode).toBe(400);
     await app.close();
   });
+
+  // R-9.3: quiet hours need the device's IANA timezone, captured here.
+  it('persists the timezone sent at registration', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/devices/push-token',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      body: JSON.stringify({ token: 'apns-token-tz-1234567890', platform: 'ios', timezone: 'Asia/Tokyo' }),
+    });
+
+    const { latestDeviceTimezone } = await import('../src/store/devices.js');
+    expect(await latestDeviceTimezone(testUserId)).toBe('Asia/Tokyo');
+
+    await app.close();
+  });
+
+  it('rejects an invalid timezone identifier with 400', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/devices/push-token',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      body: JSON.stringify({ token: 'apns-token-tz-1234567890', platform: 'ios', timezone: 'Not/AZone' }),
+    });
+    expect(res.statusCode).toBe(400);
+    await app.close();
+  });
+
+  it('reports the timezone of the most recently registered device', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/devices/push-token',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      body: JSON.stringify({ token: 'apns-token-old-1234567890', platform: 'ios', timezone: 'Asia/Tokyo' }),
+    });
+    await app.inject({
+      method: 'POST',
+      url: '/api/devices/push-token',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      body: JSON.stringify({ token: 'apns-token-new-1234567890', platform: 'ios', timezone: 'Europe/Paris' }),
+    });
+
+    const { latestDeviceTimezone } = await import('../src/store/devices.js');
+    expect(await latestDeviceTimezone(testUserId)).toBe('Europe/Paris');
+
+    await app.close();
+  });
+
+  it('keeps the stored timezone when an older build re-registers without one', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/devices/push-token',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      body: JSON.stringify({ token: 'apns-token-keep-1234567890', platform: 'ios', timezone: 'Asia/Tokyo' }),
+    });
+    await app.inject({
+      method: 'POST',
+      url: '/api/devices/push-token',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      body: JSON.stringify({ token: 'apns-token-keep-1234567890', platform: 'ios' }),
+    });
+
+    const { latestDeviceTimezone } = await import('../src/store/devices.js');
+    expect(await latestDeviceTimezone(testUserId)).toBe('Asia/Tokyo');
+
+    await app.close();
+  });
+
+  it('reports no timezone when no device has one', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/devices/push-token',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      body: JSON.stringify({ token: 'apns-token-notz-1234567890', platform: 'ios' }),
+    });
+
+    const { latestDeviceTimezone } = await import('../src/store/devices.js');
+    expect(await latestDeviceTimezone(testUserId)).toBe(null);
+
+    await app.close();
+  });
 });

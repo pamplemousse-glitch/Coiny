@@ -31,8 +31,8 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>
-	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Coiny pairs with your Coiny device over Bluetooth to deliver reactions like animations, lights, and haptics when your pet has something to say.</string>
+	<key>COINY_API_BASE_URL</key>
+	<string>$(COINY_API_BASE_URL)</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -40,7 +40,6 @@
 	</dict>
 	<key>UIBackgroundModes</key>
 	<array>
-		<string>bluetooth-central</string>
 		<string>remote-notification</string>
 	</array>
 	<key>UILaunchScreen</key>

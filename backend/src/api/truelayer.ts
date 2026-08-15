@@ -5,43 +5,13 @@ import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { truelayerConnections } from '../db/schema.js';
 import { convertToUsd } from '../fx/client.js';
+import { revokeTrueLayer } from '../revoke/upstream.js';
 import type { TrueLayerEnv } from '../truelayer/client.js';
-import { buildAuthUrl, exchangeCode, getAccounts, getBalance, refreshAccessToken } from '../truelayer/client.js';
-import { decryptString, encryptString } from '../util/crypto.js';
+import { buildAuthUrl, exchangeCode, getAccounts, getBalance } from '../truelayer/client.js';
+import { getTrueLayerAccessToken } from '../truelayer/tokens.js';
+import { encryptString } from '../util/crypto.js';
 
 const REDIRECT_URI = 'coiny://truelayer/callback';
-const REFRESH_BUFFER_MS = 5 * 60 * 1000; // refresh when < 5 min to expiry
-
-type TrueLayerConnection = typeof truelayerConnections.$inferSelect;
-
-async function getAccessToken(userId: string, conn: TrueLayerConnection): Promise<string> {
-  const expiresAt = conn.expiresAt.getTime();
-  if (expiresAt - Date.now() >= REFRESH_BUFFER_MS) {
-    return decryptString(conn.accessToken);
-  }
-
-  if (!config.TRUELAYER_CLIENT_ID || !config.TRUELAYER_CLIENT_SECRET) {
-    throw new Error('TrueLayer not configured — cannot refresh');
-  }
-
-  const env = config.TRUELAYER_ENV as TrueLayerEnv;
-  const tokens = await refreshAccessToken(
-    decryptString(conn.refreshToken),
-    config.TRUELAYER_CLIENT_ID,
-    config.TRUELAYER_CLIENT_SECRET,
-    env,
-  );
-
-  await db()
-    .update(truelayerConnections)
-    .set({
-      accessToken: encryptString(tokens.accessToken),
-      expiresAt: new Date(Date.now() + tokens.expiresIn * 1000),
-    })
-    .where(eq(truelayerConnections.userId, userId));
-
-  return tokens.accessToken;
-}
 
 export function registerTruelayerApi(app: FastifyInstance): void {
   // GET /api/truelayer/auth-url — returns the OAuth authorization URL for the frontend
@@ -112,7 +82,7 @@ export function registerTruelayerApi(app: FastifyInstance): void {
 
     if (!conn) return reply.status(404).send({ error: 'not connected' });
 
-    const accessToken = await getAccessToken(userId, conn);
+    const accessToken = await getTrueLayerAccessToken(userId, conn);
     const env = config.TRUELAYER_ENV as TrueLayerEnv;
 
     const accounts = await getAccounts(accessToken, env);
@@ -135,18 +105,21 @@ export function registerTruelayerApi(app: FastifyInstance): void {
 
     await db()
       .update(truelayerConnections)
-      .set({ lastBalanceGbp: totalUsd.toString() })
+      .set({ lastBalanceGbp: totalUsd.toString(), lastSyncedAt: new Date() })
       .where(eq(truelayerConnections.userId, userId));
 
     req.log.info({ userId }, 'truelayer sync complete');
     return { balanceGbp: totalGbp, balanceUsd: totalUsd };
   });
 
-  // DELETE /api/truelayer/connect — remove connection
+  // DELETE /api/truelayer/connect — revoke the grant upstream, then remove the row.
+  // Dropping only the row would leave Coiny sitting in the user's TrueLayer
+  // connected-apps list after they explicitly disconnected it.
   app.delete('/api/truelayer/connect', async (req: FastifyRequest, reply: FastifyReply) => {
     const userId = req.user!.id;
+    const outcome = await revokeTrueLayer(userId, req.log);
     await db().delete(truelayerConnections).where(eq(truelayerConnections.userId, userId));
-    req.log.info({ userId }, 'truelayer disconnected');
+    req.log.info({ userId, revocation: outcome.result }, 'truelayer disconnected');
     return reply.status(204).send();
   });
 }

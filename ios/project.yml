@@ -33,12 +33,14 @@ targets:
     type: application
     platform: iOS
     deploymentTarget: "17.0"
+    # Coiny/PrivacyInfo.xcprivacy is the app-target privacy manifest
+    # (PRD R-22.2); xcodegen places .xcprivacy files in the Resources build
+    # phase automatically, so it ships at the bundle root. Keep it in sync
+    # with docs/legal/app-store-privacy-labels.md.
     sources:
       - path: Coiny
         excludes:
           - "**/*.md"
-    resources:
-      - path: Coiny/Resources
     info:
       path: Coiny/Info.plist
       properties:
@@ -49,17 +51,20 @@ targets:
               - coiny
         CFBundleShortVersionString: "0.2.0"
         CFBundleVersion: "1"
+        # Which backend this build talks to. Set per configuration below, so a
+        # TestFlight build can point at staging without touching code.
+        COINY_API_BASE_URL: $(COINY_API_BASE_URL)
         UILaunchScreen:
           UIColorName: ""
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         UIRequiresFullScreen: false
+        # bluetooth-central and NSBluetoothAlwaysUsageDescription removed
+        # 2026-08-13: no CoreBluetooth code exists in the app and hardware is
+        # parked (vision.md section 8). An unused background mode is an App
+        # Review 2.5.4 rejection risk. Restore both when hardware ships.
         UIBackgroundModes:
-          - bluetooth-central
           - remote-notification
-        NSBluetoothAlwaysUsageDescription: >-
-          Coiny pairs with your Coiny device over Bluetooth to deliver reactions
-          like animations, lights, and haptics when your pet has something to say.
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
     entitlements:
@@ -70,6 +75,14 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.coiny.ios
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        # Which backend a device build talks to. Staging, for every
+        # configuration, because production does not exist yet.
+        #
+        # When it does, add a `configs:` block overriding this for Release only.
+        # Staging stays the default so that a build which forgets to opt in
+        # reaches the environment full of fake data, never real bank accounts.
+        # ($() defeats Xcode's // comment stripping in build settings.)
+        COINY_API_BASE_URL: https:/$()/coiny-backend.fly.dev
         SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
         TARGETED_DEVICE_FAMILY: "1,2"
         SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
@@ -126,6 +139,10 @@ schemes:
         CoinyUITests: [test]
     run:
       config: Debug
+      # Local StoreKit configuration: makes the subscription products, purchase
+      # flow and renewals testable in the simulator with no App Store Connect
+      # products (those are blocked on the org enrollment, R-27.1).
+      storeKitConfiguration: Coiny.storekit
     test:
       config: Debug
       targets:

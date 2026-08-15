@@ -1,6 +1,14 @@
 import { and, desc, eq, gte, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { derivedState, ladderState, netWorthDaily, petProgression, transactions } from '../db/schema.js';
+import {
+  derivedState,
+  goalPeriods,
+  ladderState,
+  netWorthDaily,
+  petProgression,
+  transactions,
+  users,
+} from '../db/schema.js';
 import {
   computeDerivedState,
   type DerivedInputTransaction,
@@ -8,6 +16,9 @@ import {
   monthlySavingsRate,
 } from '../goals/derived.js';
 import { evaluateLadder, type LadderContext, type LadderState, stageForLadder } from '../goals/ladder.js';
+import { reactionForEvent } from '../reactions/contract.js';
+import { performReactions } from '../reactions/perform.js';
+import { trackServerEvent } from './analytics.js';
 
 /** Bumped when the derived-state computation changes in a way that makes stored
  *  values incomparable to freshly computed ones. Lets a later migration find and
@@ -113,6 +124,46 @@ export async function refreshLadder(userId: string, ctx: LadderContext, now: Dat
   const next = evaluateLadder(ctx, prior, now);
   await saveLadderState(userId, next, now);
 
+  // Server-side instrumentation (prd.md R-24.2): ladder transitions are facts
+  // the backend observed itself; the client is never asked to report them.
+  // Emitted on the transition edge only, so a rung completing once emits once
+  // no matter how many refreshes follow (rungs never un-complete).
+  const priorRungs = prior?.rungs ?? {};
+  const completedRungs: number[] = [];
+  for (const [key, state] of Object.entries(next.rungs)) {
+    const before = priorRungs[key]?.status ?? 'pending';
+    if (state.status === 'completed' && before !== 'completed') {
+      await trackServerEvent(userId, 'rung_completed', { rung_index: Number(key) });
+      completedRungs.push(Number(key));
+    }
+    if (state.status === 'skipped' && before !== 'skipped') {
+      await trackServerEvent(userId, 'rung_skipped', { rung_index: Number(key) });
+    }
+  }
+  if (prior?.currentRung !== next.currentRung) {
+    await trackServerEvent(userId, 'rung_started', { rung_index: next.currentRung });
+  }
+
+  // R-7.24: a rung completing is the loudest moment in the app. All completion
+  // edges from this refresh go in as ONE candidate set, highest rung first: a
+  // well-off user auto-completing rungs 0 to 5 on day one gets one
+  // transformation, not six back-to-back (the creature has one body), and the
+  // other five land in analytics as precedence-suppressed. Reaction failure
+  // must never fail the ladder write, so this is best-effort.
+  if (completedRungs.length > 0) {
+    try {
+      const candidates = [...completedRungs]
+        .sort((a, b) => b - a)
+        .map((idx) => ({
+          name: 'ladder_rung_completed',
+          reaction: reactionForEvent('ladder_rung_completed', `ladder_rung_completed (rung ${idx})`),
+        }));
+      await performReactions(userId, candidates, now);
+    } catch (err) {
+      console.warn('rung completion reaction failed:', err);
+    }
+  }
+
   const stage = stageForLadder(next);
   const [progression] = await db().select().from(petProgression).where(eq(petProgression.userId, userId));
 
@@ -128,6 +179,83 @@ export async function refreshLadder(userId: string, ctx: LadderContext, now: Dat
 export async function getPetStage(userId: string): Promise<number> {
   const [row] = await db().select().from(petProgression).where(eq(petProgression.userId, userId));
   return row?.stage ?? 0;
+}
+
+// --- Guardrail periods (Layer 3) --------------------------------------------
+
+export type GuardrailPeriodInput = {
+  guardrailKey: string;
+  /** ISO dates (YYYY-MM-DD). */
+  periodStart: string;
+  periodEnd: string;
+  outcome: 'passed' | 'missed' | 'pending' | 'not_applicable';
+  targetValue: number | null;
+  actualValue: number | null;
+  repairUsed: boolean;
+};
+
+/** The single blessed writer for goal_periods. Upserts on (user, key, start) so
+ *  re-evaluating a period corrects the row instead of duplicating it, and emits
+ *  `guardrail_period_outcome` exactly when a period settles (transitions into
+ *  passed / missed / not_applicable). No guardrail evaluator exists yet; when
+ *  one does, writing through this function is what keeps the W4 counter-metric
+ *  (prd.md R-2.2) measurable for free. Amounts stay in the row; the analytics
+ *  event carries the outcome only (R-22.6). */
+export async function recordGuardrailPeriod(userId: string, input: GuardrailPeriodInput, now: Date): Promise<void> {
+  const [existing] = await db()
+    .select({ outcome: goalPeriods.outcome })
+    .from(goalPeriods)
+    .where(
+      and(
+        eq(goalPeriods.userId, userId),
+        eq(goalPeriods.guardrailKey, input.guardrailKey),
+        eq(goalPeriods.periodStart, input.periodStart),
+      ),
+    );
+
+  await db()
+    .insert(goalPeriods)
+    .values({
+      userId,
+      guardrailKey: input.guardrailKey,
+      periodStart: input.periodStart,
+      periodEnd: input.periodEnd,
+      outcome: input.outcome,
+      targetValue: str(input.targetValue),
+      actualValue: str(input.actualValue),
+      repairUsed: input.repairUsed,
+      evaluatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [goalPeriods.userId, goalPeriods.guardrailKey, goalPeriods.periodStart],
+      set: {
+        periodEnd: input.periodEnd,
+        outcome: input.outcome,
+        targetValue: str(input.targetValue),
+        actualValue: str(input.actualValue),
+        repairUsed: input.repairUsed,
+        evaluatedAt: now,
+      },
+    });
+
+  const settled = input.outcome !== 'pending';
+  if (settled && existing?.outcome !== input.outcome) {
+    await trackServerEvent(userId, 'guardrail_period_outcome', {
+      guardrail_key: input.guardrailKey,
+      outcome: input.outcome,
+      repair_used: input.repairUsed,
+    });
+  }
+}
+
+export async function getGuardrailPeriods(
+  userId: string,
+  guardrailKey?: string,
+): Promise<(typeof goalPeriods.$inferSelect)[]> {
+  const where = guardrailKey
+    ? and(eq(goalPeriods.userId, userId), eq(goalPeriods.guardrailKey, guardrailKey))
+    : eq(goalPeriods.userId, userId);
+  return db().select().from(goalPeriods).where(where).orderBy(desc(goalPeriods.periodStart));
 }
 
 // --- Net worth time series ------------------------------------------------
@@ -218,4 +346,17 @@ export async function netWorthPointCount(userId: string): Promise<number> {
     .from(netWorthDaily)
     .where(eq(netWorthDaily.userId, userId));
   return row?.count ?? 0;
+}
+
+/** User ids with no net_worth_daily row for the given date. The scheduler's
+ *  daily pass: a dormant user's series must not gap just because they never
+ *  opened the app (prd.md R-16.2). */
+export async function usersMissingDailyPoint(date: string): Promise<string[]> {
+  const rows = await db()
+    .select({ id: users.id })
+    .from(users)
+    .where(
+      sql`NOT EXISTS (SELECT 1 FROM ${netWorthDaily} WHERE ${netWorthDaily.userId} = ${users.id} AND ${netWorthDaily.date} = ${date})`,
+    );
+  return rows.map((r) => r.id);
 }

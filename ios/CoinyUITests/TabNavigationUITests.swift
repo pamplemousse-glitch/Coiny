@@ -19,7 +19,7 @@ final class TabNavigationUITests: XCTestCase {
     func testAllThreeTabsExist() {
         let tabBar = Self.app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 10), "Tab bar should appear")
-        XCTAssertTrue(tabBar.buttons["Pet"].exists)
+        XCTAssertTrue(tabBar.buttons["Home"].exists)
         XCTAssertTrue(tabBar.buttons["Activity"].exists)
         XCTAssertTrue(tabBar.buttons["Wealth"].exists)
     }
@@ -34,9 +34,9 @@ final class TabNavigationUITests: XCTestCase {
         XCTAssertTrue(Self.app.navigationBars["Wealth"].waitForExistence(timeout: 5))
     }
 
-    func testCanNavigateBackToPetTab() {
+    func testCanNavigateBackToHomeTab() {
         Self.app.tabBars.firstMatch.buttons["Wealth"].tap()
-        Self.app.tabBars.firstMatch.buttons["Pet"].tap()
-        XCTAssertTrue(Self.app.navigationBars["Coiny"].waitForExistence(timeout: 5))
+        Self.app.tabBars.firstMatch.buttons["Home"].tap()
+        XCTAssertTrue(Self.app.descendants(matching: .any)["home.window"].waitForExistence(timeout: 5))
     }
 }

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { config } from '../config.js';
+import { fetchWithRetry } from '../util/fetch.js';
 
 export class SpinwheelError extends Error {
   constructor(
@@ -36,7 +37,7 @@ function envelopeSchema<T extends z.ZodTypeAny>(dataSchema: T) {
 }
 
 async function spinwheelPost<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
-  const res = await fetch(`${config.SPINWHEEL_BASE_URL}${path}`, {
+  const res = await fetchWithRetry(`${config.SPINWHEEL_BASE_URL}${path}`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(body),
@@ -52,7 +53,7 @@ async function spinwheelPost<T>(path: string, body: unknown, schema: z.ZodType<T
 }
 
 async function spinwheelGet<T>(path: string, schema: z.ZodType<T>): Promise<T> {
-  const res = await fetch(`${config.SPINWHEEL_BASE_URL}${path}`, {
+  const res = await fetchWithRetry(`${config.SPINWHEEL_BASE_URL}${path}`, {
     headers: { Authorization: `Bearer ${requireKey()}` },
   });
 
@@ -66,7 +67,7 @@ async function spinwheelGet<T>(path: string, schema: z.ZodType<T>): Promise<T> {
 }
 
 async function spinwheelDelete(path: string): Promise<void> {
-  const res = await fetch(`${config.SPINWHEEL_BASE_URL}${path}`, {
+  const res = await fetchWithRetry(`${config.SPINWHEEL_BASE_URL}${path}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${requireKey()}` },
   });
@@ -123,6 +124,13 @@ export const SpinwheelDebtSchema = z.object({
   lastPaymentDate: z.string().nullable().optional(),
   openDate: z.string().nullable().optional(),
   paymentHistoryCodes: z.array(z.string()).nullable().optional(),
+  // Creditor identity fields used by the dedupe match key (R-7.13). Bureau
+  // payloads are inconsistent about which alias they use, so accept both
+  // spellings for each and normalize at ingest (store/debts.ts).
+  name: z.string().nullable().optional(),
+  creditorName: z.string().nullable().optional(),
+  last4: z.string().nullable().optional(),
+  accountNumberLast4: z.string().nullable().optional(),
 });
 
 export type SpinwheelDebt = z.infer<typeof SpinwheelDebtSchema>;

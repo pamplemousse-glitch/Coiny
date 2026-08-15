@@ -226,6 +226,9 @@ final class APITests: XCTestCase {
         let body = try JSONSerialization.jsonObject(with: req.httpBody ?? Data()) as? [String: Any]
         XCTAssertEqual(body?["token"] as? String, "deadbeef")
         XCTAssertEqual(body?["platform"] as? String, "ios")
+        // Quiet hours (backend R-9.3) depend on this field: without it the
+        // backend suppresses every push for the user rather than guess a zone.
+        XCTAssertEqual(body?["timezone"] as? String, TimeZone.current.identifier)
     }
 
     // MARK: - Concurrent 401 handling

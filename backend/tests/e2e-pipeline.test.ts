@@ -25,9 +25,11 @@ import { resetDatabase, testUserId } from './db-helper.js';
 // self-contained — no shared mutable state across test files.
 // ---------------------------------------------------------------------------
 
-const flushImmediate = () => new Promise<void>((r) => setImmediate(r));
+// Waits for the webhook's real background work instead of guessing at a number
+// of event-loop turns. See the same note in webhook.test.ts.
 async function flushAll() {
-  for (let i = 0; i < 5; i++) await flushImmediate();
+  const { awaitWebhookWork } = await import('../src/webhook/plaid.js');
+  await awaitWebhookWork();
 }
 
 const TEST_KID = 'e2e-kid-1';
@@ -247,7 +249,8 @@ describe('pipeline: reset cursor → re-fire → reaction recorded', () => {
     expect(pet.reactionHistory.length).toBeGreaterThanOrEqual(2);
     const latest = pet.reactionHistory[0]!;
     expect(latest.eventType).toBe('paycheck_received');
-    expect(latest.reaction.animation).toBe('celebrate');
+    // R-7.24: a paycheck is routine (happy), not a celebration.
+    expect(latest.reaction.animation).toBe('happy');
     expect(latest.reaction.reason).toContain('paycheck_received');
 
     // ── Step 5: assert rule_matched visible in debug/transactions ──

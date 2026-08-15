@@ -33,13 +33,17 @@ describe('claimEvent', () => {
 });
 
 describe('health score', () => {
+  // Event names and magnitudes follow the R-7.24 taxonomy (the reaction
+  // contract is the source of truth; tests/score.test.ts covers the detail).
+  // savings_milestone became contribution_made, overspent_in_category became
+  // overspend_vs_plan (softened to -5), large_purchase carries no penalty.
   it('returns correct deltas for all known event types', async () => {
     const { deltaForEvent } = await import('../src/health/score.js');
     expect(deltaForEvent('paycheck_received')).toBe(10);
     expect(deltaForEvent('bill_paid_on_time')).toBe(5);
-    expect(deltaForEvent('savings_milestone')).toBe(15);
-    expect(deltaForEvent('overspent_in_category')).toBe(-10);
-    expect(deltaForEvent('large_purchase')).toBe(-5);
+    expect(deltaForEvent('contribution_made')).toBe(10);
+    expect(deltaForEvent('overspend_vs_plan')).toBe(-5);
+    expect(deltaForEvent('large_purchase')).toBe(0);
   });
 
   it('returns 0 for an unknown event type', async () => {

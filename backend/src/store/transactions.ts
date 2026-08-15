@@ -3,8 +3,15 @@ import { db } from '../db/client.js';
 import { transactions } from '../db/schema.js';
 import { INCOME_CATEGORIES, NON_SPEND_CATEGORIES } from '../goals/categories.js';
 import type { Transaction } from '../types/transaction.js';
+import { decryptNullable, encryptNullable } from '../util/crypto.js';
 
 export type StoredTransaction = typeof transactions.$inferSelect;
+
+// merchant_name is AES-256-GCM encrypted at rest; amount is deliberately not.
+// The full decision record lives on the `transactions` table in db/schema.ts.
+// Every write goes through encryptNullable here; every read that surfaces
+// merchant_name to Node (this file, goals/evaluation.ts, api/debug.ts) must
+// decrypt. decryptNullable passes pre-0048 plaintext rows through unchanged.
 
 export async function persistTransactions(userId: string, txs: Transaction[]): Promise<void> {
   if (txs.length === 0) return;
@@ -12,7 +19,7 @@ export async function persistTransactions(userId: string, txs: Transaction[]): P
     transactionId: tx.id,
     userId,
     accountId: tx.account_id,
-    merchantName: tx.details?.counterparty?.name ?? null,
+    merchantName: encryptNullable(tx.details?.counterparty?.name ?? null),
     amount: tx.amount,
     date: tx.date,
     category: tx.details?.category ?? null,
@@ -28,7 +35,7 @@ export async function upsertModifiedTransactions(userId: string, txs: Transactio
     transactionId: tx.id,
     userId,
     accountId: tx.account_id,
-    merchantName: tx.details?.counterparty?.name ?? null,
+    merchantName: encryptNullable(tx.details?.counterparty?.name ?? null),
     amount: tx.amount,
     date: tx.date,
     category: tx.details?.category ?? null,
@@ -141,5 +148,5 @@ export async function getRecentOutflows(userId: string, days: number): Promise<S
         sql`${transactions.date} >= ${cutoffStr} AND CAST(${transactions.amount} AS NUMERIC) < 0`,
       ),
     );
-  return rows;
+  return rows.map((row) => ({ ...row, merchantName: decryptNullable(row.merchantName) }));
 }

@@ -14,10 +14,25 @@ actor API {
     }()
 
     enum Endpoint {
+        /// Which backend this build talks to.
+        ///
+        /// Read from `COINY_API_BASE_URL` in Info.plist, which comes from the
+        /// build configuration, so a TestFlight build can point at staging and a
+        /// release build at production without a code change. It was previously
+        /// hardcoded to one host, which meant there was no way to test a build
+        /// against anything but production.
+        ///
+        /// Falling back to staging is deliberate: a misconfigured build should
+        /// hit the environment full of fake data, never the one with real
+        /// people's bank accounts.
         static let baseURL: URL = {
             #if targetEnvironment(simulator)
             return URL(string: "http://127.0.0.1:3000")!
             #else
+            let configured = Bundle.main.object(forInfoDictionaryKey: "COINY_API_BASE_URL") as? String
+            if let configured, let url = URL(string: configured), url.scheme == "https" {
+                return url
+            }
             return URL(string: "https://coiny-backend.fly.dev")!
             #endif
         }()
@@ -160,8 +175,14 @@ actor API {
 
     @discardableResult
     func registerDeviceToken(_ hexToken: String) async throws -> EmptyResponse {
-        struct Body: Encodable { let token: String; let platform: String }
-        return try await post("/api/devices/push-token", body: Body(token: hexToken, platform: "ios"))
+        // The IANA timezone lets the backend enforce quiet hours in the
+        // user's own zone (docs/prd.md R-9.3); without it, pushes for this
+        // user are suppressed entirely rather than sent on a guessed zone.
+        struct Body: Encodable { let token: String; let platform: String; let timezone: String }
+        return try await post(
+            "/api/devices/push-token",
+            body: Body(token: hexToken, platform: "ios", timezone: TimeZone.current.identifier)
+        )
     }
 
     // MARK: - Account
@@ -241,35 +262,6 @@ actor API {
 
     func disconnectSpinwheel() async throws {
         try await deleteVoid("/api/spinwheel/connect")
-    }
-
-    // MARK: - Chain Wallets
-
-    func getChainWallets() async throws -> [ChainWallet] {
-        try await get("/api/chain-wallets")
-    }
-
-    func addChainWallet(chain: String, address: String, label: String?) async throws {
-        struct Body: Encodable { let chain: String; let address: String; let label: String? }
-        let _: EmptyResponse = try await post("/api/chain-wallets", body: Body(chain: chain, address: address, label: label))
-    }
-
-    func removeChainWallet(chain: String, address: String) async throws {
-        try await deleteVoid("/api/chain-wallets/\(chain)/\(encodePathComponent(address))")
-    }
-
-    func syncChainWallets() async throws -> ChainWalletSyncResult {
-        try await post("/api/chain-wallets/sync")
-    }
-
-    private func encodePathComponent(_ s: String) -> String {
-        s.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? s
-    }
-
-    // MARK: - Misc
-
-    func health() async throws -> HealthResponse {
-        try await request(method: "GET", path: "/health", body: Optional<Empty>.none, requiresAuth: false)
     }
 
     // MARK: - Internals
@@ -381,38 +373,33 @@ actor API {
     }
 }
 
-// MARK: - Spending + Subscriptions + Net Worth
+// MARK: - Chain Wallets + Misc
+// Kept outside the actor body for SwiftLint's type_body_length; extensions on
+// the actor still run on the actor.
 extension API {
-    func getSpendingSummary() async throws -> SpendingSummaryResponse {
-        try await get("/api/spending/summary")
+    func getChainWallets() async throws -> [ChainWallet] {
+        try await get("/api/chain-wallets")
     }
 
-    func getSpendingOverrides() async throws -> [SpendingOverride] {
-        try await get("/api/spending/overrides")
+    func addChainWallet(chain: String, address: String, label: String?) async throws {
+        struct Body: Encodable { let chain: String; let address: String; let label: String? }
+        let _: EmptyResponse = try await post("/api/chain-wallets", body: Body(chain: chain, address: address, label: label))
     }
 
-    @discardableResult
-    func setSpendingOverride(merchantName: String, category: String) async throws -> EmptyResponse {
-        struct Body: Encodable { let merchant_name: String; let category: String }
-        return try await put("/api/spending/overrides", body: Body(merchant_name: merchantName, category: category))
+    func removeChainWallet(chain: String, address: String) async throws {
+        try await deleteVoid("/api/chain-wallets/\(chain)/\(encodePathComponent(address))")
     }
 
-    func deleteSpendingOverride(merchantName: String) async throws {
-        struct Body: Encodable { let merchant_name: String }
-        let _: EmptyResponse = try await request(
-            method: "DELETE",
-            path: "/api/spending/overrides",
-            body: Body(merchant_name: merchantName),
-            requiresAuth: true
-        )
+    func syncChainWallets() async throws -> ChainWalletSyncResult {
+        try await post("/api/chain-wallets/sync")
     }
 
-    func getSubscriptions() async throws -> [DetectedSubscription] {
-        try await get("/api/subscriptions")
+    private func encodePathComponent(_ s: String) -> String {
+        s.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? s
     }
 
-    func getNetWorth() async throws -> NetWorthResponse {
-        try await get("/api/net-worth")
+    func health() async throws -> HealthResponse {
+        try await request(method: "GET", path: "/health", body: Optional<Empty>.none, requiresAuth: false)
     }
 }
 

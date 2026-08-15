@@ -1,8 +1,9 @@
-import { request } from 'undici';
 import { config } from '../config.js';
+import { fetchWithRetry } from '../util/fetch.js';
 import {
   type AccountsBalanceGetResponse,
   type InvestmentsHoldingsGetResponse,
+  type ItemGetResponse,
   type LiabilitiesGetResponse,
   type LinkTokenCreateResponse,
   PlaidApiError,
@@ -24,8 +25,11 @@ function baseUrl(): string {
   }
 }
 
+// fetchWithRetry gives every Plaid call the 5 s per-attempt timeout and
+// bounded retry the budgets doc mandates (R-16.5); undici's bare defaults let
+// one hung vendor pin a request for minutes.
 async function plaidPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
-  const res = await request(`${baseUrl()}${path}`, {
+  const res = await fetchWithRetry(`${baseUrl()}${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'plaid-version': '2020-09-14' },
     body: JSON.stringify({
@@ -35,9 +39,9 @@ async function plaidPost<T>(path: string, body: Record<string, unknown>): Promis
     }),
   });
 
-  const text = await res.body.text();
+  const text = await res.text();
 
-  if (res.statusCode >= 400) {
+  if (res.status >= 400) {
     let err: PlaidErrorResponse;
     try {
       err = JSON.parse(text) as PlaidErrorResponse;
@@ -50,7 +54,7 @@ async function plaidPost<T>(path: string, body: Record<string, unknown>): Promis
         request_id: '',
       };
     }
-    throw new PlaidApiError(res.statusCode, err);
+    throw new PlaidApiError(res.status, err);
   }
 
   return JSON.parse(text) as T;
@@ -90,12 +94,51 @@ export function linkTokenCreate(args: {
   });
 }
 
+/**
+ * Mint a link token in UPDATE MODE for an existing Item (docs/prd.md R-8.6).
+ *
+ * Update mode is selected by passing the Item's `access_token` and omitting
+ * `products` entirely: Plaid re-authenticates the existing Item in place, the
+ * access token and history survive, and no new products are billed. Passing
+ * `products` here would either error or initialize (and bill) new products,
+ * and exchanging a fresh public token would orphan the Item, so neither
+ * happens in this flow. `webhook` is also omitted: it has no effect in update
+ * mode (/item/webhook/update is the way to change an Item's webhook).
+ *
+ * `account_selection_enabled` opts into Account Select so the user can share
+ * accounts detected via NEW_ACCOUNTS_AVAILABLE (US/CA institutions).
+ */
+export function linkTokenCreateUpdateMode(args: {
+  client_user_id: string;
+  access_token: string;
+  account_selection_enabled?: boolean;
+  language?: string;
+  country_codes?: string[];
+  client_name?: string;
+}): Promise<LinkTokenCreateResponse> {
+  return plaidPost('/link/token/create', {
+    client_name: args.client_name ?? 'Coiny',
+    language: args.language ?? 'en',
+    country_codes: args.country_codes ?? ['US'],
+    access_token: args.access_token,
+    user: { client_user_id: args.client_user_id },
+    ...(args.account_selection_enabled ? { update: { account_selection_enabled: true } } : {}),
+  });
+}
+
 export function itemPublicTokenExchange(publicToken: string): Promise<PublicTokenExchangeResponse> {
   return plaidPost('/item/public_token/exchange', { public_token: publicToken });
 }
 
 export function itemRemove(accessToken: string): Promise<{ request_id: string }> {
   return plaidPost('/item/remove', { access_token: accessToken });
+}
+
+/** /item/get: item metadata including institution_id and institution_name.
+ *  Free to call (not associated with any billed product). Used once at link
+ *  time to capture the institution, which never changes for an item. */
+export function itemGet(accessToken: string): Promise<ItemGetResponse> {
+  return plaidPost('/item/get', { access_token: accessToken });
 }
 
 export function transactionsSync(args: {

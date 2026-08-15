@@ -10,3 +10,10 @@ process.env.APPLE_BUNDLE_ID ??= 'app.coiny.test';
 // Rate-limit window of 10 minutes in tests so deterministic bursts (101 reqs
 // can take many seconds in PGlite) don't roll past the window.
 process.env.RATE_LIMIT_WINDOW ??= '10 minute';
+process.env.TRUELAYER_CLIENT_ID ??= 'test_tl_client';
+process.env.TRUELAYER_CLIENT_SECRET ??= 'test_tl_secret';
+process.env.TRUELAYER_ENV ??= 'sandbox';
+// Mocked responses never need a network budget, and asserting one means
+// asserting how fast the machine is. fetch-with-retry.test.ts drives the real
+// timeout behaviour with fake timers instead.
+process.env.FETCH_TIMEOUT_MS ??= '120000';

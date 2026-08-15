@@ -12,6 +12,12 @@ export const PUSH_MAX_PER_WINDOW = 2;
 // events (three paychecks, five bills) cannot consume the whole weekly budget.
 export const PUSH_SAME_TYPE_COOLDOWN_HOURS = 24;
 
+// Per-day cap (R-9.2): at most one push in any rolling 24 hours, regardless of
+// event type. Kept separate from the same-type cooldown above: that one is
+// per-type texture inside the week, this one is the hard daily ceiling.
+export const PUSH_MAX_PER_DAY = 1;
+export const PUSH_DAY_WINDOW_HOURS = 24;
+
 function hoursAgo(hours: number): Date {
   return new Date(Date.now() - hours * 60 * 60 * 1000);
 }
@@ -25,6 +31,16 @@ export async function canSendPush(userId: string, eventType: string): Promise<bo
     .where(and(eq(notificationLog.userId, userId), gte(notificationLog.sentAt, hoursAgo(PUSH_WINDOW_DAYS * 24))));
 
   if (count >= PUSH_MAX_PER_WINDOW) return false;
+
+  // Day cap (R-9.2): any push in the rolling 24 hours suppresses the next,
+  // whatever its type. Without this, two different event types can both push
+  // within the same hour while staying inside the weekly budget.
+  const [{ today } = { today: 0 }] = await db()
+    .select({ today: sql<number>`CAST(COUNT(*) AS INTEGER)` })
+    .from(notificationLog)
+    .where(and(eq(notificationLog.userId, userId), gte(notificationLog.sentAt, hoursAgo(PUSH_DAY_WINDOW_HOURS))));
+
+  if (today >= PUSH_MAX_PER_DAY) return false;
 
   const [{ recent } = { recent: 0 }] = await db()
     .select({ recent: sql<number>`CAST(COUNT(*) AS INTEGER)` })

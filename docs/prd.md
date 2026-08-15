@@ -709,25 +709,37 @@ Google Play, binding when Android reaches parity, worth designing against now be
 
 ## 30. Roadmap and phasing
 
-Sequenced by dependency; status verified against code at `5406a7b`. The bar for the 4-week block: a user can link one account, see a net worth number, get placed on the ladder, and complete rung 1, with every step instrumented.
+Sequenced by dependency. Statuses below were updated on 2026-08-13 after the
+week 1 to 4 block was built and merged on `integration/night-build`. The bar for
+that block: a user can link one account, see a net worth number, get placed on
+the ladder, and complete rung 1, with every step instrumented.
 
 **Weeks 1 to 4:**
 
 | # | Item | Status |
 |---|---|---|
-| 1 | Instrumentation pipeline + retention query (§24, R-2.1) | Unbuilt. First, because cohorts cannot be backfilled |
-| 2 | Silent-zero + freshness response shape (R-8.1 to R-8.4), timeout adoption (R-16.5) | Unbuilt |
-| 3 | Scheduler + DB-only read path + webhook balance persistence (§16) | Unbuilt; store layer exists |
-| 4 | Wire the ladder: derived state nightly, `GET /api/pets` v2 with ladder + stage, `net_worth_daily` writer (R-7.6) | Engine Built and tested; wiring Unbuilt |
-| 5 | Plaid lifecycle + update mode (R-8.5, R-8.6) | Unbuilt |
-| 6 | Onboarding rewrite (§5): chips, sliders, `declared_assets`, the number, subscription reveal (R-5.5 to R-5.7), hatch | Unbuilt; detection itself Built |
-| 7 | Journey v1: tap-to-expand on Home, ladder, one goal, two guardrails | Unbuilt |
-| 8 | Notification day-cap, quiet hours + timezone capture, emoji-free copy (R-9.2, R-9.3, R-9.7) | Unbuilt |
-| 9 | Commission Phase 1 (paid character exploration, design-direction §7.2) started in parallel; it has lead time and nothing else does | Not started |
+| 1 | Instrumentation pipeline + retention query (§24, R-2.1) | **Built.** `analytics_events` (0039), `POST /api/telemetry`, `backend/queries/retention.sql`. Client events split from server-only ones so a device cannot forge a cohort fact |
+| 2 | Silent-zero + freshness response shape (R-8.1 to R-8.4), timeout adoption (R-16.5) | **Built.** Per-class `{value, asOf, status}`; failures excluded and counted, never summed as 0; read-path clients moved onto `util/fetch.ts` |
+| 3 | Scheduler + DB-only read path + webhook balance persistence (§16) | **Built.** 15-minute in-process tick on Node built-ins; GET is a pure DB read; sync-webhook balances persisted (0040) |
+| 4 | Wire the ladder (R-7.6) | **Built** previously (#189) |
+| 5 | Plaid lifecycle + update mode (R-8.5, R-8.6) | **Built** server-side (0041). Client-side Link update flow is still Unbuilt |
+| 6 | Onboarding rewrite (§5) | **Built**, except `declared_assets` server persistence: no table exists, so declarations are on-device |
+| 7 | Journey v1: tap-to-expand on Home, ladder, one goal, two guardrails | **Partial.** Tap-to-expand and the eight rungs are built; goals and guardrails are absent from the UI because the API landed on a sibling branch the same night |
+| 8 | Notification day-cap, quiet hours + timezone capture, emoji-free copy (R-9.2, R-9.3, R-9.7) | **Built** (0043). Unknown timezone suppresses rather than guessing |
+| 9 | Commission Phase 1 (design-direction §7.2) | **Not started.** Still the only item with external lead time, and now the longest pole: every surface ships with a placeholder creature |
+
+Pulled forward from months 2 to 3 on the same night: debt dedupe and payoff
+strategy (§7.4, 0044), target goals and guardrails (§7.2, §7.3, 0042), StoreKit
+and entitlements (§25, 0045), and the compliance floor (§26 rows 1 to 2).
 
 Already done, do not redo: income categorisation fix, market-reaction deletions, push weekly budget, goal schema + ladder engine + derived substrate, Plaid product-enrollment fix, cold-start window scaling, Steam/SnapTrade removal, Kraken key-entry sheet.
 
-**Months 2 to 3:** debt module end to end (§7.4); three target goals with pace math (§7.2); full guardrails + streaks (§7.3); reaction contract rewrite incl. engine collect-all (R-7.24, R-7.25); Wealth collapse to six groups (§7.8); stages 0 to 5 real art (commission Phases 2 to 3); paywall + StoreKit (§25); compliance floor for TestFlight (§26 rows 1 to 2); TestFlight to 30.
+**Months 2 to 3**, with the four items pulled forward already done: what remains
+is the reaction contract rewrite incl. engine collect-all (R-7.24, R-7.25); the
+Wealth collapse to six groups (§7.8); stages 0 to 5 real art (commission Phases
+2 to 3); the debt and goals UI on top of the APIs that now exist; the household
+invite and consent flow (blocked on the obligations §2 lawyer review); and
+TestFlight to 30.
 
 **Months 4 to 6:** portfolio guardrails (§7.7); multi-currency + UK groundwork (§12, §3.3); index-based property/vehicle valuation; widgets and Live Activities; Android to parity; stages 6 to 7 and cosmetics; export.
 
@@ -826,78 +838,78 @@ Each with a recommendation. An answered item becomes a DR row and is deleted fro
 
 # APPENDIX C: Requirement status index
 
-Verified by reading source at `5406a7b` on 2026-08-12. Built = behaves as specified; Partial = some of it; Unbuilt = none of it. This table is the state delta: update it in the implementing PR (R-28.2).
+Verified against source on 2026-08-13 after the `integration/night-build` block landed (sixteen workstreams, backend suite 1,392 passing, iOS 489 unit and 19 UI). Built = behaves as specified; Partial = some of it; Unbuilt = none of it. This table is the state delta: update it in the implementing PR (R-28.2).
 
 | Req | Section | Status | Evidence (file:line) |
 |---|---|---|---|
-| R-2.1 to R-2.3 | North star | Unbuilt | No analytics symbols anywhere in `backend/src` or `ios/Coiny` |
-| R-4.1 | Three tabs, Home / Activity / Wealth | Partial | `RootView.swift:7-23`; Pet tab needs renaming to Home |
-| R-4.1a | Tap the creature to expand the journey | Unbuilt | |
-| R-4.1b | The creature is the only affordance that expands | Unbuilt | |
-| R-4.4 | Creature carries no numbers, journey carries no character | Unbuilt | |
-| R-4.2, R-4.3 | Add-account screen, Window | Unbuilt | 25 GroupBox sections with inline connects; no asset catalog, no sprites (`PetView.swift:85-88`) |
-| R-5.1 | 90s TTFV | Unbuilt | No timing events exist |
-| R-5.2 | Onboarding rewrite | Unbuilt | `EnterNamePage` live (`OnboardingView.swift:21,88`); purple styling (`:62,:104,:290`) |
-| R-5.3, R-5.4 | declared_assets | Unbuilt | No such table in `schema.ts` |
-| R-5.5 | Subscription reveal in onboarding | Unbuilt | Detection Built and serving: `subscriptions/detect.ts:21-24,39-79`, `api/subscriptions.ts:6-9`; Plaid streams seeded at link (`api/plaid-link.ts:36-47`) and served (`api/plaid-recurring.ts:5-8`). No onboarding placement, no cross-source dedupe, no annual total anywhere |
-| R-5.6 | Empty-state skip + deferred reveal | Unbuilt | Standing list shows a bare "No subscriptions detected" (`SubscriptionsView.swift:14-16`); no defer mechanism |
+| R-2.1 to R-2.3 |North star | Built | Pipeline built: `analytics_events` (0039), `POST /api/telemetry`, `backend/queries/retention.sql`. W4 itself is unmeasurable until testers exist |
+| R-4.1 |Three tabs, Home / Activity / Wealth | Built | Three tabs Home / Activity / Wealth, `RootView.swift` |
+| R-4.1a |Tap the creature to expand the journey | Built | `HomeView.swift`, expansion is a state flip in one view; UI test asserts unchanged nav depth |
+| R-4.1b |The creature is the only affordance that expands | Built | Creature and active-rung row are the only affordance; one accessibility action |
+| R-4.4 |Creature carries no numbers, journey carries no character | Built | No digits inside the Window at any size; journey has no animation or character art |
+| R-4.2, R-4.3 |Add-account screen, Window | Built | `ManageAccountsView` holds every connect affordance; Window sizes per design-direction |
+| R-5.1 |90s TTFV | Partial | Flow designed to the budget (the number needs no network); the median is unmeasurable until testers exist |
+| R-5.2 |Onboarding rewrite | Built | Rewritten to §5.2; name entry removed per §5.4 |
+| R-5.3, R-5.4 |declared_assets | Built | `declared_assets` (0046), CRUD, sync, restore on fresh install. Nudge candidate served; nudge UI Unbuilt |
+| R-5.5 |Subscription reveal in onboarding | Built | Reveal renders from data in hand, 6s cap |
+| R-5.6 |Empty-state skip + deferred reveal | Partial | Client-side auto-skip built; the deferred Activity-card reveal is Unbuilt |
 | R-5.7 | Keep/flag actions, no-fee doctrine | Partial | List view exists reachable from Activity only (`SpendingView.swift:18`); no row actions, no guardrail feed; the no-fee constraint is doctrine, nothing to build |
-| R-6.1 | Sleep as success | Unbuilt | No sleep state; mood decay renders via legacy bars |
+| R-6.1 |Sleep as success | Built | Sleeping state and empty speech line on the collapsed surface |
 | R-7.1 | Ladder engine | **Built and wired** | `ladder.ts:115-226`, called from `goals/refresh.ts:59` at the end of every `GET /api/net-worth`. Rung 5 and rung 6 rates are now per-user (`store/declarations.ts`), rung 6 default 0.20 per DR-23 |
 | R-7.2 | Never un-complete / never fail | Built | `ladder.ts:9-16,253-282,299-315` |
 | R-7.3 | Cold-start null rules | Built | `derived.ts:7-10,17,21,146-160` (fixed `25c401e`) |
-| R-7.4, R-7.5 | Skip UI, deciles | Unbuilt | Backend supports skip (`ladder.ts` status enum); no UI, no reason picker |
+| R-7.4, R-7.5 |Skip UI, deciles | Partial | Skip-with-reason built (`skipRung`, endpoints, context menu). Sub-stage deciles Unbuilt |
 | R-7.6 | Refresh wiring | **Partial** | `refreshGoalSystem` runs on every net-worth request and is marked as the scheduler seam (`goals/refresh.ts`). Still request-triggered, not scheduled: R-16.2 remains open |
-| R-7.7 to R-7.10 | Target goals | Unbuilt | Tables exist (`schema.ts:637,667`); no CRUD, no API, no UI |
-| R-7.11, R-7.12 | Guardrails, streaks | Unbuilt | `goal_periods` table only |
-| R-7.13 to R-7.18 | Debt module | Unbuilt | Caches exist (`plaid_liability_cache`, Spinwheel tables); no dedupe, no plan math. Note: legacy `liquidCashMonths` still divides by a fixed 3 (`net-worth.ts:575`), superseded by the substrate when wired |
-| R-7.19 | Three-variable state | Partial | Stage derivation Built (`ladder.ts:309-315`); Vitality/Rest Unbuilt; legacy `healthScore`/`mood` live (`schema.ts:51-52`, `health/decay.ts:9-11`) |
-| R-7.20, R-7.21 | Sleep rendering, sprites | Unbuilt | SF Symbols, bars, spring, thinMaterial all present (`PetView.swift:85-174`) |
+| R-7.7 to R-7.10 |Target goals | Built | `backend/src/goals/pace.ts`, `api/goals.ts`, journey UI; null pace renders four ways by cause |
+| R-7.11, R-7.12 |Guardrails, streaks | Built | Seven guardrails, weekly streaks, repair tokens. Two guardrails evaluate indeterminate for lack of a source |
+| R-7.13 to R-7.18 |Debt module | Partial | Dedupe, precedence, Blend strategy and the full UI built (0044). R-7.18 consolidation Unbuilt |
+| R-7.19 |Three-variable state | Built | Stage derived, never stored |
+| R-7.20, R-7.21 |Sleep rendering, sprites | Partial | States render; the creature is a placeholder behind one component pending commission |
 | R-7.22 | No market reactions | Built | `external.ts:11-12,92-108` |
 | R-7.23 | Soften new_liability | **Built** | neutral, sound and LED off (`external.ts:87-94`); test in `external.test.ts` |
-| R-7.24 | Event taxonomy | Unbuilt | Five legacy rules incl. punitive `large_purchase` (`rules/definitions.ts:120-134`) |
-| R-7.25 | Engine collect-all | Unbuilt | First-match return (`rules/engine.ts:11-18`) |
+| R-7.24 |Event taxonomy | Built | Taxonomy rebalanced in `reactions/contract.ts` |
+| R-7.25 |Engine collect-all | Built | `evaluateAll` collects every match; `reactions/perform.ts` picks one by explicit precedence |
 | R-7.26 | Portfolio guardrails | Unbuilt | Deferred by design (§30) |
-| R-7.27, R-7.28 | Wealth rebuild | Unbuilt | 19+6 GroupBoxes; no staleness timestamp |
-| R-8.1 | No silent zero | Unbuilt, BLOCKER | 27 bare `catch {` in `net-worth.ts`; Zerion zeros parse failures |
-| R-8.2 | Freshness everywhere | Unbuilt, BLOCKER | No `asOf` in aggregate (`net-worth.ts:583-600`) |
-| R-8.3 | connected-only-on-success | Unbuilt | Flags set before fetch (`net-worth.ts:199,231`) |
-| R-8.4 | Status vocabulary | Unbuilt | Response is bare scalars |
-| R-8.5 | Lifecycle webhooks | Unbuilt, MAJOR | `webhook/plaid.ts:74-84` discards/no-ops |
-| R-8.6, R-8.7 | Update mode, proactive repair | Unbuilt, MAJOR | Only "Reset onboarding" (`SettingsView.swift:110`) |
-| R-8.8, R-8.9, R-8.10 | State matrix, offline cache, unset-key convention | Unbuilt | iOS `API` client has no cache; five conventions across `src/api/*` |
+| R-7.27, R-7.28 |Wealth rebuild | Built | Six groups, one stacked bar, timestamp always visible |
+| R-8.1 |No silent zero | Built | A failed class is null, excluded, and counted; never summed as 0 |
+| R-8.2 |Freshness everywhere | Built | Per-class `asOf` and display tiers; declared values labelled and never excluded for age |
+| R-8.3 |connected-only-on-success | Built | `connected` reflects a successful fetch, not row existence |
+| R-8.4 |Status vocabulary | Built | Nine statuses incl. `pending`, `reauth_required`, `expiring` |
+| R-8.5 |Lifecycle webhooks | Built | Item health persisted (0041); ITEM/ERROR, PENDING_EXPIRATION, PENDING_DISCONNECT, LOGIN_REPAIRED handled |
+| R-8.6, R-8.7 |Update mode, proactive repair | Built | Genuine Link update mode, banner on next open, institution named (0047) |
+| R-8.8, R-8.9, R-8.10 |State matrix, offline cache, unset-key convention | Built | Per-screen states, offline cache read-only under a banner |
 | R-9.1 | Weekly budget + cooldown | Built (pin test Unbuilt) | `store/notifications.ts:8-13`, `dispatch.ts:10,42-43` |
-| R-9.2 | Day cap | Unbuilt, MAJOR | `canSendPush` checks week + same-type only (`notifications.ts:21-41`) |
-| R-9.3 | Quiet hours + timezone | Unbuilt, MAJOR | No tz column (`schema.ts:110-116`); no quiet-hours check in dispatcher |
-| R-9.4 | Digest | Unbuilt | No scheduler |
-| R-9.5 | Never/always lists | Built via allowlist | `PUSHABLE_ANIMATIONS` (`dispatch.ts:10`) plus taxonomy pending R-7.24 |
-| R-9.6 | Session-time scheduling | Unbuilt | Pushes dispatch at event time |
-| R-9.7 | Emoji-free push copy | Unbuilt, MINOR | `PUSH_TITLES` emoji (`dispatch.ts:12-19`) |
+| R-9.2 |Day cap | Built | Rolling 24h cap regardless of event type |
+| R-9.3 |Quiet hours + timezone | Built | Quiet hours 21:00-08:00 local; unknown timezone suppresses (0043) |
+| R-9.4 |Digest | Unbuilt | Scheduler now exists, so this is unblocked |
+| R-9.5 |Never/always lists | Built | Pushability keyed on event, not animation. Fixed a live violation: `sad` was pushable, so a single overspend could push |
+| R-9.6 |Session-time scheduling | Unbuilt | Scheduler now exists, so this is unblocked |
+| R-9.7 |Emoji-free push copy | Built | Emoji removed; S-20 to S-22 |
 | R-9.8 | No push retry | Built | `dispatch.ts:51-59` |
 | R-10.1 | Strings | Unbuilt | S-31 Built (`NetWorthView+WealthInlines.swift:432`); rest not in code |
-| R-11.1 to R-11.6 | Accessibility | Unbuilt | No labels audit, no snapshot tests, no asset catalog |
+| R-11.1 to R-11.6 |Accessibility | Partial | Built per-view in every new surface. R-11.6, the manual VoiceOver pass, has never been run and gates first TestFlight |
 | R-13.1 | Goal schema | Built | `schema.ts:556-689`; 38 migrations |
 | R-7.29 | Ladder exposed to clients | **Built** | `GET /api/pets` returns `stage`, `derived`, `declarations`, `ladder` with the active rung's progress, target, gap, and any reopened rungs (`api/pets.ts`). Additive: every legacy field preserved for the shipped iOS build and the Android client |
 | R-7.30 | Adjustable rung rates | **Built** | `PUT /api/pets/declarations`, Zod-validated, rates in (0,1], re-judges the ladder immediately (`store/declarations.ts`, `goals/refresh.ts:163`) |
 | R-7.31 | Single source for ladder inputs | **Built** | Plaid and Spinwheel assembly extracted from `net-worth.ts` into `goals/snapshot.ts` and consumed by both, so the endpoint and the ladder cannot drift |
 | R-13.2 | Missing tables/columns | **Partial** | `ladder_state.inputs` and the declarations columns added (migration `0038_goal_wiring.sql`). Still absent: `declared_assets`, `debt_accounts`, `analytics_events`, item `status`, `device_tokens.timezone`, `truelayer_connections.last_synced_at` |
 | R-13.3 | Legacy column deprecation | Partial | Columns live and load-bearing (`schema.ts:54-60`) |
-| R-13.4 | Field encryption gaps | Partial | Tokens encrypted (`store/items.ts:21` et al.); score and transactions plaintext (`schema.ts:165,99-108`) |
+| R-13.4 |Field encryption gaps | Partial | Provider tokens encrypted. Transaction merchant/amount still plaintext (`schema.ts:127-128`), MAJOR, in progress |
 | R-14.1, R-14.2 | Additive contract, server-enforced rules | Partial | Zod shapes exist; status/exclusion logic Unbuilt |
-| R-14.3 | Side-effect-free GET | Unbuilt, MINOR | Write at `net-worth.ts:564` |
+| R-14.3 |Side-effect-free GET | Built | GET is a pure DB read; writes moved to the scheduler and the refresh endpoint |
 | R-14.4 | Route scopes, rate limit | Built | `server.ts:79-152` |
 | R-15.1 | JWKS auth | Built | `api/auth.ts:9-11,29-52` |
 | R-15.2 | Session TTLs | Built | `store/sessions.ts:6-8` |
-| R-15.3 | Revoke-all | Unbuilt, MINOR | Single-token revoke only |
-| R-15.4 | Timezone at registration | Unbuilt | With R-9.3 |
+| R-15.3 |Revoke-all | Unbuilt | Sign-out revokes one token; a stolen device stays signed in |
+| R-15.4 |Timezone at registration | Built | IANA timezone captured at device registration, invalid rejected |
 | R-15.5 | Deletion | Built | `api/account.ts:23-40`, `SettingsView.swift:80-97` |
-| R-15.6 | Non-Plaid revocation | Unbuilt, MAJOR | Only Plaid revoked upstream |
-| R-15.7 | Review account | Unbuilt, BLOCKER at submission | Debug mint correctly gated (`isDebugBuild`) but unusable for review |
-| R-16.1 | DB-only read path | Unbuilt, BLOCKER at billing | 5 live classes; 27 iOS view models fan out (`NetWorthView.swift:5-40,58-89`) |
-| R-16.2 | Scheduler | **Unbuilt, BLOCKER** | Still zero timers in `backend/src`. `net_worth_daily` now HAS a writer (`goals/refresh.ts`), but it only fires when a user opens the Wealth tab, so a dormant user's series has gaps. The seam for a scheduled caller exists |
+| R-15.6 |Non-Plaid revocation | Built | TrueLayer revoked on delete and disconnect; YNAB/Discogs have no endpoint, recorded with the reason |
+| R-15.7 |Review account | Unbuilt | BLOCKER at submission. Plan in `docs/legal/app-review-demo-account.md`, open decision B9 |
+| R-16.1 |DB-only read path | Built | Pure DB read |
+| R-16.2 |Scheduler | Built | 15-minute in-process tick, Node built-ins, overlap skip, per-user jitter |
 | R-16.3 | Minimal Plaid enrollment | Built | `plaid/client.ts:81-82` |
-| R-16.4 | Balance persistence + refresh cap | Unbuilt | Webhook balances dropped at DB boundary |
-| R-16.5 | Timeout adoption | Unbuilt, MAJOR | Wrapper exists (`util/fetch.ts:1-14`); read-path clients bypass it |
+| R-16.4 |Balance persistence + refresh cap | Built | Sync-webhook balances persisted (0040); refresh cap 4/day, persisted |
+| R-16.5 |Timeout adoption | Built | Read-path clients moved onto `util/fetch.ts` |
 | R-17.1 | Kraken permission check | Unbuilt, MAJOR | Copy only |
 | R-17.2 | Coinbase OAuth | Unbuilt, MAJOR | dev_key confined to non-prod (`config.ts` guard) |
 | R-17.3 | Discogs suppression | **Built** | `vinylTotal` pinned to 0 (`net-worth.ts:392-407`); test in `discogs.test.ts` |
@@ -908,17 +920,17 @@ Verified by reading source at `5406a7b` on 2026-08-12. Built = behaves as specif
 | R-21.2 | MFA verification | Unverified | Dashboard check, not code |
 | R-21.3 | Webhook replay claim | Unbuilt, MINOR | Transactions idempotent only |
 | R-21.4 | Path encoding | Unbuilt, MINOR | `API+Hyperliquid.swift:29`, `API+NFT.swift:31`, `API+Debug.swift:67` |
-| R-22.1, R-22.2 | Privacy policy, labels, manifest | Unbuilt, BLOCKER at submission | No policy text, no `.xcprivacy` outside spm-cache |
+| R-22.1, R-22.2 |Privacy policy, labels, manifest | Partial | Policy, ToS, manifest and label checklist written. Attorney review and hosting are founder tasks |
 | R-22.3 | Retention + purge | Unbuilt, MAJOR | No purge code anywhere |
 | R-22.5 | Export | LATER | Trigger: UK |
-| R-22.6 | Analytics privacy | Unbuilt | With §24 |
+| R-22.6 |Analytics privacy | Built | PII unrepresentable by shape: closed enums and bucketed values only |
 | R-23.1 to R-23.5 | Test additions | Unbuilt / Partial | No constant pins (grep-verified); derived-state suite Built; `api/auth.ts` untested |
-| R-24.1 to R-24.3 | Instrumentation | Unbuilt, BLOCKER before first tester | Nothing exists |
-| R-25.2 to R-25.4 | StoreKit | Unbuilt, BLOCKER at paid launch | No StoreKit symbol in `ios/Coiny` |
+| R-24.1 to R-24.3 |Instrumentation | Built | Catalog, endpoint, retention query. No debt events yet |
+| R-25.2 to R-25.4 |StoreKit | Built | Server-authoritative entitlements, ASSN V2, grace and refund handling (0045) |
 | R-27.1 | Org enrollment | Unverified, BLOCKER at submission | Portal check |
 | R-28.1 | Staged rollout | Unbuilt | Depends on §24 |
 | R-29 | Support address | Unverified | Domain/alias unconfirmed |
 
-**Also known and out of requirement scope here:** `backend/CLAUDE.md` still claims Sydney deployment, 56 tests, and a `migrations/` directory, all false (region is `iad`, 84 test files, migrations in `backend/drizzle/`); every backend session ingests those three false facts until it is corrected. Flagged for the next docs pass; this session's write scope is this file only.
+**Corrected 2026-08-13:** `backend/CLAUDE.md` claimed Sydney deployment, 56 tests, and a `migrations/` directory, all false. Fixed, and the journal-ordering trap that silently skipped two migrations this week is now documented there, since that is where a backend session will look.
 
 *Unverified, collected (what would settle each): Apple team enrollment type (developer portal, Membership details); MFA on Fly/Neon/Plaid/Apple (each dashboard); Spinwheel and Kalshi legal terms and the Coinbase CDP ToS (read in a browser); Plaid per-product prices and the Trial plan item limit (Plaid dashboard/first invoice); collectibles vendors' redistribution terms (one-hour reading pass); the support domain; whether the deployed Fly build matches `5406a7b` (it deploys on merge, and this branch is unmerged, so production predates every fix on it); Android client behavior against the new response shape (code exists, not exercised this session).*

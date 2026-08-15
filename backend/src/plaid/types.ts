@@ -47,6 +47,9 @@ export type PlaidAccount = {
   official_name: string | null;
   type: string;
   subtype: string | null;
+  // Last 2-4 characters of the displayed account number; may be non-unique
+  // within an Item. Optional because older cached fixtures omit it.
+  mask?: string | null;
 };
 
 export type TransactionsSyncResponse = {
@@ -69,6 +72,18 @@ export type LinkTokenCreateResponse = {
 export type PublicTokenExchangeResponse = {
   access_token: string;
   item_id: string;
+  request_id: string;
+};
+
+// /item/get, only the fields we read. institution_id and institution_name are
+// null for items created without an institution connection (e.g. Same Day
+// Micro-deposits).
+export type ItemGetResponse = {
+  item: {
+    item_id: string;
+    institution_id: string | null;
+    institution_name: string | null;
+  };
   request_id: string;
 };
 

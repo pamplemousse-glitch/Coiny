@@ -35,28 +35,59 @@ import { getPortfolio } from '../src/zerion/client.js';
 const mockedAccountsBalanceGet = vi.mocked(accountsBalanceGet);
 const mockedInvestmentsHoldingsGet = vi.mocked(investmentsHoldingsGet);
 const mockedLiabilitiesGet = vi.mocked(liabilitiesGet);
-const _mockedGetAccounts = vi.mocked(getAccounts);
-const _mockedGetSpotPrices = vi.mocked(getSpotPrices);
-const _mockedGetPortfolio = vi.mocked(getPortfolio);
+const mockedGetAccounts = vi.mocked(getAccounts);
+const mockedGetSpotPrices = vi.mocked(getSpotPrices);
+const mockedGetPortfolio = vi.mocked(getPortfolio);
 const mockedGetDebtProfile = vi.mocked(getDebtProfile);
 
-describe('GET /api/net-worth', () => {
+const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
+
+function agoDate(ms: number): Date {
+  return new Date(Date.now() - ms);
+}
+
+function defaultPlaidMocks(): void {
+  mockedInvestmentsHoldingsGet.mockResolvedValue({ accounts: [], holdings: [], securities: [], request_id: 'r' });
+  mockedLiabilitiesGet.mockResolvedValue({
+    accounts: [],
+    liabilities: { credit: null, mortgage: null, student: null },
+    request_id: 'r',
+  });
+  mockedAccountsBalanceGet.mockResolvedValue({ accounts: [], request_id: 'r' });
+}
+
+async function seedBankBalances(itemId: string, balance: number, asOf: Date = new Date()): Promise<void> {
+  const { upsertPlaidAccountBalances } = await import('../src/store/asset-cache.js');
+  await upsertPlaidAccountBalances(
+    testUserId,
+    itemId,
+    [{ accountId: `acct-${itemId}`, name: 'Checking', type: 'depository', subtype: 'checking', balance }],
+    asOf,
+  );
+}
+
+type ClassReading = { value: number | null; asOf: string | null; status: string };
+type NetWorthBody = {
+  total: number;
+  bank: number;
+  crypto: number;
+  defi: number;
+  debts: number;
+  declared: number;
+  investments: number;
+  classes: Record<string, ClassReading>;
+  excluded: { count: number; classes: string[] };
+  connections: Record<string, boolean>;
+  accounts: { bank: Array<{ accountId: string; asOf: string | null }> };
+  generatedAt: string;
+};
+
+describe('GET /api/net-worth (DB-only read)', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
     await resetDatabase();
-    // Prevent "Cannot read properties of undefined" errors in investment/liability loops
-    // when a test sets up Plaid items but doesn't care about these products.
-    mockedInvestmentsHoldingsGet.mockResolvedValue({
-      accounts: [],
-      holdings: [],
-      securities: [],
-      request_id: 'r',
-    });
-    mockedLiabilitiesGet.mockResolvedValue({
-      accounts: [],
-      liabilities: { credit: null, mortgage: null, student: null },
-      request_id: 'r',
-    });
+    defaultPlaidMocks();
   });
 
   it('returns zeros with no connections', async () => {
@@ -66,19 +97,14 @@ describe('GET /api/net-worth', () => {
     const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
     expect(res.statusCode).toBe(200);
 
-    const body = res.json<{
-      total: number;
-      bank: number;
-      crypto: number;
-      defi: number;
-      debts: number;
-      connections: { coinbase: boolean; zerion: boolean; spinwheel: boolean };
-    }>();
+    const body = res.json<NetWorthBody>();
     expect(body.total).toBe(0);
     expect(body.bank).toBe(0);
     expect(body.crypto).toBe(0);
     expect(body.defi).toBe(0);
     expect(body.debts).toBe(0);
+    expect(body.classes.bank?.status).toBe('not_connected');
+    expect(body.excluded.count).toBe(0);
     expect(body.connections.coinbase).toBe(false);
     expect(body.connections.zerion).toBe(false);
     expect(body.connections.spinwheel).toBe(false);
@@ -96,9 +122,329 @@ describe('GET /api/net-worth', () => {
     await app.close();
   });
 
-  it('aggregates bank balances from Plaid items', async () => {
+  it('makes no external calls even when every live-class provider is connected', async () => {
+    const { upsertItem } = await import('../src/store/items.js');
+    const { db } = await import('../src/db/client.js');
+    const { coinbaseConnections, spinwheelConnections, zerionWallets } = await import('../src/db/schema.js');
+    await upsertItem({ itemId: 'item-db-1', accessToken: 'access-db-1', userId: testUserId });
+    await db().insert(coinbaseConnections).values({ userId: testUserId, mode: 'dev_key' });
+    await db().insert(zerionWallets).values({ userId: testUserId, address: '0xabc' });
+    await db().insert(spinwheelConnections).values({ userId: testUserId, spinwheelUserId: 'sw-db-1' });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+
+    expect(mockedAccountsBalanceGet).not.toHaveBeenCalled();
+    expect(mockedInvestmentsHoldingsGet).not.toHaveBeenCalled();
+    expect(mockedLiabilitiesGet).not.toHaveBeenCalled();
+    expect(mockedGetAccounts).not.toHaveBeenCalled();
+    expect(mockedGetSpotPrices).not.toHaveBeenCalled();
+    expect(mockedGetPortfolio).not.toHaveBeenCalled();
+    expect(mockedGetDebtProfile).not.toHaveBeenCalled();
+
+    await app.close();
+  });
+
+  it('does not write anything: no daily point, no milestone baseline', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { eq } = await import('drizzle-orm');
+    const { chainWallets, petState } = await import('../src/db/schema.js');
+    await db().update(petState).set({ lastNetWorthUsd: '9500' }).where(eq(petState.userId, testUserId));
+    await db()
+      .insert(chainWallets)
+      .values({ userId: testUserId, chain: 'bitcoin', address: '1A1zP1', lastBalanceUsd: '11000' });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+    expect(res.json<NetWorthBody>().total).toBe(11000);
+
+    const { netWorthPointCount } = await import('../src/store/goals.js');
+    expect(await netWorthPointCount(testUserId)).toBe(0);
+    const [pet] = await db().select().from(petState).where(eq(petState.userId, testUserId));
+    expect(pet!.lastNetWorthUsd).toBe('9500');
+
+    await app.close();
+  });
+
+  it('serves cached bank balances with status ok and asOf', async () => {
     const { upsertItem } = await import('../src/store/items.js');
     await upsertItem({ itemId: 'item-nw-1', accessToken: 'access-test-1', userId: testUserId });
+    await seedBankBalances('item-nw-1', 6500);
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json<NetWorthBody>();
+    expect(body.bank).toBe(6500);
+    expect(body.total).toBe(6500);
+    expect(body.classes.bank?.status).toBe('ok');
+    expect(body.classes.bank?.asOf).not.toBeNull();
+    expect(body.accounts.bank).toHaveLength(1);
+    expect(body.accounts.bank[0]?.asOf).not.toBeNull();
+
+    await app.close();
+  });
+
+  it('labels a bank balance older than a day as stale but keeps it in the total', async () => {
+    const { upsertItem } = await import('../src/store/items.js');
+    await upsertItem({ itemId: 'item-stale-1', accessToken: 'access-stale-1', userId: testUserId });
+    await seedBankBalances('item-stale-1', 4000, agoDate(3 * DAY));
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+
+    const body = res.json<NetWorthBody>();
+    expect(body.classes.bank?.status).toBe('stale');
+    expect(body.total).toBe(4000);
+    expect(body.excluded.count).toBe(0);
+
+    await app.close();
+  });
+
+  it('excludes a bank balance past the 7-day never-show age from the total', async () => {
+    const { upsertItem } = await import('../src/store/items.js');
+    await upsertItem({ itemId: 'item-old-1', accessToken: 'access-old-1', userId: testUserId });
+    await seedBankBalances('item-old-1', 4000, agoDate(8 * DAY));
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json<NetWorthBody>();
+    expect(body.classes.bank?.status).toBe('stale_excluded');
+    // The muted last value is still visible; only the total excludes it.
+    expect(body.classes.bank?.value).toBe(4000);
+    expect(body.bank).toBe(4000);
+    expect(body.total).toBe(0);
+    expect(body.excluded.count).toBe(1);
+    expect(body.excluded.classes).toContain('bank');
+
+    await app.close();
+  });
+
+  it('reports pending for a linked bank item with no synced balances yet', async () => {
+    const { upsertItem } = await import('../src/store/items.js');
+    await upsertItem({ itemId: 'item-pend-1', accessToken: 'access-pend-1', userId: testUserId });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+
+    const body = res.json<NetWorthBody>();
+    expect(body.classes.bank?.status).toBe('pending');
+    expect(body.classes.bank?.value).toBeNull();
+    expect(body.total).toBe(0);
+    expect(body.excluded.classes).toContain('bank');
+
+    await app.close();
+  });
+
+  it('reports error, not zero, when the bank refresh has failed with no cache', async () => {
+    const { upsertItem } = await import('../src/store/items.js');
+    const { recordClassFailure } = await import('../src/store/asset-cache.js');
+    await upsertItem({ itemId: 'item-err-1', accessToken: 'access-err-1', userId: testUserId });
+    await recordClassFailure(testUserId, 'bank', 'timeout');
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json<NetWorthBody>();
+    expect(body.classes.bank?.status).toBe('error');
+    expect(body.classes.bank?.value).toBeNull();
+    expect(body.excluded.classes).toContain('bank');
+
+    await app.close();
+  });
+
+  it('serves cached spinwheel debts as negative in the total', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { spinwheelConnections } = await import('../src/db/schema.js');
+    const { recordClassSuccess } = await import('../src/store/asset-cache.js');
+    await db().insert(spinwheelConnections).values({ userId: testUserId, spinwheelUserId: 'sw-nw-1' });
+    await recordClassSuccess(testUserId, 'debts', {
+      valueUsd: 12500,
+      payload: {
+        items: [
+          { id: 'debt-1', type: 'STUDENT_LOAN', balance: 10000, monthlyPayment: 150 },
+          { id: 'debt-2', type: 'CREDIT_CARD', balance: 2500, monthlyPayment: 75 },
+        ],
+        debts: [],
+      },
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+
+    const body = res.json<NetWorthBody>();
+    expect(body.debts).toBe(-12500);
+    expect(body.total).toBe(-12500);
+    expect(body.connections.spinwheel).toBe(true);
+
+    await app.close();
+  });
+
+  it('falls back to plaid-visible debt when the bureau cache is past 45 days', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { spinwheelConnections } = await import('../src/db/schema.js');
+    const { recordClassSuccess, upsertPlaidAccountBalances } = await import('../src/store/asset-cache.js');
+    const { upsertItem } = await import('../src/store/items.js');
+
+    await upsertItem({ itemId: 'item-fb-1', accessToken: 'access-fb-1', userId: testUserId });
+    await upsertPlaidAccountBalances(testUserId, 'item-fb-1', [
+      { accountId: 'acct-chk', name: 'Checking', type: 'depository', subtype: 'checking', balance: 5000 },
+      { accountId: 'acct-card', name: 'Visa', type: 'credit', subtype: 'credit card', balance: 1200 },
+    ]);
+    await db().insert(spinwheelConnections).values({ userId: testUserId, spinwheelUserId: 'sw-fb-1' });
+    await recordClassSuccess(testUserId, 'debts', {
+      valueUsd: 9999,
+      payload: { items: [], debts: [] },
+      asOf: agoDate(46 * DAY),
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+
+    const body = res.json<NetWorthBody>();
+    // Bureau data past its never-show age: debts drop out of the total and
+    // Plaid-visible credit folds into the bank scalar instead. Never both.
+    expect(body.classes.debts?.status).toBe('stale_excluded');
+    expect(body.bank).toBe(3800); // 5000 - 1200
+    expect(body.total).toBe(3800);
+    expect(body.debts).toBe(0);
+    expect(body.excluded.classes).toContain('debts');
+
+    await app.close();
+  });
+
+  it('feeds the declared sheet into the total as a signed net', async () => {
+    const { replaceDeclaredAssets } = await import('../src/store/declared-assets.js');
+    const now = new Date();
+    await replaceDeclaredAssets(
+      testUserId,
+      [
+        { assetClass: 'home', bucketedValueUsd: 300000, declaredAt: now },
+        { assetClass: 'credit_cards', bucketedValueUsd: 5000, declaredAt: now },
+        { assetClass: 'student_loans', bucketedValueUsd: 20000, declaredAt: now },
+      ],
+      now,
+    );
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    const body = res.json<NetWorthBody>();
+    expect(body.declared).toBe(275000);
+    expect(body.total).toBe(275000);
+    expect(body.classes.declared?.status).toBe('ok');
+    expect(body.classes.declared?.asOf).toBe(now.toISOString());
+
+    await app.close();
+  });
+
+  it('never excludes a declared value for age (R-8.2)', async () => {
+    const { replaceDeclaredAssets } = await import('../src/store/declared-assets.js');
+    const yearsOld = agoDate(500 * DAY);
+    await replaceDeclaredAssets(
+      testUserId,
+      [{ assetClass: 'car', bucketedValueUsd: 12000, declaredAt: yearsOld }],
+      yearsOld,
+    );
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    const body = res.json<NetWorthBody>();
+    expect(body.classes.declared?.status).toBe('ok');
+    expect(body.total).toBe(12000);
+    expect(body.excluded.count).toBe(0);
+
+    await app.close();
+  });
+
+  it('serves an all-skipped declared sheet as null value, never zero', async () => {
+    const { replaceDeclaredAssets } = await import('../src/store/declared-assets.js');
+    const now = new Date();
+    await replaceDeclaredAssets(testUserId, [{ assetClass: 'home', bucketedValueUsd: null, declaredAt: now }], now);
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    const body = res.json<NetWorthBody>();
+    expect(body.classes.declared?.value).toBeNull();
+    expect(body.total).toBe(0);
+    expect(body.excluded.count).toBe(0);
+
+    await app.close();
+  });
+
+  it('computes liquidCashMonths from cached depository balance and 90-day outflows', async () => {
+    const { upsertItem } = await import('../src/store/items.js');
+    const { persistTransactions } = await import('../src/store/transactions.js');
+    await upsertItem({ itemId: 'item-lc-1', accessToken: 'access-lc-1', userId: testUserId });
+    await seedBankBalances('item-lc-1', 6000);
+
+    const txDate = new Date();
+    txDate.setDate(txDate.getDate() - 30);
+    await persistTransactions(testUserId, [
+      {
+        id: 'tx-1',
+        account_id: 'acct-item-lc-1',
+        amount: '-6000',
+        date: txDate.toISOString().slice(0, 10),
+        description: '',
+        status: 'posted',
+        type: 'debit',
+        running_balance: null,
+      },
+    ]);
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+
+    expect(res.json<{ liquidCashMonths: number | null }>().liquidCashMonths).toBe(3);
+
+    await app.close();
+  });
+
+  it('returns liquidCashMonths as null when no transactions exist', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(res.json<{ liquidCashMonths: number | null }>().liquidCashMonths).toBeNull();
+
+    await app.close();
+  });
+});
+
+describe('POST /api/net-worth/refresh (explicit live path)', () => {
+  beforeEach(async () => {
+    vi.resetAllMocks();
+    await resetDatabase();
+    defaultPlaidMocks();
+  });
+
+  it('fetches, persists, and returns bank balances', async () => {
+    const { upsertItem } = await import('../src/store/items.js');
+    await upsertItem({ itemId: 'item-r-1', accessToken: 'access-r-1', userId: testUserId });
 
     mockedAccountsBalanceGet.mockResolvedValue({
       accounts: [
@@ -125,18 +471,26 @@ describe('GET /api/net-worth', () => {
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
-    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    const res = await app.inject({ method: 'POST', url: '/api/net-worth/refresh', headers: authHeader() });
     expect(res.statusCode).toBe(200);
 
-    const body = res.json<{ bank: number; total: number; accounts: { bank: unknown[] } }>();
+    const body = res.json<NetWorthBody & { bankRefresh: string }>();
     expect(body.bank).toBe(6500);
-    expect(body.accounts.bank).toHaveLength(2);
     expect(body.total).toBe(6500);
+    expect(body.classes.bank?.status).toBe('ok');
+    expect(body.accounts.bank).toHaveLength(2);
+    expect(body.bankRefresh).toBe('refreshed');
+
+    // A subsequent DB-only GET serves the same numbers without a live call.
+    vi.clearAllMocks();
+    const get = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    expect(get.json<NetWorthBody>().bank).toBe(6500);
+    expect(mockedAccountsBalanceGet).not.toHaveBeenCalled();
 
     await app.close();
   });
 
-  it('subtracts credit and loan accounts from bank total', async () => {
+  it('subtracts credit accounts from the bank total when no bureau data exists', async () => {
     const { upsertItem } = await import('../src/store/items.js');
     await upsertItem({ itemId: 'item-credit-1', accessToken: 'access-credit-1', userId: testUserId });
 
@@ -164,22 +518,19 @@ describe('GET /api/net-worth', () => {
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
+    const res = await app.inject({ method: 'POST', url: '/api/net-worth/refresh', headers: authHeader() });
 
-    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
-    expect(res.statusCode).toBe(200);
-
-    const body = res.json<{ bank: number; total: number }>();
-    expect(body.bank).toBe(3800); // 5000 - 1200
+    const body = res.json<NetWorthBody>();
+    expect(body.bank).toBe(3800);
     expect(body.total).toBe(3800);
 
     await app.close();
   });
 
-  it('aggregates investment holdings into investmentsTotal', async () => {
+  it('aggregates investment holdings and persists them for the read path', async () => {
     const { upsertItem } = await import('../src/store/items.js');
     await upsertItem({ itemId: 'item-inv-1', accessToken: 'access-inv-1', userId: testUserId });
 
-    mockedAccountsBalanceGet.mockResolvedValue({ accounts: [], request_id: 'r' });
     mockedInvestmentsHoldingsGet.mockResolvedValue({
       accounts: [],
       holdings: [
@@ -209,138 +560,21 @@ describe('GET /api/net-worth', () => {
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
+    const res = await app.inject({ method: 'POST', url: '/api/net-worth/refresh', headers: authHeader() });
 
-    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
-    expect(res.statusCode).toBe(200);
-
-    const body = res.json<{
-      investments: number;
-      total: number;
-      accounts: { investments: { securityId: string; ticker: string | null }[] };
-    }>();
+    const body = res.json<
+      NetWorthBody & { accounts: { investments: Array<{ securityId: string; ticker: string | null }> } }
+    >();
     expect(body.investments).toBe(15000);
     expect(body.total).toBe(15000);
+    expect(body.classes.investments?.status).toBe('ok');
     expect(body.accounts.investments).toHaveLength(2);
-    const aapl = body.accounts.investments.find((h) => h.securityId === 'sec-1');
-    expect(aapl?.ticker).toBe('AAPL');
+    expect(body.accounts.investments.find((h) => h.securityId === 'sec-1')?.ticker).toBe('AAPL');
 
     await app.close();
   });
 
-  it('enriches credit account with liability payment metadata', async () => {
-    const { upsertItem } = await import('../src/store/items.js');
-    await upsertItem({ itemId: 'item-liab-1', accessToken: 'access-liab-1', userId: testUserId });
-
-    mockedAccountsBalanceGet.mockResolvedValue({
-      accounts: [
-        {
-          account_id: 'acct-visa',
-          name: 'Visa Card',
-          type: 'credit',
-          subtype: 'credit card',
-          official_name: null,
-          balances: { current: 2000, available: 3000, iso_currency_code: 'USD', limit: null },
-        },
-      ],
-      request_id: 'r',
-    });
-    mockedLiabilitiesGet.mockResolvedValue({
-      accounts: [],
-      liabilities: {
-        credit: [
-          {
-            account_id: 'acct-visa',
-            is_overdue: null,
-            minimum_payment_amount: 50,
-            next_payment_due_date: '2026-06-15',
-            last_statement_balance: null,
-            aprs: null,
-          },
-        ],
-        mortgage: null,
-        student: null,
-      },
-      request_id: 'r',
-    });
-
-    const { buildApp } = await import('../src/server.js');
-    const app = await buildApp();
-
-    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
-    expect(res.statusCode).toBe(200);
-
-    const body = res.json<{
-      accounts: { bank: Array<{ accountId: string; minPayment: number | null; nextDueDate: string | null }> };
-    }>();
-    const visa = body.accounts.bank.find((a) => a.accountId === 'acct-visa');
-    expect(visa?.minPayment).toBe(50);
-    expect(visa?.nextDueDate).toBe('2026-06-15');
-
-    await app.close();
-  });
-
-  it('returns liquidCashMonths as null when no transactions exist', async () => {
-    const { buildApp } = await import('../src/server.js');
-    const app = await buildApp();
-
-    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
-    expect(res.statusCode).toBe(200);
-
-    const body = res.json<{ liquidCashMonths: number | null }>();
-    expect(body.liquidCashMonths).toBeNull();
-
-    await app.close();
-  });
-
-  it('computes liquidCashMonths from depository balance and 90-day outflows', async () => {
-    const { upsertItem } = await import('../src/store/items.js');
-    const { persistTransactions } = await import('../src/store/transactions.js');
-    await upsertItem({ itemId: 'item-lc-1', accessToken: 'access-lc-1', userId: testUserId });
-
-    mockedAccountsBalanceGet.mockResolvedValue({
-      accounts: [
-        {
-          account_id: 'acct-checking',
-          name: 'Checking',
-          type: 'depository',
-          subtype: 'checking',
-          official_name: null,
-          balances: { current: 6000, available: 6000, iso_currency_code: 'USD', limit: null },
-        },
-      ],
-      request_id: 'r',
-    });
-
-    // 3 months of $6000 total outflows over 90 days → avgMonthlyBurn = $2000 → 6000/2000 = 3 months
-    const txDate = new Date();
-    txDate.setDate(txDate.getDate() - 30);
-    const dateStr = txDate.toISOString().slice(0, 10);
-    await persistTransactions(testUserId, [
-      {
-        id: 'tx-1',
-        account_id: 'acct-checking',
-        amount: '-6000',
-        date: dateStr,
-        description: '',
-        status: 'posted',
-        type: 'debit',
-        running_balance: null,
-      },
-    ]);
-
-    const { buildApp } = await import('../src/server.js');
-    const app = await buildApp();
-
-    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
-    expect(res.statusCode).toBe(200);
-
-    const body = res.json<{ liquidCashMonths: number | null }>();
-    expect(body.liquidCashMonths).toBe(3);
-
-    await app.close();
-  });
-
-  it('includes spinwheel debts as negative in total', async () => {
+  it('fetches spinwheel debts live and reports the connection on success', async () => {
     const { db } = await import('../src/db/client.js');
     const { spinwheelConnections } = await import('../src/db/schema.js');
     await db().insert(spinwheelConnections).values({ userId: testUserId, spinwheelUserId: 'sw-nw-1' });
@@ -352,80 +586,184 @@ describe('GET /api/net-worth', () => {
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
+    const res = await app.inject({ method: 'POST', url: '/api/net-worth/refresh', headers: authHeader() });
 
-    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
-    expect(res.statusCode).toBe(200);
-
-    const body = res.json<{ debts: number; total: number; connections: { spinwheel: boolean } }>();
+    const body = res.json<NetWorthBody>();
     expect(body.debts).toBe(-12500);
     expect(body.total).toBe(-12500);
     expect(body.connections.spinwheel).toBe(true);
+    expect(body.classes.debts?.status).toBe('ok');
 
     await app.close();
   });
 
-  it('fires net_worth_milestone reaction when total crosses $10k threshold', async () => {
+  it('reports a coinbase outage as status error, never as a silent zero', async () => {
     const { db } = await import('../src/db/client.js');
-    const { eq } = await import('drizzle-orm');
-    const { petState, chainWallets } = await import('../src/db/schema.js');
-    // resetDatabase() already created a petState row — update it with a seed value just below $10k.
-    await db().update(petState).set({ lastNetWorthUsd: '9500' }).where(eq(petState.userId, testUserId));
-    await db().insert(chainWallets).values({
-      userId: testUserId,
-      chain: 'bitcoin',
-      address: '1A1zP1',
-      lastBalanceUsd: '11000',
+    const { chainWallets, coinbaseConnections } = await import('../src/db/schema.js');
+    await db().insert(coinbaseConnections).values({ userId: testUserId, mode: 'dev_key' });
+    // A healthy class alongside, to prove the outage stays contained.
+    await db()
+      .insert(chainWallets)
+      .values({ userId: testUserId, chain: 'bitcoin', address: 'bc1q', lastBalanceUsd: '500' });
+
+    mockedGetAccounts.mockRejectedValue(new Error('vendor down'));
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'POST', url: '/api/net-worth/refresh', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+
+    const body = res.json<NetWorthBody>();
+    expect(body.classes.crypto?.status).toBe('error');
+    expect(body.classes.crypto?.value).toBeNull();
+    expect(body.crypto).toBe(0);
+    expect(body.total).toBe(500);
+    expect(body.excluded.classes).toContain('crypto');
+    expect(body.connections.coinbase).toBe(false);
+
+    await app.close();
+  });
+
+  it('keeps serving the last good crypto value when a later refresh fails', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { coinbaseConnections } = await import('../src/db/schema.js');
+    const { recordClassSuccess } = await import('../src/store/asset-cache.js');
+    await db().insert(coinbaseConnections).values({ userId: testUserId, mode: 'dev_key' });
+    await recordClassSuccess(testUserId, 'crypto', {
+      valueUsd: 2500,
+      payload: { positions: [] },
+      asOf: agoDate(2 * DAY),
     });
+
+    mockedGetAccounts.mockRejectedValue(new Error('vendor down'));
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'POST', url: '/api/net-worth/refresh', headers: authHeader() });
+
+    const body = res.json<NetWorthBody>();
+    expect(body.classes.crypto?.status).toBe('stale');
+    expect(body.classes.crypto?.value).toBe(2500);
+    expect(body.total).toBe(2500);
+
+    await app.close();
+  });
+
+  it('reports a zerion outage as defi status error', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { zerionWallets } = await import('../src/db/schema.js');
+    await db().insert(zerionWallets).values({ userId: testUserId, address: '0xdead' });
+
+    mockedGetPortfolio.mockRejectedValue(new Error('zerion down'));
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'POST', url: '/api/net-worth/refresh', headers: authHeader() });
+
+    const body = res.json<NetWorthBody>();
+    expect(body.classes.defi?.status).toBe('error');
+    expect(body.excluded.classes).toContain('defi');
+
+    await app.close();
+  });
+
+  it('caps the billed bank pull at 4 per day and keeps refreshing free classes', async () => {
+    const { upsertItem } = await import('../src/store/items.js');
+    await upsertItem({ itemId: 'item-cap-1', accessToken: 'access-cap-1', userId: testUserId });
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
-    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
-    expect(res.statusCode).toBe(200);
-    expect(res.json<{ total: number }>().total).toBe(11000);
+    for (let i = 0; i < 4; i++) {
+      const res = await app.inject({ method: 'POST', url: '/api/net-worth/refresh', headers: authHeader() });
+      expect(res.json<{ bankRefresh: string }>().bankRefresh).toBe('refreshed');
+    }
+    expect(mockedAccountsBalanceGet).toHaveBeenCalledTimes(4);
 
-    // DB should reflect updated lastNetWorthUsd.
+    const fifth = await app.inject({ method: 'POST', url: '/api/net-worth/refresh', headers: authHeader() });
+    expect(fifth.statusCode).toBe(200);
+    expect(fifth.json<{ bankRefresh: string }>().bankRefresh).toBe('capped');
+    expect(mockedAccountsBalanceGet).toHaveBeenCalledTimes(4);
+    // Holdings are subscription-billed, not per-call: still refreshed.
+    expect(mockedInvestmentsHoldingsGet).toHaveBeenCalledTimes(5);
+
+    // The cap decision is server-observed instrumentation (R-24.2): four
+    // refreshed rows then one capped row, recorded here, never by the device.
+    const { listAnalyticsEvents } = await import('../src/store/analytics.js');
+    const events = await listAnalyticsEvents(testUserId, 'net_worth_refreshed');
+    expect(events.map((e) => e.properties)).toEqual([
+      { bank: 'refreshed' },
+      { bank: 'refreshed' },
+      { bank: 'refreshed' },
+      { bank: 'refreshed' },
+      { bank: 'capped' },
+    ]);
+
+    await app.close();
+  });
+
+  it('fires the milestone reaction and advances the baseline on refresh', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { eq } = await import('drizzle-orm');
+    const { chainWallets, petState } = await import('../src/db/schema.js');
+    await db().update(petState).set({ lastNetWorthUsd: '9500' }).where(eq(petState.userId, testUserId));
+    await db()
+      .insert(chainWallets)
+      .values({ userId: testUserId, chain: 'bitcoin', address: '1A1zP1', lastBalanceUsd: '11000' });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'POST', url: '/api/net-worth/refresh', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+    expect(res.json<NetWorthBody>().total).toBe(11000);
+
     const [updated] = await db().select().from(petState).where(eq(petState.userId, testUserId));
     expect(parseFloat(updated!.lastNetWorthUsd!)).toBe(11000);
 
     await app.close();
   });
 
-  it('does not fire milestone when no prior net worth is recorded', async () => {
-    // petState row exists but lastNetWorthUsd is null — milestone check is skipped.
+  it('does not advance the milestone baseline while the total is degraded', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { eq } = await import('drizzle-orm');
+    const { chainWallets, coinbaseConnections, petState } = await import('../src/db/schema.js');
+    await db().update(petState).set({ lastNetWorthUsd: '9500' }).where(eq(petState.userId, testUserId));
+    await db()
+      .insert(chainWallets)
+      .values({ userId: testUserId, chain: 'bitcoin', address: '1A1zP1', lastBalanceUsd: '11000' });
+    await db().insert(coinbaseConnections).values({ userId: testUserId, mode: 'dev_key' });
+    mockedGetAccounts.mockRejectedValue(new Error('vendor down'));
+
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
-
-    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    const res = await app.inject({ method: 'POST', url: '/api/net-worth/refresh', headers: authHeader() });
     expect(res.statusCode).toBe(200);
+
+    const [pet] = await db().select().from(petState).where(eq(petState.userId, testUserId));
+    // A total computed while a vendor is down must never become the baseline.
+    expect(pet!.lastNetWorthUsd).toBe('9500');
 
     await app.close();
   });
 });
 
-describe('GET /api/net-worth goal system refresh', () => {
+describe('POST /api/net-worth/refresh goal system refresh', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
     await resetDatabase();
-    mockedInvestmentsHoldingsGet.mockResolvedValue({ accounts: [], holdings: [], securities: [], request_id: 'r' });
-    mockedLiabilitiesGet.mockResolvedValue({
-      accounts: [],
-      liabilities: { credit: null, mortgage: null, student: null },
-      request_id: 'r',
-    });
+    defaultPlaidMocks();
   });
 
-  it('records a net worth point and creates ladder state on request', async () => {
+  it('records a net worth point and creates ladder state', async () => {
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
-    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    const res = await app.inject({ method: 'POST', url: '/api/net-worth/refresh', headers: authHeader() });
     expect(res.statusCode).toBe(200);
 
     const { netWorthPointCount, getLadderState } = await import('../src/store/goals.js');
     expect(await netWorthPointCount(testUserId)).toBe(1);
     const ladder = await getLadderState(testUserId);
-    // No account connected: rung 0 is active, not completed.
     expect(ladder?.currentRung).toBe(0);
     expect(ladder?.rungs['0']?.status).toBe('active');
 
@@ -452,7 +790,7 @@ describe('GET /api/net-worth goal system refresh', () => {
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
-    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    const res = await app.inject({ method: 'POST', url: '/api/net-worth/refresh', headers: authHeader() });
     expect(res.statusCode).toBe(200);
 
     const { getLadderState, getLadderInputs, getDerivedState } = await import('../src/store/goals.js');
@@ -475,7 +813,7 @@ describe('GET /api/net-worth goal system refresh', () => {
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
-    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    const res = await app.inject({ method: 'POST', url: '/api/net-worth/refresh', headers: authHeader() });
     expect(res.statusCode).toBe(200);
 
     const { getLadderInputs } = await import('../src/store/goals.js');
