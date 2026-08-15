@@ -35,6 +35,18 @@ const configSchema = z
     // Apple bundle ID used to verify the `aud` claim in Apple identity tokens.
     APPLE_BUNDLE_ID: z.string().default('app.coiny.ios'),
 
+    // Lets a StoreKit Sandbox transaction grant a paid entitlement when
+    // APP_ENV is 'production'. Off everywhere by default, and irrelevant
+    // outside production, where sandbox transactions are the only kind there
+    // is. Turn it on only for an App Review window (reviewers buy with sandbox
+    // accounts against the production backend) and turn it off on approval:
+    // while it is on, anyone with a sandbox tester account can subscribe for
+    // free. See src/appstore/environment.ts.
+    APPLE_ALLOW_SANDBOX_ENTITLEMENTS: z
+      .string()
+      .default('false')
+      .transform((v) => v === 'true'),
+
     // Google OAuth client ID used as the `aud` claim audience when verifying
     // ID tokens from the Android Credential Manager flow. Should be the WEB
     // application client ID configured as `serverClientId` in the Android app,

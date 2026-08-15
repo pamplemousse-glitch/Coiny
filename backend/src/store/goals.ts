@@ -197,10 +197,17 @@ export type GuardrailPeriodInput = {
 /** The single blessed writer for goal_periods. Upserts on (user, key, start) so
  *  re-evaluating a period corrects the row instead of duplicating it, and emits
  *  `guardrail_period_outcome` exactly when a period settles (transitions into
- *  passed / missed / not_applicable). No guardrail evaluator exists yet; when
- *  one does, writing through this function is what keeps the W4 counter-metric
- *  (prd.md R-2.2) measurable for free. Amounts stay in the row; the analytics
- *  event carries the outcome only (R-22.6). */
+ *  passed / missed / not_applicable). Writing through it is what keeps the W4
+ *  counter-metric (prd.md R-2.2) measurable for free. Amounts stay in the row;
+ *  the analytics event carries the outcome only (R-22.6).
+ *
+ *  Currently unused, and the comment that used to sit here ("no guardrail
+ *  evaluator exists yet") is why: it outlived the evaluator's arrival and was
+ *  read as evidence that guardrails do not work. They do.
+ *  `evaluateGuardrailPeriods` (goals/evaluation.ts) evaluates all seven and
+ *  writes through `upsertGoalPeriod` (store/target-goals.ts) instead. Either
+ *  route the evaluator through this function or delete it; do not leave a
+ *  second writer sitting here describing a past that has moved on. */
 export async function recordGuardrailPeriod(userId: string, input: GuardrailPeriodInput, now: Date): Promise<void> {
   const [existing] = await db()
     .select({ outcome: goalPeriods.outcome })

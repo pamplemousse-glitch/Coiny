@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { isTransactionEnvironmentAllowed } from '../appstore/environment.js';
 import { verifyAppStoreJws } from '../appstore/jws.js';
 import { tierForProductId, transactionPayloadSchema } from '../appstore/types.js';
 import { config } from '../config.js';
@@ -83,6 +84,25 @@ export function registerEntitlementsApi(app: FastifyInstance): void {
     if (tierForProductId(tx.data.productId) === null) {
       req.log.warn('app store transaction for unknown product');
       return reply.status(400).send({ error: 'unknown_product' });
+    }
+
+    // The signature says Apple signed it; the environment says whether anyone
+    // paid. A Sandbox transaction carries the same chain, bundle id and
+    // product id as a real one, so without this a sandbox tester account is a
+    // free subscription. Allowed everywhere but production; see
+    // appstore/environment.ts for the App Review exception.
+    if (!isTransactionEnvironmentAllowed(tx.data.environment)) {
+      req.log.warn(
+        { environment: tx.data.environment, app_env: config.APP_ENV },
+        'app store transaction rejected, environment does not match this server',
+      );
+      return reply.status(400).send({ error: 'environment_mismatch' });
+    }
+    if (tx.data.environment !== 'Production' && config.APP_ENV === 'production') {
+      req.log.warn(
+        { environment: tx.data.environment },
+        'sandbox transaction accepted in production, APPLE_ALLOW_SANDBOX_ENTITLEMENTS is on',
+      );
     }
 
     const userId = req.user!.id;
