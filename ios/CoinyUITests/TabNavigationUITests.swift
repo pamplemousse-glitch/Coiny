@@ -16,6 +16,10 @@ final class TabNavigationUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    func testTabBarPassesTheAccessibilityAudit() throws {
+        try auditAccessibility(Self.app)
+    }
+
     func testAllThreeTabsExist() {
         let tabBar = Self.app.tabBars.firstMatch
         XCTAssertTrue(tabBar.waitForExistence(timeout: 10), "Tab bar should appear")

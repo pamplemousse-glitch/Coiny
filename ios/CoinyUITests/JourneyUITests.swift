@@ -52,6 +52,11 @@ final class JourneyUITests: XCTestCase {
         }
     }
 
+    func testExpandedJourneyPassesTheAccessibilityAudit() throws {
+        expand()
+        try auditAccessibility(Self.app)
+    }
+
     func testExpandedJourneyShowsGoalsWithHonestNullPace() {
         expand()
 

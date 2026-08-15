@@ -19,6 +19,48 @@ xcodegen generate
 open Coiny.xcodeproj
 ```
 
+## Versioning
+
+Two numbers, one of them typed by a human and one of them never.
+
+| Key | Source | Who changes it |
+|---|---|---|
+| `CFBundleShortVersionString` | `MARKETING_VERSION` in `project.yml` | A human, once per release |
+| `CFBundleVersion` | `git rev-list --count HEAD`, stamped at build time | Nobody |
+
+`Scripts/stamp-build-number.sh` runs as a post-build phase and rewrites
+`CFBundleVersion` inside the built product before code signing. Nothing in the
+source tree is modified, so a build never dirties the working copy.
+
+Why commit count: App Store Connect refuses a second upload carrying a build
+number it has already seen for the same marketing version, and the old value
+was the literal `1`, so the first TestFlight upload would have worked and every
+one after it would have failed. Commit count is strictly increasing (history
+only grows, and a squash-merge to `main` adds one), needs no state outside the
+repo, and names exactly one commit.
+
+Two consequences worth knowing:
+
+- **Two archives of the same commit get the same build number**, and the second
+  upload is refused. That is correct: they are the same build. Commit, then
+  re-archive.
+- **Build numbers are only comparable along one line of history.** Uploads come
+  from `main` or from a release tag, where they are.
+
+### Releases are tagged
+
+Tag the release commit `ios-v<MARKETING_VERSION>`:
+
+```
+git tag -a ios-v0.2.0 -m "iOS 0.2.0"
+git push origin ios-v0.2.0
+```
+
+The tag is what makes "which commit shipped as 0.2.0" answerable later, when
+the build number alone only tells you how many commits preceded it. The build
+script fails the build if `HEAD` carries an `ios-v` tag that disagrees with
+`MARKETING_VERSION`, so the two cannot drift silently.
+
 ## Build for Simulator (CLI)
 
 ```

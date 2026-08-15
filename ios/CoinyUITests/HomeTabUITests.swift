@@ -34,6 +34,11 @@ final class HomeTabUITests: XCTestCase {
         Self.app.descendants(matching: .any)["home.journey"]
     }
 
+    func testHomeTabPassesTheAccessibilityAudit() throws {
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        try auditAccessibility(Self.app)
+    }
+
     func testCollapsedShowsWindowAndActiveRung() {
         XCTAssertTrue(window.waitForExistence(timeout: 10))
         XCTAssertTrue(Self.app.descendants(matching: .any)["home.rung.active"].exists)

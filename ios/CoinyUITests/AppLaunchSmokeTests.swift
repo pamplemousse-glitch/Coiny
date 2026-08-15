@@ -40,4 +40,11 @@ final class AppLaunchSmokeTests: XCTestCase {
         // Sanity: the subtitle wired up in SignInView.
         XCTAssertTrue(app.staticTexts["Your pocket-sized financial companion"].exists)
     }
+
+    func testSignInScreenPassesTheAccessibilityAudit() throws {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Coiny"].waitForExistence(timeout: 10))
+        try auditAccessibility(app)
+    }
 }

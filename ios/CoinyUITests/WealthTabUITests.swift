@@ -16,6 +16,10 @@ final class WealthTabUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    func testWealthTabPassesTheAccessibilityAudit() throws {
+        try auditAccessibility(Self.app)
+    }
+
     func testWealthTabShowsNavigationTitle() {
         XCTAssertTrue(Self.app.navigationBars["Wealth"].waitForExistence(timeout: 10))
     }
