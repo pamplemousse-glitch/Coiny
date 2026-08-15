@@ -49,4 +49,11 @@ final class AppLaunchSmokeTests: XCTestCase {
         )
         XCTAssertGreaterThan(consent.count, 0, "the sign-in consent line must be on screen")
     }
+
+    func testSignInScreenPassesTheAccessibilityAudit() throws {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.staticTexts["Coiny"].waitForExistence(timeout: 10))
+        try auditAccessibility(app)
+    }
 }
