@@ -1,6 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import {
+  institutionsGetById,
+  investmentsTransactionsGet,
   itemGet,
   itemPublicTokenExchange,
   itemRemove,
@@ -14,6 +16,7 @@ import { reactionForEvent } from '../reactions/contract.js';
 import { performReactions } from '../reactions/perform.js';
 import { trackServerEvent } from '../store/analytics.js';
 import { canAddConnection } from '../store/entitlements.js';
+import { upsertInvestmentTransactions } from '../store/investment-transactions.js';
 import {
   deleteItem,
   disableItem,
@@ -27,6 +30,7 @@ import {
 } from '../store/items.js';
 import { cacheLiabilities } from '../store/plaid-liabilities.js';
 import { upsertRecurringStreams } from '../store/plaid-recurring.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const ExchangeBodySchema = z.object({
   public_token: z.string().min(1),
@@ -55,6 +59,14 @@ function itemHealthView(item: PlaidItemRow): Record<string, unknown> {
     created_at: item.createdAt.toISOString(),
   };
 }
+
+/** Institution branding, cached in-process. Logos and brand colours change
+ *  roughly never, and the endpoint is free and not Item-scoped. */
+const INSTITUTION_TTL_MS = 24 * 60 * 60 * 1000;
+const institutionCache = new Map<
+  string,
+  { at: number; value: { institutionId: string; name: string; primaryColor: string | null; logo: string | null } }
+>();
 
 export function registerPlaidLinkApi(app: FastifyInstance): void {
   app.post('/api/plaid/link-token', async (req: FastifyRequest, reply: FastifyReply) => {
@@ -166,6 +178,97 @@ export function registerPlaidLinkApi(app: FastifyInstance): void {
     );
 
     return { items: items.map(itemHealthView) };
+  });
+
+  // GET /api/plaid/institutions — branding for the user's linked institutions.
+  //
+  // Name is already stored per item; this adds the logo and brand colour, which
+  // only /institutions/get_by_id returns and only when
+  // include_optional_metadata is set. The endpoint takes no access token and is
+  // not billed per Item, so it costs nothing per user.
+  //
+  // Cached in-process: an institution's logo changes roughly never, and the
+  // alternative is two more columns and a migration for a garnish. A cold start
+  // refetches, which is a handful of free calls.
+  app.get('/api/plaid/institutions', async (req: FastifyRequest) => {
+    const items = await getItemsByUser(req.user!.id);
+    const ids = [...new Set(items.map((i) => i.institutionId).filter((id): id is string => id !== null))];
+
+    const institutions = await Promise.all(
+      ids.map(async (id) => {
+        const cached = institutionCache.get(id);
+        if (cached && Date.now() - cached.at < INSTITUTION_TTL_MS) return cached.value;
+        try {
+          const res = await institutionsGetById(id);
+          const value = {
+            institutionId: res.institution.institution_id,
+            name: res.institution.name,
+            primaryColor: res.institution.primary_color,
+            logo: res.institution.logo,
+          };
+          institutionCache.set(id, { at: Date.now(), value });
+          return value;
+        } catch {
+          // Branding is a garnish. A failure here must never break the screen
+          // that lists a user's banks, so the row is simply omitted and the
+          // client keeps the name it already has.
+          return null;
+        }
+      }),
+    );
+
+    return { institutions: institutions.filter((i): i is NonNullable<typeof i> => i !== null) };
+  });
+
+  // POST /api/plaid/investments/sync — pull investment transactions and store
+  // them so goal pacing can see contributions made INSIDE a brokerage.
+  //
+  // Pace previously observed only cash leaving a checking account, so a goal
+  // funded by a 401k contribution or a transfer straight into a brokerage
+  // looked stalled while the user was saving into it every month.
+  app.post('/api/plaid/investments/sync', SYNC_LIMIT, async (req: FastifyRequest, reply: FastifyReply) => {
+    const userId = req.user!.id;
+    const items = (await getItemsByUser(userId)).filter((i) => !i.disabled);
+    if (items.length === 0) return reply.status(404).send({ error: 'no linked items' });
+
+    const end = new Date();
+    const start = new Date(end);
+    // Plaid offers up to 24 months. A year is enough for every pace window and
+    // keeps the first sync from paging through thousands of rows.
+    start.setUTCFullYear(start.getUTCFullYear() - 1);
+    const startDate = start.toISOString().slice(0, 10);
+    const endDate = end.toISOString().slice(0, 10);
+
+    let stored = 0;
+    for (const item of items) {
+      try {
+        let offset = 0;
+        // Bounded: 20 pages of 500 is 10,000 transactions, far past a year of
+        // real activity, and stops a bad `total` from spinning forever.
+        for (let page = 0; page < 20; page += 1) {
+          const res = await investmentsTransactionsGet({
+            access_token: item.accessToken,
+            start_date: startDate,
+            end_date: endDate,
+            count: 500,
+            offset,
+          });
+          stored += await upsertInvestmentTransactions(userId, res.investment_transactions);
+          offset += res.investment_transactions.length;
+          if (res.investment_transactions.length === 0 || offset >= res.total_investment_transactions) break;
+        }
+      } catch (err) {
+        // An item without the investments product returns PRODUCT_NOT_READY or
+        // a products error. That is the normal case for a plain checking
+        // account and must not fail the whole sync for the items that do have
+        // it.
+        if (!(err instanceof PlaidApiError)) throw err;
+        req.log.info({ userId, error_code: err.body.error_code }, 'investments not available for item');
+      }
+    }
+
+    req.log.info({ userId, stored }, 'investment transactions synced');
+    return { stored };
   });
 
   // Link UPDATE MODE (docs/prd.md R-8.6): re-authenticate an existing Item

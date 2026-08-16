@@ -483,3 +483,128 @@ describe('item health store transitions', () => {
     await app.close();
   });
 });
+
+describe('GET /api/plaid/institutions', () => {
+  it('returns branding for the linked institution', async () => {
+    const { setItemInstitution } = await import('../src/store/items.js');
+    await setItemInstitution(TEST_ITEM_ID, { institutionId: 'ins_109512', institutionName: 'Chase' });
+
+    mockAgent
+      .get('https://sandbox.plaid.com')
+      .intercept({ path: '/institutions/get_by_id', method: 'POST' })
+      .reply(200, {
+        institution: {
+          institution_id: 'ins_109512',
+          name: 'Chase',
+          primary_color: '#004966',
+          logo: 'iVBORw0KGgo=',
+          url: 'https://chase.com',
+        },
+        request_id: 'r1',
+      });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/plaid/institutions', headers: authHeader() });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{ institutions: Array<Record<string, unknown>> }>();
+    expect(body.institutions[0]).toMatchObject({
+      institutionId: 'ins_109512',
+      name: 'Chase',
+      primaryColor: '#004966',
+      logo: 'iVBORw0KGgo=',
+    });
+    await app.close();
+  });
+
+  it('omits an institution whose lookup fails rather than breaking the screen', async () => {
+    const { setItemInstitution } = await import('../src/store/items.js');
+    await setItemInstitution(TEST_ITEM_ID, { institutionId: 'ins_broken', institutionName: 'Somebank' });
+
+    mockAgent
+      .get('https://sandbox.plaid.com')
+      .intercept({ path: '/institutions/get_by_id', method: 'POST' })
+      .reply(500, { error_type: 'API_ERROR', error_code: 'INTERNAL_SERVER_ERROR', error_message: 'boom' });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/plaid/institutions', headers: authHeader() });
+
+    // Branding is a garnish: the list of banks must still render.
+    expect(res.statusCode).toBe(200);
+    expect(res.json<{ institutions: unknown[] }>().institutions).toEqual([]);
+    await app.close();
+  });
+});
+
+describe('POST /api/plaid/investments/sync', () => {
+  it('stores investment transactions with the sign flipped', async () => {
+    mockAgent
+      .get('https://sandbox.plaid.com')
+      .intercept({ path: '/investments/transactions/get', method: 'POST' })
+      .reply(200, {
+        investment_transactions: [
+          {
+            investment_transaction_id: 'itx-route-1',
+            account_id: 'acct-brokerage',
+            security_id: 'sec-1',
+            date: '2026-08-01',
+            name: 'CONTRIBUTION',
+            quantity: 0,
+            amount: -750,
+            price: 0,
+            fees: 0,
+            type: 'cash',
+            subtype: 'contribution',
+            iso_currency_code: 'USD',
+          },
+        ],
+        total_investment_transactions: 1,
+        request_id: 'r1',
+      });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/plaid/investments/sync',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      payload: '{}',
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json<{ stored: number }>().stored).toBe(1);
+
+    const { getInvestmentContributions } = await import('../src/store/investment-transactions.js');
+    const rows = await getInvestmentContributions(testUserId, 'acct-brokerage', '2026-01-01');
+    expect(rows[0]?.amount).toBe(750);
+    await app.close();
+  });
+
+  it('survives an item that does not have the investments product', async () => {
+    // The normal case for a plain checking account. One item without
+    // investments must not fail the sync for the items that have it.
+    mockAgent
+      .get('https://sandbox.plaid.com')
+      .intercept({ path: '/investments/transactions/get', method: 'POST' })
+      .reply(400, {
+        error_type: 'INVALID_INPUT',
+        error_code: 'PRODUCTS_NOT_SUPPORTED',
+        error_message: 'investments is not supported',
+      });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/plaid/investments/sync',
+      headers: { ...authHeader(), 'content-type': 'application/json' },
+      payload: '{}',
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json<{ stored: number }>().stored).toBe(0);
+    await app.close();
+  });
+});

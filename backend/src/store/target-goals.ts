@@ -7,6 +7,7 @@ import { db } from '../db/client.js';
 import { goalPace, goalPeriods, goals, transactions } from '../db/schema.js';
 import type { GuardrailKey, GuardrailOutcome, Period } from '../goals/guardrails.js';
 import type { ContributionTransaction, GapAction, GoalPace, PaceBand } from '../goals/pace.js';
+import { getEarliestInvestmentDate, getInvestmentContributions } from './investment-transactions.js';
 
 /** R-7.9: hard cap on simultaneously active target goals. Enforced here in the
  *  store, inside a transaction, so no client and no future route can create a
@@ -219,7 +220,7 @@ export async function getFundingActivity(
   const cutoffStr = cutoff.toISOString().slice(0, 10);
 
   const scope = and(eq(transactions.userId, userId), eq(transactions.accountId, accountId));
-  const [rows, [earliest]] = await Promise.all([
+  const [rows, [earliest], investmentRows, earliestInvestment] = await Promise.all([
     db()
       .select({ date: transactions.date, amount: transactions.amount })
       .from(transactions)
@@ -229,13 +230,29 @@ export async function getFundingActivity(
       .select({ min: sql<string | null>`MIN(${transactions.date})` })
       .from(transactions)
       .where(scope),
+    // Contributions made INSIDE a brokerage. Before this, pace could only ever
+    // see cash leaving a checking account, so a goal funded by a 401k
+    // contribution or a direct transfer into a brokerage looked stalled while
+    // the user was actually saving into it every month.
+    getInvestmentContributions(userId, accountId, cutoffStr),
+    getEarliestInvestmentDate(userId, accountId),
   ]);
 
+  const bankTransactions = rows
+    .map((r) => ({ date: r.date, amount: parseFloat(r.amount) }))
+    .filter((r) => Number.isFinite(r.amount));
+
+  // Both sides are already stored in Coiny's sign convention, so they sum
+  // directly. See store/investment-transactions.ts for where the flip happens.
+  const combined = [...bankTransactions, ...investmentRows];
+
+  // The earliest date across BOTH sources. Taking only the bank one would call
+  // a brokerage-funded account "young" forever, because it has no bank rows.
+  const earliestDates = [earliest?.min ?? null, earliestInvestment].filter((d): d is string => typeof d === 'string');
+
   return {
-    transactions: rows
-      .map((r) => ({ date: r.date, amount: parseFloat(r.amount) }))
-      .filter((r) => Number.isFinite(r.amount)),
-    earliestTransactionDate: earliest?.min ?? null,
+    transactions: combined,
+    earliestTransactionDate: earliestDates.length > 0 ? earliestDates.sort()[0]! : null,
   };
 }
 

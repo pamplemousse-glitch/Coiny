@@ -175,6 +175,44 @@ export const transactions = pgTable(
   (t) => [index('transactions_user_date_idx').on(t.userId, t.date)],
 );
 
+/** Investment buys, sells, dividends and contributions, from
+ *  `/investments/transactions/get`.
+ *
+ *  Kept out of `transactions` on purpose. That table feeds the spending rules
+ *  and the reaction engine, and a 401k rebalance is not spending; mixing them
+ *  would make the creature react to a portfolio trade as if the user had bought
+ *  something. This table exists so goal pacing can see contributions made
+ *  INSIDE a brokerage, which it previously could not observe at all.
+ *
+ *  Deliberately narrow. `name` (e.g. "INCOME DIV DIVIDEND RECEIVED") is
+ *  financial detail with no consumer here, so it is not stored at all, which
+ *  is cheaper than storing it encrypted. `amount` is plaintext for the same
+ *  reason it is on `transactions`: every query filters and sums on it.
+ *
+ *  Amounts are stored in COINY's convention, negative for outflow, so they can
+ *  be summed alongside bank transactions without a per-row correction. Plaid's
+ *  investment convention is the opposite; see plaid/types.ts. */
+export const investmentTransactions = pgTable(
+  'investment_transactions',
+  {
+    investmentTransactionId: text('investment_transaction_id').primaryKey(),
+    userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    accountId: text('account_id').notNull(),
+    securityId: text('security_id'),
+    date: text('date').notNull(),
+    amount: text('amount').notNull(),
+    /** buy | sell | cancel | cash | fee | transfer */
+    type: text('type').notNull(),
+    /** contribution, deposit, dividend, withdrawal, transfer, and so on. */
+    subtype: text('subtype').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  // The only read pattern: one user's rows for one account inside a date
+  // window. Mirrors the index added to `transactions` in 0049 for the same
+  // reason, before the table is big enough for it to hurt.
+  (t) => [index('investment_transactions_user_account_date_idx').on(t.userId, t.accountId, t.date)],
+);
+
 export const deviceTokens = pgTable('device_tokens', {
   token: text('token').primaryKey(),
   userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),

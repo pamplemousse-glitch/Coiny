@@ -214,3 +214,52 @@ export class PlaidApiError extends Error {
     super(`${body.error_type}/${body.error_code}: ${body.error_message}`);
   }
 }
+
+/** One row from `/investments/transactions/get`.
+ *
+ *  SIGN CONVENTION, and it is the opposite of ours: Plaid uses positive when
+ *  cash is DEBITED (a purchase) and negative when cash is CREDITED (a sale, a
+ *  dividend, a contribution arriving). Coiny stores negative for outflow, so
+ *  this must be negated on the way in, exactly as plaid/adapter.ts:133 does for
+ *  bank transactions. Getting it wrong makes every contribution read as a
+ *  withdrawal. */
+export type PlaidInvestmentTransaction = {
+  investment_transaction_id: string;
+  account_id: string;
+  security_id: string | null;
+  date: string;
+  name: string;
+  quantity: number;
+  amount: number;
+  price: number;
+  fees: number | null;
+  /** `buy` | `sell` | `cancel` | `cash` | `fee` | `transfer` */
+  type: string;
+  /** e.g. `contribution`, `deposit`, `dividend`, `withdrawal`, `transfer`. */
+  subtype: string;
+  iso_currency_code: string | null;
+};
+
+export type InvestmentsTransactionsGetResponse = {
+  investment_transactions: PlaidInvestmentTransaction[];
+  /** Total available, which is what pagination is driven from. */
+  total_investment_transactions: number;
+  securities?: PlaidSecurity[];
+  request_id: string;
+};
+
+/** Subset of `/institutions/get_by_id` we use: identity and branding. */
+export type PlaidInstitution = {
+  institution_id: string;
+  name: string;
+  /** Hex, e.g. "#004966". Null when the institution has none. */
+  primary_color: string | null;
+  /** Base64-encoded 152x152 PNG, or null. */
+  logo: string | null;
+  url: string | null;
+};
+
+export type InstitutionsGetByIdResponse = {
+  institution: PlaidInstitution;
+  request_id: string;
+};
