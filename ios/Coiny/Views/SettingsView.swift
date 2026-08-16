@@ -47,12 +47,18 @@ struct SettingsView: View {
                         }
                     }
 
-                    Section("Weekly budgets") {
-                        ForEach(goals.weeklyBudgetByCategory.sorted(by: { $0.key < $1.key }),
-                                id: \.key) { category, amount in
-                            LabeledContent(category.capitalized) {
-                                Text("$\(Int(amount))")
-                                    .monospacedDigit()
+                    // Only when there is something in it. A Section renders its
+                    // header whether or not the ForEach produces rows, so an
+                    // empty budget map drew a "Weekly budgets" heading over
+                    // nothing, which reads as a screen that failed to load.
+                    if !goals.weeklyBudgetByCategory.isEmpty {
+                        Section("Weekly budgets") {
+                            ForEach(goals.weeklyBudgetByCategory.sorted(by: { $0.key < $1.key }),
+                                    id: \.key) { category, amount in
+                                LabeledContent(category.capitalized) {
+                                    Text("$\(Int(amount))")
+                                        .monospacedDigit()
+                                }
                             }
                         }
                     }
@@ -65,8 +71,14 @@ struct SettingsView: View {
                 legalSection
 
                 Section("About") {
+                    // The backend this build actually resolved, not a literal.
+                    // It was hardcoded to the Fly host, so a simulator run
+                    // against localhost reported that it was talking to
+                    // staging. The one row whose entire job is to tell you
+                    // which environment you are in has to be derived from the
+                    // value the client uses, or it is worse than absent.
                     LabeledContent("Backend") {
-                        Text("coiny-backend.fly.dev")
+                        Text(API.Endpoint.baseURL.host ?? API.Endpoint.baseURL.absoluteString)
                             .font(.caption.monospaced())
                     }
                     LabeledContent("Version") {

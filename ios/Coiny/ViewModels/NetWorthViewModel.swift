@@ -40,8 +40,17 @@ final class NetWorthViewModel {
     private let telemetry: TelemetryClient
     private let now: () -> Date
 
+    /// Mirrors `JourneyStore.defaultAPI()`. Under `--ui-testing` there is no
+    /// session, so the real client 401s and the tab renders "Not signed in".
+    nonisolated static func defaultAPI() -> any NetWorthViewModelAPI {
+        #if DEBUG
+        if CommandLine.arguments.contains("--ui-testing") { return UITestNetWorthAPI() }
+        #endif
+        return API.shared
+    }
+
     init(
-        api: any NetWorthViewModelAPI = API.shared,
+        api: any NetWorthViewModelAPI = NetWorthViewModel.defaultAPI(),
         cache: any NetWorthCaching = NetWorthCache.shared,
         telemetry: TelemetryClient = .shared,
         now: @escaping () -> Date = { Date() }

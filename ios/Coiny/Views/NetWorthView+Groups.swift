@@ -42,6 +42,20 @@ struct WealthBannerView: View {
 struct CompositionBarView: View {
     let segments: [(group: WealthGroup, fraction: Double)]
 
+    /// The legend is up to five items wide. At an accessibility text size that
+    /// does not fit across the screen, and a row that cannot grow is what
+    /// `performAccessibilityAudit` reports as "Dynamic Type font sizes are
+    /// partially unsupported": the style scales, the layout holding it does
+    /// not. Stacking vertically past the accessibility threshold is the fix.
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    /// The legend swatch. A literal `frame(width: 8, height: 8)` is a fixed
+    /// point size next to text that scales, so the row it sits in cannot grow
+    /// with Dynamic Type, which is the defect the audit reports against the
+    /// row rather than against the circle. `@ScaledMetric` ties it to the text
+    /// style it sits beside.
+    @ScaledMetric(relativeTo: .caption2) private var swatch: CGFloat = 8
+
     var body: some View {
         if segments.isEmpty {
             EmptyView()
@@ -66,18 +80,31 @@ struct CompositionBarView: View {
     }
 
     private var legend: some View {
-        HStack(spacing: 12) {
+        // Same items either way, only the axis changes.
+        AnyLayout(
+            dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+                : AnyLayout(HStackLayout(spacing: 12))
+        ) {
             ForEach(segments, id: \.group) { segment in
                 HStack(spacing: 4) {
                     Circle()
                         .fill(Self.color(for: segment.group))
-                        .frame(width: 8, height: 8)
+                        .frame(width: swatch, height: swatch)
                     Text("\(segment.group.title) \(Self.percentText(segment.fraction))")
                         .font(.caption2)
                         .foregroundStyle(CoinyTheme.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
+        // The parent already declares `children: .ignore` and supplies
+        // `accessibilitySummary`, which is these same strings joined. The rows
+        // were still surfacing as separate elements, so VoiceOver had the
+        // composition twice and the audit measured a decorative row that is not
+        // meant to be read on its own. Hiding them explicitly loses no
+        // information: the summary is built from the identical values.
+        .accessibilityHidden(true)
     }
 
     private var accessibilitySummary: Text {
