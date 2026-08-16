@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { coinHoldings } from '../db/schema.js';
 import { getPcgsCoinFacts } from '../pcgs/client.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const AddCoinBodySchema = z.object({
   pcgsNo: z.number().int().positive(),
@@ -92,7 +93,7 @@ export function registerCoinsApi(app: FastifyInstance): void {
   });
 
   // POST /api/coins/sync
-  app.post('/api/coins/sync', async (req: FastifyRequest) => {
+  app.post('/api/coins/sync', SYNC_LIMIT, async (req: FastifyRequest) => {
     const userId = req.user!.id;
     const rows = await db().select().from(coinHoldings).where(eq(coinHoldings.userId, userId));
 

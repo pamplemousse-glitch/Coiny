@@ -6,6 +6,7 @@ import { AlpacaError, getEquityUsd } from '../alpaca/client.js';
 import { db } from '../db/client.js';
 import { alpacaConnections } from '../db/schema.js';
 import { decryptString, encryptString } from '../util/crypto.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const ConnectBodySchema = z.object({
   apiKeyId: z.string().min(1),
@@ -57,7 +58,7 @@ export function registerAlpacaApi(app: FastifyInstance): void {
   });
 
   // POST /api/alpaca/sync — fetch live equity from Alpaca and cache it
-  app.post('/api/alpaca/sync', async (req: FastifyRequest, reply: FastifyReply) => {
+  app.post('/api/alpaca/sync', SYNC_LIMIT, async (req: FastifyRequest, reply: FastifyReply) => {
     const userId = req.user!.id;
     const [conn] = await db().select().from(alpacaConnections).where(eq(alpacaConnections.userId, userId));
     if (!conn) return reply.status(404).send({ error: 'not connected' });

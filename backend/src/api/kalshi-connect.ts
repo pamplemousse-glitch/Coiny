@@ -5,6 +5,7 @@ import { db } from '../db/client.js';
 import { kalshiConnections } from '../db/schema.js';
 import { getPortfolioBalance } from '../kalshi/client.js';
 import { decryptString, encryptString } from '../util/crypto.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const ConnectBodySchema = z.object({
   keyId: z.string().min(1),
@@ -61,7 +62,7 @@ export function registerKalshiConnectApi(app: FastifyInstance): void {
   });
 
   // POST /api/kalshi/sync — refresh portfolio value
-  app.post('/api/kalshi/sync', async (req: FastifyRequest, reply: FastifyReply) => {
+  app.post('/api/kalshi/sync', SYNC_LIMIT, async (req: FastifyRequest, reply: FastifyReply) => {
     const userId = req.user!.id;
     const [conn] = await db().select().from(kalshiConnections).where(eq(kalshiConnections.userId, userId));
     if (!conn) return reply.status(404).send({ error: 'not connected' });

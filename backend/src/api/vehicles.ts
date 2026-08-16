@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { vehicleAssets } from '../db/schema.js';
 import { getVehicleValue } from '../vehicles/client.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const AddVehicleBodySchema = z.object({
   vin: z.string().min(1).max(50),
@@ -55,7 +56,7 @@ export function registerVehiclesApi(app: FastifyInstance): void {
   });
 
   // POST /api/vehicles/sync
-  app.post('/api/vehicles/sync', async (req: FastifyRequest, reply: FastifyReply) => {
+  app.post('/api/vehicles/sync', SYNC_LIMIT, async (req: FastifyRequest, reply: FastifyReply) => {
     const userId = req.user!.id;
     const rows = await db().select().from(vehicleAssets).where(eq(vehicleAssets.userId, userId));
 

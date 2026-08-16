@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { polymarketAccounts } from '../db/schema.js';
 import { getPortfolioValue } from '../polymarket/client.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const AddAccountBodySchema = z.object({
   walletAddress: z.string().min(1).max(200),
@@ -59,7 +60,7 @@ export function registerPolymarketApi(app: FastifyInstance): void {
 
   // POST /api/polymarket/sync
   // Fetches live position values from the Polymarket Data API and persists them.
-  app.post('/api/polymarket/sync', async (req: FastifyRequest) => {
+  app.post('/api/polymarket/sync', SYNC_LIMIT, async (req: FastifyRequest) => {
     const userId = req.user!.id;
     const rows = await db().select().from(polymarketAccounts).where(eq(polymarketAccounts.userId, userId));
 

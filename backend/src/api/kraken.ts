@@ -5,6 +5,7 @@ import { db } from '../db/client.js';
 import { krakenConnections } from '../db/schema.js';
 import { getBalance, getTotalUsd } from '../kraken/client.js';
 import { decryptString, encryptString } from '../util/crypto.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const ConnectBodySchema = z.object({
   apiKey: z.string().min(1),
@@ -48,7 +49,7 @@ export function registerKrakenApi(app: FastifyInstance): void {
   });
 
   // POST /api/kraken/sync — compute USD total, cache it, return it
-  app.post('/api/kraken/sync', async (req: FastifyRequest, reply: FastifyReply) => {
+  app.post('/api/kraken/sync', SYNC_LIMIT, async (req: FastifyRequest, reply: FastifyReply) => {
     const userId = req.user!.id;
     const [connection] = await db().select().from(krakenConnections).where(eq(krakenConnections.userId, userId));
     if (!connection) return reply.status(404).send({ error: 'not connected' });

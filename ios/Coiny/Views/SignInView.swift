@@ -177,12 +177,21 @@ struct SignInView: View {
                 return components.isEmpty ? nil : components.joined(separator: " ")
             }()
 
+            // Apple hands this over on every sign-in and it is the only way the
+            // server can ever obtain a token that revokes the grant at deletion
+            // time (TN3194). It is single-use, expires in five minutes, and is
+            // spent immediately by the sign-in call. Optional on the wire: an
+            // absent code costs a cleaner deletion later, never this sign-in.
+            let authorizationCode = credential.authorizationCode
+                .flatMap { String(data: $0, encoding: .utf8) }
+
             do {
                 try await API.shared.signInWithApple(
                     identityToken: identityToken,
                     userId: credential.user,
                     email: credential.email,
-                    displayName: displayName
+                    displayName: displayName,
+                    authorizationCode: authorizationCode
                 )
             } catch {
                 // 3.6.3b: the raw URLError text is not an instruction. Say what

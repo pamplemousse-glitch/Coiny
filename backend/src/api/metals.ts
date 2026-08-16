@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { metalHoldings } from '../db/schema.js';
 import { getMetalSpotPrice } from '../metals/client.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const VALID_METALS = ['XAU', 'XAG', 'XPT', 'XPD'] as const;
 
@@ -58,7 +59,7 @@ export function registerMetalsApi(app: FastifyInstance): void {
   });
 
   // POST /api/metals/sync
-  app.post('/api/metals/sync', async (req: FastifyRequest, reply: FastifyReply) => {
+  app.post('/api/metals/sync', SYNC_LIMIT, async (req: FastifyRequest, reply: FastifyReply) => {
     const userId = req.user!.id;
     const rows = await db().select().from(metalHoldings).where(eq(metalHoldings.userId, userId));
 

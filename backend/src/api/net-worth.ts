@@ -15,6 +15,7 @@ import { refreshAllForUser } from '../networth/refresh.js';
 import { trackServerEvent } from '../store/analytics.js';
 import { tryConsumeManualRefresh } from '../store/asset-cache.js';
 import { getItemsByUser } from '../store/items.js';
+import { REFRESH_LIMIT } from './rate-limits.js';
 
 export const MANUAL_BANK_REFRESH_PER_DAY = 4;
 
@@ -25,7 +26,9 @@ export function registerNetWorthApi(app: FastifyInstance): void {
     return response;
   });
 
-  app.post('/api/net-worth/refresh', async (req, _reply) => {
+  // The most expensive route in the API, and until now the only limit on it was
+  // the global 100/second. See api/rate-limits.ts for the arithmetic.
+  app.post('/api/net-worth/refresh', REFRESH_LIMIT, async (req, _reply) => {
     const userId = req.user!.id;
 
     // The balance pull is the only per-call-billed request a user can drive;

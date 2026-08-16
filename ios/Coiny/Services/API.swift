@@ -112,12 +112,24 @@ actor API {
 
     var isSignedIn: Bool { sessionToken != nil }
 
-    func signInWithApple(identityToken: String, userId: String, email: String?, displayName: String?) async throws {
+    /// - Parameter authorizationCode: `ASAuthorizationAppleIDCredential.authorizationCode`,
+    ///   decoded to a string. The server exchanges it for the refresh token that
+    ///   account deletion needs in order to revoke the Sign in with Apple grant
+    ///   (TN3194). It is single-use and expires in five minutes, so it is sent
+    ///   here and nowhere else. Optional, and a nil never blocks sign-in.
+    func signInWithApple(
+        identityToken: String,
+        userId: String,
+        email: String?,
+        displayName: String?,
+        authorizationCode: String? = nil
+    ) async throws {
         struct Body: Encodable {
             let identity_token: String
             let user_id: String
             let email: String?
             let display_name: String?
+            let authorization_code: String?
         }
         struct Response: Decodable {
             let token: String
@@ -126,7 +138,13 @@ actor API {
         let res: Response = try await request(
             method: "POST",
             path: "/api/auth/apple",
-            body: Body(identity_token: identityToken, user_id: userId, email: email, display_name: displayName),
+            body: Body(
+                identity_token: identityToken,
+                user_id: userId,
+                email: email,
+                display_name: displayName,
+                authorization_code: authorizationCode
+            ),
             requiresAuth: false
         )
         try sessionStore.save(res.token)
@@ -298,14 +316,6 @@ actor API {
         try await request(method: "POST", path: path, body: body, requiresAuth: true)
     }
 
-    func patch<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T {
-        try await request(method: "PATCH", path: path, body: body, requiresAuth: true)
-    }
-
-    func delete<T: Decodable>(_ path: String) async throws -> T {
-        try await request(method: "DELETE", path: path, body: Optional<Empty>.none, requiresAuth: true)
-    }
-
     /// DELETE for endpoints that return 204 No Content.
     func deleteVoid(_ path: String) async throws {
         guard let url = URL(string: path, relativeTo: baseURL) else {
@@ -391,34 +401,6 @@ actor API {
 
 // MARK: - Chain Wallets + Misc
 // Kept outside the actor body for SwiftLint's type_body_length; extensions on
-// the actor still run on the actor.
-extension API {
-    func getChainWallets() async throws -> [ChainWallet] {
-        try await get("/api/chain-wallets")
-    }
-
-    func addChainWallet(chain: String, address: String, label: String?) async throws {
-        struct Body: Encodable { let chain: String; let address: String; let label: String? }
-        let _: EmptyResponse = try await post("/api/chain-wallets", body: Body(chain: chain, address: address, label: label))
-    }
-
-    func removeChainWallet(chain: String, address: String) async throws {
-        try await deleteVoid("/api/chain-wallets/\(chain)/\(encodePathComponent(address))")
-    }
-
-    func syncChainWallets() async throws -> ChainWalletSyncResult {
-        try await post("/api/chain-wallets/sync")
-    }
-
-    private func encodePathComponent(_ s: String) -> String {
-        s.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? s
-    }
-
-    func health() async throws -> HealthResponse {
-        try await request(method: "GET", path: "/health", body: Optional<Empty>.none, requiresAuth: false)
-    }
-}
-
 // MARK: - Performance API
 extension API {
     func getCoinbasePerformance() async throws -> CoinbasePerformance {

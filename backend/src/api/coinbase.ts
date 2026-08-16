@@ -6,6 +6,7 @@ import { evaluateExternalEvent } from '../reactions/external.js';
 import { deleteCoinbaseConnection, getCoinbaseConnection, upsertCoinbaseDevKey } from '../store/coinbase.js';
 import { claimEvent } from '../store/events.js';
 import { recordReaction } from '../store/pet.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 export function registerCoinbaseApi(app: FastifyInstance): void {
   // GET /api/coinbase/performance
@@ -64,7 +65,7 @@ export function registerCoinbaseApi(app: FastifyInstance): void {
   });
 
   // POST /api/coinbase/sync
-  app.post('/api/coinbase/sync', async (req: FastifyRequest, reply: FastifyReply) => {
+  app.post('/api/coinbase/sync', SYNC_LIMIT, async (req: FastifyRequest, reply: FastifyReply) => {
     const userId = req.user!.id;
 
     const conn = await getCoinbaseConnection(userId);

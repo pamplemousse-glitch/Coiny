@@ -89,7 +89,23 @@ const configSchema = z
     ALLOW_LEGACY_PLAINTEXT_READS: envBool(true),
 
     // Apple bundle ID used to verify the `aud` claim in Apple identity tokens.
+    // Doubles as `client_id` on Apple's REST API (token exchange and revoke).
     APPLE_BUNDLE_ID: z.string().default('app.coiny.ios'),
+
+    // Sign in with Apple REST API credentials, used only to revoke the user's
+    // grant on account deletion (TN3194). All three are needed to build the
+    // ES256 client secret; when any is empty the revoke call is skipped and
+    // logged rather than attempted, and deletion proceeds regardless.
+    //
+    //   APPLE_TEAM_ID              the 10-character Apple Developer team id (JWT `iss`)
+    //   APPLE_SIGN_IN_KEY_ID       the key id of the Sign in with Apple .p8 (JWT `kid`)
+    //   APPLE_SIGN_IN_PRIVATE_KEY  the PKCS#8 PEM body of that .p8, verbatim
+    //
+    // Stored and read the same way as APNS_KEY, which is the same shape of
+    // secret from the same developer account.
+    APPLE_TEAM_ID: z.string().default(''),
+    APPLE_SIGN_IN_KEY_ID: z.string().default(''),
+    APPLE_SIGN_IN_PRIVATE_KEY: z.string().default(''),
 
     // Lets a StoreKit Sandbox transaction grant a paid entitlement when
     // APP_ENV is 'production'. Off everywhere by default, and irrelevant
@@ -113,6 +129,25 @@ const configSchema = z
     // bearer-token hash, falling back to req.ip for unauthenticated traffic).
     RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
     RATE_LIMIT_WINDOW: z.string().default('1 second'),
+
+    // Server-side deadlines. Both default to disabled in Fastify, which is what
+    // let `POST /api/net-worth/refresh` hold a socket for its whole worst case
+    // (roughly 154 s of sequential vendor budgets) with nothing to stop it.
+    //
+    //   REQUEST_TIMEOUT_MS     http.Server#requestTimeout: how long the client
+    //                          has to finish sending a request. Bounds a slow
+    //                          or stalled upload, not the handler.
+    //   CONNECTION_TIMEOUT_MS  http.Server#timeout: socket inactivity. This is
+    //                          the one that bounds a slow fan-out, because a
+    //                          handler awaiting sixteen vendors sends no bytes
+    //                          while it waits.
+    //
+    // 120 s sits below the 154 s worst case on purpose and far above the p99 of
+    // every other route; the iOS client already gives up at 30 s. It is above
+    // the 72 s keep-alive idle timeout, so idle pooled connections are still
+    // closed by keep-alive rather than by this.
+    REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+    CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
 
     // Coinbase Advanced Trade API (ECDSA key pair).
     COINBASE_API_KEY_ID: z.string().default(''),

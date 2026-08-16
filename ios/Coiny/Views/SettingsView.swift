@@ -11,6 +11,10 @@ struct SettingsView: View {
     @State private var isUnlinkingBank = false
     @State private var showManageSubscriptions = false
     @State private var showRefundSheet = false
+    @State private var isRevokingSessions = false
+    @State private var showRevokeResult = false
+    @State private var revokeFailed = false
+    @State private var revokedCount = 0
     @State private var repairVM = ConnectionRepairViewModel()
     @State private var presentedDocument: LegalDocument?
     /// The "Share usage data" toggle (docs/legal/consent-copy.md section 2).
@@ -78,9 +82,29 @@ struct SettingsView: View {
                         NetWorthCache.shared.clear()
                         NotificationCenter.default.post(name: .coinySignedOut, object: nil)
                     }
+                    // The only path that ends a session on a device you no
+                    // longer hold. Sign in here on the replacement phone, then
+                    // run this; the stolen device is signed out and this one
+                    // is not.
+                    Button(isRevokingSessions ? "Signing out other devices…" : "Sign out other devices") {
+                        Task { await revokeOtherSessions() }
+                    }
+                    .disabled(isRevokingSessions)
                     Button("Delete account", role: .destructive) {
                         showDeleteAlert = true
                     }
+                }
+                .alert("Other devices signed out", isPresented: $showRevokeResult) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text(revokedCount == 1
+                         ? "1 other session was ended. This device is still signed in."
+                         : "\(revokedCount) other sessions were ended. This device is still signed in.")
+                }
+                .alert("Could not sign out other devices", isPresented: $revokeFailed) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text("Nothing was changed. Check your connection and try again.")
                 }
                 .alert("Delete Account?", isPresented: $showDeleteAlert) {
                     Button("Delete", role: .destructive) {
@@ -230,6 +254,18 @@ private extension SettingsView {
                 Link("coiny@athanorworks.com", destination: URL(string: "mailto:coiny@athanorworks.com")!)
                     .font(.callout)
             }
+        }
+    }
+
+    @MainActor
+    private func revokeOtherSessions() async {
+        isRevokingSessions = true
+        defer { isRevokingSessions = false }
+        do {
+            revokedCount = try await API.shared.revokeOtherSessions()
+            showRevokeResult = true
+        } catch {
+            revokeFailed = true
         }
     }
 }

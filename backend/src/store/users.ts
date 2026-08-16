@@ -46,11 +46,43 @@ export async function updateDisplayName(userId: string, displayName: string): Pr
   await db().update(users).set({ displayName }).where(eq(users.id, userId));
 }
 
+// The Sign in with Apple refresh token, stored encrypted so that account
+// deletion has something to hand Apple's `/auth/revoke` (TN3194). Written
+// best-effort at sign-in: a failed exchange must never fail a sign-in, so the
+// caller swallows the error and the user simply has no stored token, which
+// revocation reports as `no_token` rather than as a failure.
+export async function setAppleRefreshToken(userId: string, refreshToken: string): Promise<void> {
+  await db()
+    .update(users)
+    .set({ appleRefreshToken: encryptString(refreshToken) })
+    .where(eq(users.id, userId));
+}
+
+/** The Apple grant we hold for a user, decrypted. `appleSub` being null means
+ *  this is a Google-only account and there is no Apple grant to revoke. */
+export async function getAppleGrant(userId: string): Promise<{ appleSub: string | null; refreshToken: string | null }> {
+  const rows = await db()
+    .select({ appleSub: users.appleSub, appleRefreshToken: users.appleRefreshToken })
+    .from(users)
+    .where(eq(users.id, userId));
+
+  const row = rows[0];
+  if (!row) return { appleSub: null, refreshToken: null };
+  return {
+    appleSub: row.appleSub,
+    refreshToken: row.appleRefreshToken ? decryptString(row.appleRefreshToken) : null,
+  };
+}
+
 export async function getUserById(id: string): Promise<UserRow | null> {
   const rows = await db().select().from(users).where(eq(users.id, id));
   const row = rows[0];
   if (!row) return null;
-  return { ...row, email: row.email ? decryptString(row.email) : null };
+  // The Apple refresh token is deliberately dropped rather than decrypted: it
+  // is a credential, it has exactly one reader (revoke/upstream.ts, via
+  // getAppleGrant), and this is the generic accessor whose result is the one
+  // most likely to end up in a response body one day.
+  return { ...row, appleRefreshToken: null, email: row.email ? decryptString(row.email) : null };
 }
 
 export type ConsentState = {

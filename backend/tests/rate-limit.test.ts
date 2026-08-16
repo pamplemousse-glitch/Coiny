@@ -50,6 +50,71 @@ describe('per-user rate limit', () => {
     await app.close();
   });
 
+  it('caps the expensive refresh route far below the global bucket', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const { REFRESH_LIMIT } = await import('../src/api/rate-limits.js');
+    const app = await buildApp();
+
+    // A bearer that is not a live session. The rate-limit hook runs at
+    // onRequest and keys on sha256(bearer), so these requests land in the
+    // route's bucket; the auth plugin then 401s at preHandler, so the 16-call
+    // vendor fan-out this route exists to protect never runs. That is the only
+    // way to assert the limit without making the test the thing the limit is
+    // there to prevent.
+    const headers = { authorization: 'Bearer refresh-limit-probe' };
+    const max = REFRESH_LIMIT.config.rateLimit.max;
+
+    const statuses: number[] = [];
+    for (let i = 0; i <= max; i++) {
+      const res = await app.inject({ method: 'POST', url: '/api/net-worth/refresh', headers });
+      statuses.push(res.statusCode);
+    }
+
+    expect(statuses.slice(0, max)).toEqual(Array(max).fill(401));
+    expect(statuses[max]).toBe(429);
+    // And the global bucket alone would not have stopped any of them.
+    expect(max).toBeLessThan(100);
+
+    await app.close();
+  });
+
+  it('caps each vendor sync route', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const { SYNC_LIMIT } = await import('../src/api/rate-limits.js');
+    const app = await buildApp();
+
+    const headers = { authorization: 'Bearer sync-limit-probe' };
+    const max = SYNC_LIMIT.config.rateLimit.max;
+
+    let last = 0;
+    for (let i = 0; i <= max; i++) {
+      const res = await app.inject({ method: 'POST', url: '/api/zerion/sync', headers });
+      last = res.statusCode;
+    }
+    expect(last).toBe(429);
+
+    await app.close();
+  });
+
+  // Each sync route is a slice of the same fan-out, so a limit on one and not
+  // the others is a limit on nothing. This is the row that would notice a new
+  // integration landing without one.
+  it('gives every /api/*/sync route its own limit', async () => {
+    const { readdirSync, readFileSync } = await import('node:fs');
+    const dir = new URL('../src/api/', import.meta.url);
+
+    const unlimited: string[] = [];
+    for (const file of readdirSync(dir)) {
+      if (!file.endsWith('.ts')) continue;
+      const src = readFileSync(new URL(file, dir), 'utf8');
+      for (const match of src.matchAll(/'(\/api\/[a-z0-9-]+\/sync)',\s*(\w+)/g)) {
+        if (match[2] !== 'SYNC_LIMIT') unlimited.push(`${file}: ${match[1]}`);
+      }
+    }
+
+    expect(unlimited).toEqual([]);
+  });
+
   it('still rate-limits unauthenticated requests by IP', async () => {
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();

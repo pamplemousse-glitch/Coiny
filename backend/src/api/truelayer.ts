@@ -10,6 +10,7 @@ import type { TrueLayerEnv } from '../truelayer/client.js';
 import { buildAuthUrl, exchangeCode, getAccounts, getBalance } from '../truelayer/client.js';
 import { getTrueLayerAccessToken } from '../truelayer/tokens.js';
 import { encryptString } from '../util/crypto.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const REDIRECT_URI = 'coiny://truelayer/callback';
 
@@ -76,7 +77,7 @@ export function registerTruelayerApi(app: FastifyInstance): void {
 
   // POST /api/truelayer/sync — refresh token if needed, fetch account balances in GBP,
   // convert to USD via Frankfurter, and cache the USD total in lastBalanceGbp.
-  app.post('/api/truelayer/sync', async (req: FastifyRequest, reply: FastifyReply) => {
+  app.post('/api/truelayer/sync', SYNC_LIMIT, async (req: FastifyRequest, reply: FastifyReply) => {
     const userId = req.user!.id;
     const [conn] = await db().select().from(truelayerConnections).where(eq(truelayerConnections.userId, userId));
 

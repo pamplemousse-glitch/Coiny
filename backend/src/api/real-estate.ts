@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { realEstateAssets } from '../db/schema.js';
 import { getPropertyValue } from '../realestate/client.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const AddAssetBodySchema = z.object({
   address: z.string().min(1).max(500),
@@ -55,7 +56,7 @@ export function registerRealEstateApi(app: FastifyInstance): void {
   });
 
   // POST /api/real-estate/sync
-  app.post('/api/real-estate/sync', async (req: FastifyRequest, reply: FastifyReply) => {
+  app.post('/api/real-estate/sync', SYNC_LIMIT, async (req: FastifyRequest, reply: FastifyReply) => {
     const userId = req.user!.id;
     const rows = await db().select().from(realEstateAssets).where(eq(realEstateAssets.userId, userId));
 

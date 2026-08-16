@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import type { FastifyBaseLogger } from 'fastify';
+import { exchangeAuthorizationCode, isAppleRevocationConfigured, revokeToken } from '../apple/client.js';
 import { config } from '../config.js';
 import { db } from '../db/client.js';
 import {
@@ -12,6 +13,7 @@ import {
   ynabConnections,
 } from '../db/schema.js';
 import { deleteUser as deleteSpinwheelUser } from '../spinwheel/client.js';
+import { getAppleGrant } from '../store/users.js';
 import type { TrueLayerEnv } from '../truelayer/client.js';
 import { deleteCredential } from '../truelayer/client.js';
 import { getTrueLayerAccessToken } from '../truelayer/tokens.js';
@@ -24,8 +26,23 @@ import { getTrueLayerAccessToken } from '../truelayer/tokens.js';
 // Plaid is deliberately absent from this module: `DELETE /api/account` already
 // calls `itemRemove` per item, and moving it here would change the ordering
 // relative to the cascade delete for no gain.
+//
+// Apple is here and is the only entry Apple itself requires rather than a
+// vendor: TN3194 makes revoking the Sign in with Apple grant part of account
+// deletion, and it is checked at review.
 
-export type RevocationResult = 'revoked' | 'no_connection' | 'not_configured' | 'unsupported_by_provider' | 'failed';
+export type RevocationResult =
+  | 'revoked'
+  | 'no_connection'
+  | 'not_configured'
+  // The grant exists and the provider supports revoking it, but we hold nothing
+  // that authenticates the call. Only Apple can reach this: a user who signed
+  // in before the authorization code was collected has no stored refresh token
+  // and did not supply a fresh code at deletion. Distinct from 'failed', which
+  // means we tried and the provider said no.
+  | 'no_token'
+  | 'unsupported_by_provider'
+  | 'failed';
 
 export interface RevocationOutcome {
   provider: string;
@@ -75,8 +92,23 @@ const UNSUPPORTED: ReadonlyArray<{ provider: string; table: UnsupportedTable }> 
 // CCPA both give the user a deletion right that does not depend on a third
 // party being reachable, so every failure is logged and stepped over. The
 // returned outcomes let the caller log what actually happened.
-export async function revokeUpstreamGrants(userId: string, log: FastifyBaseLogger): Promise<RevocationOutcome[]> {
-  const outcomes: RevocationOutcome[] = [await revokeTrueLayer(userId, log), await revokeSpinwheel(userId, log)];
+export interface RevocationOptions {
+  /** A fresh Sign in with Apple authorization code, collected from the user at
+   *  deletion time. Preferred over any stored refresh token because TN3194's
+   *  own answer to "we hold no usable token" is to ask for a new code. */
+  appleAuthorizationCode: string | null;
+}
+
+export async function revokeUpstreamGrants(
+  userId: string,
+  log: FastifyBaseLogger,
+  options: RevocationOptions = { appleAuthorizationCode: null },
+): Promise<RevocationOutcome[]> {
+  const outcomes: RevocationOutcome[] = [
+    await revokeApple(userId, log, options.appleAuthorizationCode),
+    await revokeTrueLayer(userId, log),
+    await revokeSpinwheel(userId, log),
+  ];
 
   for (const { provider, table } of UNSUPPORTED) {
     const present = await hasConnection(table, userId);
@@ -84,6 +116,63 @@ export async function revokeUpstreamGrants(userId: string, log: FastifyBaseLogge
   }
 
   return outcomes;
+}
+
+// Apple is the one grant that is not optional. TN3194 makes revoking the Sign
+// in with Apple grant part of what "delete my account" means, and App Review
+// checks it: an account Coiny reports as deleted while still listed under
+// Settings > Apple ID > Sign in with Apple is telling the user something
+// untrue. Part 1 row 1.4.13 and Part 2 row 2.3.4 both record it as a blocker.
+//
+// It is still best-effort in exactly the same sense as every other provider
+// here. Apple being unreachable at 2am cannot be the reason a right-to-delete
+// request fails; the outcome is logged and the deletion continues.
+//
+// Order of preference for the token, from TN3194:
+//   1. a fresh authorization code supplied with the deletion request, exchanged
+//      here, which is the technote's own answer for "no usable token held"
+//   2. the refresh token stored at sign-in
+//   3. nothing, which is reported as `no_token` and not as success
+export async function revokeApple(
+  userId: string,
+  log: FastifyBaseLogger,
+  authorizationCode: string | null = null,
+): Promise<RevocationOutcome> {
+  const grant = await getAppleGrant(userId);
+  // Google-only accounts have no Apple grant. Not a gap, just not applicable.
+  if (!grant.appleSub) return { provider: 'apple', result: 'no_connection' };
+
+  if (!isAppleRevocationConfigured()) {
+    log.warn({ userId }, 'apple revocation skipped, sign in with apple rest credentials not configured');
+    return { provider: 'apple', result: 'not_configured' };
+  }
+
+  let token = grant.refreshToken;
+  if (authorizationCode) {
+    try {
+      token = (await exchangeAuthorizationCode(authorizationCode)) ?? token;
+    } catch (err) {
+      // A spent or expired code is the common case and is not a reason to stop:
+      // fall through to whatever was stored at sign-in.
+      log.warn(
+        { err, userId },
+        'apple authorization code exchange failed during deletion, falling back to stored token',
+      );
+    }
+  }
+
+  if (!token) {
+    log.warn({ userId }, 'apple revocation skipped, no refresh token held and no authorization code supplied');
+    return { provider: 'apple', result: 'no_token' };
+  }
+
+  try {
+    await revokeToken(token, 'refresh_token');
+    return { provider: 'apple', result: 'revoked' };
+  } catch (err) {
+    log.warn({ err, userId }, 'apple token revocation failed, continuing');
+    return { provider: 'apple', result: 'failed' };
+  }
 }
 
 export async function revokeTrueLayer(userId: string, log: FastifyBaseLogger): Promise<RevocationOutcome> {

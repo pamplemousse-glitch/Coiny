@@ -218,6 +218,82 @@ describe('PATCH /api/account', () => {
   });
 });
 
+// Part 1 row 1.4.5, the stolen-phone case. The user signs in on a replacement
+// device and ends every other session from there.
+describe('POST /api/account/sessions/revoke-all', () => {
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  it('returns 401 without auth', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'POST', url: '/api/account/sessions/revoke-all' });
+    expect(res.statusCode).toBe(401);
+
+    await app.close();
+  });
+
+  it('ends the other sessions and keeps the caller signed in', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const { createSession } = await import('../src/store/sessions.js');
+    const app = await buildApp();
+
+    // The device that was taken, plus the replacement the request comes from.
+    const stolen = await createSession(testUserId);
+    const replacement = await createSession(testUserId);
+    const replacementHeader = { authorization: `Bearer ${replacement.rawToken}` };
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/account/sessions/revoke-all',
+      headers: replacementHeader,
+    });
+    expect(res.statusCode).toBe(200);
+    // The stolen device and the session db-helper minted.
+    expect(res.json<{ revoked: number }>().revoked).toBe(2);
+
+    const thief = await app.inject({
+      method: 'GET',
+      url: '/api/pets',
+      headers: { authorization: `Bearer ${stolen.rawToken}` },
+    });
+    expect(thief.statusCode).toBe(401);
+
+    const owner = await app.inject({ method: 'GET', url: '/api/pets', headers: replacementHeader });
+    expect(owner.statusCode).toBe(200);
+
+    await app.close();
+  });
+
+  it('leaves a second user signed in', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const { createSession } = await import('../src/store/sessions.js');
+    const { findOrCreateUser } = await import('../src/store/users.js');
+    const app = await buildApp();
+
+    const otherUserId = await findOrCreateUser({ appleSub: 'revoke_all_other', email: null });
+    const other = await createSession(otherUserId);
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/account/sessions/revoke-all',
+      headers: authHeader(),
+    });
+    expect(res.statusCode).toBe(200);
+
+    const survives = await app.inject({
+      method: 'GET',
+      url: '/api/pets',
+      headers: { authorization: `Bearer ${other.rawToken}` },
+    });
+    expect(survives.statusCode).toBe(200);
+
+    await app.close();
+  });
+});
+
 describe('POST /api/auth/logout', () => {
   beforeEach(async () => {
     await resetDatabase();
