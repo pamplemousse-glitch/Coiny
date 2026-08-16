@@ -226,17 +226,6 @@ actor API {
         try await delete("/api/account")
     }
 
-    /// Ends every session except this device's, and returns how many were ended.
-    ///
-    /// The answer to losing a phone: sign in on a replacement, then run this.
-    /// Deliberately does not sign this device out, so the person running it
-    /// keeps the device they are holding.
-    func revokeOtherSessions() async throws -> Int {
-        struct Response: Decodable { let revoked: Int }
-        let res: Response = try await post("/api/account/sessions/revoke-all")
-        return res.revoked
-    }
-
     // MARK: - Coinbase
 
     func getCoinbaseStatus() async throws -> CoinbaseStatus {
@@ -327,14 +316,6 @@ actor API {
         try await request(method: "POST", path: path, body: body, requiresAuth: true)
     }
 
-    func patch<T: Decodable, B: Encodable>(_ path: String, body: B) async throws -> T {
-        try await request(method: "PATCH", path: path, body: body, requiresAuth: true)
-    }
-
-    func delete<T: Decodable>(_ path: String) async throws -> T {
-        try await request(method: "DELETE", path: path, body: Optional<Empty>.none, requiresAuth: true)
-    }
-
     /// DELETE for endpoints that return 204 No Content.
     func deleteVoid(_ path: String) async throws {
         guard let url = URL(string: path, relativeTo: baseURL) else {
@@ -420,34 +401,6 @@ actor API {
 
 // MARK: - Chain Wallets + Misc
 // Kept outside the actor body for SwiftLint's type_body_length; extensions on
-// the actor still run on the actor.
-extension API {
-    func getChainWallets() async throws -> [ChainWallet] {
-        try await get("/api/chain-wallets")
-    }
-
-    func addChainWallet(chain: String, address: String, label: String?) async throws {
-        struct Body: Encodable { let chain: String; let address: String; let label: String? }
-        let _: EmptyResponse = try await post("/api/chain-wallets", body: Body(chain: chain, address: address, label: label))
-    }
-
-    func removeChainWallet(chain: String, address: String) async throws {
-        try await deleteVoid("/api/chain-wallets/\(chain)/\(encodePathComponent(address))")
-    }
-
-    func syncChainWallets() async throws -> ChainWalletSyncResult {
-        try await post("/api/chain-wallets/sync")
-    }
-
-    private func encodePathComponent(_ s: String) -> String {
-        s.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? s
-    }
-
-    func health() async throws -> HealthResponse {
-        try await request(method: "GET", path: "/health", body: Optional<Empty>.none, requiresAuth: false)
-    }
-}
-
 // MARK: - Performance API
 extension API {
     func getCoinbasePerformance() async throws -> CoinbasePerformance {
