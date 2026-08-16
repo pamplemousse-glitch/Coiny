@@ -1,0 +1,89 @@
+# YNAB
+YNAB is a zero-based budgeting app that helps people get good with money so they never have to worry about money again.
+
+## About 
+Have you ever worried about money? You’re not alone. Download YNAB, get good with money, and never worry about money again.
+
+Based on the simple but powerful method of giving every dollar a job, the YNAB app guides users through the process of creating a flexible, intentional plan for their money—and their lives. YNAB helps simplify spending decisions, prioritize goals, pay down debt, and improve relationships so you can enjoy a life with less money stress. Start your free one-month trial.
+
+## Key features and benefits:
+- The average YNAB user saves $600 in their first month and $6000 in their first year. 
+- 92% of YNAB users report feeling less money stress since starting YNAB. 
+- 70% of YNAB users could live for three months or more on savings. 
+- Unlimited Categories: Customize your plan to your exact needs, wants and goals. No limits or minimums!
+- Move Money: Make changes to your plan and cover overspending without breaking your zero-based budget.
+- Learn & Explore: Access the very best & latest financial guidance from within the YNAB app, unique to your circumstances.
+- Pinned Categories: Keep what’s most important, most visible.
+- Share your YNAB subscription with a close-knit group of up to six people at no extra cost.
+- YNAB is based on the revolutionary YNAB Method: Give every dollar a job. Learn to ask simple questions that help you envelope budget with intention, anticipate non-monthly expenses, and reach ambitious goals.
+- YNAB’s system for managing credit card spending automatically sets cash aside for your bill payment each time you spend, making it easy to pay your card in full each month. No new debt!
+- Personalize your debt paydown plan with our debt calculator.
+- Prioritize spending and savings goals with YNAB’s powerful target-setting features, and track progress at a glance.
+- Plan within your means, using YNAB’s Cost to Be Me tool.
+- Get a realistic look at your spending and progress with customizable reports.
+- Get a month ahead (or more!) on expenses, assign to bills in future months, and build a buffer that brings more security and ease to your financial life.
+- Import transactions automatically by securely linking your financial accounts or choose to import manually.
+- YNAB will never sell your data. Bank-grade security, data encryption, no ads or third-party products in the app. With YNAB, you are not the product.
+- Learn how to be good with money through workshops, live Q&As, guides, podcasts, videos, social media, and newsletters.
+- You are not alone! The YNAB support team is here to help along the way with Mr. Rogers-level friendliness.
+- Access YNAB on your iPhone, Android, tablet, or computer and sync automatically across all devices.
+
+## Features
+- [Subscription Sharing](https://www.ynab.com/features/subscription-sharing): Budget as a couple, family, or friend group and create or share unlimited plans at no extra cost with YNAB Together.
+- [Connect Your Bank Accounts](https://support.ynab.com/en_us/how-direct-import-works-H1IGYLgnxl): Securely link financial accounts to import transactions and balances automatically.
+- [Debt Management](https://www.ynab.com/features/debt-management): Get out of debt (and stay out) with YNAB’s debt management features.
+- [Goal Tracking](https://www.ynab.com/features/goal-tracking): Set targets to save toward goals or expenses and visualize progress.
+- [Reports](https://support.ynab.com/en_us/reflect-in-ynab-B1GJsrWkj): Reflect on your spending with reports on your net worth, spending, income, expenses, and age of money.
+-[Accessibility Tools and Features](https://support.ynab.com/en_us/accessibility-tools-and-features-an-overview-HkmxC7W1j): Learn about YNAB's dedication to accessibility across all platforms.
+
+## Resources
+- [The YNAB Method](https://www.ynab.com/ynab-method): Learn everything about the YNAB Method—give every dollar a job—and why it works. 
+- [Guides](https://www.ynab.com/guides): Learn everything you need to know on a range of money topics with YNAB guides. 
+- [What’s New](https://www.ynab.com/whats-new): Stay updated on product releases, feature improvements, and bug fixes. Last updated this month.
+- [Stories](https://www.ynab.com/category/money-stories): Read real-life stories of how YNAB helped people never worry about money again. 
+- [Blog](https://www.ynab.com/blog): The YNAB blog offers entertaining, educational, and inspiring articles about money.
+- [Budget Templates](https://www.ynab.com/templates): Ready-made category setups you can use for your YNAB plan, with ideas for how to handle everything from planning a wedding, to surviving college life, to reacting to a job layoff.
+- [YNAB Videos](https://www.ynab.com/youtube): Fun and informative video content about how to get good with money. 
+- [Podcast](https://www.ynab.com/podcast): YNAB founder Jesse Mecham talks about how to get good with money. 
+- [Workshops](https://www.ynab.com/free-workshops): Join a live online class or Q&A to learn more about YNAB.
+- [Newsletters](https://www.ynab.com/help-center): Subscribe to the Loose Change and Round Up newsletters to get the wit and wisdom of YNAB delivered to your inbox.
+- [Financial Wellness by YNAB](https://www.ynab.com/wellness): Offer YNAB as an employee benefit with Financial Wellness by YNAB.
+- [Help Center](https://www.ynab.com/help-center): Search help articles to find YNAB-related answers or contact our support team. 
+- [YNAB API](https://support.ynab.com/en_us/the-ynab-api-an-overview-BJMgQ3zAq): Learn how to access the raw data in your plan as a developer or to build integrations between YNAB and other websites. 
+- [Gift Subscriptions](https://ynab.com/give-ynab): Gift a 3-month or 1-year subscription. Earn 3 free months when your 3-month gift results in a new signup.
+- [Referral Program](https://support.ynab.com/en_us/referral-program-an-overview-BJWpA9Rc): Earn a free month of YNAB when you refer a new subscriber.
+
+## How To
+- [How to Get Out of Debt](https://www.ynab.com/guide/how-to-get-out-of-debt): A guide on how to get out of debt (and stay out.) 
+- [How to Stop Living Paycheck to Paycheck](https://www.ynab.com/guide/stop-living-paycheck-to-paycheck): A guide on how to stop living paycheck to paycheck. 
+- [How to Save Money](https://www.ynab.com/guide/how-to-save-money): A guide on how to save money. 
+- [How to Budget with Irregular Income](https://www.ynab.com/guide/irregular-income): A guide for freelancers, gig workers, and commission-based jobs on how to budget with inconsistent income. 
+- [How to Budget as a Couple](https://www.ynab.com/guide/budgeting-as-a-couple): A guide on budgeting as a couple. 
+- [How to Create a Plan Template](https://support.ynab.com/en_us/creating-a-plan-template-ByZJZx_R9): Learn how to create a YNAB plan template. 
+-[How to Keep Your Plan Accurate](https://support.ynab.com/en_us/how-to-keep-your-plan-accurate-SyC9mj9Rq): Learn how to create a routine that sticks and how to verify that the amounts in your plan are accurate.
+- [How to Assign Future Income in YNAB](https://support.ynab.com/en_us/assigning-future-income-an-overview-BJsTo0jCq): Learn how to assign future income in YNAB. 
+- [How to Adjust Your Plan on Any Pay Cycle](https://support.ynab.com/en_us/how-to-adjust-your-plan-on-any-pay-cycle-HkpGZdW1o): Learn how to adjust your plan in YNAB to fit any pay cycle. 
+
+## Getting started
+- [Free Trial](https://www.ynab.com/our-free-34-day-trial: Sign up for a free trial of YNAB and never worry about money again.
+- [Pricing](https://www.ynab.com/pricing): Learn more about the cost of a monthly or annual YNAB subscription. 
+- [Ultimate Getting Started Guide](https://www.ynab.com/guide/the-ultimate-get-started-guide): Step-by-step instructions to help you set up YNAB so you can get good with money. 
+- [App Lineup](https://www.ynab.com/our-app-lineup): YNAB options for the web, iPhone, Android, iPad, and Apple Watch. 
+
+## Compare
+- [YNAB vs. Monarch](https://www.ynab.com/blog/ynab-vs-monarch): Compare YNAB vs. the Monarch for budgeting. 
+- [YNAB vs. Mint](https://www.ynab.com/blog/ynab-a-better-mint-alternative): Compare YNAB vs. Mint for budgeting.   
+- [YNAB vs. Credit Karma](https://www.ynab.com/blog/ynab-vs-credit-karma): Compare YNAB vs. Credit Karma for budgeting. 
+- [YNAB as an alternative to Mvelopes](https://www.ynab.com/blog/ynab-an-alternative-to-mvelopes): Compare YNAB vs. Mvelopes for budgeting. 
+- [Best Budgeting App for Couples](https://www.ynab.com/blog/best-budgeting-app-for-couples): Learn why YNAB is the best budgeting app for couples. 
+- [Best Budgeting App for Small Businesses](https://www.ynab.com/blog/5-best-budgeting-apps-for-small-businesses): Learn why YNAB is the best budgeting app for small businesses. 
+- [Best Budgeting App for College Students](https://www.ynab.com/blog/college-students-your-future-self-called-and-they-said-use-ynab-for-free) Learn why YNAB is the best budgeting app for college students. 
+- [Best Budgeting App for ADHD](https://www.ynab.com/blog/budgeting-with-adhd): Learn why YNAB is the best budgeting app for people with ADHD. 
+
+## Company Resources
+- [About Us](https://www.ynab.com/about-us): Learn more about YNAB as a company. 
+- [Security] (https://www.ynab.com/security): Read more about the steps YNAB takes to protect your personal information. 
+- [Privacy Policy](https://www.ynab.com/privacy-policy): Review our privacy policy for confidence that you can trust YNAB. 
+- [Terms of Service](https://www.ynab.com/terms): YNAB’s Terms of Service. 
+- [Press Kit](https://www.ynab.com/press): Check out brand materials, media mentions and partnerships, and YNAB personalities.   
+- [Contact us](https://support.ynab.com/en_us/contact/contact-us-B1OG9RFfj): Contact YNAB support. 

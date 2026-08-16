@@ -1,0 +1,98 @@
+# GoldAPI.io
+
+GoldAPI.io provides real-time and historical precious metals prices for Gold, Silver, Platinum and Palladium.
+
+## Documentation
+
+- API documentation: https://www.goldapi.io/api-documentation
+- OpenAPI specification: https://www.goldapi.io/openapi.json
+- Well-known OpenAPI specification: https://www.goldapi.io/.well-known/openapi.json
+- Authentication: API key in the `x-access-token` request header
+- Base URL: https://www.goldapi.io
+
+## Core Endpoints
+
+- `GET /api/{metal}/{currency}`: returns the latest spot price for a precious metal in a selected currency.
+- `GET /api/{metal}/{currency}/{date}`: returns the historical spot price for a precious metal in a selected currency for a specific date.
+
+Parameters:
+
+- `metal`: one of `XAU`, `XAG`, `XPT`, `XPD`
+- `currency`: one of the supported currency codes listed below
+- `date`: historical date in `YYYYMMDD` format
+
+## Supported Metals
+
+| Symbol | Metal |
+| --- | --- |
+| XAU | Gold |
+| XAG | Silver |
+| XPT | Platinum |
+| XPD | Palladium |
+
+## Supported Currencies
+
+AED, AUD, BTC, CAD, CHF, CNY, CZK, EGP, EUR, GBP, HKD, INR, JOD, JPY, KRW, KWD, MXN, MYR, OMR, PLN, RUB, SAR, SGD, THB, USD, ZAR
+
+## Examples
+
+```http
+GET /api/XAU/USD
+x-access-token: YOUR_API_KEY
+```
+
+```http
+GET /api/XAG/USD
+x-access-token: YOUR_API_KEY
+```
+
+```http
+GET /api/XPT/EUR
+x-access-token: YOUR_API_KEY
+```
+
+```http
+GET /api/XPD/AUD
+x-access-token: YOUR_API_KEY
+```
+
+```http
+GET /api/XAU/USD/20250101
+x-access-token: YOUR_API_KEY
+```
+
+## Integrations
+
+- RapidAPI: https://www.goldapi.io/rapidapi
+- Postman: https://www.goldapi.io/postman
+- Zapier: https://www.goldapi.io/zapier
+- MCP: https://www.goldapi.io/mcp
+- WordPress: https://www.goldapi.io/blog/wordpress-goldapi-prices-integration
+
+## Use Cases
+
+- Gold price widgets
+- Silver price widgets
+- Bullion dealer pricing systems
+- Jewelry valuation tools
+- Portfolio dashboards
+- Trading applications
+- Financial applications
+- AI agents
+- Automation workflows
+- WordPress plugins
+- No-code integrations
+
+## Important Links
+
+- Home: https://www.goldapi.io
+- API documentation: https://www.goldapi.io/api-documentation
+- Dashboard: https://www.goldapi.io/dashboard
+- Pricing: https://www.goldapi.io/pricing
+- Blog: https://www.goldapi.io/blog
+- OpenAPI JSON: https://www.goldapi.io/openapi.json
+- Well-known OpenAPI JSON: https://www.goldapi.io/.well-known/openapi.json
+- RapidAPI: https://www.goldapi.io/rapidapi
+- Postman: https://www.goldapi.io/postman
+- Zapier: https://www.goldapi.io/zapier
+- MCP: https://www.goldapi.io/mcp

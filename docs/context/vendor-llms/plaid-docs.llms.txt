@@ -1,0 +1,327 @@
+# Plaid Technical Documentation
+
+# Full version: https://plaid.com/docs/llms-full.txt
+# (Recommended for models with larger context windows)
+# Full plaid.com site index: https://plaid.com/llms.txt
+
+Plaid helps companies build financial solutions by making it easy, safe and reliable for people to connect their financial data to apps and services.
+
+## How-to Guides
+
+
+### Account
+- [Account - Overview | Plaid Docs](https://plaid.com/docs/account/index.html.md)
+- [Account - Activity, logs, and status | Plaid Docs](https://plaid.com/docs/account/activity/index.html.md)
+- [Account - Pricing and billing | Plaid Docs](https://plaid.com/docs/account/billing/index.html.md)
+- [Account - For resellers | Plaid Docs](https://plaid.com/docs/account/resellers/index.html.md)
+- [Account - Security | Plaid Docs](https://plaid.com/docs/account/security/index.html.md)
+- [Account - Teams | Plaid Docs](https://plaid.com/docs/account/teams/index.html.md)
+
+### Assets
+- [Assets - Introduction to Assets | Plaid Docs](https://plaid.com/docs/assets/index.html.md)
+- [Assets - Create an Asset Report | Plaid Docs](https://plaid.com/docs/assets/add-to-app/index.html.md)
+- [Assets - Assets partners | Plaid Docs](https://plaid.com/docs/assets/partnerships/index.html.md)
+- [Assets - Ocrolus | Plaid Docs](https://plaid.com/docs/assets/partnerships/ocrolus/index.html.md)
+
+### Auth
+- [Auth - Introduction to Auth | Plaid Docs](https://plaid.com/docs/auth/index.html.md)
+- [Auth - Add Auth to your app | Plaid Docs](https://plaid.com/docs/auth/add-to-app/index.html.md)
+- [Auth - Additional Auth flows | Plaid Docs](https://plaid.com/docs/auth/coverage/index.html.md)
+- [Auth - Money movement partnerships | Plaid Docs](https://plaid.com/docs/auth/partnerships/index.html.md)
+- [Auth - Increasing pay-by-bank adoption | Plaid Docs](https://plaid.com/docs/auth/pay-by-bank-ux/index.html.md)
+- [Auth - Automated Micro-deposits | Plaid Docs](https://plaid.com/docs/auth/coverage/automated/index.html.md)
+- [Auth - Database Auth | Plaid Docs](https://plaid.com/docs/auth/coverage/database-auth/index.html.md)
+- [Auth - Database Insights and Match (legacy) | Plaid Docs](https://plaid.com/docs/auth/coverage/database/index.html.md)
+- [Auth - Configuring entry points | Plaid Docs](https://plaid.com/docs/auth/coverage/flow-options/index.html.md)
+- [Auth - Instant Auth, Instant Match, & Instant Micro-deposits | Plaid Docs](https://plaid.com/docs/auth/coverage/instant/index.html.md)
+- [Auth - Micro-deposit Events | Plaid Docs](https://plaid.com/docs/auth/coverage/microdeposit-events/index.html.md)
+- [Auth - Anti-fraud best practices | Plaid Docs](https://plaid.com/docs/auth/coverage/same-day-link-best-practices/index.html.md)
+- [Auth - Same Day Micro-deposits | Plaid Docs](https://plaid.com/docs/auth/coverage/same-day/index.html.md)
+- [Auth - Test in Sandbox | Plaid Docs](https://plaid.com/docs/auth/coverage/testing/index.html.md)
+- [Auth - Dwolla | Plaid Docs](https://plaid.com/docs/auth/partnerships/dwolla/index.html.md)
+- [Auth - Stripe | Plaid Docs](https://plaid.com/docs/auth/partnerships/stripe/index.html.md)
+
+### Balance
+- [Balance - Introduction to Balance | Plaid Docs](https://plaid.com/docs/balance/index.html.md)
+- [Balance - Add Balance to your app | Plaid Docs](https://plaid.com/docs/balance/add-to-app/index.html.md)
+- [Balance - Migrate to Signal Rules | Plaid Docs](https://plaid.com/docs/balance/migration-guide/index.html.md)
+
+### Changelog
+- [Changelog | Plaid Docs](https://plaid.com/docs/changelog/index.html.md)
+
+### Check
+- [Consumer Report (by Plaid Check) - Introduction | Plaid Docs](https://plaid.com/docs/check/index.html.md)
+- [Consumer Report (by Plaid Check) - Implementation | Plaid Docs](https://plaid.com/docs/check/add-to-app/index.html.md)
+- [Consumer Report (by Plaid Check) - Migrate from Assets | Plaid Docs](https://plaid.com/docs/check/migrate-from-assets/index.html.md)
+- [Consumer Report (by Plaid Check) - Migrate from Income | Plaid Docs](https://plaid.com/docs/check/migrate-from-income/index.html.md)
+- [Consumer Report (by Plaid Check) - Migrate from Transactions | Plaid Docs](https://plaid.com/docs/check/migrate-from-transactions/index.html.md)
+- [Consumer Report (by Plaid Check) - Share data with partners | Plaid Docs](https://plaid.com/docs/check/oauth-sharing/index.html.md)
+- [Consumer Report (by Plaid Check) - Using Plaid Layer with Plaid Check Consumer Report | Plaid Docs](https://plaid.com/docs/check/onboard-users-with-layer/index.html.md)
+
+### Enrich
+- [Enrich - Introduction to Enrich | Plaid Docs](https://plaid.com/docs/enrich/index.html.md)
+
+### Errors
+- [Errors - Overview | Plaid Docs](https://plaid.com/docs/errors/index.html.md)
+- [Errors - API errors | Plaid Docs](https://plaid.com/docs/errors/api/index.html.md)
+- [Errors - Assets errors | Plaid Docs](https://plaid.com/docs/errors/assets/index.html.md)
+- [Errors - Check Report webhook errors | Plaid Docs](https://plaid.com/docs/errors/check-report-webhook/index.html.md)
+- [Errors - Check Report errors | Plaid Docs](https://plaid.com/docs/errors/check-report/index.html.md)
+- [Errors - Income errors | Plaid Docs](https://plaid.com/docs/errors/income/index.html.md)
+- [Errors - Institution errors | Plaid Docs](https://plaid.com/docs/errors/institution/index.html.md)
+- [Errors - Invalid Input errors | Plaid Docs](https://plaid.com/docs/errors/invalid-input/index.html.md)
+- [Errors - Invalid Request errors | Plaid Docs](https://plaid.com/docs/errors/invalid-request/index.html.md)
+- [Errors - Invalid Result errors | Plaid Docs](https://plaid.com/docs/errors/invalid-result/index.html.md)
+- [Errors - Item errors | Plaid Docs](https://plaid.com/docs/errors/item/index.html.md)
+- [Errors - Microdeposits errors | Plaid Docs](https://plaid.com/docs/errors/microdeposits/index.html.md)
+- [Errors - OAuth errors | Plaid Docs](https://plaid.com/docs/errors/oauth/index.html.md)
+- [Errors - Partner errors | Plaid Docs](https://plaid.com/docs/errors/partner/index.html.md)
+- [Errors - Payment errors (Europe) | Plaid Docs](https://plaid.com/docs/errors/payment/index.html.md)
+- [Errors - Rate Limit Exceeded errors | Plaid Docs](https://plaid.com/docs/errors/rate-limit-exceeded/index.html.md)
+- [Errors - Recaptcha errors | Plaid Docs](https://plaid.com/docs/errors/recaptcha/index.html.md)
+- [Errors - Sandbox errors | Plaid Docs](https://plaid.com/docs/errors/sandbox/index.html.md)
+- [Errors - Signal errors | Plaid Docs](https://plaid.com/docs/errors/signal/index.html.md)
+- [Errors - Transactions errors | Plaid Docs](https://plaid.com/docs/errors/transactions/index.html.md)
+- [Errors - Transfer errors | Plaid Docs](https://plaid.com/docs/errors/transfer/index.html.md)
+- [Errors - User errors | Plaid Docs](https://plaid.com/docs/errors/user/index.html.md)
+- [Errors - Virtual Accounts errors (Europe) | Plaid Docs](https://plaid.com/docs/errors/virtual-account/index.html.md)
+
+### Financial-insights
+- [Financial Insights | Plaid Docs](https://plaid.com/docs/financial-insights/index.html.md)
+
+### Identity
+- [Identity Verification - Introduction to Identity Verification | Plaid Docs](https://plaid.com/docs/identity-verification/index.html.md)
+- [Identity - Introduction to Identity | Plaid Docs](https://plaid.com/docs/identity/index.html.md)
+- [Identity Verification - Managing failed verifications | Plaid Docs](https://plaid.com/docs/identity-verification/failed-verifications/index.html.md)
+- [Identity Verification - Input validation rules | Plaid Docs](https://plaid.com/docs/identity-verification/hybrid-input-validation/index.html.md)
+- [Identity Verification - Link callbacks | Plaid Docs](https://plaid.com/docs/identity-verification/link/index.html.md)
+- [Identity Verification - Metrics and reporting | Plaid Docs](https://plaid.com/docs/identity-verification/reporting/index.html.md)
+- [Identity Verification - Risk checks | Plaid Docs](https://plaid.com/docs/identity-verification/risk-checks/index.html.md)
+- [Identity Verification - Testing in Sandbox | Plaid Docs](https://plaid.com/docs/identity-verification/testing/index.html.md)
+- [Identity Verification - Webhooks | Plaid Docs](https://plaid.com/docs/identity-verification/webhooks/index.html.md)
+- [Identity - Add Identity to your app | Plaid Docs](https://plaid.com/docs/identity/add-to-app/index.html.md)
+- [Identity - Identity Document Upload | Plaid Docs](https://plaid.com/docs/identity/identity-document-upload/index.html.md)
+- [Identity - Interpreting Identity Match Scores | Plaid Docs](https://plaid.com/docs/identity/interpreting-identity-match/index.html.md)
+
+### Identity-verification
+- [Identity Verification - Introduction to Identity Verification | Plaid Docs](https://plaid.com/docs/identity-verification/index.html.md)
+- [Identity Verification - Managing failed verifications | Plaid Docs](https://plaid.com/docs/identity-verification/failed-verifications/index.html.md)
+- [Identity Verification - Input validation rules | Plaid Docs](https://plaid.com/docs/identity-verification/hybrid-input-validation/index.html.md)
+- [Identity Verification - Link callbacks | Plaid Docs](https://plaid.com/docs/identity-verification/link/index.html.md)
+- [Identity Verification - Metrics and reporting | Plaid Docs](https://plaid.com/docs/identity-verification/reporting/index.html.md)
+- [Identity Verification - Risk checks | Plaid Docs](https://plaid.com/docs/identity-verification/risk-checks/index.html.md)
+- [Identity Verification - Testing in Sandbox | Plaid Docs](https://plaid.com/docs/identity-verification/testing/index.html.md)
+- [Identity Verification - Webhooks | Plaid Docs](https://plaid.com/docs/identity-verification/webhooks/index.html.md)
+
+### Income
+- [Income - Introduction to Income | Plaid Docs](https://plaid.com/docs/income/index.html.md)
+- [Income - Add Income to your app | Plaid Docs](https://plaid.com/docs/income/add-to-app/index.html.md)
+- [Income - Bank Income | Plaid Docs](https://plaid.com/docs/income/bank-income/index.html.md)
+- [Income - Document Income | Plaid Docs](https://plaid.com/docs/income/document-income/index.html.md)
+- [Income - Payroll Income | Plaid Docs](https://plaid.com/docs/income/payroll-income/index.html.md)
+
+### Index.html
+- [Home | Plaid Docs](https://plaid.com/docs/index.html.md)
+
+### Institutions
+- [Institutions - US and Canada Coverage | Plaid Docs](https://plaid.com/docs/institutions/index.html.md)
+- [Institutions - European Coverage | Plaid Docs](https://plaid.com/docs/institutions/europe/index.html.md)
+
+### Investments
+- [Investments Move - Introduction to Investments Move | Plaid Docs](https://plaid.com/docs/investments-move/index.html.md)
+- [Investments - Introduction to Investments | Plaid Docs](https://plaid.com/docs/investments/index.html.md)
+- [Investments Move - Add Investments Move to your app | Plaid Docs](https://plaid.com/docs/investments-move/add-to-app/index.html.md)
+- [Investments - Add Investments to your app | Plaid Docs](https://plaid.com/docs/investments/add-to-app/index.html.md)
+
+### Investments-move
+- [Investments Move - Introduction to Investments Move | Plaid Docs](https://plaid.com/docs/investments-move/index.html.md)
+- [Investments Move - Add Investments Move to your app | Plaid Docs](https://plaid.com/docs/investments-move/add-to-app/index.html.md)
+
+### Kyc-aml
+- [KYC/AML and anti-fraud | Plaid Docs](https://plaid.com/docs/kyc-aml/index.html.md)
+
+### Launch-checklist
+- [Launch checklist | Plaid Docs](https://plaid.com/docs/launch-checklist/index.html.md)
+
+### Layer
+- [Layer - Introduction to Plaid Layer | Plaid Docs](https://plaid.com/docs/layer/index.html.md)
+- [Layer - Add Plaid Layer to your app | Plaid Docs](https://plaid.com/docs/layer/add-to-app/index.html.md)
+
+### Liabilities
+- [Liabilities - Introduction to Liabilities | Plaid Docs](https://plaid.com/docs/liabilities/index.html.md)
+- [Liabilities - Add Liabilities to your app | Plaid Docs](https://plaid.com/docs/liabilities/add-to-app/index.html.md)
+
+### Link
+- [Link - Overview | Plaid Docs](https://plaid.com/docs/link/index.html.md)
+- [Link - Android | Plaid Docs](https://plaid.com/docs/link/android/index.html.md)
+- [Link - Optimizing Link conversion | Plaid Docs](https://plaid.com/docs/link/best-practices/index.html.md)
+- [Link - Customizing Link | Plaid Docs](https://plaid.com/docs/link/customization/index.html.md)
+- [Link - Data Transparency Messaging migration | Plaid Docs](https://plaid.com/docs/link/data-transparency-messaging-migration-guide/index.html.md)
+- [Link - Preventing duplicate Items | Plaid Docs](https://plaid.com/docs/link/duplicate-items/index.html.md)
+- [Link - Embedded Link | Plaid Docs](https://plaid.com/docs/link/embedded-institution-search/index.html.md)
+- [Link - Handling an invalid Link Token | Plaid Docs](https://plaid.com/docs/link/handle-invalid-link-token/index.html.md)
+- [Link - Hosted Link | Plaid Docs](https://plaid.com/docs/link/hosted-link/index.html.md)
+- [Link - Choosing when to initialize products | Plaid Docs](https://plaid.com/docs/link/initializing-products/index.html.md)
+- [Link - Institution status in Link | Plaid Docs](https://plaid.com/docs/link/institution-status/index.html.md)
+- [Link - iOS | Plaid Docs](https://plaid.com/docs/link/ios/index.html.md)
+- [Link - Link Recovery (beta) | Plaid Docs](https://plaid.com/docs/link/link-recovery/index.html.md)
+- [Link | Plaid Docs](https://plaid.com/docs/link/link-token-migration-guide/index.html.md)
+- [Link - Link analytics and tracking | Plaid Docs](https://plaid.com/docs/link/measuring-conversion/index.html.md)
+- [Link - Pre-Link messaging | Plaid Docs](https://plaid.com/docs/link/messaging/index.html.md)
+- [Link - Multi-Item Link | Plaid Docs](https://plaid.com/docs/link/multi-item-link/index.html.md)
+- [Link - OAuth guide | Plaid Docs](https://plaid.com/docs/link/oauth/index.html.md)
+- [Link - React Native | Plaid Docs](https://plaid.com/docs/link/react-native/index.html.md)
+- [Link - Returning user experience | Plaid Docs](https://plaid.com/docs/link/returning-user/index.html.md)
+- [Link - Troubleshooting | Plaid Docs](https://plaid.com/docs/link/troubleshooting/index.html.md)
+- [Link - Update mode | Plaid Docs](https://plaid.com/docs/link/update-mode/index.html.md)
+- [Link - Web | Plaid Docs](https://plaid.com/docs/link/web/index.html.md)
+- [Link - Webview integrations | Plaid Docs](https://plaid.com/docs/link/webview/index.html.md)
+- [Link - Troubleshooting | Plaid Docs](https://plaid.com/docs/link/android/troubleshooting/index.html.md)
+- [Link - Hosted Link for embedded clients | Plaid Docs](https://plaid.com/docs/link/hosted-link/embedded-clients/index.html.md)
+
+### Monitor
+- [Monitor - Introduction to Monitor | Plaid Docs](https://plaid.com/docs/monitor/index.html.md)
+- [Monitor - Watchlists and matching algorithms | Plaid Docs](https://plaid.com/docs/monitor/algorithms-and-lists/index.html.md)
+
+### Payment-initiation
+- [Payments (Europe) | Plaid Docs](https://plaid.com/docs/payment-initiation/index.html.md)
+- [Payments (Europe) - Payment Initiation | Plaid Docs](https://plaid.com/docs/payment-initiation/payment-initiation-one-time/index.html.md)
+- [Payments (Europe) - Payment Status | Plaid Docs](https://plaid.com/docs/payment-initiation/payment-status/index.html.md)
+- [Payments (Europe) - Payments Dashboard | Plaid Docs](https://plaid.com/docs/payment-initiation/payments-dashboard/index.html.md)
+- [Payments (Europe) - Variable Recurring Payments | Plaid Docs](https://plaid.com/docs/payment-initiation/variable-recurring-payments/index.html.md)
+- [Payments (Europe) - Virtual Accounts and Payouts | Plaid Docs](https://plaid.com/docs/payment-initiation/virtual-accounts/index.html.md)
+- [Payments (Europe) - Add Payment Initiation to your app | Plaid Docs](https://plaid.com/docs/payment-initiation/payment-initiation-one-time/add-to-app/index.html.md)
+- [Payments (Europe) - Handling failed payments | Plaid Docs](https://plaid.com/docs/payment-initiation/payment-initiation-one-time/handling-failed-payments/index.html.md)
+- [Payments (Europe) - Refunds | Plaid Docs](https://plaid.com/docs/payment-initiation/payment-initiation-one-time/refunds/index.html.md)
+- [Payments (Europe) - User onboarding and account funding guide | Plaid Docs](https://plaid.com/docs/payment-initiation/payment-initiation-one-time/user-onboarding-and-account-funding/index.html.md)
+- [Payments (Europe) - Add Variable Recurring Payments to your app | Plaid Docs](https://plaid.com/docs/payment-initiation/variable-recurring-payments/add-to-app/index.html.md)
+- [Payments (Europe) - Handling Failed Payments | Plaid Docs](https://plaid.com/docs/payment-initiation/variable-recurring-payments/handling-failed-payments/index.html.md)
+- [Payments (Europe) - Managing Consent | Plaid Docs](https://plaid.com/docs/payment-initiation/variable-recurring-payments/managing-consent/index.html.md)
+- [Payments (Europe) - Refunds | Plaid Docs](https://plaid.com/docs/payment-initiation/variable-recurring-payments/refunds/index.html.md)
+- [Payments (Europe) - Account Sweeping | Plaid Docs](https://plaid.com/docs/payment-initiation/virtual-accounts/account-sweeping/index.html.md)
+- [Payments (Europe) - Add Virtual Accounts to your app | Plaid Docs](https://plaid.com/docs/payment-initiation/virtual-accounts/add-to-app/index.html.md)
+- [Payments (Europe) - Handling Unexpected Payments | Plaid Docs](https://plaid.com/docs/payment-initiation/virtual-accounts/handling-unexpected-payments/index.html.md)
+- [Payments (Europe) - Managing your Virtual Account | Plaid Docs](https://plaid.com/docs/payment-initiation/virtual-accounts/managing-virtual-accounts/index.html.md)
+- [Payments (Europe) - Payment Confirmation | Plaid Docs](https://plaid.com/docs/payment-initiation/virtual-accounts/payment-confirmation/index.html.md)
+- [Payments (Europe) - Payouts | Plaid Docs](https://plaid.com/docs/payment-initiation/virtual-accounts/payouts/index.html.md)
+- [Payments (Europe) - Refunds | Plaid Docs](https://plaid.com/docs/payment-initiation/virtual-accounts/refunds/index.html.md)
+
+### Payments
+- [Payments and Funding | Plaid Docs](https://plaid.com/docs/payments/index.html.md)
+
+### Quickstart
+- [Quickstart | Plaid Docs](https://plaid.com/docs/quickstart/index.html.md)
+- [Quickstart - Glossary | Plaid Docs](https://plaid.com/docs/quickstart/glossary/index.html.md)
+
+### Resources
+- [Resources | Plaid Docs](https://plaid.com/docs/resources/index.html.md)
+- [Resources - Plaid CLI | Plaid Docs](https://plaid.com/docs/resources/cli/index.html.md)
+- [Resources - MCP Server | Plaid Docs](https://plaid.com/docs/resources/mcp/index.html.md)
+- [Resources - Vibe coding tips | Plaid Docs](https://plaid.com/docs/resources/vibe-coding/index.html.md)
+
+### Sandbox
+- [Sandbox - Overview | Plaid Docs](https://plaid.com/docs/sandbox/index.html.md)
+- [Sandbox - Sandbox institutions | Plaid Docs](https://plaid.com/docs/sandbox/institutions/index.html.md)
+- [Sandbox - Test credentials | Plaid Docs](https://plaid.com/docs/sandbox/test-credentials/index.html.md)
+- [Sandbox - Customize test data | Plaid Docs](https://plaid.com/docs/sandbox/user-custom/index.html.md)
+
+### Signal
+- [Signal - Intro to Signal | Plaid Docs](https://plaid.com/docs/signal/index.html.md)
+- [Signal - Add Signal Transaction Scores to your app | Plaid Docs](https://plaid.com/docs/signal/add-to-app/index.html.md)
+- [Signal - Creating Items | Plaid Docs](https://plaid.com/docs/signal/creating-signal-items/index.html.md)
+- [Signal - Reporting returns and decisions | Plaid Docs](https://plaid.com/docs/signal/reporting-returns/index.html.md)
+- [Signal - Signal Rules | Plaid Docs](https://plaid.com/docs/signal/signal-rules/index.html.md)
+- [Signal - Tuning the Signal Rules | Plaid Docs](https://plaid.com/docs/signal/tuning-rules/index.html.md)
+
+### Statements
+- [Statements - Introduction to Statements | Plaid Docs](https://plaid.com/docs/statements/index.html.md)
+
+### Support
+- [Support - Overview | Plaid Docs](https://plaid.com/docs/support/index.html.md)
+
+### Transactions
+- [Transactions - Introduction to Transactions | Plaid Docs](https://plaid.com/docs/transactions/index.html.md)
+- [Transactions - Add Transactions to your app | Plaid Docs](https://plaid.com/docs/transactions/add-to-app/index.html.md)
+- [Transactions - Personal Finance Category migration guide | Plaid Docs](https://plaid.com/docs/transactions/pfc-migration/index.html.md)
+- [Transactions - Transactions Sync migration guide | Plaid Docs](https://plaid.com/docs/transactions/sync-migration/index.html.md)
+- [Transactions - Transaction states | Plaid Docs](https://plaid.com/docs/transactions/transactions-data/index.html.md)
+- [Transactions - Troubleshooting | Plaid Docs](https://plaid.com/docs/transactions/troubleshooting/index.html.md)
+- [Transactions - Transactions webhooks | Plaid Docs](https://plaid.com/docs/transactions/webhooks/index.html.md)
+
+### Transfer
+- [Transfer - Transfer Overview | Plaid Docs](https://plaid.com/docs/transfer/index.html.md)
+- [Transfer - Transfer Application | Plaid Docs](https://plaid.com/docs/transfer/application/index.html.md)
+- [Transfer - Creating transfers | Plaid Docs](https://plaid.com/docs/transfer/creating-transfers/index.html.md)
+- [Transfer - Transfer Dashboard | Plaid Docs](https://plaid.com/docs/transfer/dashboard/index.html.md)
+- [Transfer - Plaid Ledger flow of funds | Plaid Docs](https://plaid.com/docs/transfer/flow-of-funds/index.html.md)
+- [Transfer - Glossary | Plaid Docs](https://plaid.com/docs/transfer/glossary/index.html.md)
+- [Transfer - Transfer for Platforms | Plaid Docs](https://plaid.com/docs/transfer/platform-payments/index.html.md)
+- [Transfer - Tracking transfer status | Plaid Docs](https://plaid.com/docs/transfer/reconciling-transfers/index.html.md)
+- [Transfer - Recurring transfers | Plaid Docs](https://plaid.com/docs/transfer/recurring-transfers/index.html.md)
+- [Transfer - Refunds | Plaid Docs](https://plaid.com/docs/transfer/refunds/index.html.md)
+- [Transfer - Reserves | Plaid Docs](https://plaid.com/docs/transfer/reserves/index.html.md)
+- [Transfer - Testing in Sandbox | Plaid Docs](https://plaid.com/docs/transfer/sandbox/index.html.md)
+- [Transfer - Customizing Signal Rules for Transfer | Plaid Docs](https://plaid.com/docs/transfer/signal-rules/index.html.md)
+- [Transfer - Errors and returns | Plaid Docs](https://plaid.com/docs/transfer/troubleshooting/index.html.md)
+- [Transfer - Transfer UI | Plaid Docs](https://plaid.com/docs/transfer/using-transfer-ui/index.html.md)
+
+### Underwriting
+- [Credit and Underwriting | Plaid Docs](https://plaid.com/docs/underwriting/index.html.md)
+
+## API Reference
+
+
+### Api
+- [API - Overview | Plaid Docs](https://plaid.com/docs/api/index.html.md)
+- [API - Accounts | Plaid Docs](https://plaid.com/docs/api/accounts/index.html.md)
+- [API - Consent | Plaid Docs](https://plaid.com/docs/api/consent/index.html.md)
+- [API - Institutions | Plaid Docs](https://plaid.com/docs/api/institutions/index.html.md)
+- [API - Items | Plaid Docs](https://plaid.com/docs/api/items/index.html.md)
+- [API - Look up Dashboard users | Plaid Docs](https://plaid.com/docs/api/kyc-aml-users/index.html.md)
+- [API - Libraries | Plaid Docs](https://plaid.com/docs/api/libraries/index.html.md)
+- [API - Link | Plaid Docs](https://plaid.com/docs/api/link/index.html.md)
+- [API - Network | Plaid Docs](https://plaid.com/docs/api/network/index.html.md)
+- [API - OAuth | Plaid Docs](https://plaid.com/docs/api/oauth/index.html.md)
+- [API - Reseller partners | Plaid Docs](https://plaid.com/docs/api/partner/index.html.md)
+- [API - Postman Collection | Plaid Docs](https://plaid.com/docs/api/postman/index.html.md)
+- [API - Processor partners | Plaid Docs](https://plaid.com/docs/api/processor-partners/index.html.md)
+- [API - Processor tokens | Plaid Docs](https://plaid.com/docs/api/processors/index.html.md)
+- [API - Sandbox | Plaid Docs](https://plaid.com/docs/api/sandbox/index.html.md)
+- [API - Users | Plaid Docs](https://plaid.com/docs/api/users/index.html.md)
+- [API - API versioning | Plaid Docs](https://plaid.com/docs/api/versioning/index.html.md)
+- [API - Webhooks | Plaid Docs](https://plaid.com/docs/api/webhooks/index.html.md)
+- [API - Assets | Plaid Docs](https://plaid.com/docs/api/products/assets/index.html.md)
+- [API - Auth | Plaid Docs](https://plaid.com/docs/api/products/auth/index.html.md)
+- [API | Plaid Docs](https://plaid.com/docs/api/products/beacon/index.html.md)
+- [API - Consumer Report (by Plaid Check) | Plaid Docs](https://plaid.com/docs/api/products/check/index.html.md)
+- [API - Enrich | Plaid Docs](https://plaid.com/docs/api/products/enrich/index.html.md)
+- [API - Identity Verification | Plaid Docs](https://plaid.com/docs/api/products/identity-verification/index.html.md)
+- [API - Identity | Plaid Docs](https://plaid.com/docs/api/products/identity/index.html.md)
+- [API - Income | Plaid Docs](https://plaid.com/docs/api/products/income/index.html.md)
+- [API - Investments Move | Plaid Docs](https://plaid.com/docs/api/products/investments-move/index.html.md)
+- [API - Investments | Plaid Docs](https://plaid.com/docs/api/products/investments/index.html.md)
+- [API - Plaid Layer | Plaid Docs](https://plaid.com/docs/api/products/layer/index.html.md)
+- [API - Liabilities | Plaid Docs](https://plaid.com/docs/api/products/liabilities/index.html.md)
+- [API - Monitor | Plaid Docs](https://plaid.com/docs/api/products/monitor/index.html.md)
+- [API - Payment Initiation (Europe) | Plaid Docs](https://plaid.com/docs/api/products/payment-initiation/index.html.md)
+- [API - Signal and Balance | Plaid Docs](https://plaid.com/docs/api/products/signal/index.html.md)
+- [API - Statements | Plaid Docs](https://plaid.com/docs/api/products/statements/index.html.md)
+- [API - Transactions | Plaid Docs](https://plaid.com/docs/api/products/transactions/index.html.md)
+- [API - Transfer | Plaid Docs](https://plaid.com/docs/api/products/transfer/index.html.md)
+- [API - Virtual Accounts | Plaid Docs](https://plaid.com/docs/api/products/virtual-accounts/index.html.md)
+- [API - New User API migration guide | Plaid Docs](https://plaid.com/docs/api/users/migrate-to-new-user-apis/index.html.md)
+- [API - New User API overview | Plaid Docs](https://plaid.com/docs/api/users/user-apis/index.html.md)
+- [API - Webhook verification | Plaid Docs](https://plaid.com/docs/api/webhooks/webhook-verification/index.html.md)
+- [API - Account Linking | Plaid Docs](https://plaid.com/docs/api/products/transfer/account-linking/index.html.md)
+- [API - Guaranteed ACH | Plaid Docs](https://plaid.com/docs/api/products/transfer/guaranteed-ach/index.html.md)
+- [API - Initiating Transfers | Plaid Docs](https://plaid.com/docs/api/products/transfer/initiating-transfers/index.html.md)
+- [API - Plaid Ledger | Plaid Docs](https://plaid.com/docs/api/products/transfer/ledger/index.html.md)
+- [API - Program Metrics | Plaid Docs](https://plaid.com/docs/api/products/transfer/metrics/index.html.md)
+- [API - Transfer for Platforms | Plaid Docs](https://plaid.com/docs/api/products/transfer/platform-payments/index.html.md)
+- [API - Reading Transfers | Plaid Docs](https://plaid.com/docs/api/products/transfer/reading-transfers/index.html.md)
+- [API - Recurring Transfers | Plaid Docs](https://plaid.com/docs/api/products/transfer/recurring-transfers/index.html.md)
+- [API - Refunds | Plaid Docs](https://plaid.com/docs/api/products/transfer/refunds/index.html.md)
+
+## Machine-Readable Data
+
+- [Plaid API rate limits (JSON)](https://plaid.com/data/rate-limits.json): Production and sandbox rate limits for all Plaid API endpoints.

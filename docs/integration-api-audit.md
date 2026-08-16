@@ -13,34 +13,51 @@ Everything below was checked against the running vendor, not from memory.
 
 ---
 
-## 1. `llms.txt`: ten vendors publish one, we use zero
+## 1. `llms.txt`: seventeen vendors publish one, now vendored
 
 `llms.txt` is a vendor-curated, plain-text index of their documentation, meant
 to be read by a model rather than crawled. Where it exists it is strictly better
 than searching the docs site, because it is the vendor's own answer to "what
 should a machine know about this API".
 
-| Vendor | URL | Size | Status |
-|---|---|---:|---|
-| Plaid | `plaid.com/llms.txt` | 346 KB | **live** |
-| Plaid (docs) | `docs.plaid.com/llms.txt` | 27 KB | **live** |
-| Alpaca | `docs.alpaca.markets/llms.txt` | 249 KB | **live** |
-| TrueLayer | `docs.truelayer.com/llms.txt` | 61 KB | **live** |
-| Polymarket | `docs.polymarket.com/llms.txt` | 48 KB | **live** |
-| Spinwheel | `docs.spinwheel.io/llms.txt` | 19 KB | **live** |
-| Zerion | `developers.zerion.io/llms.txt` | 19 KB | **live** |
-| YNAB | `ynab.com/llms.txt` | 10 KB | **live** |
-| Coinbase CDP | `docs.cdp.coinbase.com/llms.txt` | 8 KB | **live** |
-| Helius | `www.helius.dev/llms.txt` | 4 KB | **live** |
+**All seventeen are now vendored into `docs/context/vendor-llms/`** (912 KB), so
+integration work reads the vendor's own index instead of guessing at endpoint
+shapes. Refresh them by re-running the URLs below.
 
-Checked and **not** usable, recorded so nobody re-checks:
+| Vendor | URL | Size |
+|---|---|---:|
+| Plaid | `plaid.com/llms.txt` | 346 KB |
+| Alpaca | `docs.alpaca.markets/llms.txt` | 249 KB |
+| TrueLayer | `docs.truelayer.com/llms.txt` | 61 KB |
+| Polymarket | `docs.polymarket.com/llms.txt` | 48 KB |
+| **Kalshi** | `docs.kalshi.com/llms.txt` | 45 KB |
+| Plaid (docs) | `docs.plaid.com/llms.txt` | 27 KB |
+| **Alchemy** | `www.alchemy.com/llms.txt` | 24 KB |
+| **Hyperliquid** | `hyperliquid.gitbook.io/llms.txt` | 21 KB |
+| Spinwheel | `docs.spinwheel.io/llms.txt` | 19 KB |
+| Zerion | `developers.zerion.io/llms.txt` | 19 KB |
+| **PokemonPriceTracker** | `www.pokemonpricetracker.com/llms.txt` | 11 KB |
+| YNAB | `ynab.com/llms.txt` | 10 KB |
+| Coinbase CDP | `docs.cdp.coinbase.com/llms.txt` | 8 KB |
+| Helius | `www.helius.dev/llms.txt` | 4 KB |
+| **Kraken** | `docs.kraken.com/llms.txt` | 4 KB |
+| **TCGapi** | `tcgapi.dev/llms.txt` | 4 KB |
+| **GoldAPI** | `www.goldapi.io/llms.txt` | 3 KB |
+
+The six in bold were missed on the first pass **because the hostname was
+guessed rather than looked up.** `trading.kalshi.com` does not resolve at all,
+and reporting "no llms.txt" from that is a failure of method, not a fact about
+Kalshi. If a vendor appears to have none, try the docs subdomain, the apex, and
+`www.` before concluding anything.
+
+Checked and genuinely **not** usable, recorded so nobody re-checks:
 
 | Vendor | Result |
 |---|---|
-| Alchemy | `docs.alchemy.com/llms.txt` returns 200 at 472 bytes, a stub, not an index |
+| Alchemy (docs host) | `docs.alchemy.com/llms.txt` returns 200 at 472 bytes, a stub. `www.alchemy.com` is the real one |
+| Frankfurter | 200 at 953 bytes, a stub |
 | Blockfrost | 404 |
 | Discogs | 403 |
-| Kalshi | no response |
 | YNAB API host | `api.ynab.com/llms.txt` 401, the docs host is the one to use |
 
 Note the trap: **size matters as much as status.** Alchemy's 472-byte 200 and
@@ -48,13 +65,7 @@ the OWASP MASVS checklists' 610-byte 200 both pass a status-code check and
 contain nothing. Verify bytes.
 
 Coinbase and Zerion additionally expose **MCP servers already connected to this
-project**, which are a better interface than their `llms.txt` and are currently
-unused for anything.
-
-**Recommendation.** Pull the four that matter for asset depth (Alpaca, Plaid,
-TrueLayer, Zerion) into `docs/context/` the way `kicksdb-openapi.json` already
-is, so integration work stops guessing at endpoint shapes. Alpaca's is the
-highest value because our Alpaca integration is the thinnest (section 2).
+project**, which are a better interface still.
 
 ---
 
@@ -81,17 +92,34 @@ is offering the individual holdings for one more call. Given that asset depth is
 the stated differentiator against Kubera, this is the clearest gap in the whole
 integration surface.
 
-### HIGH: Kalshi fetches cash and ignores the positions
+### HIGH: Kalshi drops the cash balance
 
-We call `/trade-api/v2/portfolio/balance`, which is the cash balance.
-`GET /portfolio/positions` returns market positions (ticker, contract position,
-market exposure, realized P&L, fees) and event positions.
+An earlier draft of this file said Kalshi ignores positions and that a user
+with $0 cash and $4,000 of positions would see $0. **That was wrong, and it was
+wrong in the opposite direction.** Reading the endpoint contract rather than
+guessing from the endpoint name gives the real defect.
 
-For a prediction-market account the open contracts **are** the holdings. Today a
-user with $0 cash and $4,000 of open Kalshi positions sees $0.
+`GET /portfolio/balance` returns both figures, and they are additive:
 
-It is also internally inconsistent: the Polymarket client already calls
-`/positions`. Two prediction markets, two different depths.
+| Field | Meaning |
+|---|---|
+| `balance` | available cash, in cents |
+| `portfolio_value` | current value of the positions held, in cents |
+
+`src/kalshi/client.ts` reads them as alternatives:
+
+```ts
+const cents = body.portfolio_value ?? body.balance ?? 0;
+```
+
+`portfolio_value` is a required field, so it is effectively always present and
+**`balance` is never counted**. A user with $1,000 cash and $500 of positions is
+reported as $500. Their cash disappears from net worth entirely.
+
+Separately, `GET /portfolio/positions` gives per-market detail (ticker, contract
+position, market exposure, realized P&L, fees) and per-event detail, which the
+Polymarket client already fetches for its side. Two prediction markets, two
+different depths.
 
 ### MEDIUM: Plaid investment transactions are unused
 
@@ -154,14 +182,14 @@ a better citizen when a vendor is debugging traffic.
 
 ## 4. What to do
 
-1. **Add Alpaca `/v2/positions`.** Highest value per hour. Turns a single number
-   into a real holdings list, on the axis the product competes on.
-2. **Add Kalshi `/portfolio/positions`.** Fixes a case where the reported total
-   can be flatly wrong, not merely shallow.
-3. **Vendor `llms.txt` into `docs/context/`** for Alpaca, Plaid, TrueLayer and
-   Zerion.
+1. ~~Vendor every `llms.txt`~~ **done**, all seventeen are in
+   `docs/context/vendor-llms/`.
+2. **Fix the Kalshi cash drop and add `/portfolio/positions`.** The cash drop is
+   a wrong number, not a shallow one.
+3. **Add Alpaca `/v2/positions`.** Turns a single opaque figure into a real
+   holdings list, on the axis the product competes on.
 4. **Consider Plaid `/investments/transactions/get`** when goal pacing gets its
    next pass.
 5. **A consistent `User-Agent`** across every outbound client.
 
-Items 1 and 2 are the ones that change what a user sees.
+Items 2 and 3 are the ones that change what a user sees.

@@ -1,0 +1,50 @@
+# TCG API
+
+> Pricing API for 89+ trading card games with prices refreshed daily for major games (Pokemon, Magic, Yu-Gi-Oh, Lorcana, Flesh and Blood, One Piece, Riftbound) and every 3 days catalog-wide, plus per-condition prices and price history. Covers games (Pokemon, Magic: The Gathering, Yu-Gi-Oh!, Lorcana, Flesh and Blood, One Piece, Riftbound, and more) sourced from TCGPlayer. Free tier 100 requests/day, paid tiers $9.99–$99.99/mo, plus x402 pay-per-request in USDC on Base or Solana.
+
+Base URL: `https://api.tcgapi.dev/v1`. Authentication is either an `X-API-Key` (instant signup, no approval) or x402 USDC pay-per-request — same endpoints, agent picks. For full machine-readable reference of every endpoint, see [llms-full.txt](https://tcgapi.dev/llms-full.txt).
+
+## Documentation
+
+- [Introduction](https://tcgapi.dev/introduction/): What TCG API is, what data it covers, who it's for
+- [Quickstart](https://tcgapi.dev/quickstart/): First request in under 5 minutes
+- [Authentication](https://tcgapi.dev/authentication/): X-API-Key header and x402 pay-per-request
+- [API explorer](https://tcgapi.dev/api-explorer/): Live request playground in the browser
+- [llms-full.txt](https://tcgapi.dev/llms-full.txt): Full reference (every endpoint, params, schemas, x402 prices) for LLM ingestion
+
+## API Reference
+
+- [Games](https://tcgapi.dev/api/games/): List the 89+ supported games and per-game metadata
+- [Sets](https://tcgapi.dev/api/sets/): List sets, fetch set details, list cards in a set
+- [Cards](https://tcgapi.dev/api/cards/): Card details, prices per printing, per-condition prices (NM/LP/MP/HP/Damaged), history, TCGPlayer-ID lookup
+- [Search](https://tcgapi.dev/api/search/): Cross-game card and sealed-product search with filters
+- [Prices](https://tcgapi.dev/api/prices/): Top movers and bulk price endpoints
+- [Bulk](https://tcgapi.dev/api/bulk/): Bulk prices, per-condition prices, cards, history, plus name and TCGPlayer-ID resolve
+- [OpenAPI spec](https://tcgapi.dev/openapi.yaml): Source-of-truth machine-readable spec
+
+## Guides
+
+- [Errors](https://tcgapi.dev/guides/errors/): HTTP status codes and the `{error:{message,code}}` envelope
+- [Pagination](https://tcgapi.dev/guides/pagination/): `page` / `per_page` / `has_more` (max per_page = 200)
+- [Rate limits](https://tcgapi.dev/guides/rate-limits/): Tier quotas and the `X-RateLimit-*` response headers
+- [x402 pay-per-request](https://tcgapi.dev/x402/): EIP-3009 USDC settlement on Base mainnet and Solana mainnet
+
+## Pricing & Plans
+
+- [Pricing page](https://tcgapi.dev/pricing/): Free 100/day → Business 50K/day, $0–$99.99/mo
+- [Live x402 price map](https://api.tcgapi.dev/v1/x402/info): Per-endpoint USDC prices and supported networks
+
+## Agent discovery
+
+- [x402 manifest](https://tcgapi.dev/.well-known/x402.json): Pay-per-request profile (chains, asset, facilitator)
+- [ACP profile](https://tcgapi.dev/.well-known/acp.json): Agentic Commerce Protocol stub
+- [UCP profile](https://tcgapi.dev/.well-known/ucp): Universal Commerce Protocol stub
+- [MCP server card](https://tcgapi.dev/.well-known/mcp/server-card.json): Model Context Protocol transport info
+- [API catalog](https://tcgapi.dev/.well-known/api-catalog): RFC 9727 linkset of API resources
+
+## Optional
+
+- [Pricing comparisons](https://tcgapi.dev/compare/): TCG API vs Pokemon TCG API, MTGJSON, Scryfall, Cardmarket, etc.
+- [Per-game landing pages](https://tcgapi.dev/games/): Game-specific overviews and field details
+- [x402 protocol upstream](https://github.com/coinbase/x402): Coinbase's open spec
+- [Contact](mailto:thetcgapi@proton.me): Email for support and partnership questions

@@ -1,0 +1,69 @@
+# Pokemon Price Tracker API
+
+> Daily-updated Pokemon card prices, grading analytics, and market data for 50,000+ English and Japanese cards. Covers TCGPlayer market prices, eBay graded sales (PSA/CGC/BGS/SGC), Cardmarket EUR prices, and GemRate population data. Credit-based REST API with JSON responses.
+
+## Documentation
+- [API Reference](https://www.pokemonpricetracker.com/api-reference): Full endpoint reference with parameters and examples
+- [Docs](https://www.pokemonpricetracker.com/docs): Guides, integration patterns, and SDK usage
+- [OpenAPI Spec](https://www.pokemonpricetracker.com/api/openapi): Machine-readable OpenAPI 3.0 specification
+- [Parse Title API](https://www.pokemonpricetracker.com/parse-title-api): eBay listing title parser documentation
+- [Full LLM Documentation](https://www.pokemonpricetracker.com/llms-full.txt): Complete inline docs for LLMs (all endpoints, parameters, response fields, examples)
+- [Licensing & Commercial Use](https://www.pokemonpricetracker.com/licensing): Which plan a given use case requires, and what is never permitted
+- [Changelog RSS](https://www.pokemonpricetracker.com/changelog.xml): Product updates and release notes as an RSS 2.0 feed (same notes as the Discord #change-log channel; no auth, no credits)
+- [Changelog JSON Feed](https://www.pokemonpricetracker.com/changelog.json): The same release notes as JSON Feed 1.1 — poll this to pipe product updates into automations or LLMs
+
+## Quick Reference
+- Base URL: `https://www.pokemonpricetracker.com/api/v2`
+- Auth: `Authorization: Bearer YOUR_API_KEY` (required on all requests)
+- Free: 100 credits/day, 60 calls/min
+- Pro ($9.99/mo): 20,000 credits/day, 60 calls/min
+- Business ($99/mo): 200,000 credits/day, 500 calls/min
+- Enterprise ($300/mo): 1,000,000 credits/day, 1,000 calls/min
+- Credit cost: 1 base + 1 per optional data type (history, eBay, Cardmarket — Cardmarket is English-only and not charged for language=japanese); +1 for maxDataPoints>365 (Business only)
+- History depth is per-card, not a fixed retention: TCGPlayer history goes back years for old cards, while Cardmarket collection began 2026-03-16 (no earlier backfill) and each card's Cardmarket history starts when that card was first tracked — a newly released card having only weeks of data with `days=365` is expected, not a bug. `metadata.historyWindow` on every response reports the window actually applied (after plan caps)
+- Requests are billed on the requested `limit` (default 50), not results returned — a default `/cards` or `/sealed-products` request costs 50 credits; single lookups (`limit=1`) are billed at the per-card cost (1 credit base + includes)
+- Every response reports the exact charge in `metadata.apiCallsConsumed` and the `X-API-Calls-Consumed` header; `X-RateLimit-Daily-Remaining` reflects the balance after the request
+- Prepaid credits (pay-as-you-go): paid plans can top up credits from the dashboard that never expire and don't reset daily; when a request exceeds the daily allowance the cost is drawn from this balance (daily first, then prepaid) so requests succeed instead of 429. Reported via `X-RateLimit-Purchased-Remaining` and `X-RateLimit-Total-Remaining` (= daily + prepaid). The per-minute cap is unchanged
+- Minute credit cost: multi-result requests also consume minute credits = min(30, ceil(limit/10)); pass limit=1 for single-item lookups to avoid this; fetchAllInSet=true is most efficient for full-set syncs
+- `fetchAllInSet=true` with NO `limit`/`offset` returns the entire set in one response (the per-request size caps do not apply, even for 200+ card sets) and bills once at set size × per-card cost — no pagination needed. Passing `limit`/`offset` switches it to pagination, billing each page on its own size; the pages sum to the set size, never the whole set per page
+- Handling 429: every 429 carries a `Retry-After` header in seconds — honour it, as it is the shortest wait that can succeed. The body reports `limitType` (`daily` | `per_minute`), `retryAfter`, `resetsAt` (ISO 8601) and `resolution`. The two limits differ sharply: a per-minute limit clears within 60s, a daily limit not until 00:00 UTC (possibly hours away), so retrying a daily 429 on a short loop cannot succeed. On a daily limit, paid plans can continue immediately by buying prepaid credits instead of waiting
+
+## Licensing & Commercial Use
+- **Build with the data; do not resell the data.** Two questions decide almost every case: does it generate revenue, and are you selling the data itself?
+- Free and Pro ($9.99) are for personal, hobby, educational, and pre-launch development use only
+- **Commercial use requires Business ($99/mo) or Enterprise.** Commercial means any revenue: subscriptions, paid features, one-off sales, sponsorship, affiliate links, and **advertising** — an ad-supported site that is free to visitors is still commercial. Also covers internal business analytics, pricing your own inventory, and training ML models for commercial products
+- **Reselling and redistribution are prohibited on every plan, including Enterprise.** No competing price API or feed, no bulk datasets or database exports for third parties, no data brokerage, and nothing that substitutes for a PokemonPriceTracker subscription
+- Caching and storing responses in your own database to serve your own end users IS permitted. Serving your own first-party clients (your mobile app, front end, or internal tool hitting your own backend) is not a "competing API" — it becomes one when third parties can use it as a data source
+- Displaying derived values (medians, ranges, indices, charts) is permitted on the plan matching your use
+- Data sources, collection methods, and infrastructure are not disclosed. No affiliation with or endorsement by Nintendo, The Pokémon Company, TCGplayer, eBay, or PSA. Prices are estimates, provided "as is", with no warranty, no uptime SLA, and no indemnification
+- Full detail: https://www.pokemonpricetracker.com/licensing — binding terms: https://www.pokemonpricetracker.com/terms (Section 6)
+
+## Pricing Data Notes
+- Default response includes `prices.market`, `prices.variants` (Near Mint only per printing), and `prices.primaryPrinting`
+- `priceHistory.conditions` and `priceHistory.variants` (canonical per-condition history) require `includeHistory=true` (2 credits/card)
+- `prices.conditions` and the full multi-condition `prices.variants` are **deprecated (removal August 2026)** — migrate to `priceHistory.conditions` / `priceHistory.variants`
+- `condition` and `printing` query parameters are search filters — they narrow which cards are returned, they do not change what pricing fields appear in the response
+- Per-condition `listings` count is always `null`; only the `price` field is populated
+- `prices.listings`/`prices.sellers` are active TCGPlayer marketplace depth, refreshed on a price-tiered cadence (daily ≥$10, weekly $1–$10, monthly below); `prices.recentSales` is the daily recent-sales count from the price guide (sales activity, not depth)
+
+## Endpoints
+- `GET /cards` — Search and filter Pokemon cards with TCGPlayer pricing, optional price history and eBay graded sales. `search` matches card identity fields (name, set, number, rarity); to match a raw marketplace/eBay listing title, use `POST /parse-title` instead
+- `cardType` (response field and filter) is the card supertype: "Pokemon", "Trainer", or "Energy" (filter is case- and accent-insensitive; subtype values like "Supporter" also work). It is null on cards missing type data (~13% of English cards) — those cards never match a cardType filter
+- `GET /cards/{id}` — Single card by either identifier the API returns: a `tcgPlayerId` (e.g. `/cards/114004`) or the `id` field from a `/cards` response (24-char Mongo ObjectId). Same response envelope, same credit cost, and accepts the same `includeHistory`/`includeEbay`/`includeCardmarket`/`days`/`language` parameters as `/cards`. Returns 404 when no card matches (unlike `/cards`, which returns 200 with an empty `data` array)
+- `GET /sets` — List Pokemon TCG sets; any of its id fields (`tcgPlayerNumericId`, `tcgPlayerId` slug, or `id`) works as the `setId` filter for `/cards`
+- `GET /sealed-products` — Booster boxes, ETBs, and sealed products with pricing
+- `GET /population` — GemRate grading population data by grade and grader (Business plan only, 2 credits/card; a single-card tcgPlayerId lookup with no match returns data:null and costs 1 credit)
+- `POST /parse-title` — Extract card name, set, grade, and condition from eBay listing titles and fuzzy-match them to cards; the right endpoint for bulk listing-title matching (use it instead of `/cards?search=`)
+- `GET /export` — Daily price dump CSV for all cards (per-card or per-printing), sealed, eBay sales, or population data (Business plan only)
+
+## Bulk Export Notes (`GET /export`, Business plan only)
+- `type` param selects the dataset: `cards` (default), `printings`, `sealed`, `ebay`, or `population`
+- `cards` has one row per card and shows only its **primary printing** — other printings (Reverse Holofoil, 1st Edition, Unlimited Holofoil) are omitted, and the primary is not always the most valuable. `printings` uses the identical columns with one row per printing and is a strict superset; switch to it for complete pricing and key rows on `tcgPlayerId` + `printing`
+- `marketPrice`/`lowPrice` reflect a **single condition per printing** — the best available, which is Near Mint when NM listings exist but falls through to a lower condition when they don't, so `marketPrice` is **not always a Near Mint price**
+- `printings` additionally carries six columns appended after `lastPriceUpdate`: `marketNearMint`, `marketLightlyPlayed`, `marketModeratelyPlayed`, `marketHeavilyPlayed`, `marketDamaged`, `marketPriceCondition`. A blank price cell means the card isn't listed in that condition (not that it's worth zero); NM/LP are near-universal, HP/Damaged are common on vintage and sparse on modern
+- `marketPriceCondition` names the condition `marketPrice` describes — check it before comparing cards. Example: Shining Charizard (Neo Destiny, Unlimited Holofoil) has no Near Mint listing on TCGplayer, so `marketPrice` 1495 / `marketPriceCondition` "Lightly Played" while `marketNearMint` 3998.99 is the last recorded NM *sale*. Both correct, different questions. The same data is on the API as `variants[printing].conditionUsed` (any call) and `priceHistory.variants[printing][condition]` (`includeHistory=true`)
+- `population` rows carry both `matchConfidence` (high/medium/low) and `matchScore` (0-1, trailing column) — the same match-quality fields the `/population` endpoint returns. Scores **above 0.80** mean the printed card number was verified against the GemRate entry; 0.80 and below can be name/set-only matches, so treat them with more caution
+- Returns `302` redirect to a gzip-compressed CSV (`.csv.gz`) on blob storage — follow the redirect and decompress before parsing
+- Regenerated daily at 6:00 AM UTC; consumes no API credits but is capped at 2 downloads/day (separate quota, resets UTC midnight)
+- Best practice: download once per day after 6:00 AM UTC, cache locally, and join the five dataset types on `tcgPlayerId`
+- On `503` the new dump isn't ready yet — respect the `Retry-After` header (does not count against the daily quota)
