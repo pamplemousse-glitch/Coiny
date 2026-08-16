@@ -2,7 +2,9 @@ import { config } from '../config.js';
 import { fetchWithRetry } from '../util/fetch.js';
 import {
   type AccountsBalanceGetResponse,
+  type InstitutionsGetByIdResponse,
   type InvestmentsHoldingsGetResponse,
+  type InvestmentsTransactionsGetResponse,
   type ItemGetResponse,
   type LiabilitiesGetResponse,
   type LinkTokenCreateResponse,
@@ -161,6 +163,47 @@ export function accountsBalanceGet(accessToken: string): Promise<AccountsBalance
 
 export function investmentsHoldingsGet(accessToken: string): Promise<InvestmentsHoldingsGetResponse> {
   return plaidPost('/investments/holdings/get', { access_token: accessToken });
+}
+
+/** Investment buys, sells, dividends and contributions.
+ *
+ *  Paginated: up to 24 months are available and the caller drives `count` and
+ *  `offset` against `total_investment_transactions`. Plaid caps `count` at 500. */
+export function investmentsTransactionsGet(args: {
+  access_token: string;
+  start_date: string;
+  end_date: string;
+  count?: number;
+  offset?: number;
+}): Promise<InvestmentsTransactionsGetResponse> {
+  return plaidPost('/investments/transactions/get', {
+    access_token: args.access_token,
+    start_date: args.start_date,
+    end_date: args.end_date,
+    options: { count: args.count ?? 500, offset: args.offset ?? 0 },
+  });
+}
+
+/** Institution identity and branding.
+ *
+ *  `include_optional_metadata` is what returns `logo`, `primary_color` and
+ *  `url`; without it they are absent. Takes no access token and is not scoped
+ *  to an Item, so it costs nothing per user.
+ *
+ *  Plaid's own terms on the logos: they do not own them, they disclaim all
+ *  warranties, and the caller is responsible for obtaining any permissions the
+ *  rights holders require. Displaying a bank's logo next to that bank's own
+ *  balances is the ordinary case, but this is worth knowing before the logo is
+ *  used anywhere else. */
+export function institutionsGetById(
+  institutionId: string,
+  countryCodes: string[] = ['US'],
+): Promise<InstitutionsGetByIdResponse> {
+  return plaidPost('/institutions/get_by_id', {
+    institution_id: institutionId,
+    country_codes: countryCodes,
+    options: { include_optional_metadata: true },
+  });
 }
 
 export function liabilitiesGet(accessToken: string): Promise<LiabilitiesGetResponse> {
