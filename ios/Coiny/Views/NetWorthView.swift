@@ -46,14 +46,11 @@ struct NetWorthView: View {
             loadedContent(data)
 
         case let .failed(message):
-            ContentUnavailableView {
-                Label("Couldn't load", systemImage: "exclamationmark.triangle")
-            } description: {
-                Text(message)
-            } actions: {
-                Button("Retry") { Task { await vm.load() } }
-                    .buttonStyle(.coinyFilledInline)
+            CoinyErrorLine(message: message, actionTitle: "Try again") {
+                Task { await vm.load() }
             }
+            .padding(.horizontal)
+            .frame(maxHeight: .infinity, alignment: .top)
         }
     }
 
@@ -67,13 +64,16 @@ struct NetWorthView: View {
                 if sections.isEmpty {
                     emptyState
                 }
-                ForEach(sections) { section in
-                    WealthGroupBoxView(
-                        section: section,
-                        bankNeedsRepair: repairVM.needsRepair,
-                        onRefresh: { Task { await vm.refresh() } },
-                        onRepairBank: { Task { await repairVM.repairFirstBrokenItem(source: .prompt) } }
-                    )
+                // Zero spacing: CoinySection carries its own leading gap.
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(sections) { section in
+                        WealthGroupSectionView(
+                            section: section,
+                            bankNeedsRepair: repairVM.needsRepair,
+                            onRefresh: { Task { await vm.refresh() } },
+                            onRepairBank: { Task { await repairVM.repairFirstBrokenItem(source: .prompt) } }
+                        )
+                    }
                 }
                 manageAccountsLink
                 footer(data)
@@ -93,8 +93,13 @@ struct NetWorthView: View {
                 systemImage: "wifi.slash"
             )
         }
+        // A failure is a CoinyErrorLine wherever it appears. The banner stays
+        // for the two states above and below that are status, not failure:
+        // being offline, and a connection that needs renewing.
         if let message = vm.refreshErrorMessage {
-            WealthBannerView(text: message, systemImage: "exclamationmark.circle")
+            CoinyErrorLine(message: message, actionTitle: "Try again") {
+                Task { await vm.refresh() }
+            }
         }
         if repairVM.needsRepair {
             // Proactive repair (R-8.7): surfaced on open, in-app only.
@@ -106,7 +111,9 @@ struct NetWorthView: View {
             )
         }
         if let repairError = repairVM.errorMessage {
-            WealthBannerView(text: repairError, systemImage: "exclamationmark.circle")
+            CoinyErrorLine(message: repairError, actionTitle: "Try again") {
+                Task { await repairVM.repairFirstBrokenItem(source: .prompt) }
+            }
         }
     }
 

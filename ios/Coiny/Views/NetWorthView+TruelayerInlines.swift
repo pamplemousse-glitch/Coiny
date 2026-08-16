@@ -15,7 +15,7 @@ struct TruelayerInlineView: View {
                 disconnectedView
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
+                CoinyErrorLine(message: error)
             }
         }
     }
@@ -59,7 +59,7 @@ struct PokemonCardsInlineView: View {
                 holdingsList
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
+                CoinyErrorLine(message: error)
             }
         }
         .sheet(isPresented: $showingAdd) { addSheet }
@@ -77,7 +77,7 @@ struct PokemonCardsInlineView: View {
     private var holdingsList: some View {
         VStack(spacing: 0) {
             ForEach(vm.holdings) { holding in
-                Divider().padding(.vertical, 6)
+                CoinyHairline().padding(.vertical, 8)
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(holding.label ?? holding.cardName).font(.subheadline).lineLimit(1)
@@ -165,7 +165,7 @@ struct EnergyInlineView: View {
                 positionsList
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
+                CoinyErrorLine(message: error)
             }
         }
         .sheet(isPresented: $showingAdd) { addSheet }
@@ -183,7 +183,7 @@ struct EnergyInlineView: View {
     private var positionsList: some View {
         VStack(spacing: 0) {
             ForEach(vm.positions) { pos in
-                Divider().padding(.vertical, 6)
+                CoinyHairline().padding(.vertical, 8)
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(pos.label ?? commodityName(pos.commodity)).font(.subheadline).lineLimit(1)
@@ -268,7 +268,7 @@ struct FarmlandInlineView: View {
                 parcelsList
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
+                CoinyErrorLine(message: error)
             }
         }
         .sheet(isPresented: $showingAdd) { addSheet }
@@ -286,7 +286,7 @@ struct FarmlandInlineView: View {
     private var parcelsList: some View {
         VStack(spacing: 0) {
             ForEach(vm.parcels) { parcel in
-                Divider().padding(.vertical, 6)
+                CoinyHairline().padding(.vertical, 8)
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(parcel.label ?? String(format: "%.1f ac, %@", parcel.acres, parcel.stateCode))

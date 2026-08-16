@@ -7,19 +7,18 @@ struct CryptoView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
-                    GroupBox {
+                VStack(alignment: .leading, spacing: 0) {
+                    CoinySection(title: "Coinbase") {
                         CoinbaseView()
                     }
-                    .padding(.horizontal)
-
-                    GroupBox {
+                    CoinySection(title: "DeFi") {
                         ZerionView()
                     }
-                    .padding(.horizontal)
                 }
-                .padding(.vertical)
+                .padding(.horizontal)
+                .padding(.bottom, 32)
             }
+            .background(CoinyTheme.screen)
             .navigationTitle("Crypto")
         }
         .environment(coinbaseVM)

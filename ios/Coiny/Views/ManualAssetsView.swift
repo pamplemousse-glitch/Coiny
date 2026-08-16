@@ -47,7 +47,7 @@ struct ManualAssetsView: View {
                 .padding(.top, 4)
             } else {
                 ForEach(vm.assets) { asset in
-                    Divider().padding(.vertical, 6)
+                    CoinyHairline().padding(.vertical, 8)
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(asset.name)
@@ -76,9 +76,7 @@ struct ManualAssetsView: View {
                 .padding(.top, 6)
             }
             if let error = vm.errorMessage {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(CoinyTheme.negative)
+                CoinyErrorLine(message: error)
                     .padding(.top, 4)
             }
         }
