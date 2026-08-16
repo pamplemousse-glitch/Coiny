@@ -60,8 +60,12 @@ private extension PaywallView {
         VStack(alignment: .leading, spacing: 6) {
             Text("More room to grow")
                 .font(.title2.bold())
-            Text("The free tier keeps the pet, every ladder rung, 2 live connections,"
-                + " 1 goal, 2 guardrails and 30 days of history. Paid tiers add breadth and depth.")
+            // Describes the free tier by what the server actually enforces.
+            // The goal, guardrail and history limits in TIER_LIMITS are not
+            // gated anywhere, so naming them here would sell a difference that
+            // does not exist. See SubscriptionCatalog.Tier.features.
+            Text("The free tier keeps the pet, every ladder rung and 2 live bank connections."
+                + " Paid tiers raise the connection limit.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }

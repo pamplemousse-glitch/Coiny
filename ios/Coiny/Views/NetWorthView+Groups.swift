@@ -15,7 +15,7 @@ struct WealthBannerView: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: systemImage)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
                 .accessibilityHidden(true)
             Text(text)
                 .font(.subheadline)
@@ -23,12 +23,13 @@ struct WealthBannerView: View {
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
                     .font(.subheadline.weight(.semibold))
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.coinyFilledInline)
             }
         }
         .padding(12)
         .frame(minHeight: 44)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
+        .background(CoinyTheme.surface, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(CoinyTheme.rule, lineWidth: 1))
         .accessibilityElement(children: .combine)
     }
 }
@@ -73,7 +74,7 @@ struct CompositionBarView: View {
                         .frame(width: 8, height: 8)
                     Text("\(segment.group.title) \(Self.percentText(segment.fraction))")
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(CoinyTheme.ink2)
                 }
             }
         }
@@ -88,14 +89,20 @@ struct CompositionBarView: View {
         "\(Int((fraction * 100).rounded())) percent"
     }
 
+    /// Six opacity steps of `ink`, not six hues (design-direction 6.3 rule 4).
+    /// Six chromatic segments made the app read as having six accents when it
+    /// has one, and one of them was the purple 3.1 exists to remove. The values
+    /// are safe to grade by opacity because the legend beside each swatch
+    /// carries the number, so no reader has to tell two segments apart by
+    /// appearance (WCAG 1.4.11 is not engaged).
     static func color(for group: WealthGroup) -> Color {
         switch group {
-        case .liquid: return .blue
-        case .invested: return .green
-        case .crypto: return .orange
-        case .owned: return .brown
-        case .speculative: return .purple
-        case .owed: return .gray
+        case .liquid: return CoinyTheme.ink
+        case .invested: return CoinyTheme.ink.opacity(0.85)
+        case .crypto: return CoinyTheme.ink.opacity(0.70)
+        case .owned: return CoinyTheme.ink.opacity(0.55)
+        case .speculative: return CoinyTheme.ink.opacity(0.40)
+        case .owed: return CoinyTheme.ink.opacity(0.25)
         }
     }
 }
@@ -134,7 +141,7 @@ struct WealthGroupBoxView: View {
             // Absolute values in ink; debt is a fact, never red.
             Text(section.includedTotal, format: .currency(code: "USD"))
                 .font(.headline.monospacedDigit())
-                .foregroundStyle(.primary)
+                .foregroundStyle(CoinyTheme.ink)
         }
         .frame(minHeight: 44)
         .accessibilityElement(children: .combine)
@@ -160,7 +167,7 @@ struct WealthRowView: View {
                 if let subtitle {
                     Text(subtitle)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(CoinyTheme.ink2)
                 }
             }
             Spacer(minLength: 8)
@@ -230,7 +237,7 @@ struct WealthRowView: View {
     private func valueText(muted: Bool) -> some View {
         Text(row.reading.value ?? 0, format: .currency(code: "USD"))
             .font(.subheadline.monospacedDigit())
-            .foregroundStyle(muted ? .secondary : .primary)
+            .foregroundStyle(muted ? CoinyTheme.ink2 : CoinyTheme.ink)
     }
 
     private func actionButton(_ title: String, action: @escaping () -> Void) -> some View {

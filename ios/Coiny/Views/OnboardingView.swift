@@ -26,7 +26,7 @@ struct OnboardingView: View {
 
     var body: some View {
         ZStack {
-            OnboardingPalette.screen.ignoresSafeArea()
+            CoinyTheme.screen.ignoresSafeArea()
             content
                 .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 8)))
                 .id(viewModel.step)

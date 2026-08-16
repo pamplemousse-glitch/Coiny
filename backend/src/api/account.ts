@@ -40,9 +40,11 @@ export function registerAccountApi(app: FastifyInstance): void {
       }
     }
 
-    // Non-Plaid grants: TrueLayer is revocable, YNAB and Discogs are not.
-    // See revoke/upstream.ts for which providers offer an endpoint and which
-    // leave the user to revoke from their own settings.
+    // Non-Plaid grants: TrueLayer and Spinwheel are revocable, the rest are
+    // not. See revoke/upstream.ts for which providers offer an endpoint and
+    // which leave the user to revoke from their own settings. Deleting the
+    // account must do at least as much upstream as disconnecting a single
+    // connection would have.
     const revocations = await revokeUpstreamGrants(userId, req.log);
 
     await deleteUser(userId);

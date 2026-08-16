@@ -344,6 +344,13 @@
       "when": 1786655900000,
       "tag": "0048_encrypt_transaction_pii",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1786790780483,
+      "tag": "0049_transactions_user_date_idx",
+      "breakpoints": true
     }
   ]
 }

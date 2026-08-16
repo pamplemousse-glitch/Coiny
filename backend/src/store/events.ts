@@ -75,8 +75,13 @@ export async function releaseWebhookDelivery(key: string): Promise<void> {
   await db().delete(processedEvents).where(eq(processedEvents.id, key));
 }
 
-// Sandbox-only. Deletes processedEvents rows whose IDs correspond to
-// transactions owned by this user, allowing replay through the rule engine.
+// Deletes processedEvents rows whose IDs correspond to transactions owned by
+// this user. Two callers: the sandbox debug route, where it allows replay
+// through the rule engine, and account deletion, where it is the only way to
+// reach a table that has no user foreign key to cascade from (the ids are
+// Plaid's own pseudonyms, but they are still a deleted user's activity).
+// Must run before the user row is deleted: the ids are resolved through
+// `transactions`, which cascades.
 export async function clearUserEvents(userId: string): Promise<number> {
   const result = await db().execute(sql`
     DELETE FROM ${processedEvents}

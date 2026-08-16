@@ -25,7 +25,7 @@ struct ZerionView: View {
             if let error = vm.errorMessage {
                 Text(error)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(CoinyTheme.negative)
             }
         }
         .sheet(isPresented: $showAddSheet) {
@@ -49,7 +49,7 @@ struct ZerionView: View {
         HStack {
             Text("Portfolio value")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
             Spacer()
             Text(portfolio.data.attributes.total.positions, format: .currency(code: "USD"))
                 .font(.subheadline.weight(.semibold))
@@ -68,7 +68,7 @@ struct ZerionView: View {
                     if let label = wallet.label {
                         Text(label)
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(CoinyTheme.ink2)
                     }
                 }
                 Spacer()
@@ -78,7 +78,7 @@ struct ZerionView: View {
                     }
                 } label: {
                     Image(systemName: "trash")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(CoinyTheme.negative)
                 }
                 .buttonStyle(.plain)
             }
@@ -112,7 +112,7 @@ struct ZerionView: View {
             if let reacted = vm.lastSyncReacted {
                 Text("\(reacted) reaction\(reacted == 1 ? "" : "s") fired")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(CoinyTheme.ink2)
             }
         }
     }

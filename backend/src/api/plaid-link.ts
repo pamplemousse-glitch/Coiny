@@ -15,6 +15,7 @@ import { performReactions } from '../reactions/perform.js';
 import { trackServerEvent } from '../store/analytics.js';
 import { canAddConnection } from '../store/entitlements.js';
 import {
+  deleteItem,
   disableItem,
   getItemForUser,
   getItemsByUser,
@@ -247,8 +248,15 @@ export function registerPlaidLinkApi(app: FastifyInstance): void {
         } catch (err) {
           req.log.warn({ err, item_id: item.itemId }, 'plaid item_remove failed during unlink');
         }
+        // The status transition and the disable both stay: they are what emit
+        // item_state_changed (R-24.2), and they must run while the row exists.
+        // The row then goes, taking the encrypted access token with it, the
+        // same way every other provider's disconnect drops its credential row.
+        // Unlinking is not blocked by Plaid being unreachable, so the delete
+        // runs whether or not item_remove succeeded.
         await setItemStatus(item.itemId, 'revoked', { errorCode: null });
         await disableItem(item.itemId);
+        await deleteItem(item.itemId);
       }),
     );
 

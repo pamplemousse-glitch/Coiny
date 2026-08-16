@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { and, count, eq } from 'drizzle-orm';
 import { type Tier, type TransactionPayload, tierForProductId } from '../appstore/types.js';
 import { db } from '../db/client.js';
-import { entitlements, householdMembers, plaidItems } from '../db/schema.js';
+import { appStoreNotifications, entitlements, householdMembers, plaidItems } from '../db/schema.js';
 
 // Server-side subscription authority (docs/prd.md §25). The client never
 // decides whether a user has paid: rows here are written only from verified
@@ -147,6 +147,24 @@ export async function applyTransaction(userId: string, tx: TransactionPayload): 
   };
   const [updated] = await db().update(entitlements).set(patch).where(eq(entitlements.userId, userId)).returning();
   return updated as EntitlementRow;
+}
+
+/** Strips the Apple subscriber identifier from the notification ledger for a
+ *  user who is being deleted. `app_store_notifications` is keyed by Apple's
+ *  notificationUUID and has no user foreign key, deliberately: it is the
+ *  replay guard, and a redelivered notification must still be recognised as a
+ *  duplicate after the account is gone. What must not survive is
+ *  `original_transaction_id`, which is Apple's stable per-subscriber id and
+ *  ties the retained subscription-event history back to a person. Nulling it
+ *  keeps the ledger working and leaves behind only a type and a timestamp. */
+export async function forgetAppStoreIdentifiers(userId: string): Promise<void> {
+  const row = await getEntitlementRow(userId);
+  const originalTransactionId = row?.originalTransactionId;
+  if (!originalTransactionId) return;
+  await db()
+    .update(appStoreNotifications)
+    .set({ originalTransactionId: null })
+    .where(eq(appStoreNotifications.originalTransactionId, originalTransactionId));
 }
 
 export type EntitlementPatch = Partial<

@@ -20,7 +20,7 @@ struct KrakenInlineView: View {
                 disconnectedView
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
             }
         }
     }
@@ -29,7 +29,7 @@ struct KrakenInlineView: View {
         HStack {
             Text("Add read-only Kraken API keys")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
             Spacer()
             Button("Connect") { onConnect() }
                 .font(.caption)
@@ -69,7 +69,7 @@ struct YnabInlineView: View {
                 disconnectedView
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
             }
         }
     }
@@ -78,7 +78,7 @@ struct YnabInlineView: View {
         HStack {
             Text("Connect YNAB budgeting")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
             Spacer()
             Button("Connect") { Task { await vm.startOAuth() } }
                 .font(.caption)
@@ -121,7 +121,7 @@ struct KalshiInlineView: View {
                 disconnectedView
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
             }
         }
         .sheet(isPresented: $showingSetup) { setupSheet }
@@ -131,7 +131,7 @@ struct KalshiInlineView: View {
         HStack {
             Text("Connect Kalshi prediction markets")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
             Spacer()
             Button("Connect") {
                 generatedPair = KalshiKeyGen.generate()
@@ -164,7 +164,7 @@ struct KalshiInlineView: View {
                             .font(.system(.caption2, design: .monospaced))
                             .textSelection(.enabled)
                     } else {
-                        Text("Key generation failed").font(.caption).foregroundStyle(.red)
+                        Text("Key generation failed").font(.caption).foregroundStyle(CoinyTheme.negative)
                     }
                 } header: {
                     Text("Step 1 — Your Public Key")
@@ -229,7 +229,7 @@ struct DiscogsInlineView: View {
                 disconnectedView
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
             }
         }
         .onChange(of: vm.authorizeUrl) { _, url in
@@ -242,7 +242,7 @@ struct DiscogsInlineView: View {
         HStack {
             Text("Connect Discogs vinyl collection")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
             Spacer()
             Button("Connect") { Task { await vm.requestToken() } }
                 .font(.caption)
@@ -255,7 +255,7 @@ struct DiscogsInlineView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Authorize in Discogs, then enter the PIN")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
             HStack {
                 TextField("PIN", text: $pin)
                     .keyboardType(.numberPad)
@@ -278,7 +278,7 @@ struct DiscogsInlineView: View {
                 HStack {
                     Label(username, systemImage: "person.fill")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(CoinyTheme.ink2)
                     Spacer()
                 }
             }
@@ -313,7 +313,7 @@ struct PolymarketInlineView: View {
                 accountsList
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
             }
         }
     }
@@ -322,7 +322,7 @@ struct PolymarketInlineView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Add your Polygon wallet address to track Polymarket positions.")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
             addForm
         }
         .padding(.top, 4)
@@ -337,7 +337,7 @@ struct PolymarketInlineView: View {
                             .font(.subheadline)
                         Text(String(account.walletAddress.prefix(10)) + "…")
                             .font(.caption2.monospaced())
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(CoinyTheme.ink2)
                     }
                     Spacer()
                     if let value = account.lastValueUsd {
@@ -348,7 +348,7 @@ struct PolymarketInlineView: View {
                         Task { await vm.removeAccount(address: account.walletAddress) }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(CoinyTheme.ink2)
                     }
                     .buttonStyle(.plain)
                 }
@@ -390,8 +390,7 @@ struct PolymarketInlineView: View {
                     newAddress = ""; newLabel = ""; isAdding = false
                 }
             }
-            .font(.caption)
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.coinyFilledInline)
             .disabled(newAddress.isEmpty)
         }
         .padding(.top, 4)
@@ -436,7 +435,7 @@ struct KrakenKeyEntryView: View {
                 }
 
                 if let error = vm.errorMessage {
-                    Text(error).font(.caption).foregroundStyle(.red)
+                    Text(error).font(.caption).foregroundStyle(CoinyTheme.negative)
                 }
             }
             .navigationTitle("Connect Kraken")

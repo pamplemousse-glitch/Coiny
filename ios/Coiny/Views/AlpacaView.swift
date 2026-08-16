@@ -21,7 +21,7 @@ struct AlpacaView: View {
             if let error = vm.errorMessage {
                 Text(error)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(CoinyTheme.negative)
                     .padding(.top, 4)
             }
         }
@@ -32,7 +32,7 @@ struct AlpacaView: View {
         HStack {
             Text("Connect Alpaca brokerage")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
             Spacer()
             Button("Connect") { showingConnect = true }
                 .font(.caption)
@@ -47,7 +47,7 @@ struct AlpacaView: View {
                 HStack {
                     Label("Portfolio", systemImage: "chart.bar.fill")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(CoinyTheme.ink2)
                     Spacer()
                     Text(equity, format: .currency(code: "USD"))
                         .font(.caption.monospacedDigit())

@@ -194,6 +194,9 @@ export interface NotificationOptions {
   uuid?: string;
   transaction?: Record<string, unknown> | null;
   renewal?: Record<string, unknown> | null;
+  // Envelope-level environment. Defaults to Sandbox, like every notification
+  // this codebase has ever received.
+  environment?: string;
 }
 
 let notificationCounter = 0;
@@ -203,7 +206,7 @@ let notificationCounter = 0;
 export function signedNotification(chain: TestChain, options: NotificationOptions): string {
   notificationCounter += 1;
   const data: Record<string, unknown> = {
-    environment: 'Sandbox',
+    environment: options.environment ?? 'Sandbox',
     bundleId: 'app.coiny.test',
   };
   if (options.transaction !== null) {

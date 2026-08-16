@@ -16,7 +16,7 @@ struct NftView: View {
                 HStack {
                     Text("No NFT wallets added")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(CoinyTheme.ink2)
                     Spacer()
                     Button { showingAdd = true } label: {
                         Label("Add", systemImage: "plus.circle")
@@ -35,7 +35,7 @@ struct NftView: View {
                             if wallet.label != nil {
                                 Text(wallet.address)
                                     .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(CoinyTheme.ink2)
                                     .lineLimit(1)
                                     .truncationMode(.middle)
                             }
@@ -47,7 +47,7 @@ struct NftView: View {
                         } else {
                             Text("—")
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(CoinyTheme.ink2)
                         }
                     }
                     .swipeActions {
@@ -81,7 +81,7 @@ struct NftView: View {
             if let error = vm.errorMessage {
                 Text(error)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(CoinyTheme.negative)
                     .padding(.top, 4)
             }
         }

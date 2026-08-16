@@ -27,8 +27,8 @@ describe('reaction_history encryption at rest', () => {
     expect(rows).toHaveLength(1);
     const stored = rows[0]?.reaction ?? '';
 
-    // Should be the envelope format: hex(iv):hex(tag):hex(ct)
-    expect(stored).toMatch(/^[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$/);
+    // Should be the envelope format: v<n>:hex(iv):hex(tag):hex(ct)
+    expect(stored).toMatch(/^v[0-9]{1,3}:[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$/);
 
     // Belt-and-suspenders: none of the sensitive plaintext substrings should
     // appear anywhere in the stored value.
@@ -53,7 +53,7 @@ describe('reaction_history encryption at rest', () => {
     const ivs = new Set<string>();
     for (let i = 0; i < 50; i++) {
       const ct = encryptString(JSON.stringify(sampleReaction));
-      const iv = ct.split(':')[0];
+      const iv = ct.split(':')[1];
       ivs.add(iv!);
     }
     expect(ivs.size).toBe(50);
@@ -78,7 +78,7 @@ describe('reaction_history encryption at rest', () => {
     // All rows in DB must be ciphertext, not plaintext.
     const rows = await db().select().from(reactionHistory).where(eq(reactionHistory.userId, testUserId));
     for (const row of rows) {
-      expect(row.reaction).toMatch(/^[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$/);
+      expect(row.reaction).toMatch(/^v[0-9]{1,3}:[0-9a-f]+:[0-9a-f]+:[0-9a-f]+$/);
       expect(row.reaction).not.toContain('animate');
       expect(row.reaction).not.toContain('paycheck');
       expect(row.reaction).not.toContain('groceries');

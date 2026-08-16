@@ -18,7 +18,7 @@ struct ChainWalletsView: View {
             if let error = vm.errorMessage {
                 Text(error)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(CoinyTheme.negative)
             }
         }
         .sheet(isPresented: $showAddSheet) {
@@ -43,11 +43,11 @@ struct ChainWalletsView: View {
                     HStack(spacing: 4) {
                         Text(wallet.chain.uppercased())
                             .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(CoinyTheme.ink2)
                         if let label = wallet.label {
                             Text("· \(label)")
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(CoinyTheme.ink2)
                         }
                     }
                     Text(wallet.address)
@@ -63,7 +63,7 @@ struct ChainWalletsView: View {
                     } else {
                         Text("—")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(CoinyTheme.ink2)
                     }
                     Button(role: .destructive) {
                         let c = wallet.chain; let a = wallet.address
@@ -71,7 +71,7 @@ struct ChainWalletsView: View {
                     } label: {
                         Image(systemName: "trash")
                             .font(.caption)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(CoinyTheme.negative)
                     }
                     .buttonStyle(.plain)
                 }
@@ -108,7 +108,7 @@ struct ChainWalletsView: View {
             if let updated = vm.lastSyncUpdated {
                 Text("\(updated) updated")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(CoinyTheme.ink2)
             }
         }
     }

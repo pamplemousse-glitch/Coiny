@@ -24,7 +24,7 @@ struct SpinwheelInlineView: View {
         if vm.debts.isEmpty {
             Text("No debts found")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
                 .padding(.top, 4)
         } else {
             ForEach(vm.debts) { debt in
@@ -33,14 +33,14 @@ struct SpinwheelInlineView: View {
                         Text(debt.debtType?.capitalized ?? "Debt").font(.subheadline)
                         if let monthly = debt.monthlyPayment {
                             Text("\(monthly, format: .currency(code: "USD"))/mo")
-                                .font(.caption).foregroundStyle(.secondary)
+                                .font(.caption).foregroundStyle(CoinyTheme.ink2)
                         }
                     }
                     Spacer()
                     if let balance = debt.balance {
                         Text(-balance, format: .currency(code: "USD"))
                             .font(.subheadline.monospacedDigit())
-                            .foregroundStyle(.red)
+                            .foregroundStyle(CoinyTheme.negative)
                     }
                 }
                 .padding(.vertical, 2)
@@ -71,13 +71,13 @@ struct PhoneInlineView: View {
                 .keyboardType(.numbersAndPunctuation)
                 .textFieldStyle(.roundedBorder)
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red)
+                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative)
             }
             Button("Send code") {
                 let p = phone; let d = dob
                 Task { await vm.sendOtp(phone: p, dateOfBirth: d) }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.coinyFilledInline)
             .disabled(phone.isEmpty || dob.isEmpty)
         }
         .padding(.top, 4)
@@ -92,19 +92,19 @@ struct OtpInlineView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Enter the code sent to \(vm.pendingPhone)")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
             TextField("6-digit code", text: $code)
                 .keyboardType(.numberPad)
                 .textContentType(.oneTimeCode)
                 .textFieldStyle(.roundedBorder)
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red)
+                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative)
             }
             Button("Verify") {
                 let c = code
                 Task { await vm.verifyOtp(code: c) }
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.coinyFilledInline)
             .disabled(code.isEmpty)
         }
         .padding(.top, 4)
