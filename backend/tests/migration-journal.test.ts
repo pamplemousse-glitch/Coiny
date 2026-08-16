@@ -157,9 +157,10 @@ describe('migrating onto a database that already has history', () => {
       `SELECT table_name, column_name FROM information_schema.columns
        WHERE table_schema = 'public'
          AND ((table_name = 'device_tokens' AND column_name = 'timezone')
-           OR (table_name = 'plaid_items' AND column_name IN ('status', 'institution_name')))`,
+           OR (table_name = 'plaid_items' AND column_name IN ('status', 'institution_name'))
+           OR (table_name = 'users' AND column_name IN ('legal_accepted_at', 'legal_version', 'analytics_opt_out')))`,
     );
-    expect(columns.rows).toHaveLength(3);
+    expect(columns.rows).toHaveLength(6);
 
     await client.close();
   });

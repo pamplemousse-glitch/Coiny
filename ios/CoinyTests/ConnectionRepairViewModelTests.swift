@@ -36,7 +36,7 @@ final class ConnectionRepairViewModelTests: XCTestCase {
 
     private func makeVM(
         api: FakeAPI,
-        telemetry: TelemetryClient = TelemetryClient(transport: LogTelemetryTransport())
+        telemetry: TelemetryClient = TelemetryClient(transport: LogTelemetryTransport(), isGranted: { true })
     ) -> ConnectionRepairViewModel {
         // A fresh telemetry client per test: no network, and the shared queue
         // is untouched.
@@ -107,7 +107,7 @@ final class ConnectionRepairViewModelTests: XCTestCase {
         let api = FakeAPI()
         api.items = [NetWorthFixtures.item(id: "b", institutionName: "Chase", status: .reauthRequired)]
         let transport = RecordingTelemetryTransport()
-        let telemetry = TelemetryClient(transport: transport)
+        let telemetry = TelemetryClient(transport: transport, isGranted: { true })
         let vm = makeVM(api: api, telemetry: telemetry)
 
         await vm.loadItems()
@@ -125,7 +125,7 @@ final class ConnectionRepairViewModelTests: XCTestCase {
         let api = FakeAPI()
         api.items = [NetWorthFixtures.item(id: "b", status: .reauthRequired)]
         let transport = RecordingTelemetryTransport()
-        let telemetry = TelemetryClient(transport: transport)
+        let telemetry = TelemetryClient(transport: transport, isGranted: { true })
         let vm = makeVM(api: api, telemetry: telemetry)
 
         await vm.loadItems()

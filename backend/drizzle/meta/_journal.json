@@ -351,6 +351,13 @@
       "when": 1786790780483,
       "tag": "0049_transactions_user_date_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1786802400000,
+      "tag": "0050_consent",
+      "breakpoints": true
     }
   ]
 }

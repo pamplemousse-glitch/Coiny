@@ -3,11 +3,15 @@ import os
 
 // Client-side analytics emitter per PRD section 24 (R-24.1, R-24.2).
 //
-// The backend endpoint (`POST /api/telemetry`) does not exist yet; it is being
-// built in parallel. This client is therefore written against the wire shape
-// section 24 specifies (a batch of `{event, properties, client_ts}` rows) and
-// the transport is a stub that logs. Swapping in the real network transport is
-// a one-line change at `Telemetry.shared`.
+// The wire shape is the batch of `{event, properties, client_ts}` rows section
+// 24 specifies. `APITelemetryTransport` (API+Telemetry.swift) is what is wired
+// at `TelemetryClient.shared`; `LogTelemetryTransport` below is kept for tests
+// and for reading the funnel in Console without a backend.
+//
+// Consent rule, from docs/legal/consent-copy.md: nothing is enqueued before the
+// first sign-in completes, and nothing while the Settings toggle is off. See
+// `TelemetryConsent`. The server enforces the same flag independently
+// (users.analytics_opt_out), because server-emitted events have no client.
 //
 // Privacy rule, inherited from engineering-budgets section 8 and R-22.6:
 // no amounts, no merchant names, no emails, ever. Values are bucketed enums.
@@ -111,6 +115,37 @@ struct LogTelemetryTransport: TelemetryTransport {
     }
 }
 
+// MARK: - Consent
+
+/// The consent gate `docs/legal/consent-copy.md` specifies, in the one place
+/// both conditions can be checked: "no event may be enqueued before the first
+/// successful sign-in completes, and none while the Settings toggle below is
+/// off" (`:30-32`).
+///
+/// The sign-in screen is where the disclosure is shown, so it is also where
+/// consent starts. Before it, nothing is collected: Apple 5.1.1(ii) requires
+/// consent before collection, and a user who never got past sign-in never had
+/// a chance to give it.
+enum TelemetryConsent {
+    /// Set once the first sign-in completes and the consent line has therefore
+    /// been shown. Never reset on sign-out: the disclosure was still delivered.
+    static let acknowledgedKey = "telemetryConsentAcknowledged"
+    /// The "Share usage data" toggle. Absent means on, because consent was
+    /// given at sign-in; the user turns it off, they never turn it on.
+    static let shareUsageDataKey = "shareUsageData"
+
+    static var isGranted: Bool {
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: acknowledgedKey) else { return false }
+        return defaults.object(forKey: shareUsageDataKey) as? Bool ?? true
+    }
+
+    /// Called by `SignInView` once the server has recorded the acknowledgement.
+    static func recordAcknowledgement() {
+        UserDefaults.standard.set(true, forKey: acknowledgedKey)
+    }
+}
+
 // MARK: - Client
 
 /// Queueing emitter per R-24.1: events accumulate and flush 25 at a time or on
@@ -123,18 +158,25 @@ actor TelemetryClient {
 
     private let transport: TelemetryTransport
     private let now: @Sendable () -> Date
+    private let isGranted: @Sendable () -> Bool
     private var queue: [TelemetryEvent] = []
     private var isFlushing = false
 
-    init(transport: TelemetryTransport, now: @escaping @Sendable () -> Date = { Date() }) {
+    init(
+        transport: TelemetryTransport,
+        now: @escaping @Sendable () -> Date = { Date() },
+        isGranted: @escaping @Sendable () -> Bool = { TelemetryConsent.isGranted }
+    ) {
         self.transport = transport
         self.now = now
+        self.isGranted = isGranted
     }
 
     /// Number of events currently queued. Exposed for tests.
     var pendingCount: Int { queue.count }
 
     func emit(_ event: String, _ properties: [String: TelemetryValue] = [:]) async {
+        guard isGranted() else { return }
         queue.append(TelemetryEvent(event: event, properties: properties, clientTimestamp: now()))
         if queue.count >= Self.flushThreshold {
             await flush()
@@ -142,6 +184,13 @@ actor TelemetryClient {
     }
 
     func flush() async {
+        // Consent can be withdrawn while a batch is queued. Turning the toggle
+        // off stops the queue immediately, which means discarding what is in
+        // it, not delivering it one last time.
+        guard isGranted() else {
+            queue.removeAll()
+            return
+        }
         guard !isFlushing, !queue.isEmpty else { return }
         isFlushing = true
         let batch = queue
