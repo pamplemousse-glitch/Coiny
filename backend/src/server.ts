@@ -63,6 +63,26 @@ function isDebugBuild(): boolean {
   return config.NODE_ENV !== 'production' && config.PLAID_ENV === 'sandbox';
 }
 
+/** One registered route, as captured at build time. */
+export type RegisteredRoute = { method: string; url: string };
+
+const registeredRoutes: RegisteredRoute[] = [];
+
+/** Every route the last `buildApp()` registered.
+ *
+ *  Exists so the authorization matrix (`tests/authorization-matrix.test.ts`)
+ *  can enumerate the API instead of hand-maintaining a list of it. A
+ *  hand-written list of 157 routes is a list that goes stale, and a stale list
+ *  in an authorization test fails open: the route nobody remembered to add is
+ *  exactly the route nobody remembered to protect.
+ *
+ *  `printRoutes()` is not usable for this. It renders a radix tree with merged
+ *  prefixes, so `/api/plaid/item` and `/api/plaid/items` come back as a node
+ *  and a child called `s`, and reassembling them is guesswork. */
+export function getRegisteredRoutes(): readonly RegisteredRoute[] {
+  return registeredRoutes;
+}
+
 async function buildApp() {
   await initDb();
   // Migrations run as a deploy step (fly.toml release_command), not here.
@@ -86,6 +106,17 @@ async function buildApp() {
     // on sixteen vendors sends no bytes while it waits. See config.ts.
     requestTimeout: config.REQUEST_TIMEOUT_MS,
     connectionTimeout: config.CONNECTION_TIMEOUT_MS,
+  });
+
+  // Before anything registers a route, so nothing is missed. onRoute fires on
+  // this instance and every encapsulated child, which is what makes the
+  // three-scope registration below visible to it.
+  registeredRoutes.length = 0;
+  app.addHook('onRoute', (route) => {
+    const methods = Array.isArray(route.method) ? route.method : [route.method];
+    for (const method of methods) {
+      registeredRoutes.push({ method, url: route.url });
+    }
   });
 
   registerErrorHandler(app);

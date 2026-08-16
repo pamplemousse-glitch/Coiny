@@ -51,3 +51,24 @@ export async function resetDatabase(): Promise<void> {
 export function authHeader(): Record<string, string> {
   return { authorization: `Bearer ${testToken}` };
 }
+
+/** A second, unrelated signed-in user.
+ *
+ *  The attacker in every BOLA case: a real account with a real session, whose
+ *  only disqualification from seeing another user's data is that the data is
+ *  not theirs. Testing with an anonymous request instead proves only that
+ *  authentication is on, which is a different and much weaker property.
+ *
+ *  Call after `resetDatabase()`, which truncates users. */
+export async function createOtherUser(): Promise<{
+  userId: string;
+  token: string;
+  authHeader: Record<string, string>;
+}> {
+  const { findOrCreateUser } = await import('../src/store/users.js');
+  const { createSession } = await import('../src/store/sessions.js');
+
+  const userId = await findOrCreateUser({ appleSub: 'test_apple_sub_other', email: 'other@coiny.test' });
+  const { rawToken } = await createSession(userId);
+  return { userId, token: rawToken, authHeader: { authorization: `Bearer ${rawToken}` } };
+}
