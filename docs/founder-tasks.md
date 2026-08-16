@@ -13,8 +13,18 @@ urgent. Everything below section 1 can be done in any order once unblocked.
 
 ### 1.1 Get a D-U-N-S number for Athanor Works LLC
 - Free, from Dun & Bradstreet. Up to about 5 business days.
-- Nothing else on the Apple side can start until this exists.
-- **Blocks:** Apple Organization enrollment, which blocks TestFlight and StoreKit.
+- **Blocks:** Apple Organization enrollment, which is required for App Store
+  *submission* under guideline 5.1.1(ix).
+- **Does NOT block TestFlight, archiving, device installs, or StoreKit.** This
+  document previously said it did, and that was wrong. Apple's TestFlight page
+  states its limits with no membership-type condition, and 5.1.1(ix) says apps
+  in banking and financial services "should be **submitted** by a legal entity",
+  using "should", about submission, and never mentioning beta distribution:
+  https://developer.apple.com/testflight/
+  https://developer.apple.com/app-store/review/guidelines/
+  Verified against both pages on 2026-08-16. Start D-U-N-S because submission
+  genuinely needs it and it has weeks of lead time, not because it gates
+  getting the app in front of testers.
 
 ### 1.2 Convert the Apple Developer account to an Organization
 - developer.apple.com > Account > Membership details. Team ID `UKL98DS9D3`.
