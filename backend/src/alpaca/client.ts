@@ -50,3 +50,79 @@ export async function getEquityUsd(apiKeyId: string, apiSecretKey: string, env: 
   const account = await getAccount(apiKeyId, apiSecretKey, env);
   return parseFloat(account.equity);
 }
+
+/** One open position. Every numeric field on the wire is a STRING, so each is
+ *  parsed here rather than at the call sites. */
+export interface AlpacaPosition {
+  symbol: string;
+  /** us_equity, us_option, crypto, treasury, and so on. */
+  assetClass: string;
+  /** long or short. */
+  side: string;
+  qty: number;
+  /** Total dollar amount of the position. */
+  marketValueUsd: number;
+  costBasisUsd: number;
+  currentPriceUsd: number;
+  avgEntryPriceUsd: number;
+  unrealizedPlUsd: number;
+}
+
+interface RawPosition {
+  symbol?: string;
+  asset_class?: string;
+  side?: string;
+  qty?: string;
+  market_value?: string;
+  cost_basis?: string;
+  current_price?: string;
+  avg_entry_price?: string;
+  unrealized_pl?: string;
+}
+
+const num = (v: string | undefined): number => {
+  const n = Number.parseFloat(v ?? '0');
+  return Number.isFinite(n) ? n : 0;
+};
+
+/**
+ * `GET /v2/positions`, the individual holdings behind the single equity figure
+ * that `/v2/account` reports.
+ *
+ * Until this existed a connected brokerage appeared in Coiny as one opaque
+ * number, which is the shallow end of exactly the axis the product competes on.
+ * Closed positions are not returned by this endpoint, by design: it is current
+ * holdings, not history.
+ */
+export async function getPositions(apiKeyId: string, apiSecretKey: string, env: AlpacaEnv): Promise<AlpacaPosition[]> {
+  const res = await fetch(`${baseUrl(env)}/v2/positions`, {
+    headers: {
+      'APCA-API-KEY-ID': apiKeyId,
+      'APCA-API-SECRET-KEY': apiSecretKey,
+    },
+  });
+
+  if (res.status === 401 || res.status === 403) {
+    throw new AlpacaError('Invalid Alpaca API credentials', res.status);
+  }
+  if (!res.ok) {
+    throw new AlpacaError(`Alpaca positions fetch failed: ${res.status}`, res.status);
+  }
+
+  const raw = (await res.json()) as RawPosition[];
+  // An account with nothing open returns [], which is a valid answer and not an
+  // error state.
+  if (!Array.isArray(raw)) return [];
+
+  return raw.map((p) => ({
+    symbol: p.symbol ?? '',
+    assetClass: p.asset_class ?? 'unknown',
+    side: p.side ?? 'long',
+    qty: num(p.qty),
+    marketValueUsd: num(p.market_value),
+    costBasisUsd: num(p.cost_basis),
+    currentPriceUsd: num(p.current_price),
+    avgEntryPriceUsd: num(p.avg_entry_price),
+    unrealizedPlUsd: num(p.unrealized_pl),
+  }));
+}

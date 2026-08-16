@@ -44,17 +44,22 @@ describe('getPortfolioBalance', () => {
     'base64',
   );
 
-  it('returns portfolio_value in USD (cents → dollars)', async () => {
+  it('adds cash to position value, in USD (cents → dollars)', async () => {
+    // This test used to expect 500, asserting `portfolio_value ?? balance`.
+    // That encoded the defect rather than the contract: per Kalshi's schema
+    // `balance` is available cash and `portfolio_value` is the value of
+    // positions held, and both are required fields. Taking one meant the
+    // $100 of cash below never reached net worth.
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ portfolio_value: 50000, balance: 10000 }),
     });
 
     const balance = await getPortfolioBalance(KEY_ID, FAKE_PEM_B64);
-    expect(balance).toBe(500); // 50000 cents → $500
+    expect(balance).toBe(600); // $500 of positions + $100 of cash
   });
 
-  it('falls back to balance field when portfolio_value absent', async () => {
+  it('returns just the cash when portfolio_value is absent', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ balance: 25000 }),
