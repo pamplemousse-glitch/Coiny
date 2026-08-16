@@ -231,13 +231,18 @@ struct HomeView: View {
             anchoredWindow(.panel)
             if let rung = HomePresentation.activeRungDisplay(for: pet) {
                 VStack(alignment: .leading, spacing: 2) {
+                    // No line limit and no truncation: the audit reported this
+                    // header as only partially supporting Dynamic Type, and a
+                    // two-line cap on the one sentence that says what the rung
+                    // means is exactly what breaks at the larger sizes.
                     Text("\(rung.code)  \(rung.nameTag)")
                         .font(.system(.caption, design: .monospaced).weight(.medium))
                         .foregroundStyle(CoinyTheme.ink3)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(rung.blurb)
                         .font(.subheadline)
                         .foregroundStyle(CoinyTheme.ink)
-                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             Spacer()

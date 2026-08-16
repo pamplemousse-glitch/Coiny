@@ -78,7 +78,7 @@ final class CoinyThemeContrastTests: XCTestCase {
         let bg = CoinyTheme.screen
         assertRatio(CoinyTheme.ink, on: bg, .light, equals: 14.84, "light ink on screen")
         assertRatio(CoinyTheme.ink2, on: bg, .light, equals: 6.80, "light ink2 on screen")
-        assertRatio(CoinyTheme.ink3, on: bg, .light, equals: 4.15, "light ink3 on screen")
+        assertRatio(CoinyTheme.ink3, on: bg, .light, equals: 4.86, "light ink3 on screen")
         assertRatio(CoinyTheme.rule, on: bg, .light, equals: 1.25, "light rule on screen")
         assertRatio(CoinyTheme.signal, on: bg, .light, equals: 4.95, "light signal on screen")
         assertRatio(CoinyTheme.positive, on: bg, .light, equals: 5.35, "light positive on screen")
@@ -89,7 +89,7 @@ final class CoinyThemeContrastTests: XCTestCase {
         let bg = CoinyTheme.surface
         assertRatio(CoinyTheme.ink, on: bg, .light, equals: 16.27, "light ink on surface")
         assertRatio(CoinyTheme.ink2, on: bg, .light, equals: 7.46, "light ink2 on surface")
-        assertRatio(CoinyTheme.ink3, on: bg, .light, equals: 4.55, "light ink3 on surface")
+        assertRatio(CoinyTheme.ink3, on: bg, .light, equals: 5.33, "light ink3 on surface")
         assertRatio(CoinyTheme.signal, on: bg, .light, equals: 5.43, "light signal on surface")
         assertRatio(CoinyTheme.positive, on: bg, .light, equals: 5.86, "light positive on surface")
         assertRatio(CoinyTheme.negative, on: bg, .light, equals: 6.52, "light negative on surface")
@@ -99,7 +99,7 @@ final class CoinyThemeContrastTests: XCTestCase {
         let bg = CoinyTheme.screen
         assertRatio(CoinyTheme.ink, on: bg, .dark, equals: 14.96, "dark ink on screen")
         assertRatio(CoinyTheme.ink2, on: bg, .dark, equals: 7.94, "dark ink2 on screen")
-        assertRatio(CoinyTheme.ink3, on: bg, .dark, equals: 4.75, "dark ink3 on screen")
+        assertRatio(CoinyTheme.ink3, on: bg, .dark, equals: 5.22, "dark ink3 on screen")
         assertRatio(CoinyTheme.rule, on: bg, .dark, equals: 1.38, "dark rule on screen")
         assertRatio(CoinyTheme.signal, on: bg, .dark, equals: 8.38, "dark signal on screen")
         assertRatio(CoinyTheme.positive, on: bg, .dark, equals: 8.59, "dark positive on screen")
@@ -110,6 +110,9 @@ final class CoinyThemeContrastTests: XCTestCase {
         let bg = CoinyTheme.surface
         assertRatio(CoinyTheme.ink, on: bg, .dark, equals: 13.51, "dark ink on surface")
         assertRatio(CoinyTheme.ink2, on: bg, .dark, equals: 7.17, "dark ink2 on surface")
+        // Absent from the published table, which is how it went unnoticed at
+        // 4.29:1 while the screen figure beside it read 4.75.
+        assertRatio(CoinyTheme.ink3, on: bg, .dark, equals: 4.71, "dark ink3 on surface")
         assertRatio(CoinyTheme.signal, on: bg, .dark, equals: 7.56, "dark signal on surface")
         assertRatio(CoinyTheme.positive, on: bg, .dark, equals: 7.76, "dark positive on surface")
         assertRatio(CoinyTheme.negative, on: bg, .dark, equals: 7.28, "dark negative on surface")
@@ -153,13 +156,16 @@ final class CoinyThemeContrastTests: XCTestCase {
         }
     }
 
-    /// `ink3` is the one token the design document itself constrains, so the
-    /// constraint is recorded here rather than left as prose: it does not clear
-    /// AA on `screen` in light, which is why the substitution pass used `ink2`
-    /// for secondary and tertiary text and left `ink3` to the surfaces that
-    /// already used it at caption size.
-    func testInk3IsBelowAAInLightAndIsConstrainedForThatReason() {
-        XCTAssertLessThan(ratio(CoinyTheme.ink3, on: CoinyTheme.screen, .light), 4.5)
-        XCTAssertGreaterThanOrEqual(ratio(CoinyTheme.ink3, on: CoinyTheme.surface, .light), 4.5)
+    /// `ink3` used to be exempted rather than fixed: 4.15:1 on `screen` in
+    /// light, permitted by the design document "at caption size and above".
+    /// WCAG's large-text exemption starts at 18pt, or 14pt bold, and `caption`
+    /// is 12pt, so the exemption did not exist and every rung code, unit label
+    /// and section heading in the app was below AA. It is now a real value, and
+    /// this test is the thing that stops the exemption coming back.
+    func testInk3ClearsAAOnEveryBackgroundItIsDrawnOn() {
+        for (name, background) in [("screen", CoinyTheme.screen), ("surface", CoinyTheme.surface)] {
+            assertAtLeastAA(CoinyTheme.ink3, on: background, .light, "light ink3 on \(name)")
+            assertAtLeastAA(CoinyTheme.ink3, on: background, .dark, "dark ink3 on \(name)")
+        }
     }
 }

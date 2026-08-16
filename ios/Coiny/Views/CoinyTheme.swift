@@ -18,8 +18,20 @@ enum CoinyTheme {
     static let ink = dynamic(light: 0x191C17, dark: 0xE8EBE0)
     /// Secondary text.
     static let ink2 = dynamic(light: 0x4E534A, dark: 0xA8AEA0)
-    /// Labels, units. Light-mode use is constrained to caption-and-above.
-    static let ink3 = dynamic(light: 0x6E7468, dark: 0x7E857A)
+    /// Labels, units, the monospaced section headings.
+    ///
+    /// The light value was `#6E7468`, which is 4.15:1 on `screen`, and the
+    /// design document permitted it anyway "at caption size and above". That
+    /// permission was wrong: WCAG's large-text exemption starts at 18pt, or
+    /// 14pt bold, and `caption` is 12pt, so every rung code and section heading
+    /// in the app was below AA. `XCUIApplication.performAccessibilityAudit()`
+    /// found it on Home, the journey and Activity within a minute of being
+    /// switched on. Darkened until it clears 4.5:1 on `screen`, which is the
+    /// background these labels are actually drawn on.
+    /// The dark value moved for the same reason: `#7E857A` cleared AA on
+    /// `screen` and was 4.29:1 on `surface`, a background the published table
+    /// never listed it against.
+    static let ink3 = dynamic(light: 0x64695E, dark: 0x858C81)
     /// 1px hairlines. Decorative, carries no information.
     static let rule = dynamic(light: 0xD3D8C9, dark: 0x2E3229)
     /// Interactive text, links, the one accent.
