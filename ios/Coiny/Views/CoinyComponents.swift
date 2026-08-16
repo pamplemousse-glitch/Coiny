@@ -92,15 +92,23 @@ struct CoinyErrorLine: View {
                 .foregroundStyle(CoinyTheme.ink2)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                // Combined only here, never across the button. Collapsing the
+                // whole stack into one element makes the retry unreachable:
+                // VoiceOver is handed a sentence where a button used to be.
+                .accessibilityElement(children: .combine)
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(CoinyTheme.signal)
+                    // contentShape, not just the frame: a frame around a text
+                    // label leaves the hit region the size of the text, which
+                    // the audit measured at 15pt against a 44pt floor.
                     .frame(minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .accessibilityHint(message)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        .accessibilityElement(children: .combine)
     }
 }
 

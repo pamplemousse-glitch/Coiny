@@ -311,14 +311,14 @@ The palette is derived from the product's own material: a reflective Sharp Memor
 | `field` | `#E4E7DA` | Inside the Window only | base | base |
 | `ink` | `#191C17` | Primary text, all balances | **14.84** | **16.27** |
 | `ink-2` | `#4E534A` | Secondary text | **6.80** | **7.46** |
-| `ink-3` | `#6E7468` | Labels, units, disabled | **4.15** | **4.55** |
+| `ink-3` | `#64695E` | Labels, units, disabled | **4.86** | **5.33** |
 | `rule` | `#D3D8C9` | 1px hairlines | 1.25 (decorative) | 1.37 |
 | `signal` | `#9C5310` | Interactive text, links, the one accent | **4.95** | **5.43** |
 | `signal-fill` | `#A85B14` | Filled button background | white text on it: **5.03** | |
 | `positive` | `#3D6B44` | Positive delta only | **5.35** | **5.86** |
 | `negative` | `#9A3B32` | Negative delta only | **5.94** | **6.52** |
 
-`ink-3` at 4.15 on `screen` is below AA for normal text. It is therefore permitted **only at `caption` size and above with weight 500, or on `surface` where it reaches 4.55**. Everywhere else, secondary text uses `ink-2`.
+`ink-3` used to be `#6E7468`, 4.15 on `screen`, and this paragraph used to permit it anyway "at `caption` size and above with weight 500". That exemption did not exist: WCAG's large-text threshold is 18pt, or 14pt bold, and `caption` is 12pt, so every rung code, unit label and section heading drawn in it was below AA. `XCUIApplication.performAccessibilityAudit()` reported it on Home, the journey and Activity the first time it ran. The token was darkened instead, and `CoinyThemeContrastTests.testInk3ClearsAAOnEveryBackgroundItIsDrawnOn` now asserts the floor on both backgrounds in both schemes, so the exemption cannot come back as prose.
 
 #### Dark
 
@@ -329,13 +329,13 @@ The palette is derived from the product's own material: a reflective Sharp Memor
 | `field` | `#1C1F16` | Inside the Window only | ink on it: 13.84 | |
 | `ink` | `#E8EBE0` | Primary text, all balances | **14.96** | **13.51** |
 | `ink-2` | `#A8AEA0` | Secondary text | **7.94** | **7.17** |
-| `ink-3` | `#7E857A` | Labels, units | **4.75** | **4.29** |
+| `ink-3` | `#858C81` | Labels, units | **5.22** | **4.71** |
 | `rule` | `#2E3229` | 1px hairlines | 1.38 (decorative) | 1.25 |
 | `signal` | `#E8A33D` | Interactive, accent | **8.38** | **7.56** |
 | `positive` | `#8FBF8A` | Positive delta only | **8.59** | **7.76** |
 | `negative` | `#E39B92` | Negative delta only | **8.06** | **7.28** |
 
-Every value in both tables clears AA for normal text except the two hairline tokens, which carry no information, and light `ink-3`, which is constrained as noted.
+Every value in both tables clears AA for normal text except the two hairline tokens, which carry no information.
 
 **Why amber and not green or purple.** Purple is the AI signature. Green is the fintech default and, more practically, green is needed for the positive-delta role, so using it as the brand accent would make brand and meaning collide on the same screen. Amber is an indicator-lamp color, it belongs to the instrument idea, it is close to unused in consumer finance, and because it is reserved exclusively for interaction it can never be confused with a financial value.
 

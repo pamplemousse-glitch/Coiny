@@ -57,11 +57,20 @@ struct SpendingView: View {
     private var content: some View {
         if let pet = store.pet {
             if pet.reactionHistory.isEmpty && summary == nil {
-                ContentUnavailableView(
-                    "No reactions yet",
-                    systemImage: "tray",
-                    description: Text("Reactions will appear once your bank starts sending transactions.")
-                )
+                // Not ContentUnavailableView: its description text renders in
+                // the system secondary grey, which the audit measured below AA
+                // on this background and which no palette token can reach.
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("No reactions yet")
+                        .font(.headline)
+                        .foregroundStyle(CoinyTheme.ink)
+                    Text("Reactions will appear once your bank starts sending transactions.")
+                        .font(.subheadline)
+                        .foregroundStyle(CoinyTheme.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             } else {
                 List {
                     if let s = summary {
