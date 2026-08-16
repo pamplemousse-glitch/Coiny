@@ -76,6 +76,16 @@ const CoinbaseAccountSchema = z.object({
     value: z.string(),
     currency: z.string(),
   }),
+  // "Amount that is being held for pending transfers against the available
+  // balance." It is still the user's money, and summing available_balance
+  // alone silently understated any account with a transfer in flight.
+  // Optional because not every account object carries it.
+  hold: z
+    .object({
+      value: z.string(),
+      currency: z.string(),
+    })
+    .optional(),
 });
 
 const CoinbaseAccountsResponseSchema = z.object({

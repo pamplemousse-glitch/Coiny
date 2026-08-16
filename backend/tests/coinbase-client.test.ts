@@ -74,6 +74,43 @@ describe('coinbase getAccounts — with valid keys', () => {
     expect(result[0]?.currency).toBe('BTC');
   });
 
+  it('parses the hold balance, which net worth needs and used to discard', async () => {
+    // `hold` is "amount that is being held for pending transfers against the
+    // available balance". It is still the user's money. The schema omitted it,
+    // so refreshCrypto could only ever see available_balance and understated
+    // every account with a transfer in flight.
+    vi.mocked(fetch).mockResolvedValue(
+      makeFetch({
+        accounts: [
+          {
+            uuid: 'acc-1',
+            currency: 'BTC',
+            available_balance: { value: '1.5', currency: 'BTC' },
+            hold: { value: '0.5', currency: 'BTC' },
+          },
+        ],
+        has_next: false,
+      }),
+    );
+
+    const { getAccounts } = await import('../src/coinbase/client.js');
+    const result = await getAccounts();
+    expect(result[0]?.hold?.value).toBe('0.5');
+  });
+
+  it('still parses an account with no hold field', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      makeFetch({
+        accounts: [{ uuid: 'acc-1', currency: 'BTC', available_balance: { value: '1.5', currency: 'BTC' } }],
+        has_next: false,
+      }),
+    );
+
+    const { getAccounts } = await import('../src/coinbase/client.js');
+    const result = await getAccounts();
+    expect(result[0]?.hold).toBeUndefined();
+  });
+
   it('follows pagination when has_next is true', async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(

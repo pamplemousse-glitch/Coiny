@@ -146,8 +146,15 @@ describe('POST /api/hyperliquid/sync', () => {
     await app.close();
   });
 
-  it('fetches state and persists accountValue', async () => {
-    mockedGetHyperliquidState.mockResolvedValue({ accountValue: 4200, positions: [] });
+  it('persists perps account value plus spot balances', async () => {
+    // The stored figure is the address's whole worth, not just perps. Spot
+    // balances used to be counted nowhere.
+    mockedGetHyperliquidState.mockResolvedValue({
+      accountValue: 4200,
+      positions: [],
+      spotBalances: [{ coin: 'USDC', total: 800, valueUsd: 800 }],
+      spotValueUsd: 800,
+    });
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
@@ -162,14 +169,19 @@ describe('POST /api/hyperliquid/sync', () => {
     expect(sync.json()).toEqual({ updated: 1 });
 
     const list = await app.inject({ method: 'GET', url: '/api/hyperliquid/accounts', headers: authHeader() });
-    expect(list.json()[0].lastAccountValueUsd).toBe(4200);
+    expect(list.json()[0].lastAccountValueUsd).toBe(5000); // 4200 perps + 800 spot
     expect(list.json()[0].lastSyncedAt).not.toBeNull();
 
     await app.close();
   });
 
   it('calls getHyperliquidState with the stored address', async () => {
-    mockedGetHyperliquidState.mockResolvedValue({ accountValue: 0, positions: [] });
+    mockedGetHyperliquidState.mockResolvedValue({
+      accountValue: 0,
+      positions: [],
+      spotBalances: [],
+      spotValueUsd: 0,
+    });
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();

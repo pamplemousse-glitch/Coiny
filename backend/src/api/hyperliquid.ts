@@ -71,9 +71,23 @@ export function registerHyperliquidApi(app: FastifyInstance): void {
 
     for (const row of rows) {
       const state = await getHyperliquidState(row.address);
+      // Perps account value PLUS spot token balances. This used to store the
+      // perps figure alone, so an address holding spot tokens had them counted
+      // nowhere: no error, no warning, simply absent from net worth.
+      //
+      // Deliberately reusing the existing column rather than adding one. The
+      // column means "what this Hyperliquid address is worth", and it was
+      // answering that question wrongly; a migration would only let both
+      // answers coexist. See docs/integration-api-audit.md.
+      //
+      // Each term is coerced: a NaN here does not throw, it stringifies to
+      // "NaN", and the numeric column stores NULL. That turns "we could not
+      // price one token" into "this account is worth nothing", silently.
+      const safe = (n: number): number => (Number.isFinite(n) ? n : 0);
+      const totalUsd = safe(state.accountValue) + safe(state.spotValueUsd);
       await db()
         .update(hyperliquidAccounts)
-        .set({ lastAccountValueUsd: state.accountValue.toString(), lastSyncedAt: now })
+        .set({ lastAccountValueUsd: totalUsd.toString(), lastSyncedAt: now })
         .where(and(eq(hyperliquidAccounts.userId, userId), eq(hyperliquidAccounts.id, row.id)));
       updated++;
     }
