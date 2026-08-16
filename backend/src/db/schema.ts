@@ -23,6 +23,12 @@ export const users = pgTable(
     // code (findOrCreateUser) rather than via a DB check constraint.
     appleSub: text('apple_sub'),
     googleSub: text('google_sub'),
+    // Sign in with Apple refresh token, AES-256-GCM encrypted (util/crypto).
+    // Held for exactly one purpose: TN3194 requires account deletion to call
+    // Apple's `/auth/revoke`, and that endpoint needs a token. Written
+    // best-effort at sign-in when the client sends an authorization code, read
+    // once at deletion, and destroyed with the row.
+    appleRefreshToken: text('apple_refresh_token'),
     email: text('email'),
     displayName: text('display_name'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

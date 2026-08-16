@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { pokemonCardHoldings } from '../db/schema.js';
 import { getPokemonCardPrice } from '../pokemonpricetracker/client.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const CreateSchema = z.object({
   cardName: z.string().min(1),
@@ -85,7 +86,7 @@ export function registerPokemonCardsApi(app: FastifyInstance): void {
     return reply.code(204).send();
   });
 
-  app.post('/api/pokemon-cards/sync', async (req) => {
+  app.post('/api/pokemon-cards/sync', SYNC_LIMIT, async (req) => {
     const userId = req.user!.id;
     const apiKey = config.POKEMONPRICETRACKER_API_KEY;
 

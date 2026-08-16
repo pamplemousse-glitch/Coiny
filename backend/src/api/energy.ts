@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { energyPositions } from '../db/schema.js';
 import { EIA_COMMODITIES, type EiaCommodity, getAllEiaSpotPrices } from '../eia/client.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const SUPPORTED_COMMODITIES = Object.keys(EIA_COMMODITIES) as [EiaCommodity, ...EiaCommodity[]];
 
@@ -91,7 +92,7 @@ export function registerEnergyApi(app: FastifyInstance): void {
   });
 
   // POST /api/energy/sync
-  app.post('/api/energy/sync', async (req: FastifyRequest) => {
+  app.post('/api/energy/sync', SYNC_LIMIT, async (req: FastifyRequest) => {
     const userId = req.user!.id;
     const rows = await db().select().from(energyPositions).where(eq(energyPositions.userId, userId));
 

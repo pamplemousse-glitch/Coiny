@@ -76,6 +76,13 @@ async function buildApp() {
       level: config.LOG_LEVEL,
       ...loggerOptions,
     },
+    // Both default to disabled in Fastify, which is why nothing bounded the
+    // total duration of POST /api/net-worth/refresh: only the individual vendor
+    // attempts were bounded, and there can be up to 84 of them.
+    // connectionTimeout is the one that matters here, because a handler waiting
+    // on sixteen vendors sends no bytes while it waits. See config.ts.
+    requestTimeout: config.REQUEST_TIMEOUT_MS,
+    connectionTimeout: config.CONNECTION_TIMEOUT_MS,
   });
 
   registerErrorHandler(app);

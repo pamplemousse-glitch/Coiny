@@ -33,6 +33,7 @@ import {
   updateDebtAccount,
 } from '../store/debts.js';
 import { getItemsByUser } from '../store/items.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const dayOfMonth = z.number().int().min(1).max(31);
 
@@ -133,7 +134,7 @@ export function registerDebtsApi(app: FastifyInstance): void {
 
   // POST /api/debts/sync: re-pull both providers. Each source fails soft; a
   // dead bureau connection must not block a bank refresh or vice versa.
-  app.post('/api/debts/sync', async (req: FastifyRequest) => {
+  app.post('/api/debts/sync', SYNC_LIMIT, async (req: FastifyRequest) => {
     const userId = req.user!.id;
     let plaidSynced = false;
     let spinwheelSynced = false;

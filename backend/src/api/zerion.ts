@@ -8,6 +8,7 @@ import { evaluateExternalEvent } from '../reactions/external.js';
 import { claimEvent } from '../store/events.js';
 import { recordReaction } from '../store/pet.js';
 import { getDeFiPositions, getPnl, getPortfolio, getTransactions } from '../zerion/client.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const AddWalletBodySchema = z.object({
   address: z.string().min(1).max(100),
@@ -192,7 +193,7 @@ export function registerZerionApi(app: FastifyInstance): void {
   });
 
   // POST /api/zerion/sync
-  app.post('/api/zerion/sync', async (req: FastifyRequest) => {
+  app.post('/api/zerion/sync', SYNC_LIMIT, async (req: FastifyRequest) => {
     const userId = req.user!.id;
     const rows = await db().select().from(zerionWallets).where(eq(zerionWallets.userId, userId));
 

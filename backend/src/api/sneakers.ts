@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { sneakerHoldings } from '../db/schema.js';
 import { getSneakerPrice } from '../kicksdb/client.js';
+import { SYNC_LIMIT } from './rate-limits.js';
 
 const AddSneakerBodySchema = z.object({
   sku: z.string().min(1).max(50),
@@ -59,7 +60,7 @@ export function registerSneakersApi(app: FastifyInstance): void {
   });
 
   // POST /api/sneakers/sync
-  app.post('/api/sneakers/sync', async (req: FastifyRequest, reply: FastifyReply) => {
+  app.post('/api/sneakers/sync', SYNC_LIMIT, async (req: FastifyRequest, reply: FastifyReply) => {
     const userId = req.user!.id;
     const rows = await db().select().from(sneakerHoldings).where(eq(sneakerHoldings.userId, userId));
 
