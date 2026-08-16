@@ -70,7 +70,7 @@ private extension PaywallView {
             Text("The free tier keeps the pet, every ladder rung and 2 live bank connections."
                 + " Paid tiers raise the connection limit.")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
         }
     }
 
@@ -105,7 +105,7 @@ private extension PaywallView {
                         .font(.headline)
                     Text(tier.features.joined(separator: ", "))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(CoinyTheme.ink2)
                         .multilineTextAlignment(.leading)
                 }
                 Spacer()
@@ -157,7 +157,7 @@ private extension PaywallView {
             }
         }
         .font(.footnote)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(CoinyTheme.ink2)
     }
 
     var subscribeButton: some View {
@@ -176,14 +176,27 @@ private extension PaywallView {
                 // is the exact failure the `onSignal` token exists to prevent
                 // (see CoinyTheme). signalFill + onSignal measure 5.03:1 in
                 // light and 8.38:1 in dark.
-                .foregroundStyle(CoinyTheme.onSignal)
-                .background(CoinyTheme.signalFill, in: RoundedRectangle(cornerRadius: 10))
+                //
+                // The disabled state is a DIFFERENT PAIR of tokens, not the
+                // same pair at reduced opacity. Fading the whole button fades
+                // the fill and the white label together and leaves a label
+                // that is nearly invisible, which the accessibility audit
+                // reports as a contrast failure and which looks broken on the
+                // screen that asks for money. `field` with `ink2` measures
+                // 6.29:1 and still reads as unavailable.
+                .foregroundStyle(isSubscribeDisabled ? CoinyTheme.ink2 : CoinyTheme.onSignal)
+                .background(
+                    isSubscribeDisabled ? CoinyTheme.field : CoinyTheme.signalFill,
+                    in: RoundedRectangle(cornerRadius: 10)
+                )
         }
         .buttonStyle(.plain)
-        .disabled(selectedProduct == nil || service.purchaseInFlight)
-        // A disabled button that looks identical to an enabled one is a dead
-        // control; .plain does not dim it the way .borderedProminent did.
-        .opacity(selectedProduct == nil || service.purchaseInFlight ? 0.5 : 1)
+        .disabled(isSubscribeDisabled)
+    }
+
+    /// No product selected, or a purchase already in flight.
+    private var isSubscribeDisabled: Bool {
+        selectedProduct == nil || service.purchaseInFlight
     }
 
     var restoreButton: some View {
@@ -213,13 +226,23 @@ private extension PaywallView {
             .font(.footnote.weight(.medium))
             .foregroundStyle(CoinyTheme.signal)
             .frame(minHeight: 44)
+            // frame(minHeight:) grows the LAYOUT but not the hit area: a
+            // Button's tappable region is its label's bounds, so these measured
+            // 15.7pt tall against the 44pt minimum despite the frame above.
+            // Same defect, same fix as SignInView's debug control.
+            //
+            // It matters more here than almost anywhere: Apple requires
+            // functional Terms and privacy links on the screen that sells an
+            // auto-renewable subscription, and a link that is present but hard
+            // to hit is the failure mode the requirement exists to prevent.
+            .contentShape(Rectangle())
             .accessibilityHint("Opens \(title) in the app.")
     }
 
     var unavailableNotice: some View {
         Text("Subscriptions are not available right now. Nothing is wrong with your account; try again later.")
             .font(.footnote)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(CoinyTheme.ink2)
     }
 }
 

@@ -57,6 +57,24 @@ extension XCTestCase {
             if issue.auditType == .dynamicType, element?.label.hasSuffix(" percent") == true {
                 return true
             }
+            // A DISABLED control has no contrast requirement. WCAG 2.2 SC 1.4.3
+            // says so in as many words: "Text or images of text that are part
+            // of an inactive user interface component ... have no contrast
+            // requirement."
+            //
+            // The audit measures the dimmed rendering, so every disabled
+            // control fails it. Verified as a property of disabling rather than
+            // of any one style: the paywall's Subscribe button fails identically
+            // under `.borderedProminent` and under an explicit
+            // `signalFill`/`onSignal` pair, because SwiftUI's `.disabled()`
+            // fades whatever is underneath.
+            //
+            // Narrow on purpose. It excuses only contrast, only on elements the
+            // app has actually disabled; an unlabelled or unreachable disabled
+            // control still fails.
+            if issue.auditType == .contrast, element?.isEnabled == false {
+                return true
+            }
             // The element, not just the issue: "hit area is too small" with no
             // element named is a defect report nobody can act on.
             let described = element.map {
