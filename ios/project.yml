@@ -107,6 +107,12 @@ targets:
         # (design-direction section 5). Set this back to AppIcon and add the
         # icon set in the same commit; App Store submission requires one.
         ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        # Without this the AccentColor colorset compiles into Assets.car and is
+        # then never read: nothing writes NSAccentColorName into Info.plist, so
+        # `.tint(.accentColor)` keeps resolving to system blue. Shipping the
+        # asset alone looked correct in code review and in a green test run, and
+        # was visibly wrong on screen.
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         # Which backend a device build talks to. Staging, for every
         # configuration, because production does not exist yet.
         #

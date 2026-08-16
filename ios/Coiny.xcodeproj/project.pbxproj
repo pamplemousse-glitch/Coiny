@@ -161,6 +161,7 @@
 		BFA7E639197CBAA87F96AC0D /* CoinyThemeContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDCC857A4023EBFEB99C929F /* CoinyThemeContrastTests.swift */; };
 		C35276938C6B206366D2DE1C /* MetalsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D8B5B4F86546575B9C283D2 /* MetalsView.swift */; };
 		C49068E0831EC801A484EDC3 /* DeclaredAssetsSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA4113EC84E1619F48C5A0C6 /* DeclaredAssetsSync.swift */; };
+		C4E5C36A68F4521B92EBD45D /* PaywallUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C25CD58983B1DE8884967F35 /* PaywallUITests.swift */; };
 		C5237D9417EF0455D0DEA686 /* AccessibilityAudit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D9B50E84AD3F895E3DD9F29 /* AccessibilityAudit.swift */; };
 		C6B61D744A511AC9D6D0F26E /* SubscriptionCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FFDEA6743F2696C59BE5D6F /* SubscriptionCatalogTests.swift */; };
 		C7A55A81C43EDBA5D944D007 /* ConnectionRepairViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BA56E7F280F38672F7A1433 /* ConnectionRepairViewModelTests.swift */; };
@@ -357,6 +358,7 @@
 		C0845CBE9430D01E8553CC30 /* ManualAssetsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualAssetsView.swift; sourceTree = "<group>"; };
 		C104CD7196BD12428D6AC151 /* VehiclesViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehiclesViewModelTests.swift; sourceTree = "<group>"; };
 		C12C0A2DFEC71B90CE63DB87 /* ChainWalletsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChainWalletsViewModel.swift; sourceTree = "<group>"; };
+		C25CD58983B1DE8884967F35 /* PaywallUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallUITests.swift; sourceTree = "<group>"; };
 		C3FF4A43F181F21963F8104F /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		C5043ACB1718911F675E13C0 /* PetStateDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetStateDecodingTests.swift; sourceTree = "<group>"; };
 		C816126CBDB97FF30688AA95 /* VehiclesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehiclesView.swift; sourceTree = "<group>"; };
@@ -571,6 +573,7 @@
 				6BD662F116695FBC1F88EA32 /* ExploratoryCrawlTests.swift */,
 				9044185A2145890BDCC4E96E /* HomeTabUITests.swift */,
 				B9D7A31FF840B964A6B679CA /* JourneyUITests.swift */,
+				C25CD58983B1DE8884967F35 /* PaywallUITests.swift */,
 				9ABFBF4FEA310EB336444E6C /* TabNavigationUITests.swift */,
 				5EA22C9CCB74F58819DC9960 /* WealthTabUITests.swift */,
 			);
@@ -1058,6 +1061,7 @@
 				4A6A206CE41D16F674FCF2E5 /* ExploratoryCrawlTests.swift in Sources */,
 				3C397BA178634116F5947E26 /* HomeTabUITests.swift in Sources */,
 				5F383346FE6CADB1E61552F3 /* JourneyUITests.swift in Sources */,
+				C4E5C36A68F4521B92EBD45D /* PaywallUITests.swift in Sources */,
 				DBE346706AEA00CEFC43F53D /* TabNavigationUITests.swift in Sources */,
 				FAC96919A888EBFD62B70071 /* WealthTabUITests.swift in Sources */,
 			);
@@ -1139,6 +1143,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Coiny/Coiny.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
@@ -1232,6 +1237,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Coiny/Coiny.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
