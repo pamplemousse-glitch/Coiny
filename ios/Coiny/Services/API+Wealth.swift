@@ -91,6 +91,28 @@ struct KalshiSyncResult: Decodable {
     let portfolioUsd: Double
 }
 
+/// One open Kalshi market position.
+struct KalshiMarketPosition: Decodable, Identifiable {
+    let ticker: String
+    /// Contracts held. Negative means NO contracts, positive means YES.
+    let contracts: Double
+    let exposureUsd: Double
+    let totalTradedUsd: Double
+    let realizedPnlUsd: Double
+    let feesPaidUsd: Double
+
+    var id: String { ticker }
+}
+
+/// Cash and open positions, kept apart because the total alone cannot tell you
+/// whether an account is holding contracts or sitting in cash.
+struct KalshiPositionsResponse: Decodable {
+    let cashUsd: Double
+    let positionsUsd: Double
+    let totalUsd: Double
+    let markets: [KalshiMarketPosition]
+}
+
 // MARK: - Discogs DTOs
 
 struct DiscogsStatus: Decodable {
@@ -244,6 +266,12 @@ extension API {
 
     func disconnectKalshi() async throws {
         try await deleteVoid("/api/kalshi/connect")
+    }
+
+    /// The open contracts behind the portfolio value, plus the cash/positions
+    /// split. Read live by the backend, so this is a round trip to Kalshi.
+    func getKalshiPositions() async throws -> KalshiPositionsResponse {
+        try await get("/api/kalshi/positions")
     }
 
     func syncKalshi() async throws -> KalshiSyncResult {

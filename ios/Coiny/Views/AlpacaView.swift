@@ -51,6 +51,8 @@ struct AlpacaView: View {
                         .font(.caption.monospacedDigit())
                 }
             }
+            holdings
+
             HStack {
                 Button("Sync") { Task { await vm.sync() } }
                     .font(.caption)
@@ -61,6 +63,89 @@ struct AlpacaView: View {
             }
         }
         .padding(.top, 4)
+        // On appear rather than on a button: the equity figure above is
+        // meaningless on its own, which was the entire complaint. Loading is
+        // still explicit and separate from the tab's fan-out, because the
+        // backend reads this live from Alpaca.
+        .task { await vm.loadPositions() }
+    }
+
+    /// The individual positions behind the equity figure. Before this the
+    /// brokerage was a single opaque number, which is the shallow end of the
+    /// one axis this product competes on.
+    @ViewBuilder
+    private var holdings: some View {
+        if vm.isLoadingPositions {
+            ProgressView()
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
+                .accessibilityLabel("Loading holdings")
+        } else if vm.hasLoadedPositions && vm.positions.isEmpty {
+            // An empty account is a real answer, so say so rather than
+            // rendering nothing and looking like a failed load.
+            HStack {
+                Text("No open positions")
+                    .font(.caption)
+                    .foregroundStyle(CoinyTheme.ink2)
+                Spacer()
+            }
+        } else {
+            ForEach(vm.positions) { position in
+                CoinyHairline().padding(.vertical, 6)
+                positionRow(position)
+            }
+        }
+    }
+
+    private func positionRow(_ position: AlpacaPosition) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(position.symbol)
+                    .font(.subheadline)
+                    .lineLimit(1)
+                Text(Self.subtitle(for: position))
+                    .font(.caption)
+                    .foregroundStyle(CoinyTheme.ink2)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(position.marketValueUsd, format: .currency(code: "USD"))
+                    .font(.subheadline.monospacedDigit())
+                Text(Self.gainLabel(for: position))
+                    .font(.caption.monospacedDigit())
+                    // Colour is a reinforcement, never the only carrier: the
+                    // sign is in the text too, so this reads correctly without
+                    // colour vision.
+                    .foregroundStyle(position.unrealizedPlUsd < 0 ? CoinyTheme.negative : CoinyTheme.positive)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Self.accessibilityLabel(for: position))
+    }
+
+    /// Quantity is formatted rather than interpolated: a fractional share or a
+    /// crypto amount renders as 0.045, not 4.5e-2.
+    private static func quantityText(_ qty: Double) -> String {
+        qty.formatted(.number.precision(.fractionLength(0...4)))
+    }
+
+    private static func subtitle(for position: AlpacaPosition) -> String {
+        let asset = position.assetClass.replacingOccurrences(of: "_", with: " ")
+        return "\(quantityText(position.qty)) × \(position.currentPriceUsd.formatted(.currency(code: "USD"))) · \(asset)"
+    }
+
+    private static func gainLabel(for position: AlpacaPosition) -> String {
+        let sign = position.unrealizedPlUsd < 0 ? "-" : "+"
+        return sign + abs(position.unrealizedPlUsd).formatted(.currency(code: "USD"))
+    }
+
+    private static func accessibilityLabel(for position: AlpacaPosition) -> String {
+        let direction = position.unrealizedPlUsd < 0 ? "down" : "up"
+        return """
+            \(position.symbol), \(quantityText(position.qty)) units, \
+            worth \(position.marketValueUsd.formatted(.currency(code: "USD"))), \
+            \(direction) \(abs(position.unrealizedPlUsd).formatted(.currency(code: "USD")))
+            """
     }
 
     private var connectSheet: some View {

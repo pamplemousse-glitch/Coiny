@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/client.js';
 import { kalshiConnections } from '../db/schema.js';
-import { getPortfolioBalance } from '../kalshi/client.js';
+import { getBalance, getPortfolioBalance, getPositions } from '../kalshi/client.js';
 import { decryptString, encryptString } from '../util/crypto.js';
 import { SYNC_LIMIT } from './rate-limits.js';
 
@@ -76,6 +76,29 @@ export function registerKalshiConnectApi(app: FastifyInstance): void {
 
     req.log.info({ userId }, 'kalshi sync complete');
     return { portfolioUsd };
+  });
+
+  // GET /api/kalshi/positions — the open contracts behind the portfolio value
+  //
+  // Live, not cached, for the same reason as the Alpaca equivalent: the cached
+  // total is what net worth reads, and this is additive detail for the Wealth
+  // tab. Returns the cash and positions split too, since the total alone cannot
+  // tell you whether an account is holding contracts or sitting in cash.
+  app.get('/api/kalshi/positions', SYNC_LIMIT, async (req: FastifyRequest, reply: FastifyReply) => {
+    const userId = req.user!.id;
+    const [conn] = await db().select().from(kalshiConnections).where(eq(kalshiConnections.userId, userId));
+    if (!conn) return reply.status(404).send({ error: 'not connected' });
+
+    const privateKey = decryptString(conn.privateKeyBase64);
+    const [balance, positions] = await Promise.all([
+      getBalance(conn.keyId, privateKey),
+      getPositions(conn.keyId, privateKey),
+    ]);
+
+    // Counts only. Tickers say what someone is betting on, which is exactly the
+    // kind of detail .claude/rules/security.md #2 keeps out of logs.
+    req.log.info({ userId, markets: positions.markets.length }, 'kalshi positions fetched');
+    return { ...balance, ...positions };
   });
 
   // DELETE /api/kalshi/connect

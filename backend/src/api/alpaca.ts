@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { AlpacaEnv } from '../alpaca/client.js';
-import { AlpacaError, getEquityUsd } from '../alpaca/client.js';
+import { AlpacaError, getEquityUsd, getPositions } from '../alpaca/client.js';
 import { db } from '../db/client.js';
 import { alpacaConnections } from '../db/schema.js';
 import { decryptString, encryptString } from '../util/crypto.js';
@@ -77,6 +77,35 @@ export function registerAlpacaApi(app: FastifyInstance): void {
 
       req.log.info({ userId, equity }, 'alpaca sync complete');
       return { equity };
+    } catch (err) {
+      if (err instanceof AlpacaError && (err.status === 401 || err.status === 403)) {
+        return reply.status(401).send({ error: 'Invalid Alpaca API credentials' });
+      }
+      throw err;
+    }
+  });
+
+  // GET /api/alpaca/positions — the individual holdings behind the equity total
+  //
+  // Read live rather than cached. Positions have no column to cache into, and
+  // adding one would mean a migration; the equity figure that net worth reads
+  // is still the cached one, so this route is additive detail for the Wealth
+  // tab rather than a new source of truth for the total.
+  app.get('/api/alpaca/positions', SYNC_LIMIT, async (req: FastifyRequest, reply: FastifyReply) => {
+    const userId = req.user!.id;
+    const [conn] = await db().select().from(alpacaConnections).where(eq(alpacaConnections.userId, userId));
+    if (!conn) return reply.status(404).send({ error: 'not connected' });
+
+    try {
+      const positions = await getPositions(
+        decryptString(conn.apiKeyId),
+        decryptString(conn.apiSecretKey),
+        conn.env as AlpacaEnv,
+      );
+      // Count only, never the symbols: a holdings list is exactly the kind of
+      // financial detail .claude/rules/security.md #2 keeps out of logs.
+      req.log.info({ userId, count: positions.length }, 'alpaca positions fetched');
+      return { positions };
     } catch (err) {
       if (err instanceof AlpacaError && (err.status === 401 || err.status === 403)) {
         return reply.status(401).send({ error: 'Invalid Alpaca API credentials' });

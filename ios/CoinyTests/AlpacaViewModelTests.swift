@@ -11,6 +11,11 @@ final class AlpacaViewModelTests: XCTestCase {
         private var connectError: Error?
         private var syncResult: Result<AlpacaSyncResult, Error> = .success(AlpacaSyncResult(equity: 0))
         private var disconnectError: Error?
+        private var positionsResult: Result<[AlpacaPosition], Error> = .success([])
+
+        func setPositionsResult(_ r: Result<[AlpacaPosition], Error>) {
+            lock.lock(); positionsResult = r; lock.unlock()
+        }
 
         func setStatusResult(_ r: Result<AlpacaStatus, Error>) { lock.lock(); statusResult = r; lock.unlock() }
         func setConnectError(_ e: Error?) { lock.lock(); connectError = e; lock.unlock() }
@@ -29,6 +34,11 @@ final class AlpacaViewModelTests: XCTestCase {
 
         func syncAlpaca() async throws -> AlpacaSyncResult {
             lock.lock(); let r = syncResult; lock.unlock()
+            return try r.get()
+        }
+
+        func getAlpacaPositions() async throws -> [AlpacaPosition] {
+            lock.lock(); let r = positionsResult; lock.unlock()
             return try r.get()
         }
 
@@ -167,5 +177,89 @@ final class AlpacaViewModelTests: XCTestCase {
         await vm.disconnect()
 
         XCTAssertEqual(vm.errorMessage, "disconnect failed")
+    }
+
+    // MARK: - Positions
+
+    private static func position(_ symbol: String, value: Double) -> AlpacaPosition {
+        AlpacaPosition(
+            symbol: symbol, assetClass: "us_equity", side: "long", qty: 10,
+            marketValueUsd: value, costBasisUsd: value - 100, currentPriceUsd: value / 10,
+            avgEntryPriceUsd: (value - 100) / 10, unrealizedPlUsd: 100
+        )
+    }
+
+    func testLoadPositionsPopulatesHoldings() async {
+        let fake = FakeAPI()
+        fake.setStatusResult(.success(AlpacaStatus(env: "paper", lastEquityUsd: 5000, lastSyncedAt: nil)))
+        fake.setPositionsResult(.success([Self.position("AAPL", value: 2760)]))
+        let vm = AlpacaViewModel(api: fake)
+        await vm.loadStatus()
+
+        await vm.loadPositions()
+
+        XCTAssertEqual(vm.positions.map(\.symbol), ["AAPL"])
+        XCTAssertTrue(vm.hasLoadedPositions)
+        XCTAssertNil(vm.errorMessage)
+    }
+
+    func testLoadPositionsDoesNothingWhenDisconnected() async {
+        // Guards against firing a request that can only 404, and against
+        // showing a stale holdings list after a disconnect.
+        let fake = FakeAPI()
+        fake.setPositionsResult(.success([Self.position("AAPL", value: 100)]))
+        let vm = AlpacaViewModel(api: fake)
+
+        await vm.loadPositions()
+
+        XCTAssertTrue(vm.positions.isEmpty)
+        XCTAssertFalse(vm.hasLoadedPositions)
+    }
+
+    func testEmptyPortfolioIsLoadedNotFailed() async {
+        // An account holding nothing must be distinguishable from a load that
+        // never happened, or the view cannot choose between "no open
+        // positions" and staying blank.
+        let fake = FakeAPI()
+        fake.setStatusResult(.success(AlpacaStatus(env: "paper", lastEquityUsd: 0, lastSyncedAt: nil)))
+        fake.setPositionsResult(.success([]))
+        let vm = AlpacaViewModel(api: fake)
+        await vm.loadStatus()
+
+        await vm.loadPositions()
+
+        XCTAssertTrue(vm.positions.isEmpty)
+        XCTAssertTrue(vm.hasLoadedPositions)
+        XCTAssertNil(vm.errorMessage)
+    }
+
+    func testLoadPositionsSurfacesFailureRatherThanShowingAnEmptyList() async {
+        struct Boom: Error {}
+        let fake = FakeAPI()
+        fake.setStatusResult(.success(AlpacaStatus(env: "paper", lastEquityUsd: 10, lastSyncedAt: nil)))
+        fake.setPositionsResult(.failure(Boom()))
+        let vm = AlpacaViewModel(api: fake)
+        await vm.loadStatus()
+
+        await vm.loadPositions()
+
+        XCTAssertNotNil(vm.errorMessage)
+        XCTAssertFalse(vm.hasLoadedPositions)
+    }
+
+    func testDisconnectClearsHoldings() async {
+        let fake = FakeAPI()
+        fake.setStatusResult(.success(AlpacaStatus(env: "paper", lastEquityUsd: 5000, lastSyncedAt: nil)))
+        fake.setPositionsResult(.success([Self.position("AAPL", value: 2760)]))
+        let vm = AlpacaViewModel(api: fake)
+        await vm.loadStatus()
+        await vm.loadPositions()
+
+        await vm.disconnect()
+
+        // Leaving them behind would show one account's holdings to whoever
+        // connects next on the same device.
+        XCTAssertTrue(vm.positions.isEmpty)
+        XCTAssertFalse(vm.hasLoadedPositions)
     }
 }

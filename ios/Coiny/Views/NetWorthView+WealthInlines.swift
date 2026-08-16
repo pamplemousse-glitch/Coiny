@@ -144,15 +144,92 @@ struct KalshiInlineView: View {
     }
 
     private var connectedView: some View {
+        VStack(spacing: 0) {
+            // The cash/positions split. A single portfolio figure cannot tell
+            // you whether an account is holding contracts or sitting in cash,
+            // and those are different financial situations.
+            if let cash = vm.cashUsd, let positions = vm.positionsUsd {
+                splitRow(label: "Cash", value: cash)
+                splitRow(label: "Positions", value: positions)
+            }
+
+            openContracts
+
+            HStack {
+                Button("Sync") { Task { await vm.sync() } }
+                    .font(.caption)
+                    .buttonStyle(.bordered)
+                Spacer()
+                Button("Disconnect", role: .destructive) { Task { await vm.disconnect() } }
+                    .font(.caption)
+            }
+            .padding(.top, 4)
+        }
+        .task { await vm.loadPositions() }
+    }
+
+    private func splitRow(label: String, value: Double) -> some View {
         HStack {
-            Button("Sync") { Task { await vm.sync() } }
+            Text(label)
                 .font(.caption)
-                .buttonStyle(.bordered)
+                .foregroundStyle(CoinyTheme.ink2)
             Spacer()
-            Button("Disconnect", role: .destructive) { Task { await vm.disconnect() } }
-                .font(.caption)
+            Text(value, format: .currency(code: "USD"))
+                .font(.caption.monospacedDigit())
         }
         .padding(.top, 4)
+    }
+
+    @ViewBuilder
+    private var openContracts: some View {
+        if vm.isLoadingPositions {
+            ProgressView()
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
+                .accessibilityLabel("Loading positions")
+        } else if vm.hasLoadedPositions && vm.markets.isEmpty {
+            HStack {
+                Text("No open contracts")
+                    .font(.caption)
+                    .foregroundStyle(CoinyTheme.ink2)
+                Spacer()
+            }
+            .padding(.top, 4)
+        } else {
+            ForEach(vm.markets) { market in
+                CoinyHairline().padding(.vertical, 6)
+                marketRow(market)
+            }
+        }
+    }
+
+    private func marketRow(_ market: KalshiMarketPosition) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(market.ticker)
+                    .font(.subheadline)
+                    .lineLimit(1)
+                // A negative position is NO contracts, not a negative holding.
+                // Rendering "-40 contracts" would read as a debt.
+                Text(Self.contractsLabel(market.contracts))
+                    .font(.caption)
+                    .foregroundStyle(CoinyTheme.ink2)
+            }
+            Spacer()
+            Text(market.exposureUsd, format: .currency(code: "USD"))
+                .font(.subheadline.monospacedDigit())
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "\(market.ticker), \(Self.contractsLabel(market.contracts)), "
+                + "worth \(market.exposureUsd.formatted(.currency(code: "USD")))"
+        )
+    }
+
+    static func contractsLabel(_ contracts: Double) -> String {
+        let side = contracts < 0 ? "NO" : "YES"
+        let count = abs(contracts).formatted(.number.precision(.fractionLength(0...2)))
+        return "\(count) \(side)"
     }
 
     private var setupSheet: some View {
