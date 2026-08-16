@@ -144,7 +144,12 @@ export async function refreshCrypto(userId: string): Promise<RefreshOutcome> {
     let total = 0;
     const positions: CryptoPosition[] = [];
     for (const acct of accounts) {
-      const amount = parseFloat(acct.available_balance.value);
+      // Available PLUS held. `hold` is money reserved against pending
+      // transfers; it is still the user's, and counting only
+      // available_balance understated any account with a transfer in flight.
+      const available = Number.parseFloat(acct.available_balance.value);
+      const held = acct.hold ? Number.parseFloat(acct.hold.value) : 0;
+      const amount = (Number.isFinite(available) ? available : 0) + (Number.isFinite(held) ? held : 0);
       if (amount <= 0) continue;
       const usd = prices.get(acct.currency);
       const valueUSD = usd ? amount * usd : 0;

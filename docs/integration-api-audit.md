@@ -151,7 +151,49 @@ worth without erroring:
 
 All three are fixed, with `tests/kraken-balance.test.ts` covering each.
 
-### LOW: Coinbase
+### FIXED: Hyperliquid counted perps and ignored spot entirely
+
+`src/hyperliquid/client.ts` called only `clearinghouseState`, which is the
+**perps** account. Hyperliquid's `spotClearinghouseState` returns the address's
+token balances, and nothing read it. An address holding spot tokens had them
+counted nowhere: no error, no warning, simply absent from net worth.
+
+Spot balances are now fetched alongside and priced from `allMids`, with USDC
+taken at $1 as the quote asset. A token with no mid is **excluded** rather than
+valued at zero, because counting it as zero is the same silent understatement
+the fix exists to remove. A spot failure leaves the perps figure intact rather
+than zeroing the whole account.
+
+One trap worth recording: the sum reached a `numeric` column via `.toString()`,
+so a `NaN` did not throw, it stored **NULL**. That turns "we could not price one
+token" into "this account is worth nothing". Both terms are now coerced.
+
+### FIXED: Coinbase discarded funds on hold
+
+`src/networth/refresh.ts` summed `available_balance` alone. Coinbase accounts
+also carry `hold`, documented as "amount that is being held for pending
+transfers against the available balance". It is still the user's money, and the
+Zod schema did not even parse the field, so the refresh path could not have used
+it. Any account with a transfer in flight was understated, and an account whose
+entire balance was on hold contributed nothing at all.
+
+### The pattern
+
+Four integrations, four instances of the same defect: **Kraken, Kalshi,
+Hyperliquid and Coinbase each read one part of a balance the vendor splits into
+several**, and each understated net worth with no error to show for it. Kalshi
+even had a test defending its version.
+
+The shape is always the same. A vendor separates cash from positions, available
+from held, spot from perps, or staked from liquid. The client reads the field
+whose name sounds like the total. Nothing fails, so nothing is noticed.
+
+**When adding or reviewing any balance integration, the question to ask is not
+"does this endpoint return a total" but "what else does this vendor split the
+balance into".** Reading the endpoint contract answers it; reading the endpoint
+name does not.
+
+### LOW: Coinbase account list
 
 `/api/v3/brokerage/accounts` and `/portfolios` are called, which is the account
 and portfolio list. Worth a look at whether per-portfolio breakdown adds
