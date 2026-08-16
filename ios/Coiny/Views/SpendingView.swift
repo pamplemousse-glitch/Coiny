@@ -11,6 +11,12 @@ struct SpendingView: View {
     var body: some View {
         NavigationStack {
             content
+                // The same surface Home uses. Until this, Home was the only
+                // screen wearing the design system and the other three were
+                // stock iOS white, which design-direction 3.1 names as a tell.
+                // The `surface` cards on this screen were already chosen to sit
+                // on it: near-white on cream is the intended relationship.
+                .background(CoinyTheme.screen)
                 .navigationTitle("Activity")
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {

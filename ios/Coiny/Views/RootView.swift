@@ -37,11 +37,22 @@ struct RootView: View {
                 }
                 .accessibilityIdentifier("tab.wealth")
         }
-        // There is no AccentColor asset, so this resolves to system blue at
-        // 4.02:1 on white, below AA for the tab bar's own labels. The fix is the
-        // asset catalog (runbook G1.7), not a `.tint(CoinyTheme.signal)` here:
-        // tint propagates down the whole tab tree into PaywallView's filled
-        // purchase button, whose white label on dark amber would be 2.16:1.
+        // Resolves to Assets.xcassets/AccentColor, which is now CoinyTheme's
+        // `signal` in both schemes: 5.74:1 on the light background and 8.6:1 on
+        // the dark one. It used to fall back to system blue at 4.02:1, below AA
+        // for the tab bar's own labels, because no asset catalog existed at all
+        // (runbook G1.7).
+        //
+        // The reason this was deferred was real: the accent propagates down the
+        // whole tab tree, and PaywallView's `.borderedProminent` button would
+        // have painted itself amber and labelled it white, which is 2.15:1 in
+        // dark mode. That button now sets `signalFill` and `onSignal`
+        // explicitly instead of inheriting, which is what those tokens are for.
+        //
+        // One colour cannot be both light enough to read on a dark background
+        // and dark enough for white text on top of it. The palette already
+        // solves that by separating the tint token from the fill token; the
+        // mistake would be to collapse them.
         // swiftlint:disable:next design_system_color
         .tint(.accentColor)
     }

@@ -17,6 +17,8 @@ struct NetWorthView: View {
     var body: some View {
         NavigationStack {
             content
+                // Matches Home and Activity. See SpendingView for why.
+                .background(CoinyTheme.screen)
                 .navigationTitle("Wealth")
                 .refreshable { await vm.refresh() }
         }
