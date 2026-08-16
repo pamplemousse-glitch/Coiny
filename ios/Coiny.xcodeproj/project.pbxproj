@@ -68,6 +68,7 @@
 		4887E84F9604FB4286CD1F47 /* CoinyTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AE46D8172612594E679EF5A /* CoinyTheme.swift */; };
 		48A0B70757F046C4FEBCFDE4 /* OnboardingViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0336E1DC0E43C3546544A9 /* OnboardingViewModelTests.swift */; };
 		49605D7EAB8872075DC99F24 /* CreaturePlaceholderArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF3B9CB6ADCE331E98E1D43 /* CreaturePlaceholderArt.swift */; };
+		4A6A206CE41D16F674FCF2E5 /* ExploratoryCrawlTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BD662F116695FBC1F88EA32 /* ExploratoryCrawlTests.swift */; };
 		4A8EA7116AFFEB0E02938D63 /* API+Alpaca.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7FF7020479D78C12B2B789 /* API+Alpaca.swift */; };
 		4F0C56086A58D6670889BE01 /* CoinbaseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDD31B08C041475EBBE3534B /* CoinbaseView.swift */; };
 		528DD11017726DEE1734B981 /* MetalsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 691F168939803E11E7179DA9 /* MetalsViewModel.swift */; };
@@ -289,6 +290,7 @@
 		684858149CD173ED09BB9F7B /* DebtPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebtPresentation.swift; sourceTree = "<group>"; };
 		691F168939803E11E7179DA9 /* MetalsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalsViewModel.swift; sourceTree = "<group>"; };
 		6AF73651E65C599901D32475 /* ChainWalletsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChainWalletsView.swift; sourceTree = "<group>"; };
+		6BD662F116695FBC1F88EA32 /* ExploratoryCrawlTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploratoryCrawlTests.swift; sourceTree = "<group>"; };
 		6C8A559C5C1CE5E41BC91F87 /* TradingCardsViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradingCardsViewModelTests.swift; sourceTree = "<group>"; };
 		6C984EF3F9DF6DB25768C476 /* JourneyStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JourneyStoreTests.swift; sourceTree = "<group>"; };
 		6D32ED5F0B28A5899A6EBA88 /* NftView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NftView.swift; sourceTree = "<group>"; };
@@ -563,6 +565,7 @@
 				8D9B50E84AD3F895E3DD9F29 /* AccessibilityAudit.swift */,
 				1375043E147E354417174A6B /* ActivityTabUITests.swift */,
 				5AF3A73745D2BE9B2500936F /* AppLaunchSmokeTests.swift */,
+				6BD662F116695FBC1F88EA32 /* ExploratoryCrawlTests.swift */,
 				9044185A2145890BDCC4E96E /* HomeTabUITests.swift */,
 				B9D7A31FF840B964A6B679CA /* JourneyUITests.swift */,
 				9ABFBF4FEA310EB336444E6C /* TabNavigationUITests.swift */,
@@ -1048,6 +1051,7 @@
 				C5237D9417EF0455D0DEA686 /* AccessibilityAudit.swift in Sources */,
 				6C33FA777B4231F8FF23A8E3 /* ActivityTabUITests.swift in Sources */,
 				A6E3F5BBAB25E5586700936F /* AppLaunchSmokeTests.swift in Sources */,
+				4A6A206CE41D16F674FCF2E5 /* ExploratoryCrawlTests.swift in Sources */,
 				3C397BA178634116F5947E26 /* HomeTabUITests.swift in Sources */,
 				5F383346FE6CADB1E61552F3 /* JourneyUITests.swift in Sources */,
 				DBE346706AEA00CEFC43F53D /* TabNavigationUITests.swift in Sources */,

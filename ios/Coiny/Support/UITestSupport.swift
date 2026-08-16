@@ -243,4 +243,83 @@ struct UITestJourneyAPI: JourneyAPI {
         return await UITestJourneyState.shared.ladder()
     }
 }
+
+/// Deterministic net worth fixture for `--ui-testing`.
+///
+/// Without this the Wealth tab was the one tab with no fixture, so it fell
+/// through to the real API with no session and rendered "Not signed in" over a
+/// "Try again" button. That is not only a bad screenshot: it meant no automated
+/// test had ever seen the Wealth tab's actual content, because every test that
+/// navigated there was asserting against an error state.
+///
+/// The figures agree with `UITestPetAPI`'s derived state (liquid cash 7,440) so
+/// the two tabs cannot disagree about the same user in the same run.
+struct UITestNetWorthAPI: NetWorthViewModelAPI {
+    /// Recomputed per access so the freshness label reads like a live session
+    /// rather than a fixed past date. The convenience initializer defaults
+    /// `generatedAt` to epoch 0, which renders as "Updated Dec 31" (1969 in
+    /// local time) and looks like a plausible recent date rather than an
+    /// obviously wrong one.
+    static var fixture: NetWorthResponse {
+        let asOf = Date()
+        // Must be populated, not defaulted to [:]. WealthPresenter.sections
+        // builds entirely from `classes`, so a response with real totals and no
+        // class readings renders "Nothing connected yet." directly underneath a
+        // non-zero net worth.
+        let classes: [String: ClassReading] = [
+            "bank": ClassReading(value: 7440, asOf: asOf, status: .ok),
+            "investments": ClassReading(value: 18_200, asOf: asOf, status: .ok),
+            "crypto": ClassReading(value: 3100, asOf: asOf, status: .ok),
+            "debts": ClassReading(value: 4300, asOf: asOf, status: .ok),
+        ]
+        return NetWorthResponse(
+        total: 24_440,
+        bank: 7440, investments: 18_200, crypto: 3100, defi: 0,
+        chainWallets: 0, hyperliquid: 0, realEstate: 0, vehicles: 0,
+        metals: 0, sneakers: 0, nft: nil, manual: nil, declared: nil, alpaca: nil,
+        truelayer: nil, kraken: 0, ynab: 0, vinyl: nil, kalshi: nil,
+        polymarket: nil, pokemonCards: nil, energy: nil, farmland: nil,
+        tradingCards: nil, coins: nil,
+        debts: 4300,
+        liquidCashMonths: 3.1,
+        accounts: NetWorthAccounts(
+            bank: [
+                BankAccount(
+                    id: "acct-1", name: "Everyday Checking", type: "depository",
+                    balance: 2440, minPayment: nil, nextDueDate: nil
+                ),
+                BankAccount(
+                    id: "acct-2", name: "Emergency Savings", type: "depository",
+                    balance: 5000, minPayment: nil, nextDueDate: nil
+                ),
+            ],
+            investments: [
+                InvestmentHolding(id: "sec-1", name: "Total Market Index", ticker: "VTI", value: 18_200),
+            ],
+            crypto: [
+                CryptoPosition(id: "btc", name: "Bitcoin", symbol: "BTC", amount: 0.03, valueUSD: 3100),
+            ],
+            defi: DefiTotal(totalUSD: 0),
+            debts: [
+                DebtItem(id: "debt-1", type: "credit card", balance: 4300, monthlyPayment: 180),
+            ]
+        ),
+        connections: NetWorthConnections(
+            coinbase: false, zerion: false, spinwheel: false, kraken: false,
+            ynab: false, kalshi: nil, alpaca: nil, truelayer: nil
+        ),
+        classes: classes,
+        excluded: ExcludedSummary(count: 0, classes: []),
+        generatedAt: asOf,
+        bankRefresh: nil
+        )
+    }
+
+    func getNetWorth() async throws -> NetWorthResponse { Self.fixture }
+
+    /// A refresh returns the same numbers rather than new ones. The fixture is
+    /// for rendering the tab, not for asserting that a refresh changed
+    /// anything; a test that needs that should inject its own double.
+    func refreshNetWorth() async throws -> NetWorthResponse { Self.fixture }
+}
 #endif

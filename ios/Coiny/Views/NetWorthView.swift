@@ -188,6 +188,13 @@ struct NetWorthView: View {
             Label("Add or manage accounts", systemImage: "plus.circle")
                 .font(.subheadline)
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                // Not the default accent. System blue is roughly 3.6:1 on this
+                // background and .subheadline is 15pt, so it is normal text
+                // needing 4.5:1 and it failed the audit as soon as the tab had
+                // real content to render. CoinyTheme.signal is 5.7:1 on white,
+                // and is the colour the rest of the app already uses for an
+                // action.
+                .foregroundStyle(CoinyTheme.signal)
         }
         .accessibilityIdentifier("wealth.manageAccounts")
     }
