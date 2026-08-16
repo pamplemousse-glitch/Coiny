@@ -111,7 +111,16 @@ struct SignInView: View {
             }
             .font(.footnote)
             .foregroundStyle(CoinyTheme.signal)
+            // fixedSize first: without it the label is laid out at the width the
+            // stack offers and truncates, which the audit reports as clipped
+            // text. Then frame(minHeight:) grows the layout but not the hit
+            // area, because a Button's tappable region is its label's bounds,
+            // so contentShape is what actually makes the 44pt frame hittable.
+            // Both defects were found by performAccessibilityAudit, which is
+            // the class of thing it was added to catch.
+            .fixedSize()
             .frame(minHeight: 44)
+            .contentShape(Rectangle())
             #endif
         }
     }
