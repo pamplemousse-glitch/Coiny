@@ -1,4 +1,5 @@
 import { createHash, createHmac } from 'node:crypto';
+import { convertToUsd } from '../fx/client.js';
 
 const BASE = 'https://api.kraken.com';
 
@@ -51,11 +52,29 @@ const ASSET_MAP: Record<string, string> = {
   XXDG: 'DOGE',
   ZUSD: 'USD',
   ZEUR: 'EUR',
+  ZGBP: 'GBP',
+  ZCAD: 'CAD',
+  ZJPY: 'JPY',
+  ZAUD: 'AUD',
+  ZCHF: 'CHF',
 };
 
-// Strip Kraken suffixes: .S (staked), .M (margin), .B (bonded), .F (futures)
+/** Fiat that must be converted through the FX rate, not looked up as a coin.
+ *  Anything here and not in ASSET_MAP would fall through to getSpotPrice,
+ *  fail, and be dropped from the total in silence. */
+const FIAT = new Set(['USD', 'EUR', 'GBP', 'CAD', 'JPY', 'AUD', 'CHF']);
+
+/** Strip Kraken's balance suffixes.
+ *
+ *  Per Kraken's own docs these are `.S` (staked), `.M` (opt-in rewards),
+ *  `.F` (automatically earning), `.B` (yield-bearing) and `.T` (tokenized).
+ *  `.T` was missing, so a tokenized balance normalized to something like
+ *  "ETH.T", failed the spot-price lookup, and was silently dropped from net
+ *  worth. Silently, because the only signal is a console.warn.
+ *
+ *  The previous comment also mislabelled `.M` as margin and `.F` as futures. */
 function normalizeAsset(raw: string): string {
-  const stripped = raw.replace(/\.(S|M|B|F)$/, '');
+  const stripped = raw.replace(/\.(S|M|B|F|T)$/, '');
   return ASSET_MAP[stripped] ?? stripped;
 }
 
@@ -82,9 +101,16 @@ export async function getTotalUsd(
       continue;
     }
 
-    if (asset === 'EUR') {
-      // Use a fixed approximation for EUR; skip if we don't want the complexity
-      total += amount * 1.08;
+    if (FIAT.has(asset)) {
+      // Was a hardcoded `amount * 1.08` for EUR and nothing at all for the
+      // other five fiats Kraken holds, which fell through to the spot-price
+      // lookup and were dropped. A stale constant in a net worth total is a
+      // wrong number presented as a real one, and it drifts further every day.
+      try {
+        total += await convertToUsd(amount, asset);
+      } catch {
+        console.warn(`[kraken] fx lookup failed for ${asset}, balance excluded`);
+      }
       continue;
     }
 
