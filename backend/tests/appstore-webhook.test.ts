@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { setTrustedRootsForTesting } from '../src/appstore/roots.js';
 import { PRODUCT_IDS } from '../src/appstore/types.js';
 import {
@@ -289,5 +289,73 @@ describe('POST /webhooks/appstore', () => {
     const res = await post(app, signedNotification(chain, { type: 'TEST', transaction: null }));
     expect(res.statusCode).toBe(200);
     await app.close();
+  });
+
+  // App Store Connect allows the sandbox and production notification URLs to
+  // be the same URL, so the same gate the client-report path uses has to apply
+  // here (appstore/environment.ts).
+  describe('environment enforcement', () => {
+    let savedAppEnv: 'local' | 'staging' | 'production';
+
+    beforeEach(async () => {
+      const { config } = await import('../src/config.js');
+      savedAppEnv = config.APP_ENV;
+    });
+
+    afterEach(async () => {
+      const { config } = await import('../src/config.js');
+      config.APP_ENV = savedAppEnv;
+    });
+
+    it('ignores a sandbox notification when the server is production', async () => {
+      const { config } = await import('../src/config.js');
+      const app = await makeApp();
+      const { appAccountToken } = await ensureEntitlementRow(testUserId);
+      config.APP_ENV = 'production';
+
+      const res = await post(
+        app,
+        signedNotification(chain, {
+          type: 'SUBSCRIBED',
+          subtype: 'INITIAL_BUY',
+          transaction: transactionPayload({ appAccountToken, originalTransactionId: 'orig_sandbox_wh' }),
+        }),
+      );
+      // 200, not an error: Apple retries anything else, and we will never
+      // apply this notification however many times it arrives.
+      expect(res.statusCode).toBe(200);
+
+      config.APP_ENV = savedAppEnv;
+      const effective = await getEffectiveEntitlement(testUserId);
+      expect(effective.tier).toBe('free');
+      await app.close();
+    });
+
+    it('applies a production notification when the server is production', async () => {
+      const { config } = await import('../src/config.js');
+      const app = await makeApp();
+      const { appAccountToken } = await ensureEntitlementRow(testUserId);
+      config.APP_ENV = 'production';
+
+      const res = await post(
+        app,
+        signedNotification(chain, {
+          type: 'SUBSCRIBED',
+          subtype: 'INITIAL_BUY',
+          environment: 'Production',
+          transaction: transactionPayload({
+            appAccountToken,
+            originalTransactionId: 'orig_prod_wh',
+            environment: 'Production',
+          }),
+        }),
+      );
+      expect(res.statusCode).toBe(200);
+
+      config.APP_ENV = savedAppEnv;
+      const effective = await getEffectiveEntitlement(testUserId);
+      expect(effective.tier).toBe('individual');
+      await app.close();
+    });
   });
 });

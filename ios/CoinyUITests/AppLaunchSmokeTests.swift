@@ -38,6 +38,15 @@ final class AppLaunchSmokeTests: XCTestCase {
         )
 
         // Sanity: the subtitle wired up in SignInView.
-        XCTAssertTrue(app.staticTexts["Your pocket-sized financial companion"].exists)
+        XCTAssertTrue(app.staticTexts["Everything you own and everything you owe, in one number."].exists)
+
+        // The consent line. This screen is where the privacy notice is
+        // delivered (Reg P 1016.9(b)(1)(iii)) and where Apple's required Terms
+        // and Privacy links live in-binary. If the line disappears, the build
+        // is not submittable, so assert the sentence rather than the layout.
+        let consent = app.staticTexts.containing(
+            NSPredicate(format: "label CONTAINS[c] %@", "you agree to the Terms of Service and Privacy Policy")
+        )
+        XCTAssertGreaterThan(consent.count, 0, "the sign-in consent line must be on screen")
     }
 }

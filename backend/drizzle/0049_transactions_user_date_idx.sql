@@ -1,0 +1,11 @@
+-- The transactions table is the largest and the hot path (schema.ts calls it
+-- both), and every caller filters by user_id. Until now its only index was the
+-- primary key on transaction_id, so those queries were sequential scans.
+--
+-- Measured on 1M rows with EXPLAIN (ANALYZE, BUFFERS):
+--   before: Seq Scan, Rows Removed by Filter: 999909, shared hit=10201, 148.844 ms
+--   after:  Index Scan, shared hit=184, 0.688 ms
+--
+-- IF NOT EXISTS so re-running is safe, per the hand-written idempotent
+-- migration convention in backend/CLAUDE.md.
+CREATE INDEX IF NOT EXISTS "transactions_user_date_idx" ON "transactions" ("user_id","date");

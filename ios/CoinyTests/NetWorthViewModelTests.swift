@@ -111,7 +111,7 @@ final class NetWorthViewModelTests: XCTestCase {
     private func makeVM(
         api: FakeAPI,
         cache: FakeCache = FakeCache(),
-        telemetry: TelemetryClient = TelemetryClient(transport: LogTelemetryTransport()),
+        telemetry: TelemetryClient = TelemetryClient(transport: LogTelemetryTransport(), isGranted: { true }),
         now: @escaping () -> Date = { Date() }
     ) -> NetWorthViewModel {
         NetWorthViewModel(api: api, cache: cache, telemetry: telemetry, now: now)
@@ -466,7 +466,7 @@ final class NetWorthViewModelTests: XCTestCase {
         fake.setRefreshResult(.success(NetWorthFixtures.response(total: 1)))
         fake.setResult(.success(NetWorthFixtures.response(total: 2)))
         let transport = RecordingTelemetryTransport()
-        let telemetry = TelemetryClient(transport: transport)
+        let telemetry = TelemetryClient(transport: transport, isGranted: { true })
         var currentTime = Date(timeIntervalSince1970: 1_000_000)
         let vm = makeVM(api: fake, telemetry: telemetry, now: { currentTime })
 
@@ -488,7 +488,7 @@ final class NetWorthViewModelTests: XCTestCase {
         cache.save(NetWorthFixtures.response(total: 11))
         fake.setResult(.failure(URLError(.notConnectedToInternet)))
         let transport = RecordingTelemetryTransport()
-        let telemetry = TelemetryClient(transport: transport)
+        let telemetry = TelemetryClient(transport: transport, isGranted: { true })
         let vm = makeVM(api: fake, cache: cache, telemetry: telemetry)
 
         await vm.load()

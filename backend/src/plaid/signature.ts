@@ -1,4 +1,4 @@
-import { createHash, webcrypto } from 'node:crypto';
+import { createHash, timingSafeEqual, webcrypto } from 'node:crypto';
 import { decodeProtectedHeader, importJWK, type JWK, jwtVerify } from 'jose';
 
 // jose's key type union spans CryptoKey | KeyObject | Uint8Array depending on the
@@ -83,8 +83,18 @@ export async function verifyPlaidSignature(
     return { ok: false, reason: 'expired' };
   }
 
-  const bodyHash = createHash('sha256').update(rawBody).digest('hex');
-  if (payload.request_body_sha256 !== bodyHash) return { ok: false, reason: 'body_mismatch' };
+  if (typeof payload.request_body_sha256 !== 'string') return { ok: false, reason: 'body_mismatch' };
+  // Plaid's verification page asks for a constant-time comparison here. Both
+  // sides are compared as their hex text rather than decoded bytes, because
+  // Buffer.from(x, 'hex') silently drops invalid characters and would make two
+  // different claims compare equal. timingSafeEqual throws on a length
+  // mismatch, so the lengths are checked first; that leaks only the length of
+  // the value the caller sent, which the caller already knows.
+  const expected = Buffer.from(createHash('sha256').update(rawBody).digest('hex'), 'utf8');
+  const provided = Buffer.from(payload.request_body_sha256, 'utf8');
+  if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) {
+    return { ok: false, reason: 'body_mismatch' };
+  }
 
   return { ok: true };
 }

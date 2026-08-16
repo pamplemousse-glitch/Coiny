@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { plaidTxToInternal } from '../plaid/adapter.js';
@@ -10,7 +11,7 @@ import type { RuleContext } from '../rules/engine.js';
 import { evaluateAll } from '../rules/engine.js';
 import { trackServerEvent } from '../store/analytics.js';
 import { upsertPlaidAccountBalances } from '../store/asset-cache.js';
-import { claimEvent } from '../store/events.js';
+import { claimEvent, claimWebhookDelivery, releaseWebhookDelivery } from '../store/events.js';
 import {
   disableItem,
   getItem,
@@ -149,9 +150,11 @@ export function registerPlaidWebhook(app: FastifyInstance): void {
 
       reply.status(200).send({ ok: true });
 
+      const bodyHash = createHash('sha256').update(rawBody).digest('hex');
+
       trackWebhookWork(async () => {
         try {
-          await dispatch(app, envelope);
+          await dispatch(app, envelope, bodyHash);
         } catch (err) {
           // A data call (sync, liabilities, recurring) failing with
           // ITEM_LOGIN_REQUIRED is detection in its own right: the item is
@@ -229,7 +232,75 @@ async function handleItemWebhook(app: FastifyInstance, webhook: z.infer<typeof I
   }
 }
 
-async function dispatch(app: FastifyInstance, envelope: PlaidWebhookEnvelope): Promise<void> {
+async function handleLiabilitiesWebhook(app: FastifyInstance, itemId: string): Promise<void> {
+  const item = await getItem(itemId);
+  if (!item?.userId || item.disabled) {
+    app.log.info({ item_id: itemId }, 'plaid liabilities webhook — item not found or disabled');
+    return;
+  }
+  const liabilities = await liabilitiesGet(item.accessToken);
+  await cacheLiabilities(item.userId, liabilities);
+  app.log.info(
+    {
+      item_id: itemId,
+      credit_count: liabilities.liabilities.credit?.length ?? 0,
+      student_count: liabilities.liabilities.student?.length ?? 0,
+    },
+    'plaid liabilities cached',
+  );
+  // bill_overdue (R-7.24): concerned, pushes once (the same-type cooldown is
+  // the "once"), one-tap-pay deep link is the client's job. Routed through
+  // the contract like every other event; the reason names no issuer and no
+  // amount because none is needed.
+  const overdueAccounts = liabilities.liabilities.credit?.filter((c) => c.is_overdue === true) ?? [];
+  if (overdueAccounts.length > 0) {
+    await performReactions(item.userId, [
+      { name: 'bill_overdue', reaction: reactionForEvent('bill_overdue', 'bill_overdue (credit account past due)') },
+    ]);
+  }
+}
+
+/**
+ * Runs `work` at most once per webhook body inside the claim window (1.7.4).
+ *
+ * Plaid legitimately redelivers, and its signature stays valid for five
+ * minutes, so a body that arrives twice must not apply its side effect twice:
+ * the health penalty and the push behind LIABILITIES/DEFAULT_UPDATE are not
+ * idempotent the way the transaction path is. On failure the claim is released
+ * so a redelivery still gets to do the work.
+ *
+ * Only the handlers that need it are wrapped. The transactions path is
+ * deliberately NOT guarded: `claimEvent` per transaction id and the sync cursor
+ * already make it idempotent, and a redelivery there is the normal way the rest
+ * of a paginated sync arrives.
+ */
+async function guardReplay(
+  app: FastifyInstance,
+  bodyHash: string,
+  envelope: PlaidWebhookEnvelope,
+  work: () => Promise<void>,
+): Promise<void> {
+  const key = `plaid_webhook:${bodyHash}`;
+  if (!(await claimWebhookDelivery(key))) {
+    app.log.info(
+      { webhook_type: envelope.webhook_type, webhook_code: envelope.webhook_code, item_id: envelope.item_id },
+      'plaid webhook replay suppressed',
+    );
+    return;
+  }
+  try {
+    await work();
+  } catch (err) {
+    // A failed release must not replace the original error: the caller reads it
+    // to detect ITEM_LOGIN_REQUIRED.
+    await releaseWebhookDelivery(key).catch((releaseErr) => {
+      app.log.error({ err: releaseErr }, 'failed to release plaid webhook replay claim');
+    });
+    throw err;
+  }
+}
+
+async function dispatch(app: FastifyInstance, envelope: PlaidWebhookEnvelope, bodyHash: string): Promise<void> {
   const { webhook_type, webhook_code, item_id } = envelope;
 
   if (webhook_type === 'ITEM') {
@@ -238,36 +309,12 @@ async function dispatch(app: FastifyInstance, envelope: PlaidWebhookEnvelope): P
       app.log.warn({ webhook_code, item_id }, 'plaid ITEM webhook failed validation, ignoring');
       return;
     }
-    await handleItemWebhook(app, parsed.data);
+    await guardReplay(app, bodyHash, envelope, () => handleItemWebhook(app, parsed.data));
     return;
   }
 
   if (webhook_type === 'LIABILITIES' && webhook_code === 'DEFAULT_UPDATE') {
-    const item = await getItem(item_id);
-    if (!item?.userId || item.disabled) {
-      app.log.info({ item_id }, 'plaid liabilities webhook — item not found or disabled');
-      return;
-    }
-    const liabilities = await liabilitiesGet(item.accessToken);
-    await cacheLiabilities(item.userId, liabilities);
-    app.log.info(
-      {
-        item_id,
-        credit_count: liabilities.liabilities.credit?.length ?? 0,
-        student_count: liabilities.liabilities.student?.length ?? 0,
-      },
-      'plaid liabilities cached',
-    );
-    // bill_overdue (R-7.24): concerned, pushes once (the same-type cooldown is
-    // the "once"), one-tap-pay deep link is the client's job. Routed through
-    // the contract like every other event; the reason names no issuer and no
-    // amount because none is needed.
-    const overdueAccounts = liabilities.liabilities.credit?.filter((c) => c.is_overdue === true) ?? [];
-    if (overdueAccounts.length > 0) {
-      await performReactions(item.userId, [
-        { name: 'bill_overdue', reaction: reactionForEvent('bill_overdue', 'bill_overdue (credit account past due)') },
-      ]);
-    }
+    await guardReplay(app, bodyHash, envelope, () => handleLiabilitiesWebhook(app, item_id));
     return;
   }
 

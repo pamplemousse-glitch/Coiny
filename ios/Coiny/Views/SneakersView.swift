@@ -22,7 +22,7 @@ struct SneakersView: View {
             if let error = vm.errorMessage {
                 Text(error)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(CoinyTheme.negative)
                     .padding(.top, 4)
             }
         }
@@ -33,7 +33,7 @@ struct SneakersView: View {
         HStack {
             Text("No sneakers added")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
             Spacer()
             Button { showingAdd = true } label: {
                 Label("Add", systemImage: "plus.circle").font(.caption)
@@ -54,16 +54,16 @@ struct SneakersView: View {
                         HStack(spacing: 6) {
                             Text(holding.sku)
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(CoinyTheme.ink2)
                             if let size = holding.size {
                                 Text("Sz \(size)")
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(CoinyTheme.ink2)
                             }
                             if holding.quantity > 1 {
                                 Text("×\(holding.quantity)")
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(CoinyTheme.ink2)
                             }
                         }
                     }
@@ -74,7 +74,7 @@ struct SneakersView: View {
                     } else {
                         Text("—")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(CoinyTheme.ink2)
                     }
                 }
                 .swipeActions {

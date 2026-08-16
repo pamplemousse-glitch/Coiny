@@ -37,7 +37,7 @@ struct ManualAssetsView: View {
                 HStack {
                     Text("No manual assets added")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(CoinyTheme.ink2)
                     Spacer()
                     Button { showingAdd = true } label: {
                         Label("Add", systemImage: "plus.circle")
@@ -55,7 +55,7 @@ struct ManualAssetsView: View {
                                 .lineLimit(1)
                             Text(categoryLabels[asset.category] ?? asset.category)
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(CoinyTheme.ink2)
                         }
                         Spacer()
                         Text(asset.selfReportedValueUsd, format: .currency(code: "USD"))
@@ -78,7 +78,7 @@ struct ManualAssetsView: View {
             if let error = vm.errorMessage {
                 Text(error)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(CoinyTheme.negative)
                     .padding(.top, 4)
             }
         }

@@ -160,6 +160,24 @@ describe('verifyPlaidSignature', () => {
     expect(result).toEqual({ ok: false, reason: 'body_mismatch' });
   });
 
+  it('returns body_mismatch, not a throw, when request_body_sha256 is the wrong length', async () => {
+    // The comparison is constant-time now, and timingSafeEqual throws on a
+    // length mismatch. The length guard in front of it is what keeps a short
+    // claim a rejection rather than a 500.
+    const token = await signBody(TEST_BODY, { request_body_sha256: 'deadbeef' });
+    const result = await verifyPlaidSignature(token, TEST_BODY);
+    expect(result).toEqual({ ok: false, reason: 'body_mismatch' });
+  });
+
+  it('returns body_mismatch when request_body_sha256 is absent', async () => {
+    const token = await new SignJWT({})
+      .setProtectedHeader({ alg: 'ES256', kid: TEST_KID, typ: 'JWT' })
+      .setIssuedAt()
+      .sign(privateKey);
+    const result = await verifyPlaidSignature(token, TEST_BODY);
+    expect(result).toEqual({ ok: false, reason: 'body_mismatch' });
+  });
+
   it('returns ok: true for a valid signature matching the body', async () => {
     const token = await signBody(TEST_BODY);
     const result = await verifyPlaidSignature(token, TEST_BODY);

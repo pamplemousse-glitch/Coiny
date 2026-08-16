@@ -274,7 +274,9 @@ describe('GET /health', () => {
 
     const res = await app.inject({ method: 'GET', url: '/health' });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ ok: true });
+    // Liveness only. The scheduler heartbeat is reported here but never gates
+    // the status code; /health/scheduler is the endpoint that can 503.
+    expect(res.json()).toEqual({ ok: true, scheduler_enabled: false, last_tick_at: null });
 
     await app.close();
   });

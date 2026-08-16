@@ -32,6 +32,54 @@ describe('claimEvent', () => {
   });
 });
 
+describe('claimWebhookDelivery', () => {
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  it('returns true for the first claim of a body hash', async () => {
+    const { claimWebhookDelivery } = await import('../src/store/events.js');
+    expect(await claimWebhookDelivery('plaid_webhook:hash_a')).toBe(true);
+  });
+
+  it('returns false on a re-claim inside the window', async () => {
+    const { claimWebhookDelivery } = await import('../src/store/events.js');
+    await claimWebhookDelivery('plaid_webhook:hash_b');
+    expect(await claimWebhookDelivery('plaid_webhook:hash_b')).toBe(false);
+  });
+
+  it('returns true again once the claim window has passed', async () => {
+    const { claimWebhookDelivery } = await import('../src/store/events.js');
+    const now = Date.now();
+    await claimWebhookDelivery('plaid_webhook:hash_c', now);
+    // A byte-identical LIABILITIES body arriving days later is a genuine
+    // update, not a replay: the claim must have expired by then.
+    expect(await claimWebhookDelivery('plaid_webhook:hash_c', now + 11 * 60 * 1000)).toBe(true);
+  });
+
+  it('atomically resolves concurrent claims of the same body hash', async () => {
+    const { claimWebhookDelivery } = await import('../src/store/events.js');
+    const results = await Promise.all([
+      claimWebhookDelivery('plaid_webhook:hash_race'),
+      claimWebhookDelivery('plaid_webhook:hash_race'),
+    ]);
+    expect(results.filter(Boolean).length).toBe(1);
+  });
+
+  it('releaseWebhookDelivery lets the same body be claimed again', async () => {
+    const { claimWebhookDelivery, releaseWebhookDelivery } = await import('../src/store/events.js');
+    await claimWebhookDelivery('plaid_webhook:hash_d');
+    await releaseWebhookDelivery('plaid_webhook:hash_d');
+    expect(await claimWebhookDelivery('plaid_webhook:hash_d')).toBe(true);
+  });
+
+  it('does not collide with a transaction id claimed by claimEvent', async () => {
+    const { claimEvent, claimWebhookDelivery } = await import('../src/store/events.js');
+    await claimEvent('txn_shared_table');
+    expect(await claimWebhookDelivery('plaid_webhook:txn_shared_table')).toBe(true);
+  });
+});
+
 describe('health score', () => {
   // Event names and magnitudes follow the R-7.24 taxonomy (the reaction
   // contract is the source of truth; tests/score.test.ts covers the detail).

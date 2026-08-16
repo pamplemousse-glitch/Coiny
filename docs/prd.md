@@ -461,7 +461,7 @@ Every user-facing line passes three tests: (1) **specific**, a number, a name, o
 | S-27 | Deletion confirm | "This deletes your account and data from Coiny and tells your banks to cut access. It cannot be undone." |
 | S-28 | Deletion failed | "That did not finish. Nothing was deleted. Try again." |
 | S-29 | Declared line label | "Self-reported <date>" |
-| S-30 | Paywall disclosure | "Coiny Individual, $99/year. Renews yearly until cancelled in Settings > Apple Account > Subscriptions. Includes 12 connections, 3 goals, all guardrails, full debt tooling." (values from §25; keep in sync by reference) |
+| S-30 | Paywall disclosure | "Coiny Individual, $99/year. Renews yearly until cancelled in Settings > Apple Account > Subscriptions. Includes 12 live bank connections." **The contents clause names only limits the server enforces**, which today is the connection limit alone: goals are capped at 3 for every tier, all seven guardrails are served to every tier, there is no history endpoint, and the debt layer is not tier-gated. Apple 3.1.2(c) makes the purchase screen a statement of fact, not of plan. Each item from §25.1 returns to this string in the same change that lands its gate. Source of truth: `ios/Coiny/Models/SubscriptionCatalog.swift`, `Tier.features` |
 | S-31 | Kraken key entry | "Create a key in Kraken with Query Funds permission only. Do not enable trading or withdrawal. Coiny reads balances and never places orders." (Built, `NetWorthView+WealthInlines.swift:432`) |
 | S-32 | Sleep state | (no copy; the speech line is empty) |
 | S-33 | Subscription reveal, header (P) | "This account pays for 7 things on repeat. $1,340 a year. Worth a look before we start?" (numbers computed) |

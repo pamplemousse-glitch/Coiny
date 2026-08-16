@@ -31,6 +31,16 @@ export const users = pgTable(
     appleRefreshToken: text('apple_refresh_token'),
     email: text('email'),
     displayName: text('display_name'),
+    // Reg P 1016.9(b)(1)(iii) delivers the privacy notice by requiring the
+    // consumer to acknowledge it as a necessary step to obtaining the service.
+    // The sign-in screen is that step; these two columns are the record of it.
+    // Null means the user predates the consent surface, not that they refused.
+    legalAcceptedAt: timestamp('legal_accepted_at', { withTimezone: true }),
+    legalVersion: text('legal_version'),
+    // The server half of the "Share usage data" toggle
+    // (docs/legal/consent-copy.md §2). A client-only flag would stop the client
+    // queue and leave every server-emitted event still writing.
+    analyticsOptOut: boolean('analytics_opt_out').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('users_apple_sub_idx').on(t.appleSub), uniqueIndex('users_google_sub_idx').on(t.googleSub)],
@@ -145,16 +155,25 @@ export const plaidItems = pgTable(
 //   and coarse categories keyed to pseudonymous user ids (emails are
 //   encrypted in `users`). Rows written before migration 0048 are plaintext
 //   until scripts/backfill-encrypt-pii.ts runs; decryptString tolerates them.
-export const transactions = pgTable('transactions', {
-  transactionId: text('transaction_id').primaryKey(),
-  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
-  accountId: text('account_id').notNull(),
-  merchantName: text('merchant_name'), // AES-256-GCM encrypted (see above)
-  amount: text('amount').notNull(), // plaintext ON PURPOSE (see above)
-  date: text('date').notNull(),
-  category: text('category'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const transactions = pgTable(
+  'transactions',
+  {
+    transactionId: text('transaction_id').primaryKey(),
+    userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    accountId: text('account_id').notNull(),
+    merchantName: text('merchant_name'), // AES-256-GCM encrypted (see above)
+    amount: text('amount').notNull(), // plaintext ON PURPOSE (see above)
+    date: text('date').notNull(),
+    category: text('category'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  // The comment above calls this the largest table and the hot path, and every
+  // caller filters by user_id (three of them additionally by date). Until 0049
+  // the only index was the primary key on transaction_id, so those queries were
+  // sequential scans. Measured on 1M rows: 148.8ms seq scan against 0.688ms
+  // index scan, shared buffers 10201 against 184.
+  (t) => [index('transactions_user_date_idx').on(t.userId, t.date)],
+);
 
 export const deviceTokens = pgTable('device_tokens', {
   token: text('token').primaryKey(),

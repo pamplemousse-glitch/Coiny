@@ -87,11 +87,11 @@ struct SpendingView: View {
                                 Spacer()
                                 Text(record.at, style: .relative)
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(CoinyTheme.ink2)
                             }
                             Text(record.reaction.reason)
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(CoinyTheme.ink2)
                         }
                         .padding(.vertical, 4)
                     }
@@ -105,7 +105,7 @@ struct SpendingView: View {
                                     Spacer()
                                     Text(override.category)
                                         .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(CoinyTheme.ink2)
                                 }
                             }
                             .onDelete { indexSet in
@@ -141,7 +141,7 @@ struct SpendingView: View {
         return VStack(alignment: .leading, spacing: 8) {
             Text("Top categories")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
             ForEach(Array(top), id: \.key) { cat, amount in
                 HStack {
                     Text(cat.replacingOccurrences(of: "_", with: " ").capitalized)
@@ -153,7 +153,11 @@ struct SpendingView: View {
             }
         }
         .padding()
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .background(CoinyTheme.surface, in: RoundedRectangle(cornerRadius: 10))
+        // `surface` is a near-white in light mode, so on the system background
+        // the card needs the hairline to read as a card at all. The translucent
+        // material it replaces got its edge from whatever was behind it.
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(CoinyTheme.rule, lineWidth: 1))
         .padding(.horizontal)
         .padding(.vertical, 4)
     }
@@ -163,37 +167,64 @@ struct SpendingView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Savings rate")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(CoinyTheme.ink2)
                 if let rate = s.savingsRate {
+                    // The rate is a level, not a delta, so it renders in ink
+                    // (design-direction 4.3 rule 1) and the band is carried by
+                    // the sentence beneath it. It used to be three hues with no
+                    // threshold shown, which meant the only thing distinguishing
+                    // good from bad was colour: identical in greyscale, and to
+                    // anyone with a red-green deficiency (WCAG 1.4.1).
                     Text("\(rate)%")
                         .font(.title2.weight(.bold).monospacedDigit())
-                        .foregroundStyle(rate >= 20 ? .green : rate >= 5 ? .orange : .red)
+                        .foregroundStyle(CoinyTheme.ink)
+                    Text(Self.savingsBandText(rate))
+                        .font(.caption)
+                        .foregroundStyle(CoinyTheme.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
                 } else {
                     Text("—")
                         .font(.title2.weight(.bold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(CoinyTheme.ink2)
+                    Text("Needs a month of transactions")
+                        .font(.caption)
+                        .foregroundStyle(CoinyTheme.ink2)
                 }
                 Text("30-day average")
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(CoinyTheme.ink2)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
                 Text("Spend")
-                    .font(.caption2).foregroundStyle(.secondary)
+                    .font(.caption2).foregroundStyle(CoinyTheme.ink2)
                 Text(s.monthlySpend, format: .currency(code: "USD"))
                     .font(.caption.monospacedDigit())
                 Text("Income")
-                    .font(.caption2).foregroundStyle(.secondary)
+                    .font(.caption2).foregroundStyle(CoinyTheme.ink2)
                     .padding(.top, 2)
                 Text(s.monthlyIncome, format: .currency(code: "USD"))
                     .font(.caption.monospacedDigit())
             }
         }
         .padding()
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .background(CoinyTheme.surface, in: RoundedRectangle(cornerRadius: 10))
+        // `surface` is a near-white in light mode, so on the system background
+        // the card needs the hairline to read as a card at all. The translucent
+        // material it replaces got its edge from whatever was behind it.
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(CoinyTheme.rule, lineWidth: 1))
         .padding(.horizontal)
         .padding(.vertical, 4)
+    }
+
+    /// The band, in words, with its own boundary printed. The 20 and the 5 were
+    /// previously implicit in the colour and nowhere in the text, so the number
+    /// could not be read against anything. Stated plainly and without praise or
+    /// blame: the PRD's second principle is never shame.
+    static func savingsBandText(_ rate: Int) -> String {
+        if rate >= 20 { return "At or above the 20% mark" }
+        if rate >= 5 { return "Between 5% and 20%" }
+        return "Under the 5% mark"
     }
 }
 

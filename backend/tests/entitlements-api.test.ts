@@ -131,6 +131,106 @@ describe('POST /api/entitlements/transaction', () => {
     await app.close();
   });
 
+  // The Apple chain proves the transaction is genuine, not that it was paid
+  // for. In production a Sandbox transaction is a free subscription for anyone
+  // with a tester account.
+  describe('environment enforcement', () => {
+    let savedAppEnv: 'local' | 'staging' | 'production';
+    let savedAllowSandbox: boolean;
+
+    beforeEach(async () => {
+      const { config } = await import('../src/config.js');
+      savedAppEnv = config.APP_ENV;
+      savedAllowSandbox = config.APPLE_ALLOW_SANDBOX_ENTITLEMENTS;
+    });
+
+    afterEach(async () => {
+      const { config } = await import('../src/config.js');
+      config.APP_ENV = savedAppEnv;
+      config.APPLE_ALLOW_SANDBOX_ENTITLEMENTS = savedAllowSandbox;
+    });
+
+    it('rejects a sandbox transaction when the server is production', async () => {
+      const { config } = await import('../src/config.js');
+      config.APP_ENV = 'production';
+      config.APPLE_ALLOW_SANDBOX_ENTITLEMENTS = false;
+
+      const app = await makeApp();
+      const jws = signJws(transactionPayload({ originalTransactionId: 'orig_sandbox_prod' }), chain);
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/entitlements/transaction',
+        headers: authHeader(),
+        payload: { jws },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toBe('environment_mismatch');
+
+      // And no entitlement was granted on the way to the rejection.
+      config.APP_ENV = savedAppEnv;
+      const read = await app.inject({ method: 'GET', url: '/api/entitlements', headers: authHeader() });
+      expect(read.json().tier).toBe('free');
+      await app.close();
+    });
+
+    it('accepts a production transaction when the server is production', async () => {
+      const { config } = await import('../src/config.js');
+      config.APP_ENV = 'production';
+      config.APPLE_ALLOW_SANDBOX_ENTITLEMENTS = false;
+
+      const app = await makeApp();
+      const jws = signJws(
+        transactionPayload({ originalTransactionId: 'orig_prod_prod', environment: 'Production' }),
+        chain,
+      );
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/entitlements/transaction',
+        headers: authHeader(),
+        payload: { jws },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().tier).toBe('individual');
+      await app.close();
+    });
+
+    // Local development, the test suite and TestFlight against staging only
+    // ever see sandbox transactions; the gate must not touch them.
+    it('accepts a sandbox transaction when the server is not production', async () => {
+      const { config } = await import('../src/config.js');
+      config.APP_ENV = 'staging';
+
+      const app = await makeApp();
+      const jws = signJws(transactionPayload({ originalTransactionId: 'orig_sandbox_staging' }), chain);
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/entitlements/transaction',
+        headers: authHeader(),
+        payload: { jws },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().tier).toBe('individual');
+      await app.close();
+    });
+
+    it('accepts a sandbox transaction in production during an App Review window', async () => {
+      const { config } = await import('../src/config.js');
+      config.APP_ENV = 'production';
+      config.APPLE_ALLOW_SANDBOX_ENTITLEMENTS = true;
+
+      const app = await makeApp();
+      const jws = signJws(transactionPayload({ originalTransactionId: 'orig_sandbox_review' }), chain);
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/entitlements/transaction',
+        headers: authHeader(),
+        payload: { jws },
+      });
+      expect(res.statusCode).toBe(200);
+      await app.close();
+    });
+  });
+
   it('refuses a subscription already bound to a different user', async () => {
     const app = await makeApp();
     const { findOrCreateUser } = await import('../src/store/users.js');

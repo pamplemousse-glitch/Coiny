@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
+import { isTransactionEnvironmentAllowed } from '../appstore/environment.js';
 import { verifyAppStoreJws } from '../appstore/jws.js';
 import {
   type NotificationPayload,
@@ -57,6 +58,20 @@ export function registerAppStoreWebhook(app: FastifyInstance): void {
     }
 
     const { tx, renewal } = decodeInnerPayloads(req, notification);
+
+    // Same environment gate as the client-report path (appstore/environment.ts).
+    // App Store Connect lets the sandbox and production notification URLs be
+    // the same URL, so a production server can be handed a sandbox renewal for
+    // a subscription nobody paid for. Acknowledged with 200 rather than an
+    // error: Apple would otherwise retry a notification we will never apply.
+    const environment = tx?.environment ?? notification.data?.environment ?? null;
+    if (environment !== null && !isTransactionEnvironmentAllowed(environment)) {
+      req.log.warn(
+        { notification_type: notification.notificationType, environment, app_env: config.APP_ENV },
+        'app store notification ignored, environment does not match this server',
+      );
+      return reply.status(200).send({ ok: true });
+    }
 
     // Idempotency: Apple retries delivery, so claim the notificationUUID
     // before applying. A duplicate is acknowledged without reprocessing.
