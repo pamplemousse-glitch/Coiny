@@ -138,7 +138,7 @@ struct ManageAccountsView: View {
                 Text(message)
             } actions: {
                 Button("Retry") { Task { await reload() } }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.coinyFilledInline)
             }
         }
     }
@@ -153,13 +153,13 @@ extension ManageAccountsView {
     private func bankSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
-                sectionHeader(title: "Bank", total: data.bank, icon: "building.columns.fill", color: .blue)
+                sectionHeader(title: "Bank", total: data.bank, icon: "building.columns.fill")
                 if let months = data.liquidCashMonths {
                     Divider().padding(.vertical, 6)
                     HStack {
                         Label("Emergency runway", systemImage: "shield.fill")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(CoinyTheme.ink2)
                         Spacer()
                         Text("\(months, specifier: "%.1f") mo")
                             .font(.caption.monospacedDigit())
@@ -168,7 +168,7 @@ extension ManageAccountsView {
                 if data.accounts.bank.isEmpty {
                     Text("No bank accounts linked")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(CoinyTheme.ink2)
                         .padding(.top, 8)
                 } else {
                     ForEach(data.accounts.bank) { account in
@@ -176,7 +176,7 @@ extension ManageAccountsView {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(account.name).font(.subheadline)
-                                Text(account.type.capitalized).font(.caption).foregroundStyle(.secondary)
+                                Text(account.type.capitalized).font(.caption).foregroundStyle(CoinyTheme.ink2)
                             }
                             Spacer()
                             Text(account.balance, format: .currency(code: "USD"))
@@ -191,11 +191,11 @@ extension ManageAccountsView {
     private func investmentsSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
-                sectionHeader(title: "Investments", total: data.investments, icon: "chart.bar.fill", color: .green)
+                sectionHeader(title: "Investments", total: data.investments, icon: "chart.bar.fill")
                 if data.accounts.investments.isEmpty {
                     Text("No investment accounts linked")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(CoinyTheme.ink2)
                         .padding(.top, 8)
                 } else {
                     ForEach(data.accounts.investments) { holding in
@@ -204,7 +204,7 @@ extension ManageAccountsView {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(holding.name ?? holding.ticker ?? "Holding").font(.subheadline)
                                 if let ticker = holding.ticker {
-                                    Text(ticker).font(.caption).foregroundStyle(.secondary)
+                                    Text(ticker).font(.caption).foregroundStyle(CoinyTheme.ink2)
                                 }
                             }
                             Spacer()
@@ -222,7 +222,7 @@ extension ManageAccountsView {
     private func cryptoSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
-                sectionHeader(title: "Crypto", total: data.crypto, icon: "bitcoinsign.circle.fill", color: .orange)
+                sectionHeader(title: "Crypto", total: data.crypto, icon: "bitcoinsign.circle.fill")
                 if !data.accounts.crypto.isEmpty {
                     ForEach(data.accounts.crypto) { position in
                         Divider().padding(.vertical, 6)
@@ -230,7 +230,7 @@ extension ManageAccountsView {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(position.name).font(.subheadline)
                                 Text("\(position.amount, specifier: "%.4f") \(position.symbol)")
-                                    .font(.caption).foregroundStyle(.secondary)
+                                    .font(.caption).foregroundStyle(CoinyTheme.ink2)
                             }
                             Spacer()
                             Text(position.valueUSD, format: .currency(code: "USD"))
@@ -247,7 +247,7 @@ extension ManageAccountsView {
     private func defiSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
-                sectionHeader(title: "DeFi", total: data.defi, icon: "link.circle.fill", color: .purple)
+                sectionHeader(title: "DeFi", total: data.defi, icon: "link.circle.fill")
                 Divider().padding(.vertical, 6)
                 ZerionView()
             }
@@ -257,7 +257,7 @@ extension ManageAccountsView {
     private func chainWalletsSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
-                sectionHeader(title: "On-chain", total: data.chainWallets, icon: "bitcoinsign.square.fill", color: .yellow)
+                sectionHeader(title: "On-chain", total: data.chainWallets, icon: "bitcoinsign.square.fill")
                 Divider().padding(.vertical, 6)
                 ChainWalletsView()
             }
@@ -267,7 +267,7 @@ extension ManageAccountsView {
     private func hyperliquidSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
-                sectionHeader(title: "Hyperliquid", total: data.hyperliquid, icon: "chart.line.uptrend.xyaxis", color: .indigo)
+                sectionHeader(title: "Hyperliquid", total: data.hyperliquid, icon: "chart.line.uptrend.xyaxis")
                 Divider().padding(.vertical, 6)
                 HyperliquidView()
             }
@@ -277,7 +277,7 @@ extension ManageAccountsView {
     private func nftSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
-                sectionHeader(title: "NFT Wallets", total: data.nft ?? 0, icon: "photo.stack", color: .purple)
+                sectionHeader(title: "NFT Wallets", total: data.nft ?? 0, icon: "photo.stack")
                 Divider().padding(.vertical, 6)
                 NftView()
             }
@@ -287,7 +287,7 @@ extension ManageAccountsView {
     private func alpacaSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
-                sectionHeader(title: "Alpaca", total: data.alpaca ?? 0, icon: "chart.bar.xaxis", color: .green)
+                sectionHeader(title: "Alpaca", total: data.alpaca ?? 0, icon: "chart.bar.xaxis")
                 Divider().padding(.vertical, 6)
                 AlpacaView()
             }
@@ -297,7 +297,7 @@ extension ManageAccountsView {
     private func manualAssetsSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
-                sectionHeader(title: "Other Assets", total: data.manual ?? 0, icon: "archivebox.fill", color: .brown)
+                sectionHeader(title: "Other Assets", total: data.manual ?? 0, icon: "archivebox.fill")
                 Divider().padding(.vertical, 6)
                 ManualAssetsView()
             }
@@ -309,7 +309,7 @@ extension ManageAccountsView {
     private func metalsSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
-                sectionHeader(title: "Precious Metals", total: data.metals, icon: "sparkles", color: .yellow)
+                sectionHeader(title: "Precious Metals", total: data.metals, icon: "sparkles")
                 Divider().padding(.vertical, 6)
                 MetalsView()
             }
@@ -319,7 +319,7 @@ extension ManageAccountsView {
     private func realEstateSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
-                sectionHeader(title: "Real Estate", total: data.realEstate, icon: "house.fill", color: .brown)
+                sectionHeader(title: "Real Estate", total: data.realEstate, icon: "house.fill")
                 Divider().padding(.vertical, 6)
                 RealEstateView()
             }
@@ -329,7 +329,7 @@ extension ManageAccountsView {
     private func vehiclesSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
-                sectionHeader(title: "Vehicles", total: data.vehicles, icon: "car.fill", color: .teal)
+                sectionHeader(title: "Vehicles", total: data.vehicles, icon: "car.fill")
                 Divider().padding(.vertical, 6)
                 VehiclesView()
             }
@@ -339,7 +339,7 @@ extension ManageAccountsView {
     private func sneakersSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
-                sectionHeader(title: "Sneakers", total: data.sneakers, icon: "figure.walk", color: .pink)
+                sectionHeader(title: "Sneakers", total: data.sneakers, icon: "figure.walk")
                 Divider().padding(.vertical, 6)
                 SneakersView()
             }
@@ -351,7 +351,7 @@ extension ManageAccountsView {
     private func discogsSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
-                sectionHeader(title: "Vinyl", total: data.vinyl ?? 0, icon: "music.note", color: .purple)
+                sectionHeader(title: "Vinyl", total: data.vinyl ?? 0, icon: "music.note")
                 Divider().padding(.vertical, 6)
                 DiscogsInlineView(vm: discogsVM)
             }
@@ -361,7 +361,7 @@ extension ManageAccountsView {
     private func krakenSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
-                sectionHeader(title: "Kraken", total: data.kraken, icon: "chart.line.uptrend.xyaxis.circle.fill", color: .cyan)
+                sectionHeader(title: "Kraken", total: data.kraken, icon: "chart.line.uptrend.xyaxis.circle.fill")
                 Divider().padding(.vertical, 6)
                 KrakenInlineView(vm: krakenVM, isConnected: data.connections.kraken, onConnect: {
                     showKrakenKeyEntry = true
@@ -376,7 +376,7 @@ extension ManageAccountsView {
     private func ynabSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
-                sectionHeader(title: "YNAB", total: data.ynab, icon: "dollarsign.circle.fill", color: .green)
+                sectionHeader(title: "YNAB", total: data.ynab, icon: "dollarsign.circle.fill")
                 Divider().padding(.vertical, 6)
                 YnabInlineView(vm: ynabVM, isConnected: data.connections.ynab)
             }
@@ -386,7 +386,7 @@ extension ManageAccountsView {
     private func kalshiSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
-                sectionHeader(title: "Kalshi", total: data.kalshi ?? 0, icon: "chart.pie.fill", color: .indigo)
+                sectionHeader(title: "Kalshi", total: data.kalshi ?? 0, icon: "chart.pie.fill")
                 Divider().padding(.vertical, 6)
                 KalshiInlineView(vm: kalshiVM, isConnected: kalshiVM.isConnected || (data.connections.kalshi ?? false))
             }
@@ -396,7 +396,7 @@ extension ManageAccountsView {
     private func polymarketSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
-                sectionHeader(title: "Polymarket", total: data.polymarket ?? 0, icon: "chart.xyaxis.line", color: .purple)
+                sectionHeader(title: "Polymarket", total: data.polymarket ?? 0, icon: "chart.xyaxis.line")
                 Divider().padding(.vertical, 6)
                 PolymarketInlineView(vm: polymarketVM)
             }
@@ -408,14 +408,14 @@ extension ManageAccountsView {
     private func debtsSection(_ data: NetWorthResponse) -> some View {
         GroupBox {
             VStack(spacing: 0) {
-                sectionHeader(title: "Debts", total: data.debts, icon: "creditcard.fill", color: .red)
+                sectionHeader(title: "Debts", total: data.debts, icon: "creditcard.fill")
                 if spinwheelVM.isConnected {
                     if let score = spinwheelVM.creditScore {
                         Divider().padding(.vertical, 6)
                         HStack {
                             Label("Credit score", systemImage: "chart.bar.fill")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(CoinyTheme.ink2)
                             Spacer()
                             Text("\(score)")
                                 .font(.caption.monospacedDigit().weight(.semibold))
@@ -427,7 +427,7 @@ extension ManageAccountsView {
                             HStack {
                                 Label("Credit utilization", systemImage: "percent")
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(CoinyTheme.ink2)
                                 Spacer()
                                 Text("\(utilization, specifier: "%.1f")%")
                                     .font(.caption.monospacedDigit())
@@ -448,15 +448,21 @@ extension ManageAccountsView {
 
     // MARK: - Shared header helper
 
-    func sectionHeader(title: String, total: Double, icon: String, color: Color) -> some View {
+    /// One heading treatment for all 25 sections. It used to take a per-section
+    /// `color:` and paint the heading text with it, which produced eleven hues
+    /// on one screen (design-direction 4.2: exactly one accent) and put 23 of
+    /// the 25 headings below 4.5:1. Headings are ink; the amount beside them is
+    /// ink too, because an amount is an absolute value (4.3 rule 1).
+    func sectionHeader(title: String, total: Double, icon: String) -> some View {
         HStack {
             Label(title, systemImage: icon)
                 .font(.headline)
-                .foregroundStyle(color)
+                .foregroundStyle(CoinyTheme.ink)
+                .accessibilityAddTraits(.isHeader)
             Spacer()
             Text(total, format: .currency(code: "USD"))
                 .font(.headline.monospacedDigit())
-                .foregroundStyle(.primary)
+                .foregroundStyle(CoinyTheme.ink)
         }
     }
 }

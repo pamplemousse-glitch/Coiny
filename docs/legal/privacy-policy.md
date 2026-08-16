@@ -165,8 +165,10 @@ The rules that matter:
 ## 5. Deleting your account, and your choices
 
 **Delete everything.** Settings > Delete account. This deletes your account and
-all data described above from our systems immediately, and tells Plaid to revoke
-our access to your linked banks. It cannot be undone.
+all data described above from our systems immediately, and revokes our access
+upstream everywhere a provider offers a way to do it: Plaid, TrueLayer, and
+Spinwheel, where deletion also removes the identity record behind your credit
+data. It cannot be undone.
 
 **Backups.** Deleted data can persist in our encrypted backups for up to 30
 days after deletion, after which it is gone from those too. Backups are never
@@ -175,13 +177,21 @@ used to restore a deleted account.
 **Disconnect one account.** Every connected account can be disconnected
 individually in the app, which deletes its stored credentials on our side.
 
-**Revoke access at the source.** For accounts connected by OAuth (Coinbase,
-YNAB, Discogs, TrueLayer), you can also revoke Coiny's authorization at any time
-in that provider's own security settings. We recommend doing this after deleting
-your account. (Attorney note and engineering note R-15.6: automatic upstream
-revocation for non-Plaid providers is planned but not yet built; this paragraph
-is written honestly around that gap and should be strengthened to "we revoke it
-for you" once R-15.6 ships.)
+**Revoke access at the source.** Some providers give us no way to end your
+authorization on your behalf. For those, revoke it yourself in the provider's
+own security settings, and do it after deleting your account:
+
+- **Kraken, Kalshi, Alpaca.** You created an API key and gave it to us. Delete
+  that key in the provider's dashboard. These are the connections where a key
+  can carry trading permissions, so they matter most.
+- **YNAB, Discogs.** Neither offers an endpoint that lets an app revoke its own
+  grant; revoke Coiny from your account settings there.
+
+(Engineering note R-15.6: TrueLayer and Spinwheel revocation are built and run
+automatically on deletion, so neither appears in this list. Coinbase is not
+listed either: today the connection uses a developer key of ours rather than an
+authorization of yours, so there is nothing at Coinbase for you to revoke. If a
+Coinbase OAuth flow ships, it belongs in one of these two groups.)
 
 **Push notifications.** Turn them off in iOS Settings at any time; the app works
 without them.

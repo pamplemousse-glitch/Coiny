@@ -114,7 +114,13 @@ So, binding rules for every row you mark VERIFIED:
    asserted pre-existing lint errors on a tree that had none.
 5. **A source that will not load is not evidence.** Mark the row UNVERIFIED
    with what would settle it.
-6. **Quote before you rule.** Never write a verdict about code or a document you
+6. **Prefer the live system to the repository's description of it.** For
+   anything that lives outside the source tree, query it: `gh api` for branch
+   protection, required checks, secrets and workflow runs; the Fly and Neon
+   CLIs or consoles for deployed configuration. A workflow file tells you what
+   was intended; `gh api` tells you what is enforced. The pilot's three best
+   findings came from that gap.
+7. **Quote before you rule.** Never write a verdict about code or a document you
    have not opened. Before judging an item, pull the specific lines it turns on
    and put them in the Evidence column. This is the reading counterpart of rule
    1: the same failure that produces a wrong command result produces a wrong
@@ -124,10 +130,14 @@ So, binding rules for every row you mark VERIFIED:
 </verification_discipline>
 
 <the_document>
-Write `docs/prelaunch-verification.md`. That is the only file you create, and
-you build it up part by part as you go rather than holding the whole thing in
-your head and writing it at the end. Do not modify code. Do not create planning
-notes, scratch files or a summary document alongside it.
+Write your assigned part to `docs/prelaunch-verification/<NN>-<slug>.md`, where
+`NN` is the part number zero-padded and `<slug>` names the subject, for example
+`01-security.md` or `03-interface-craft.md`. That is the only file you create,
+and you build it up subsection by subsection as you go rather than holding the
+whole thing in your head and writing it at the end. One part per file, because
+the full set runs to roughly a thousand rows and a single document that long
+gets skimmed rather than used. Do not modify code. Do not create planning notes,
+scratch files or a summary document alongside it.
 
 Every item in every section takes the same shape, and the shape is the point:
 
@@ -139,6 +149,11 @@ is wrong), **UNVERIFIED** (needs a device, an account, or a human), or
 
 Evidence is a `file:line`, a command and its output, or a link. "Looks fine" is
 not evidence.
+
+Where the true answer is narrower than one word, lead the cell with one of the
+four keywords and qualify after a comma: "VERIFIED, against accident but not
+against a compromised operator account". The keyword stays greppable and the
+qualification stays honest. Do not invent a fifth status.
 
 **Rows are dense, not discursive.** One sentence per cell. The Evidence column
 is a reference, not a paragraph: the anchor plus the few words that make it
@@ -195,6 +210,12 @@ asset-by-asset table with file:line evidence. Restate it as a STRIDE pass over
 the real trust boundaries: device to backend, backend to Plaid, backend to the
 other twenty integrations, Plaid and Apple to webhook endpoint, founder laptop
 to Fly and Neon, CI to production.
+
+The fixed row shape is the default, and 1.0 is its one exemption: a STRIDE pass
+is natively a matrix and an attacker ranking is natively a list. Render the
+threat model as assertions about what must be true where that works, and put the
+ranking in prose beneath. Do not contort a matrix into a table to satisfy a
+format rule.
 
 Name the attacker classes explicitly and rank them. At minimum: someone holding
 a stolen unlocked phone, someone holding the IPA and nothing else, someone with
@@ -269,13 +290,14 @@ Insufficient Cryptography.
   One page per group, each listing its controls. These are the section headings
   of Part 1.
 
-  https://mas.owasp.org/checklists/
-  The per-control checklists, which are the bridge from control to test. Each
-  control links to the MASTG tests that verify it. This is the page that turns
-  "we do secure storage" into a list of things you can actually run.
-
   https://mas.owasp.org/MASTG/tests/
-  The test index. Cite test IDs in the Evidence column.
+  The test index, grouped by MASVS category. This is the bridge from control to
+  test, and the page that turns "we do secure storage" into a list of things you
+  can actually run. Cite test IDs in the Evidence column.
+
+  NOTE: OWASP removed the per-control checklists on 2026-07-14
+  (https://mas.owasp.org/news/2026/07/14/checklists-removal/). Anything that
+  points you at mas.owasp.org/checklists is stale; use this index and MASWE.
 
   https://mas.owasp.org/MASTG/techniques/
   The techniques (how to dump the keychain, inspect the binary, intercept
@@ -345,8 +367,8 @@ handled rather than silently swallowed.
   phone" attacker class, and it is a user-side control Coiny can recommend but
   cannot enforce.
 
-  https://mas.owasp.org/checklists/MASVS-STORAGE/
-  The tests that verify all of the above.
+  https://mas.owasp.org/MASTG/tests/
+  Filter to the MASVS-STORAGE tests; they verify all of the above.
 
 ### 1.3 Encryption at rest, key management, and the field-level question
 
@@ -416,7 +438,7 @@ Address, specifically:
   shape Coiny would move to if rotation ever becomes real; say whether it
   should now or what triggers it.
 
-  https://www.latacora.com/blog/2018/04/03/cryptographic-right-answers/
+  https://www.latacora.com/blog/cryptographic-right-answers/
   Practitioner defaults for primitive choice. Use it to confirm AES-256-GCM and
   HMAC-SHA256 are the right calls here, and to avoid recommending anything
   exotic.
@@ -426,8 +448,8 @@ Address, specifically:
   application-level encryption with protection the platform provides anyway,
   or vice versa.
 
-  https://mas.owasp.org/checklists/MASVS-CRYPTO/
-  Client-side crypto tests, for anything the app encrypts locally.
+  https://mas.owasp.org/MASTG/tests/
+  Filter to MASVS-CRYPTO for anything the app encrypts locally.
 
 ### 1.4 Authentication, sessions, and what happens when a device is stolen
 
@@ -494,8 +516,8 @@ person has to maintain. Take a position.
   makes it replay-resistant. Read both before taking a position on device
   binding; the cost is mostly in this second page.
 
-  https://mas.owasp.org/checklists/MASVS-AUTH/
-  The tests.
+  https://mas.owasp.org/MASTG/tests/
+  Filter to MASVS-AUTH.
 
 ### 1.5 API authorisation, IDOR and BOLA, rate limiting, enumeration
 
@@ -558,8 +580,8 @@ none; confirm), and the Android network security config.
   https://developer.android.com/privacy-and-security/security-config
   The Android equivalent, including cleartext policy.
 
-  https://mas.owasp.org/checklists/MASVS-NETWORK/
-  The tests.
+  https://mas.owasp.org/MASTG/tests/
+  Filter to MASVS-NETWORK.
 
 ### 1.7 Webhook authenticity and replay resistance
 
@@ -630,7 +652,7 @@ Verify it by grepping the actual log call sites, not by trusting the rule.
   the safe default, but `.public` annotations and `print()` calls both defeat
   it. Verify which the code uses.
 
-  https://getpino.io/#/docs/redaction
+  https://github.com/pinojs/pino/blob/main/docs/redaction.md
   The backend logger's redaction mechanism. If rule 2 is enforced only by
   convention rather than by a redact path, say so.
 
@@ -744,6 +766,10 @@ Get the following right, because they are commonly stated wrong:
   Developer and GitHub, and record the result.
 
   https://www.ecfr.gov/current/title-16/part-314/section-314.4
+  NOTE: eCFR serves an anti-automation page to some clients. If a fetch returns
+  "Request Access", read the same section at
+  https://www.law.cornell.edu/cfr/text/16/314.4 rather than recording it
+  unverified; Cornell LII mirrors the text and is fetchable.
   The operative section: risk assessment, access controls, encryption, MFA,
   monitoring or annual penetration testing plus biannual vulnerability
   assessments, service provider oversight, incident response plan. Read the
@@ -816,9 +842,11 @@ them is not a security assessment, it is a wish list.
   brief so the conclusion is a judgment rather than an echo.
 
   https://mas.owasp.org/MASVS/11-MASVS-RESILIENCE/
-  OWASP's own framing, and the sentence that settles most of this subsection:
-  the absence of resilience measures is not in itself a vulnerability. They are
-  threat-specific additions on top of the other controls, not a baseline.
+  OWASP's own framing, and the sentences that settle most of this subsection,
+  quoted exactly as the page serves them: "The absence of these measures does
+  not in itself constitute a vulnerability. Instead, resilience controls provide
+  additional protection against threat-specific attacks." They are additions on
+  top of the other controls, not a baseline.
 
   https://mas.owasp.org/MASTG/knowledge/ios/MASVS-RESILIENCE/MASTG-KNOW-0084/
   Jailbreak detection specifically, including how it is bypassed. Useful for
@@ -1121,7 +1149,7 @@ finance-specific obligations a general checklist misses:
   Apple's specific requirements for in-app account deletion, which are stricter
   than "we have a delete button".
 
-  https://developer.apple.com/app-store/review/rejections/
+  https://developer.apple.com/distribute/app-review/
   Apple's own list of the most common rejection reasons, with 2.1 App
   Completeness the largest category. Directly relevant given the app currently
   cannot be got past the sign-in screen without a demo account.
@@ -1221,8 +1249,8 @@ Each item labelled **[Founder]** or **[Agent]**, grouped by gate:
 Ordered within each gate by lead time, so the long poles start first. If an item
 blocks another, say so.
 
-  https://mas.owasp.org/checklists/
-  Reuse the MASVS checklists as the security portion of the runbook rather than
+  https://mas.owasp.org/MASTG/tests/
+  Reuse the MASTG test IDs as the security portion of the runbook rather than
   inventing a parallel list, so a later reviewer can map runbook rows back to a
   standard.
 
@@ -1290,7 +1318,10 @@ why it was worth adding.
 </constraints>
 
 <anti_patterns>
-Do not duplicate `docs/launch-gap-analysis.md`. Cite it.
+Do not duplicate `docs/launch-gap-analysis.md`. Cite it. The boundary: a row
+that would leave a hole in your section if omitted belongs in your section, as
+one row that cites the gap analysis for the finding rather than re-deriving it.
+A row that exists only because the gap analysis found it does not.
 Do not restate `docs/obligations.md` §5. Extend and verify it.
 Do not produce a survey where a verdict is possible.
 Do not write an item that cannot be verified by a specific action.
@@ -1312,9 +1343,12 @@ section is about to do before it does it.
 This governs how you write a row, never whether a row exists. Never resolve a
 length concern by dropping an item, only by tightening the sentence.
 Completeness is counted in rows present; brevity is counted in words per row.
-Before you finish, confirm every part has a table, every bullet listed under a
-part has produced at least one row, and Part 7 references items by number
-instead of restating them.
+Before you finish, enumerate the bullets your part's brief lists and write a
+short bullet-to-row map at the end of the file, then confirm every bullet
+produced at least one row. Doing this as a written ledger rather than from
+memory is the point: in the pilot it surfaced two genuine gaps that had been
+missed. Also confirm every subsection has a table, and that the runbook
+references items by number instead of restating them.
 </length>
 
 <delegation>
@@ -1324,6 +1358,12 @@ round trip is exactly what this document is made of: the specific line, the
 exact command output, the reason a verdict is what it is. A summary from a
 subagent is not evidence, and a row built on one is an assertion wearing a
 citation.
+
+A wide sweep is usually a script, not a subagent. When the question is "does
+this hold across all 45 tables" or "does every view use the design token", write
+the ten-line grep or Python pass and read its output yourself. That is faster
+than briefing an agent, and the output is evidence you can paste into a row
+rather than a summary you have to trust.
 
 Use a subagent for genuinely independent, sizeable tracks: a wide sweep across
 many files where the output is a list of locations you will then read yourself.

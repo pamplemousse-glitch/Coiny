@@ -424,7 +424,10 @@ describe('item health store transitions', () => {
     expect(missing).toBeNull();
   });
 
-  it('unlinking marks items revoked as well as disabled', async () => {
+  // The disposal schedule says nothing retains a revoked credential, and every
+  // other provider drops its row at disconnect. The encrypted access token, the
+  // cursor and the institution all live on this row, so the row has to go.
+  it('unlinking deletes the item row, credential and all', async () => {
     mockAgent
       .get('https://sandbox.plaid.com')
       .intercept({ path: '/item/remove', method: 'POST' })
@@ -436,9 +439,47 @@ describe('item health store transitions', () => {
     expect(res.statusCode).toBe(204);
 
     const { getItem } = await import('../src/store/items.js');
-    const item = await getItem(TEST_ITEM_ID);
-    expect(item?.disabled).toBe(true);
-    expect(item?.status).toBe('revoked');
+    expect(await getItem(TEST_ITEM_ID)).toBeNull();
+    await app.close();
+  });
+
+  // Deleting the row must not cost the observability the disable path provides:
+  // item_state_changed is emitted while the row still exists (R-24.2).
+  it('unlinking still emits item_state_changed before the row goes', async () => {
+    mockAgent
+      .get('https://sandbox.plaid.com')
+      .intercept({ path: '/item/remove', method: 'POST' })
+      .reply(200, { request_id: 'req_rm' });
+
+    const { buildApp } = await import('../src/server.js');
+    const { listAnalyticsEvents } = await import('../src/store/analytics.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'DELETE', url: '/api/plaid/item', headers: authHeader() });
+    expect(res.statusCode).toBe(204);
+
+    const events = await listAnalyticsEvents(testUserId, 'item_state_changed');
+    expect(events.map((e) => e.properties)).toContainEqual({ state: 'revoked' });
+    await app.close();
+  });
+
+  // Right-to-disconnect cannot depend on Plaid being reachable: the credential
+  // has to go even when item/remove fails.
+  it('unlinking deletes the row even when item/remove fails', async () => {
+    mockAgent.get('https://sandbox.plaid.com').intercept({ path: '/item/remove', method: 'POST' }).reply(500, {
+      error_type: 'API_ERROR',
+      error_code: 'INTERNAL_SERVER_ERROR',
+      error_message: 'boom',
+      display_message: null,
+      request_id: 'req_rm',
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'DELETE', url: '/api/plaid/item', headers: authHeader() });
+    expect(res.statusCode).toBe(204);
+
+    const { getItem } = await import('../src/store/items.js');
+    expect(await getItem(TEST_ITEM_ID)).toBeNull();
     await app.close();
   });
 });

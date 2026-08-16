@@ -4,6 +4,8 @@ import { db } from '../db/client.js';
 import { petState, users } from '../db/schema.js';
 import { decryptString, encryptString } from '../util/crypto.js';
 import { trackServerEvent } from './analytics.js';
+import { forgetAppStoreIdentifiers } from './entitlements.js';
+import { clearUserEvents } from './events.js';
 
 export type UserRow = typeof users.$inferSelect;
 
@@ -87,8 +89,26 @@ export async function setAnalyticsOptOut(userId: string, optOut: boolean): Promi
   await db().update(users).set({ analyticsOptOut: optOut }).where(eq(users.id, userId));
 }
 
-// Deletes the user row. All child tables (sessions, pet_state, plaid_items,
-// transactions, reaction_history, device_tokens, category_overrides) cascade.
+// Deletes the user row (R-15.5). All child tables (sessions, pet_state,
+// plaid_items, transactions, reaction_history, device_tokens,
+// category_overrides) cascade off the user foreign key.
+//
+// Two tables carry no user foreign key and so cannot cascade, and both hold
+// something that identifies the person after the account is gone. They are
+// handled here rather than at the route so that every deletion path gets them:
+//
+//   processed_events: Plaid transaction ids, keyed by the id itself because
+//     webhooks are deduplicated before any user lookup. Cleared first, because
+//     the ids are resolved through `transactions`, which the cascade is about
+//     to destroy.
+//   app_store_notifications: Apple's stable per-subscriber identifier. The
+//     ledger row itself must survive (it is what makes a redelivered
+//     notification idempotent), so only the identifier is nulled.
+//
+// Both run before the delete and neither throws on an empty result, so a user
+// with no subscription and no synced transactions costs two no-op statements.
 export async function deleteUser(id: string): Promise<void> {
+  await clearUserEvents(id);
+  await forgetAppStoreIdentifiers(id);
   await db().delete(users).where(eq(users.id, id));
 }

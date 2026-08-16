@@ -21,7 +21,7 @@ struct OnboardingNumberScreen: View {
                 // (design-direction section 4.3 rule 1).
                 Text(MoneyText.usd(total))
                     .font(.system(size: displaySize, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(OnboardingPalette.ink)
+                    .foregroundStyle(CoinyTheme.ink)
                     .minimumScaleFactor(0.5)
                     .lineLimit(1)
                     .padding(.horizontal, 20)
@@ -30,7 +30,7 @@ struct OnboardingNumberScreen: View {
             }
             Text("This is an estimate. Let's make it real.")
                 .font(.subheadline)
-                .foregroundStyle(OnboardingPalette.inkSecondary)
+                .foregroundStyle(CoinyTheme.ink2)
                 .padding(.top, 8)
 
             ScrollView {
@@ -56,19 +56,19 @@ struct OnboardingNumberScreen: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(asset.assetClass.label)
                     .font(.body)
-                    .foregroundStyle(OnboardingPalette.ink)
+                    .foregroundStyle(CoinyTheme.ink)
                 Text("Self-reported today")
                     .font(.caption)
-                    .foregroundStyle(OnboardingPalette.inkSecondary)
+                    .foregroundStyle(CoinyTheme.ink2)
             }
             Spacer()
             Text(lineValue(for: asset))
                 .font(.body.weight(.medium).monospacedDigit())
-                .foregroundStyle(OnboardingPalette.ink)
+                .foregroundStyle(CoinyTheme.ink)
         }
         .padding(.vertical, 8)
         .overlay(alignment: .bottom) {
-            Rectangle().fill(OnboardingPalette.rule).frame(height: 1)
+            Rectangle().fill(CoinyTheme.rule).frame(height: 1)
         }
         .accessibilityElement(children: .combine)
     }
@@ -101,7 +101,7 @@ struct OnboardingConnectScreen: View {
                 Text("Plaid holds the credentials. We never see them.")
             }
             .font(.subheadline)
-            .foregroundStyle(OnboardingPalette.inkSecondary)
+            .foregroundStyle(CoinyTheme.ink2)
             .multilineTextAlignment(.center)
             .padding(.top, 20)
             .padding(.horizontal, 32)
@@ -109,7 +109,7 @@ struct OnboardingConnectScreen: View {
             if let errorMessage {
                 Text(errorMessage)
                     .font(.caption)
-                    .foregroundStyle(OnboardingPalette.signal)
+                    .foregroundStyle(CoinyTheme.signal)
                     .multilineTextAlignment(.center)
                     .padding(.top, 12)
                     .padding(.horizontal, 32)
@@ -136,10 +136,10 @@ struct OnboardingOfflineScreen: View {
             Spacer()
             Text("No connection")
                 .font(.title2.weight(.semibold))
-                .foregroundStyle(OnboardingPalette.ink)
+                .foregroundStyle(CoinyTheme.ink)
             Text("Connecting an account needs the network. Your sign-in is saved; nothing is lost.")
                 .font(.subheadline)
-                .foregroundStyle(OnboardingPalette.inkSecondary)
+                .foregroundStyle(CoinyTheme.ink2)
                 .multilineTextAlignment(.center)
                 .padding(.top, 8)
                 .padding(.horizontal, 32)
@@ -186,25 +186,25 @@ struct OnboardingRevealScreen: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.merchantName)
                     .font(.body)
-                    .foregroundStyle(OnboardingPalette.ink)
+                    .foregroundStyle(CoinyTheme.ink)
                 Text(item.cadenceLabel)
                     .font(.caption)
-                    .foregroundStyle(OnboardingPalette.inkSecondary)
+                    .foregroundStyle(CoinyTheme.ink2)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
                 Text(MoneyText.usdExact(item.amountUSD))
                     .font(.body.weight(.medium).monospacedDigit())
-                    .foregroundStyle(OnboardingPalette.ink)
+                    .foregroundStyle(CoinyTheme.ink)
                 Text("\(MoneyText.usd(item.annualisedUSD)) a year")
                     .font(.caption)
-                    .foregroundStyle(OnboardingPalette.inkSecondary)
+                    .foregroundStyle(CoinyTheme.ink2)
             }
         }
         .padding(.vertical, 8)
         .frame(minHeight: 44)
         .overlay(alignment: .bottom) {
-            Rectangle().fill(OnboardingPalette.rule).frame(height: 1)
+            Rectangle().fill(CoinyTheme.rule).frame(height: 1)
         }
         .accessibilityElement(children: .combine)
     }

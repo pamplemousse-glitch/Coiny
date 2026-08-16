@@ -27,7 +27,7 @@ struct SpinwheelView: View {
             Section {
                 if vm.debts.isEmpty {
                     Text("No debts found.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(CoinyTheme.ink2)
                 } else {
                     ForEach(vm.debts) { debt in
                         DebtRow(debt: debt)
@@ -68,7 +68,7 @@ private struct PhoneEntryView: View {
             if let error = vm.errorMessage {
                 Section {
                     Text(error)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(CoinyTheme.negative)
                         .font(.caption)
                 }
             }
@@ -103,7 +103,7 @@ private struct OtpEntryView: View {
             if let error = vm.errorMessage {
                 Section {
                     Text(error)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(CoinyTheme.negative)
                         .font(.caption)
                 }
             }
@@ -137,7 +137,7 @@ private struct DebtRow: View {
             if let monthly = debt.monthlyPayment {
                 Text("Monthly: \(monthly, format: .currency(code: "USD"))")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(CoinyTheme.ink2)
                     .monospacedDigit()
             }
         }

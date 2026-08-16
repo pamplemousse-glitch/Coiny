@@ -197,11 +197,9 @@ struct HomeView: View {
                 connectFlow.start()
             } label: {
                 Text(connectFlow.isLoading ? "Opening Link…" : "Connect an account")
-                    .font(.body.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .frame(minHeight: 50)
             }
-            .background(CoinyTheme.signalFill, in: RoundedRectangle(cornerRadius: 10))
-            .foregroundStyle(CoinyTheme.screen)
+            .buttonStyle(.coinyFilled)
             .disabled(connectFlow.isLoading)
             .accessibilityIdentifier("home.action.connect")
         case nil:

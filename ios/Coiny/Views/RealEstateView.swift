@@ -20,7 +20,7 @@ struct RealEstateView: View {
             if let error = vm.errorMessage {
                 Text(error)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(CoinyTheme.negative)
                     .padding(.top, 4)
             }
         }
@@ -31,7 +31,7 @@ struct RealEstateView: View {
         HStack {
             Text("No properties added")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
             Spacer()
             Button { showingAdd = true } label: {
                 Label("Add", systemImage: "plus.circle").font(.caption)
@@ -52,7 +52,7 @@ struct RealEstateView: View {
                         if asset.label != nil {
                             Text(asset.address)
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(CoinyTheme.ink2)
                                 .lineLimit(1)
                         }
                     }
@@ -63,7 +63,7 @@ struct RealEstateView: View {
                     } else {
                         Text("—")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(CoinyTheme.ink2)
                     }
                 }
                 .swipeActions {

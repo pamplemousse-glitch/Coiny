@@ -8,17 +8,29 @@ Fastify + TypeScript + Drizzle ORM. Deployed on Fly.io (`iad`). Postgres via Neo
 # Dev (from repo root — loads Keychain secrets)
 source bin/load-secrets.sh && pnpm --filter coiny-backend dev
 
-# Tests (all must pass before PR). Use --maxWorkers=3 locally: at full
+# Tests (all must pass before PR). Reduced parallelism locally: at full
 # parallelism PGlite's first migration per file exceeds the 60s hook timeout
 # and produces dozens of failures that are machine load, not real.
-pnpm --filter coiny-backend test -- --maxWorkers=3
+pnpm --filter coiny-backend test:local
+
+# NOTE: `pnpm ... test -- --maxWorkers=3`, which this file used to document,
+# SILENTLY IGNORES THE FLAG. The script is `vitest run`, so the pnpm `--`
+# separator renders it as `vitest run -- --maxWorkers=3`, and vitest parks
+# everything after `--` in argv['--'] rather than parsing it. Proof: an
+# invalid value passed after `--` runs the suite normally, while the same
+# value passed directly is rejected in 202ms before a single test runs. So
+# the documented mitigation for the load failures was a no-op, which is a
+# good candidate for why they never went away. Use test:local, or run
+# `npx vitest run --maxWorkers=3` from backend/.
 
 # What CI actually runs. Catches races that reduced parallelism hides.
 pnpm --filter coiny-backend test:coverage
 
-# Lint + format
-pnpm --filter coiny-backend check        # Biome check
-pnpm biome check --write backend/src/   # auto-fix
+# Lint + format. Run these from backend/, NOT the repo root: biome resolves a
+# different config from the root and reports files as unfixable that it fixes
+# correctly from here.
+pnpm --filter coiny-backend lint         # Biome check (there is no `check` script)
+cd backend && npx biome check --write src/   # auto-fix
 ```
 
 ## Key files

@@ -89,7 +89,7 @@ struct DebtPlanSection: View {
         } label: {
             Text(DebtPresentation.strategyName(strategy))
                 .font(.subheadline.weight(selected ? .semibold : .regular))
-                .foregroundStyle(selected ? CoinyTheme.screen : CoinyTheme.ink)
+                .foregroundStyle(selected ? CoinyTheme.onSignal : CoinyTheme.ink)
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .background(
                     selected ? AnyShapeStyle(CoinyTheme.signalFill) : AnyShapeStyle(CoinyTheme.surface),

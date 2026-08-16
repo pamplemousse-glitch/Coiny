@@ -9,6 +9,10 @@ struct NetWorthView: View {
     @Environment(NetWorthViewModel.self) private var vm
     @State private var repairVM = ConnectionRepairViewModel()
     @State private var showExcludedList = false
+    /// The flagship number. It was `.system(size: 48)`, the one string in the
+    /// app that ignored Dynamic Type entirely (WCAG 1.4.4); onboarding already
+    /// scaled the same figure this way at `OnboardingConnectScreens.swift`.
+    @ScaledMetric(relativeTo: .largeTitle) private var totalSize: CGFloat = 48
 
     var body: some View {
         NavigationStack {
@@ -48,7 +52,7 @@ struct NetWorthView: View {
                 Text(message)
             } actions: {
                 Button("Retry") { Task { await vm.load() } }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.coinyFilledInline)
             }
         }
     }
@@ -112,12 +116,14 @@ struct NetWorthView: View {
         VStack(spacing: 4) {
             Text("Net Worth")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
             // Absolute values are always ink, never coloured (design rule:
             // only deltas are coloured, and status never rides on colour).
             Text(data.total, format: .currency(code: "USD"))
-                .font(.system(size: 48, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary)
+                .font(.system(size: totalSize, weight: .bold).monospacedDigit())
+                .foregroundStyle(CoinyTheme.ink)
+                .minimumScaleFactor(0.5)
+                .lineLimit(1)
                 .accessibilityLabel(Text("Net worth \(data.total, format: .currency(code: "USD"))"))
             if !data.excluded.classes.isEmpty {
                 excludedFootnote(data)
@@ -136,7 +142,7 @@ struct NetWorthView: View {
                 Text(excludedFootnoteText(data.excluded.count))
                     .font(.footnote)
                     .underline()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(CoinyTheme.ink2)
                     .frame(minHeight: 44)
             }
             .accessibilityHint("Shows which accounts are not included in the total.")
@@ -144,7 +150,7 @@ struct NetWorthView: View {
                 ForEach(WealthPresenter.excludedDisplayNames(data.excluded), id: \.self) { name in
                     Text(name)
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(CoinyTheme.ink2)
                 }
             }
         }
@@ -162,7 +168,7 @@ struct NetWorthView: View {
                 .font(.subheadline)
             Text("Connect an account and your wealth shows up here, grouped and honest about its age.")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 8)
@@ -184,11 +190,11 @@ struct NetWorthView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(WealthPresenter.generatedLabel(data.generatedAt))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(CoinyTheme.ink2)
             if vm.bankRefreshCapped {
                 Text("Daily bank refresh limit reached. Other accounts updated.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(CoinyTheme.ink2)
             }
         }
         .padding(.vertical, 12)

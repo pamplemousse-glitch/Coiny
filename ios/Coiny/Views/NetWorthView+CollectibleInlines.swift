@@ -22,7 +22,7 @@ struct TradingCardsInlineView: View {
                 holdingsList
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
             }
         }
         .sheet(isPresented: $showingAdd) { addSheet }
@@ -30,7 +30,7 @@ struct TradingCardsInlineView: View {
 
     private var emptyView: some View {
         HStack {
-            Text("No trading cards added").font(.caption).foregroundStyle(.secondary)
+            Text("No trading cards added").font(.caption).foregroundStyle(CoinyTheme.ink2)
             Spacer()
             Button { showingAdd = true } label: { Label("Add", systemImage: "plus.circle").font(.caption) }
         }
@@ -45,16 +45,16 @@ struct TradingCardsInlineView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(holding.label ?? holding.cardName).font(.subheadline).lineLimit(1)
                         HStack(spacing: 4) {
-                            Text(holding.game.capitalized).font(.caption).foregroundStyle(.secondary)
-                            if let set = holding.setName { Text(set).font(.caption).foregroundStyle(.secondary) }
-                            if holding.quantity > 1 { Text("×\(holding.quantity)").font(.caption).foregroundStyle(.secondary) }
+                            Text(holding.game.capitalized).font(.caption).foregroundStyle(CoinyTheme.ink2)
+                            if let set = holding.setName { Text(set).font(.caption).foregroundStyle(CoinyTheme.ink2) }
+                            if holding.quantity > 1 { Text("×\(holding.quantity)").font(.caption).foregroundStyle(CoinyTheme.ink2) }
                         }
                     }
                     Spacer()
                     if let value = holding.valueUsd {
                         Text(value, format: .currency(code: "USD")).font(.subheadline.monospacedDigit())
                     } else {
-                        Text("—").font(.subheadline).foregroundStyle(.secondary)
+                        Text("—").font(.subheadline).foregroundStyle(CoinyTheme.ink2)
                     }
                 }
                 .swipeActions {
@@ -127,7 +127,7 @@ struct CoinsInlineView: View {
                 holdingsList
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red).padding(.top, 4)
+                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
             }
         }
         .sheet(isPresented: $showingAdd) { addSheet }
@@ -135,7 +135,7 @@ struct CoinsInlineView: View {
 
     private var emptyView: some View {
         HStack {
-            Text("No graded coins added").font(.caption).foregroundStyle(.secondary)
+            Text("No graded coins added").font(.caption).foregroundStyle(CoinyTheme.ink2)
             Spacer()
             Button { showingAdd = true } label: { Label("Add", systemImage: "plus.circle").font(.caption) }
         }
@@ -150,15 +150,15 @@ struct CoinsInlineView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(holding.label ?? (holding.coinName ?? "PCGS \(holding.pcgsNo)")).font(.subheadline).lineLimit(1)
                         HStack(spacing: 4) {
-                            Text("MS-\(holding.gradeNo)\(holding.plusGrade ? "+" : "")").font(.caption).foregroundStyle(.secondary)
-                            if holding.quantity > 1 { Text("×\(holding.quantity)").font(.caption).foregroundStyle(.secondary) }
+                            Text("MS-\(holding.gradeNo)\(holding.plusGrade ? "+" : "")").font(.caption).foregroundStyle(CoinyTheme.ink2)
+                            if holding.quantity > 1 { Text("×\(holding.quantity)").font(.caption).foregroundStyle(CoinyTheme.ink2) }
                         }
                     }
                     Spacer()
                     if let value = holding.valueUsd {
                         Text(value, format: .currency(code: "USD")).font(.subheadline.monospacedDigit())
                     } else {
-                        Text("—").font(.subheadline).foregroundStyle(.secondary)
+                        Text("—").font(.subheadline).foregroundStyle(CoinyTheme.ink2)
                     }
                 }
                 .swipeActions {
