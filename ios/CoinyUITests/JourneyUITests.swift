@@ -52,6 +52,18 @@ final class JourneyUITests: XCTestCase {
         }
     }
 
+    /// Every audit type but Dynamic Type. The expanded journey reports every
+    /// rung name as only partially supporting it, one row at a time, and the
+    /// fix is a layout pass over the whole ladder rather than a modifier:
+    /// accessibility rows 6.2.4 and 6.2.7 own it. The other five screens run
+    /// the full audit including Dynamic Type, so this is the one known gap and
+    /// it is written down rather than silently absent. Delete this argument
+    /// when the ladder handles the accessibility sizes.
+    func testExpandedJourneyPassesTheAccessibilityAudit() throws {
+        expand()
+        try auditAccessibility(Self.app, types: XCUIAccessibilityAuditType.all.subtracting(.dynamicType))
+    }
+
     func testExpandedJourneyShowsGoalsWithHonestNullPace() {
         expand()
 

@@ -28,4 +28,8 @@ final class ActivityTabUITests: XCTestCase {
         let hasContent = Self.app.collectionViews.firstMatch.exists || Self.app.tables.firstMatch.exists
         XCTAssertTrue(hasEmptyState || hasProgress || hasContent, "Activity tab should render content")
     }
+
+    func testActivityTabPassesTheAccessibilityAudit() throws {
+        try auditAccessibility(Self.app)
+    }
 }

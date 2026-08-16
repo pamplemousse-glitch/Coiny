@@ -98,7 +98,9 @@ struct ManageAccountsView: View {
 
         case let .loaded(data):
             ScrollView {
-                VStack(spacing: 24) {
+                // Zero spacing: CoinySection carries its own leading gap, so
+                // the container adding more would double it.
+                VStack(spacing: 0) {
                     bankSection(data)
                     investmentsSection(data)
                     cryptoSection(data)
@@ -132,14 +134,11 @@ struct ManageAccountsView: View {
             }
 
         case let .failed(message):
-            ContentUnavailableView {
-                Label("Couldn't load", systemImage: "exclamationmark.triangle")
-            } description: {
-                Text(message)
-            } actions: {
-                Button("Retry") { Task { await reload() } }
-                    .buttonStyle(.coinyFilledInline)
+            CoinyErrorLine(message: message, actionTitle: "Try again") {
+                Task { await reload() }
             }
+            .padding(.horizontal)
+            .frame(maxHeight: .infinity, alignment: .top)
         }
     }
 }
@@ -151,67 +150,39 @@ extension ManageAccountsView {
     // MARK: - Plaid sections
 
     private func bankSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Bank", total: data.bank, icon: "building.columns.fill")
-                if let months = data.liquidCashMonths {
-                    Divider().padding(.vertical, 6)
-                    HStack {
-                        Label("Emergency runway", systemImage: "shield.fill")
-                            .font(.caption)
-                            .foregroundStyle(CoinyTheme.ink2)
-                        Spacer()
-                        Text("\(months, specifier: "%.1f") mo")
-                            .font(.caption.monospacedDigit())
-                    }
-                }
-                if data.accounts.bank.isEmpty {
-                    Text("No bank accounts linked")
-                        .font(.caption)
-                        .foregroundStyle(CoinyTheme.ink2)
-                        .padding(.top, 8)
-                } else {
-                    ForEach(data.accounts.bank) { account in
-                        Divider().padding(.vertical, 6)
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(account.name).font(.subheadline)
-                                Text(account.type.capitalized).font(.caption).foregroundStyle(CoinyTheme.ink2)
-                            }
-                            Spacer()
-                            Text(account.balance, format: .currency(code: "USD"))
-                                .font(.subheadline.monospacedDigit())
-                        }
-                    }
+        CoinySection(title: "Bank", total: data.bank) {
+            if let months = data.liquidCashMonths {
+                AccountRow(
+                    title: "Emergency runway",
+                    detail: nil,
+                    trailing: "\(months.formatted(.number.precision(.fractionLength(1)))) mo"
+                )
+            }
+            if data.accounts.bank.isEmpty {
+                EmptyClassLine(text: "No bank accounts linked")
+            } else {
+                ForEach(data.accounts.bank) { account in
+                    AccountRow(
+                        title: account.name,
+                        detail: account.type.capitalized,
+                        trailing: account.balance.formatted(.currency(code: "USD"))
+                    )
                 }
             }
         }
     }
 
     private func investmentsSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Investments", total: data.investments, icon: "chart.bar.fill")
-                if data.accounts.investments.isEmpty {
-                    Text("No investment accounts linked")
-                        .font(.caption)
-                        .foregroundStyle(CoinyTheme.ink2)
-                        .padding(.top, 8)
-                } else {
-                    ForEach(data.accounts.investments) { holding in
-                        Divider().padding(.vertical, 6)
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(holding.name ?? holding.ticker ?? "Holding").font(.subheadline)
-                                if let ticker = holding.ticker {
-                                    Text(ticker).font(.caption).foregroundStyle(CoinyTheme.ink2)
-                                }
-                            }
-                            Spacer()
-                            Text(holding.value, format: .currency(code: "USD"))
-                                .font(.subheadline.monospacedDigit())
-                        }
-                    }
+        CoinySection(title: "Investments", total: data.investments) {
+            if data.accounts.investments.isEmpty {
+                EmptyClassLine(text: "No investment accounts linked")
+            } else {
+                ForEach(data.accounts.investments) { holding in
+                    AccountRow(
+                        title: holding.name ?? holding.ticker ?? "Holding",
+                        detail: holding.ticker,
+                        trailing: holding.value.formatted(.currency(code: "USD"))
+                    )
                 }
             }
         }
@@ -220,153 +191,93 @@ extension ManageAccountsView {
     // MARK: - Crypto sections
 
     private func cryptoSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Crypto", total: data.crypto, icon: "bitcoinsign.circle.fill")
-                if !data.accounts.crypto.isEmpty {
-                    ForEach(data.accounts.crypto) { position in
-                        Divider().padding(.vertical, 6)
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(position.name).font(.subheadline)
-                                Text("\(position.amount, specifier: "%.4f") \(position.symbol)")
-                                    .font(.caption).foregroundStyle(CoinyTheme.ink2)
-                            }
-                            Spacer()
-                            Text(position.valueUSD, format: .currency(code: "USD"))
-                                .font(.subheadline.monospacedDigit())
-                        }
-                    }
-                }
-                Divider().padding(.vertical, 6)
-                CoinbaseView()
+        CoinySection(title: "Crypto", total: data.crypto) {
+            ForEach(data.accounts.crypto) { position in
+                AccountRow(
+                    title: position.name,
+                    detail: "\(position.amount.formatted(.number.precision(.fractionLength(4)))) \(position.symbol)",
+                    trailing: position.valueUSD.formatted(.currency(code: "USD"))
+                )
             }
+            CoinbaseView()
         }
     }
 
     private func defiSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "DeFi", total: data.defi, icon: "link.circle.fill")
-                Divider().padding(.vertical, 6)
-                ZerionView()
-            }
+        CoinySection(title: "DeFi", total: data.defi) {
+            ZerionView()
         }
     }
 
     private func chainWalletsSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "On-chain", total: data.chainWallets, icon: "bitcoinsign.square.fill")
-                Divider().padding(.vertical, 6)
-                ChainWalletsView()
-            }
+        CoinySection(title: "On-chain", total: data.chainWallets) {
+            ChainWalletsView()
         }
     }
 
     private func hyperliquidSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Hyperliquid", total: data.hyperliquid, icon: "chart.line.uptrend.xyaxis")
-                Divider().padding(.vertical, 6)
-                HyperliquidView()
-            }
+        CoinySection(title: "Hyperliquid", total: data.hyperliquid) {
+            HyperliquidView()
         }
     }
 
     private func nftSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "NFT Wallets", total: data.nft ?? 0, icon: "photo.stack")
-                Divider().padding(.vertical, 6)
-                NftView()
-            }
+        CoinySection(title: "NFT Wallets", total: data.nft ?? 0) {
+            NftView()
         }
     }
 
     private func alpacaSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Alpaca", total: data.alpaca ?? 0, icon: "chart.bar.xaxis")
-                Divider().padding(.vertical, 6)
-                AlpacaView()
-            }
+        CoinySection(title: "Alpaca", total: data.alpaca ?? 0) {
+            AlpacaView()
         }
     }
 
     private func manualAssetsSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Other Assets", total: data.manual ?? 0, icon: "archivebox.fill")
-                Divider().padding(.vertical, 6)
-                ManualAssetsView()
-            }
+        CoinySection(title: "Other Assets", total: data.manual ?? 0) {
+            ManualAssetsView()
         }
     }
 
     // MARK: - Add-your-own asset sections
 
     private func metalsSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Precious Metals", total: data.metals, icon: "sparkles")
-                Divider().padding(.vertical, 6)
-                MetalsView()
-            }
+        CoinySection(title: "Precious Metals", total: data.metals) {
+            MetalsView()
         }
     }
 
     private func realEstateSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Real Estate", total: data.realEstate, icon: "house.fill")
-                Divider().padding(.vertical, 6)
-                RealEstateView()
-            }
+        CoinySection(title: "Real Estate", total: data.realEstate) {
+            RealEstateView()
         }
     }
 
     private func vehiclesSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Vehicles", total: data.vehicles, icon: "car.fill")
-                Divider().padding(.vertical, 6)
-                VehiclesView()
-            }
+        CoinySection(title: "Vehicles", total: data.vehicles) {
+            VehiclesView()
         }
     }
 
     private func sneakersSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Sneakers", total: data.sneakers, icon: "figure.walk")
-                Divider().padding(.vertical, 6)
-                SneakersView()
-            }
+        CoinySection(title: "Sneakers", total: data.sneakers) {
+            SneakersView()
         }
     }
 
     // MARK: - Connect-style sections
 
     private func discogsSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Vinyl", total: data.vinyl ?? 0, icon: "music.note")
-                Divider().padding(.vertical, 6)
-                DiscogsInlineView(vm: discogsVM)
-            }
+        CoinySection(title: "Vinyl", total: data.vinyl ?? 0) {
+            DiscogsInlineView(vm: discogsVM)
         }
     }
 
     private func krakenSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Kraken", total: data.kraken, icon: "chart.line.uptrend.xyaxis.circle.fill")
-                Divider().padding(.vertical, 6)
-                KrakenInlineView(vm: krakenVM, isConnected: data.connections.kraken, onConnect: {
-                    showKrakenKeyEntry = true
-                })
-            }
+        CoinySection(title: "Kraken", total: data.kraken) {
+            KrakenInlineView(vm: krakenVM, isConnected: data.connections.kraken, onConnect: {
+                showKrakenKeyEntry = true
+            })
         }
         .sheet(isPresented: $showKrakenKeyEntry) {
             KrakenKeyEntryView(vm: krakenVM)
@@ -374,71 +285,44 @@ extension ManageAccountsView {
     }
 
     private func ynabSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "YNAB", total: data.ynab, icon: "dollarsign.circle.fill")
-                Divider().padding(.vertical, 6)
-                YnabInlineView(vm: ynabVM, isConnected: data.connections.ynab)
-            }
+        CoinySection(title: "YNAB", total: data.ynab) {
+            YnabInlineView(vm: ynabVM, isConnected: data.connections.ynab)
         }
     }
 
     private func kalshiSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Kalshi", total: data.kalshi ?? 0, icon: "chart.pie.fill")
-                Divider().padding(.vertical, 6)
-                KalshiInlineView(vm: kalshiVM, isConnected: kalshiVM.isConnected || (data.connections.kalshi ?? false))
-            }
+        CoinySection(title: "Kalshi", total: data.kalshi ?? 0) {
+            KalshiInlineView(vm: kalshiVM, isConnected: kalshiVM.isConnected || (data.connections.kalshi ?? false))
         }
     }
 
     private func polymarketSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Polymarket", total: data.polymarket ?? 0, icon: "chart.xyaxis.line")
-                Divider().padding(.vertical, 6)
-                PolymarketInlineView(vm: polymarketVM)
-            }
+        CoinySection(title: "Polymarket", total: data.polymarket ?? 0) {
+            PolymarketInlineView(vm: polymarketVM)
         }
     }
 
     // MARK: - Debts + Performance
 
     private func debtsSection(_ data: NetWorthResponse) -> some View {
-        GroupBox {
-            VStack(spacing: 0) {
-                sectionHeader(title: "Debts", total: data.debts, icon: "creditcard.fill")
-                if spinwheelVM.isConnected {
-                    if let score = spinwheelVM.creditScore {
-                        Divider().padding(.vertical, 6)
-                        HStack {
-                            Label("Credit score", systemImage: "chart.bar.fill")
-                                .font(.caption)
-                                .foregroundStyle(CoinyTheme.ink2)
-                            Spacer()
-                            Text("\(score)")
-                                .font(.caption.monospacedDigit().weight(.semibold))
-                        }
-                    }
-                    if let utilization = spinwheelVM.creditUtilization {
-                        Divider().padding(.vertical, 6)
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Label("Credit utilization", systemImage: "percent")
-                                    .font(.caption)
-                                    .foregroundStyle(CoinyTheme.ink2)
-                                Spacer()
-                                Text("\(utilization, specifier: "%.1f")%")
-                                    .font(.caption.monospacedDigit())
-                            }
-                            ProgressView(value: min(utilization / 100, 1))
-                        }
+        CoinySection(title: "Debts", total: data.debts) {
+            if spinwheelVM.isConnected {
+                if let score = spinwheelVM.creditScore {
+                    AccountRow(title: "Credit score", detail: nil, trailing: "\(score)")
+                }
+                if let utilization = spinwheelVM.creditUtilization {
+                    VStack(alignment: .leading, spacing: 4) {
+                        AccountRow(
+                            title: "Credit utilization",
+                            detail: nil,
+                            trailing: "\(utilization.formatted(.number.precision(.fractionLength(1))))%"
+                        )
+                        ProgressView(value: min(utilization / 100, 1))
+                            .tint(CoinyTheme.signal)
                     }
                 }
-                Divider().padding(.vertical, 6)
-                SpinwheelInlineView(vm: spinwheelVM)
             }
+            SpinwheelInlineView(vm: spinwheelVM)
         }
     }
 
@@ -446,24 +330,53 @@ extension ManageAccountsView {
         PerformanceView()
     }
 
-    // MARK: - Shared header helper
+}
 
-    /// One heading treatment for all 25 sections. It used to take a per-section
-    /// `color:` and paint the heading text with it, which produced eleven hues
-    /// on one screen (design-direction 4.2: exactly one accent) and put 23 of
-    /// the 25 headings below 4.5:1. Headings are ink; the amount beside them is
-    /// ink too, because an amount is an absolute value (4.3 rule 1).
-    func sectionHeader(title: String, total: Double, icon: String) -> some View {
-        HStack {
-            Label(title, systemImage: icon)
-                .font(.headline)
-                .foregroundStyle(CoinyTheme.ink)
-                .accessibilityAddTraits(.isHeader)
-            Spacer()
-            Text(total, format: .currency(code: "USD"))
-                .font(.headline.monospacedDigit())
+// MARK: - Rows
+
+/// One account, holding or figure inside a section. Hairline underneath, 44pt
+/// minimum, the amount in ink whatever its sign: the same row Home, the journey
+/// and Debt use, which is why `sectionHeader` and its per-section SF Symbol are
+/// gone. Twenty-five glyphs on one screen were decoration carrying no
+/// information that the heading beside them did not already carry.
+struct AccountRow: View {
+    let title: String
+    let detail: String?
+    let trailing: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline)
+                    .foregroundStyle(CoinyTheme.ink)
+                if let detail {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(CoinyTheme.ink2)
+                }
+            }
+            Spacer(minLength: 8)
+            Text(trailing)
+                .font(.subheadline.monospacedDigit())
                 .foregroundStyle(CoinyTheme.ink)
         }
+        .padding(.vertical, 8)
+        .frame(minHeight: 44)
+        .overlay(alignment: .bottom) { CoinyHairline() }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// A class with nothing in it yet. One line, no illustration.
+struct EmptyClassLine: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.subheadline)
+            .foregroundStyle(CoinyTheme.ink2)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
     }
 }
 

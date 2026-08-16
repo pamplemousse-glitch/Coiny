@@ -18,9 +18,7 @@ struct RealEstateView: View {
                 assetsList
             }
             if let error = vm.errorMessage {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(CoinyTheme.negative)
+                CoinyErrorLine(message: error)
                     .padding(.top, 4)
             }
         }
@@ -43,7 +41,7 @@ struct RealEstateView: View {
     private var assetsList: some View {
         VStack(spacing: 0) {
             ForEach(vm.assets) { asset in
-                Divider().padding(.vertical, 6)
+                CoinyHairline().padding(.vertical, 8)
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(asset.label ?? asset.address)

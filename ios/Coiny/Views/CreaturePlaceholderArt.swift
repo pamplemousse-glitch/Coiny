@@ -15,12 +15,16 @@ struct CreatureArtView: View {
     let condition: CreatureCondition
     let stage: Int
     let size: WindowSize
+    /// The hatch moment: a crack across the stage-0 egg. Ignored at any other
+    /// stage, because there is no shell left to crack.
+    var hatching = false
 
     var body: some View {
         Canvas { context, canvasSize in
             let painter = CreaturePainter(
                 condition: condition,
                 stage: max(0, min(stage, 7)),
+                hatching: hatching,
                 bounds: CGRect(origin: .zero, size: canvasSize)
             )
             painter.draw(into: &context)
@@ -35,6 +39,7 @@ struct CreatureArtView: View {
 private struct CreaturePainter {
     let condition: CreatureCondition
     let stage: Int
+    let hatching: Bool
     let bounds: CGRect
 
     func draw(into context: inout GraphicsContext) {
@@ -42,20 +47,7 @@ private struct CreaturePainter {
 
         // Stage 0 is the egg: an oval with a single speck, no face.
         if stage == 0 && condition != .disconnected {
-            let egg = CGRect(
-                x: bounds.width * 0.28,
-                y: bounds.height * 0.18,
-                width: bounds.width * 0.44,
-                height: bounds.height * 0.62
-            )
-            context.stroke(Path(ellipseIn: egg), with: ink, lineWidth: max(bounds.width * 0.03, 1))
-            let speck = CGRect(
-                x: bounds.midX - bounds.width * 0.03,
-                y: bounds.height * 0.42,
-                width: bounds.width * 0.06,
-                height: bounds.width * 0.06
-            )
-            context.fill(Path(ellipseIn: speck), with: ink)
+            drawEgg(into: &context, ink: ink)
             return
         }
 
@@ -89,6 +81,49 @@ private struct CreaturePainter {
         }
 
         drawEyes(into: &context, bodyRect: bodyRect, ink: ink)
+    }
+
+    /// The egg, and the only place it is drawn. Onboarding used to carry its
+    /// own (`EggShape`, `CrackLine`, `HatchlingShape`) so the user watched one
+    /// creature hatch and was handed a different one on the next screen.
+    private func drawEgg(into context: inout GraphicsContext, ink: GraphicsContext.Shading) {
+        // Sleeping at stage 0 is the egg in the dark, before the first
+        // connection: same shell, less light.
+        if condition == .sleeping {
+            context.opacity = 0.55
+        }
+        let lineWidth = max(bounds.width * 0.03, 1)
+        let egg = CGRect(
+            x: bounds.width * 0.28,
+            y: bounds.height * 0.18,
+            width: bounds.width * 0.44,
+            height: bounds.height * 0.62
+        )
+        context.stroke(Path(ellipseIn: egg), with: ink, lineWidth: lineWidth)
+        let speck = CGRect(
+            x: bounds.midX - bounds.width * 0.03,
+            y: bounds.height * 0.42,
+            width: bounds.width * 0.06,
+            height: bounds.width * 0.06
+        )
+        context.fill(Path(ellipseIn: speck), with: ink)
+
+        guard hatching else { return }
+        var crack = Path()
+        let crackRect = CGRect(
+            x: egg.minX + egg.width * 0.06,
+            y: egg.minY + egg.height * 0.28,
+            width: egg.width * 0.88,
+            height: egg.height * 0.16
+        )
+        let step = crackRect.width / 6
+        crack.move(to: CGPoint(x: crackRect.minX, y: crackRect.midY))
+        for index in 1...6 {
+            let x = crackRect.minX + step * CGFloat(index)
+            let y = index.isMultiple(of: 2) ? crackRect.minY : crackRect.maxY
+            crack.addLine(to: CGPoint(x: x, y: y))
+        }
+        context.stroke(crack, with: ink, lineWidth: lineWidth)
     }
 
     /// Eyes are the whole expression, chosen so each state is unmistakable

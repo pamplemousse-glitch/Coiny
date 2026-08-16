@@ -60,8 +60,16 @@ targets:
           - CFBundleURLName: app.coiny.ios
             CFBundleURLSchemes:
               - coiny
-        CFBundleShortVersionString: "0.2.0"
-        CFBundleVersion: "1"
+        # Version, and the build number that goes with it.
+        #
+        # CFBundleShortVersionString is MARKETING_VERSION, edited by hand once
+        # per release; the release commit is tagged ios-v<version>.
+        # CFBundleVersion is stamped at build time from the git commit count by
+        # Scripts/stamp-build-number.sh, so a second TestFlight upload cannot
+        # collide with the first. The literal below is only the fallback for a
+        # build with no git history. See ios/README.md, "Versioning".
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         # Which backend this build talks to. Set per configuration below, so a
         # TestFlight build can point at staging without touching code.
         COINY_API_BASE_URL: $(COINY_API_BASE_URL)
@@ -85,6 +93,13 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.coiny.ios
+        # The one place the marketing version is written. Bump it in the same
+        # commit that gets tagged ios-v<version>; the build script fails the
+        # build if the tag on HEAD disagrees with this value.
+        MARKETING_VERSION: "0.2.0"
+        # Fallback only. Every build from a git checkout overwrites this with
+        # the commit count (Scripts/stamp-build-number.sh).
+        CURRENT_PROJECT_VERSION: "1"
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         # Which backend a device build talks to. Staging, for every
         # configuration, because production does not exist yet.
@@ -105,6 +120,13 @@ targets:
     dependencies:
       - package: LinkKit
         product: LinkKit
+    # Runs after every build phase and before code signing, rewriting
+    # CFBundleVersion inside the built product. Nothing in the source tree is
+    # touched, so a build never produces a dirty working copy.
+    postBuildScripts:
+      - name: Stamp CFBundleVersion from git
+        script: '"$SRCROOT/Scripts/stamp-build-number.sh"'
+        basedOnDependencyAnalysis: false
 
   CoinyTests:
     type: bundle.unit-test

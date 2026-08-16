@@ -81,9 +81,14 @@ private struct JourneyRowView: View {
                         .foregroundStyle(CoinyTheme.ink3)
                         .frame(width: 16, alignment: .leading)
 
+                    // The rung name wraps rather than truncating: the audit
+                    // reports a row that cannot grow as only partially
+                    // supporting Dynamic Type, and a truncated rung name is
+                    // the one thing on this screen that has to be readable.
                     Text(row.name)
                         .font(isActive ? .body.weight(.semibold) : .body)
                         .foregroundStyle(isActive ? CoinyTheme.ink : CoinyTheme.ink3)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     Spacer(minLength: 8)
 

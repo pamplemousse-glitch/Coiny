@@ -12,6 +12,7 @@ import SwiftUI
 struct PaywallView: View {
     @State private var selectedTier: SubscriptionCatalog.Tier = .individual
     @State private var annual = true
+    @State private var presentedDocument: LegalDocument?
 
     private var service: StoreKitService { .shared }
 
@@ -33,13 +34,12 @@ struct PaywallView: View {
                 disclosure
                 subscribeButton
                 restoreButton
+                legalLinks
                 if service.products.isEmpty {
                     unavailableNotice
                 }
                 if let message = service.lastErrorMessage {
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
+                    CoinyErrorLine(message: message)
                 }
             }
             .padding()
@@ -49,6 +49,9 @@ struct PaywallView: View {
         .task {
             await service.loadProducts()
             await service.refreshEntitlements()
+        }
+        .sheet(item: $presentedDocument) { document in
+            LegalDocumentView(document: document)
         }
     }
 }
@@ -175,6 +178,29 @@ private extension PaywallView {
             Task { await service.restorePurchases() }
         }
         .frame(maxWidth: .infinity, minHeight: 44)
+    }
+
+    /// Apple requires functional links to the Terms of Use and the privacy
+    /// policy on the screen that sells an auto-renewable subscription, not only
+    /// somewhere in the binary (App Review 3.1.2, and the Schedule 2 EULA
+    /// requirement). They sit under the buttons, at full size in the accent,
+    /// because a link a user has to hunt for is the FTC's "information hiding"
+    /// dark pattern whether or not it is technically present.
+    var legalLinks: some View {
+        HStack(spacing: 20) {
+            legalLink(.termsOfService, title: "Terms of Use")
+            legalLink(.privacyPolicy, title: "Privacy Policy")
+            Spacer(minLength: 0)
+        }
+        .accessibilityIdentifier("paywall.legal")
+    }
+
+    func legalLink(_ document: LegalDocument, title: String) -> some View {
+        Button(title) { presentedDocument = document }
+            .font(.footnote.weight(.medium))
+            .foregroundStyle(CoinyTheme.signal)
+            .frame(minHeight: 44)
+            .accessibilityHint("Opens \(title) in the app.")
     }
 
     var unavailableNotice: some View {

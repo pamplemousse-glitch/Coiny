@@ -22,7 +22,7 @@ struct TradingCardsInlineView: View {
                 holdingsList
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
+                CoinyErrorLine(message: error)
             }
         }
         .sheet(isPresented: $showingAdd) { addSheet }
@@ -40,7 +40,7 @@ struct TradingCardsInlineView: View {
     private var holdingsList: some View {
         VStack(spacing: 0) {
             ForEach(vm.holdings) { holding in
-                Divider().padding(.vertical, 6)
+                CoinyHairline().padding(.vertical, 8)
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(holding.label ?? holding.cardName).font(.subheadline).lineLimit(1)
@@ -127,7 +127,7 @@ struct CoinsInlineView: View {
                 holdingsList
             }
             if let error = vm.errorMessage {
-                Text(error).font(.caption).foregroundStyle(CoinyTheme.negative).padding(.top, 4)
+                CoinyErrorLine(message: error)
             }
         }
         .sheet(isPresented: $showingAdd) { addSheet }
@@ -145,7 +145,7 @@ struct CoinsInlineView: View {
     private var holdingsList: some View {
         VStack(spacing: 0) {
             ForEach(vm.holdings) { holding in
-                Divider().padding(.vertical, 6)
+                CoinyHairline().padding(.vertical, 8)
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(holding.label ?? (holding.coinName ?? "PCGS \(holding.pcgsNo)")).font(.subheadline).lineLimit(1)
