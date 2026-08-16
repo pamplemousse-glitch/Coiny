@@ -150,6 +150,10 @@ struct SettingsView: View {
                     }
                 }
             }
+            // A Form paints its own grouped background, so the theme colour has
+            // to replace it rather than sit behind it.
+            .scrollContentBackground(.hidden)
+            .background(CoinyTheme.screen)
             .navigationTitle("Settings")
             // An explicit dismiss, not just swipe-to-dismiss. A sheet whose
             // only exit is a drag gesture is unreachable for a VoiceOver user

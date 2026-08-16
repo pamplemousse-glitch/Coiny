@@ -168,9 +168,22 @@ private extension PaywallView {
         } label: {
             Text(service.purchaseInFlight ? "Processing purchase" : "Subscribe")
                 .frame(maxWidth: .infinity, minHeight: 44)
+                // Explicit fill and label, NOT the inherited accent.
+                //
+                // `.borderedProminent` paints itself in the accent colour and
+                // labels it white. Now that AccentColor is CoinyTheme.signal,
+                // that would be white on the dark-mode amber at 2.15:1, which
+                // is the exact failure the `onSignal` token exists to prevent
+                // (see CoinyTheme). signalFill + onSignal measure 5.03:1 in
+                // light and 8.38:1 in dark.
+                .foregroundStyle(CoinyTheme.onSignal)
+                .background(CoinyTheme.signalFill, in: RoundedRectangle(cornerRadius: 10))
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.plain)
         .disabled(selectedProduct == nil || service.purchaseInFlight)
+        // A disabled button that looks identical to an enabled one is a dead
+        // control; .plain does not dim it the way .borderedProminent did.
+        .opacity(selectedProduct == nil || service.purchaseInFlight ? 0.5 : 1)
     }
 
     var restoreButton: some View {

@@ -117,6 +117,7 @@
 		86D22A9708F301E2547024A1 /* LadderDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27FF0824715EFE9ECBB53996 /* LadderDecodingTests.swift */; };
 		8781E72C6D666183EE0F641D /* ChainWalletsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AF73651E65C599901D32475 /* ChainWalletsView.swift */; };
 		889025576576A1A9B2CADDF2 /* DeclaredAssets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B65907D7899776DD5BB0C2D /* DeclaredAssets.swift */; };
+		8A8F78B146E48EFF8A58F174 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B6A8E10BF5FCB655B6812F7B /* Assets.xcassets */; };
 		8B40FFC2A30781989B478D05 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD7615652A7C923819AF7530 /* HomeView.swift */; };
 		8C2AA7F42179EF88E24EB1AF /* CryptoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF2E7165A1DFF7A44B19A9F1 /* CryptoView.swift */; };
 		8CE69BC29AA540C1C0ABB97A /* CoinsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3447DE65D62287EFD555F19F /* CoinsViewModel.swift */; };
@@ -347,6 +348,7 @@
 		B1DFC9EF12AEA9D6D6E2FBDB /* MetalsViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalsViewModelTests.swift; sourceTree = "<group>"; };
 		B52F2C8D5C291C6BC47B2D5F /* SessionStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStoreTests.swift; sourceTree = "<group>"; };
 		B5A5E4FC4D5FB5C2DE9C278F /* Telemetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Telemetry.swift; sourceTree = "<group>"; };
+		B6A8E10BF5FCB655B6812F7B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B762515DECDB32F8A1DBCF9E /* CoinsViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoinsViewModelTests.swift; sourceTree = "<group>"; };
 		B8258ECA2A45F98233BFA406 /* API+Consent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Consent.swift"; sourceTree = "<group>"; };
 		B8611F52E6CEAC6B7A81804A /* PerformanceViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceViewModelTests.swift; sourceTree = "<group>"; };
@@ -551,6 +553,7 @@
 				97881861061CD8498DB94AFC /* Support */,
 				FEF95A507C0370119BC55804 /* ViewModels */,
 				819C9C0DFC070CFB95203214 /* Views */,
+				B6A8E10BF5FCB655B6812F7B /* Assets.xcassets */,
 				618CA9077B0177F449506F80 /* Coiny.entitlements */,
 				180CBB3806803A3DAFA9428B /* CoinyApp.swift */,
 				1660ED70D8D82F79BF9545EF /* Info.plist */,
@@ -828,6 +831,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8A8F78B146E48EFF8A58F174 /* Assets.xcassets in Resources */,
 				029C9DE542DE9EFC6C2B74E2 /* PrivacyInfo.xcprivacy in Resources */,
 				B5040095ED1C6559503D1EF3 /* privacy-policy.md in Resources */,
 				B8F35FD5262B17D96AB7111F /* terms-of-service.md in Resources */,
@@ -1133,7 +1137,7 @@
 		B7835D887C601CC0D9C229A7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CODE_SIGN_ENTITLEMENTS = Coiny/Coiny.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
@@ -1226,7 +1230,7 @@
 		DAA42EE91F81C33BF6846A4F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CODE_SIGN_ENTITLEMENTS = Coiny/Coiny.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
