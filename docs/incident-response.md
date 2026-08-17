@@ -119,13 +119,135 @@ it.
 
 ---
 
+## Restoring the database
+
+Runbook G1.26. Written 2026-08-17 from a real inspection of the Neon project,
+not from the Neon docs.
+
+### What you actually have
+
+Neon keeps a continuous history and can reconstruct the database as of any
+moment inside a retention window. There are no backup files to manage.
+
+**The window is 21,600 seconds. Six hours.** Read off the project itself
+(`history_retention_seconds`), not assumed. Two consequences worth internalising
+before you need them:
+
+- **Six hours is the entire backup strategy.** There is no nightly dump. Notice
+  a corruption on Tuesday that began Sunday and nothing here can help you. That
+  gap is runbook G1.27 and it is unbuilt.
+- The clock runs from now, continuously. It is not a nightly snapshot, so
+  "restore to 14:07" is a real thing you can ask for.
+
+Two branches exist: `production` (`br-rapid-haze-apncnynh`, the Neon default,
+despite no production app existing yet) and `staging`
+(`br-orange-mouse-ap2jgw62`, what `coiny-backend.fly.dev` uses).
+
+### The sentence this page exists to carry
+
+**A restore brings back rows, not readability.** Plaid access tokens, merchant
+names and recurring-stream descriptions are AES-256-GCM encrypted. If
+`DATA_ENCRYPTION_KEY` is lost or has been rotated, a perfect restore returns
+rows of permanently unreadable ciphertext, every bank connection has to be
+relinked, and on the Trial plan each relink burns one of ten connections that
+never come back.
+
+**The database and the key are two things that must both survive.** Restoring
+one without the other is not a recovery. See "Rotating things" above, which is
+the same fact from the other direction.
+
+### Doing it
+
+The Neon MCP server exposes no point-in-time restore: `create_branch` takes no
+timestamp and `reset_from_parent` resets to the parent's *current* state. So
+this is done from the console or with a Neon API key, not by an agent with the
+tools available today.
+
+1. **Capture the baseline first**, while the damaged database is still up. Run
+   the assertion query below and keep the output. Without it you cannot tell a
+   successful restore from a plausible-looking one.
+2. Neon console, project **Coiny**, the branch you are restoring, **Restore**.
+3. Choose a timestamp **before the damage and inside the six hours**. Let Neon
+   preserve the pre-restore state under a backup branch. That is the undo, and
+   the one thing that makes this reversible.
+4. **Start a timer.** The wall clock is the deliverable, not a detail: it is
+   your real recovery time, as opposed to the one anybody would guess.
+5. Re-run the assertion query and diff it against the baseline.
+6. If the restore crossed a migration boundary the schema moves too. Re-run
+   migrations (`node backend/dist/db/migrate-run.js`) before pointing the app at
+   it, or the app will expect tables the restored schema does not have.
+
+### The assertion query
+
+Answers three different questions: did the data come back, is it readable, is it
+current. Run it before and after, and diff.
+
+```sql
+SELECT (SELECT count(*) FROM users)            AS users,
+       (SELECT count(*) FROM plaid_items)      AS plaid_items,
+       (SELECT count(*) FROM transactions)     AS transactions,
+       (SELECT count(*) FROM net_worth_daily)  AS net_worth_daily,
+       (SELECT max(date) FROM net_worth_daily) AS max_nwd_date,
+       (SELECT count(*) FROM analytics_events) AS analytics_events;
+
+-- Readability, without printing a credential. Compare the md5 column
+-- before and after: identical means the ciphertext came back byte for byte.
+SELECT item_id,
+       md5(access_token) AS ciphertext_md5,
+       CASE
+         WHEN access_token ~ '^v[0-9]+:'                              THEN 'versioned envelope'
+         WHEN access_token ~ '^[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$'  THEN 'legacy unversioned envelope'
+         WHEN access_token LIKE 'access-%'                            THEN 'PLAINTEXT'
+         ELSE 'unknown'
+       END AS storage_form
+FROM plaid_items ORDER BY item_id;
+```
+
+Row counts within 5% of the baseline is the bar, allowing for writes between the
+restore point and the incident. `max(net_worth_daily.date)` should be today or
+yesterday; G1.26 says "yesterday", which is wrong on any day the scheduler has
+already run, and the real question it is asking is whether the series is current
+rather than ancient.
+
+### State as of 2026-08-17, from running the baseline half
+
+`staging` held: users 1, plaid_items 3, transactions 67, net_worth_daily 3,
+analytics_events 7, `max(net_worth_daily.date)` = 2026-08-17.
+
+**The restore half has NOT been rehearsed.** Do not read this section as
+evidence that a restore works here. Nobody has ever performed one.
+
+The baseline pass did find something the drill was not looking for, recorded
+here because it changes what the third assertion means:
+
+> **Two of the three `plaid_items` rows on `staging` hold PLAINTEXT access
+> tokens**, and the third holds a legacy unversioned envelope. All three predate
+> migration 0048 (2026-08-13), which introduced field encryption.
+> `scripts/backfill-encrypt-pii.ts` exists to fix exactly this and has evidently
+> never been run. `ALLOW_LEGACY_PLAINTEXT_READS` defaults to `true`, and its own
+> comment says to set it false once the backfill reports zero rewrites, which
+> has not happened.
+
+Impact today is nil: sandbox tokens against synthetic data. It matters for two
+reasons. It violates `.claude/rules/security.md` #4 as written, and it means the
+"one known access_token decrypts" assertion in G1.26 cannot pass on `staging`
+today, because two of the three are not encrypted at all.
+
+---
+
 ## What this page deliberately does not do
 
-Detection. Nothing alerts. Request logs carry no user or session id
-(audit §1.0.3), so "which account did this" is not answerable from logs today.
-Discovery will realistically come from a user, a vendor, or a researcher via
-`SECURITY.md` and `/.well-known/security.txt`. That is a known gap, written down
-rather than papered over.
+Detection. Nothing alerts. Discovery will realistically come from a user, a
+vendor, or a researcher via `SECURITY.md` and `/.well-known/security.txt`. That
+is a known gap, written down rather than papered over.
+
+One half of it closed on 2026-08-17: request logs now carry `user_id`, bound to
+the request logger in `plugins/auth.ts` (R-31.2), so **"which account did this"
+IS answerable from logs now**. Audit §1.0.3 and the sentence that used to sit
+here both predate that. Nothing still alerts, which is the larger half.
+
+Restoring is above rather than here, because it is now written down. It is still
+unrehearsed, which that section says plainly.
 
 ## Sources
 
