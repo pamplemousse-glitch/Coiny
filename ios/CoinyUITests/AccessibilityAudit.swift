@@ -54,6 +54,38 @@ extension XCTestCase {
         let tabBar = app.tabBars.firstMatch
         let tabBarFrame = tabBar.exists ? tabBar.frame : .null
 
+        /// How far ABOVE the tab bar iOS 26's scroll-edge effect reaches.
+        ///
+        /// iOS 26 draws a floating tab bar and fades content approaching it, so
+        /// a row that is nowhere near the bar's own rectangle is still
+        /// composited against a gradient. The audit measures that composite and
+        /// reports a contrast failure describing the effect rather than any
+        /// colour the app chose.
+        ///
+        /// 48 is derived from measurement, not taste. On macos-26 / Xcode 26.6
+        /// the bar sits at y=791 and the three reported elements were:
+        ///
+        ///     'GOALS'      y 753.7 to 768.0
+        ///     'Debts'      y 767.7 to 785.7
+        ///     '$4,300.00'  y 767.7 to 785.7
+        ///
+        /// so the affected band runs about 37pt above the bar. 48 covers that
+        /// with margin and still leaves the great majority of the screen
+        /// audited.
+        ///
+        /// This is an exclusion on EVIDENCE, which is the bar this file sets.
+        /// The colours underneath were measured independently and pass
+        /// comfortably: `DarkModeRenderingTests`
+        /// `testWealthRowTextStylesMeetContrastWhenRendered` renders those exact
+        /// (font, colour) pairs and gets 7.58:1 in light and 7.25:1 in dark
+        /// against an AA bar of 4.5:1. So the app is not the thing failing here.
+        ///
+        /// If Apple changes the effect, re-measure rather than raising this.
+        let scrollEdgeEffectHeight: CGFloat = 48
+        let tabBarExclusion = tabBarFrame.isNull
+            ? CGRect.null
+            : tabBarFrame.insetBy(dx: 0, dy: -scrollEdgeEffectHeight)
+
         try app.performAccessibilityAudit(for: types) { issue in
             // Elements the app does not draw cannot be fixed by the app.
             // `SignInWithAppleButton` is rendered by AuthenticationServices and
@@ -63,13 +95,14 @@ extension XCTestCase {
             if element?.elementType == .button, element?.identifier == "AuthenticationServices.AuthorizationAppleIDButton" {
                 return true
             }
-            // Scrolled content passing under the translucent tab bar is
-            // measured against the bar, so a row halfway behind it reports a
-            // contrast failure that describes the scroll position rather than
-            // any colour the app chose. The same row measures correctly once it
-            // is clear of the bar. Only contrast is excused: a hit region under
-            // the tab bar is a real defect and still fails.
-            if issue.auditType == .contrast, let frame = element?.frame, tabBarFrame.intersects(frame) {
+            // Scrolled content passing under the translucent tab bar, OR inside
+            // the scroll-edge effect above it on iOS 26, is measured against
+            // that composite rather than against the colour the app chose. The
+            // same row measures correctly once it is clear.
+            //
+            // Only contrast is excused: a hit region under the tab bar is a
+            // real defect and still fails.
+            if issue.auditType == .contrast, let frame = element?.frame, tabBarExclusion.intersects(frame) {
                 return true
             }
             // The composition bar legend (CompositionBarView) reports
