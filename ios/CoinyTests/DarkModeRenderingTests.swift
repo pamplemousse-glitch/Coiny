@@ -66,6 +66,56 @@ final class DarkModeRenderingTests: XCTestCase {
             return counts.max { $0.value < $1.value }?.key ?? background
         }
 
+        /// How many pixels in the image are exactly this colour.
+        func count(of color: RGB) -> Int {
+            pixels.filter { $0 == color }.count
+        }
+
+        /// The bounding box of every pixel matching `color`.
+        func boundingBox(of color: RGB) -> (minX: Int, minY: Int, maxX: Int, maxY: Int)? {
+            var minX = width, minY = height, maxX = -1, maxY = -1
+            for y in 0..<height {
+                for x in 0..<width where self.color(x: x, y: y) == color {
+                    minX = min(minX, x); maxX = max(maxX, x)
+                    minY = min(minY, y); maxY = max(maxY, y)
+                }
+            }
+            return maxX < 0 ? nil : (minX, minY, maxX, maxY)
+        }
+
+        /// The colour in `box` at `percentile` of distance-in-luminance from
+        /// `reference`.
+        ///
+        /// Not "the most common colour that isn't the fill". Antialiased text
+        /// has no dominant colour: the disabled Subscribe label is ~780 pixels
+        /// spread so thinly that its most common single value appears fewer
+        /// than 20 times, so a count threshold picks a fringe pixel next to
+        /// the glyphs and reports 1.05:1 for a label that is plainly legible.
+        /// A percentile ignores stray outliers without needing any one value
+        /// to repeat.
+        func percentileExtreme(
+            in box: (minX: Int, minY: Int, maxX: Int, maxY: Int),
+            from reference: RGB,
+            percentile: Double,
+            luminance: (RGB) -> Double
+        ) -> RGB? {
+            let minY = max(0, box.minY), maxY = min(height - 1, box.maxY)
+            let minX = max(0, box.minX), maxX = min(width - 1, box.maxX)
+            guard minY <= maxY, minX <= maxX else { return nil }
+            let referenceLuminance = luminance(reference)
+            var scored: [(color: RGB, distance: Double)] = []
+            for y in minY...maxY {
+                for x in minX...maxX {
+                    let c = color(x: x, y: y)
+                    scored.append((c, abs(luminance(c) - referenceLuminance)))
+                }
+            }
+            guard !scored.isEmpty else { return nil }
+            scored.sort { $0.distance < $1.distance }
+            let index = min(scored.count - 1, Int(Double(scored.count - 1) * percentile))
+            return scored[index].color
+        }
+
         /// The last row containing `color`, or nil. Used to find where the
         /// creature window ends so the search for the sign-in button starts
         /// below it rather than at a guessed fraction of the height, which
@@ -151,6 +201,11 @@ final class DarkModeRenderingTests: XCTestCase {
         for i in stride(from: 0, to: buffer.count, by: 4) {
             pixels.append(RGB(red: buffer[i], green: buffer[i + 1], blue: buffer[i + 2]))
         }
+        // A visible window is retained by UIKit, so without this each render
+        // leaves another key window behind for every later test in the target.
+        window.isHidden = true
+        window.rootViewController = nil
+
         return Raster(width: width, height: height, pixels: pixels, image: image)
     }
 
@@ -237,6 +292,25 @@ final class DarkModeRenderingTests: XCTestCase {
                 "\(scheme) Sign in with Apple fill \(fill.hex) is "
                 + "\(String(format: "%.2f", measured)):1 against screen \(screen.hex), below the 3:1 floor"
             )
+            // Identity and area, not contrast alone. Everything else in this
+            // band is text, and `ink` glyphs clear 3:1 comfortably, so if the
+            // button ever fails to appear in the capture the assertion above
+            // would pass while measuring a label. That is not hypothetical:
+            // `layer.render(in:)` omitted this exact control, and the band
+            // used to be a guessed fraction that found the creature window.
+            let expected: RGB = scheme == .dark
+                ? RGB(red: 255, green: 255, blue: 255)
+                : RGB(red: 0, green: 0, blue: 0)
+            XCTAssertEqual(
+                fill.hex, expected.hex,
+                "\(scheme) the largest fill below the window is \(fill.hex), not the Apple button "
+                + "(\(expected.hex)): the button is probably missing from the capture"
+            )
+            XCTAssertGreaterThan(
+                raster.count(of: fill), 10_000,
+                "\(scheme) Sign in with Apple covers only \(raster.count(of: fill))px; "
+                + "a 350x50 button is about 17,500, so this is not the button"
+            )
         }
     }
 
@@ -260,24 +334,63 @@ final class DarkModeRenderingTests: XCTestCase {
             // subscribe button renders in exactly the disabled state that was
             // shipping unreadable.
             let paywall = render(PaywallView(), scheme, named: "paywall-disabled")
-            let fill = paywall.dominantColor(
-                excluding: rgb(CoinyTheme.screen, scheme),
-                fromY: 0, toY: paywall.height
+            let field = rgb(CoinyTheme.field, scheme)
+
+            // Locate the button by its own fill rather than by taking the
+            // most common non-background colour of the whole image: the
+            // segmented picker and, if this screen ever gains a creature, the
+            // window are both large blocks that would win that contest.
+            guard let box = paywall.boundingBox(of: field), paywall.count(of: field) > 8_000 else {
+                return XCTFail(
+                    "\(scheme) disabled Subscribe: no `field` fill found, so the button is either "
+                    + "missing from the capture or is being faded rather than swapped"
+                )
+            }
+
+            // Both sides measured. Asserting a token label against a measured
+            // fill leaves the label unverified, and reverting only the
+            // foreground swap would leave white on `field` at 1.25:1 while
+            // still passing.
+            let label = paywall.percentileExtreme(
+                in: box, from: field, percentile: 0.99, luminance: luminance
             )
-            let label = rgb(CoinyTheme.ink2, scheme)
-            let measured = contrast(label, fill)
-            XCTAssertGreaterThanOrEqual(
-                measured, 4.5,
-                "\(scheme) disabled Subscribe: label \(label.hex) on the rendered fill \(fill.hex) "
-                + "is \(String(format: "%.2f", measured)):1"
+            XCTAssertNotNil(label, "\(scheme) disabled Subscribe: no label pixels inside the button")
+            if let label {
+                let measured = contrast(label, field)
+                XCTAssertGreaterThanOrEqual(
+                    measured, 4.5,
+                    "\(scheme) disabled Subscribe: label \(label.hex) on fill \(field.hex) "
+                    + "is \(String(format: "%.2f", measured)):1"
+                )
+            }
+
+            // The shape has to stay locatable too: `field` on `screen` is
+            // 1.08:1, so the disabled button carries an outline.
+            //
+            // Measured as contrast within the top border band, not as an exact
+            // match on `ink3`. A 1pt stroke on a rounded rect antialiases, so
+            // the token's exact value appears in zero pixels: the rendered
+            // core is #686D64 against an #858C81 token. Demanding the exact
+            // colour failed on a border that is plainly visible, which is the
+            // kind of assertion that gets deleted rather than believed.
+            let screen = rgb(CoinyTheme.screen, scheme)
+            // Above `box.minY`, not at it: `boundingBox` matched pixels that
+            // are exactly `field`, and the stroke is drawn over the fill's top
+            // edge, so the outline rows sit just outside that region.
+            let band = (minX: box.minX, minY: box.minY - 3, maxX: box.maxX, maxY: box.minY)
+            let outline = paywall.percentileExtreme(
+                in: band, from: screen, percentile: 0.9, luminance: luminance
             )
-            // The disabled fill has to be the token at full strength. A faded
-            // one lands somewhere between `field` and whatever is behind it.
-            XCTAssertEqual(
-                fill.hex, rgb(CoinyTheme.field, scheme).hex,
-                "\(scheme) disabled Subscribe fill is \(fill.hex), expected field "
-                + "\(rgb(CoinyTheme.field, scheme).hex): it is being faded rather than swapped"
-            )
+            XCTAssertNotNil(outline, "\(scheme) disabled Subscribe: no outline pixels above the fill")
+            if let outline {
+                let measured = contrast(outline, screen)
+                XCTAssertGreaterThanOrEqual(
+                    measured, 3.0,
+                    "\(scheme) disabled Subscribe outline \(outline.hex) is "
+                    + "\(String(format: "%.2f", measured)):1 against screen \(screen.hex): the control "
+                    + "has no locatable shape"
+                )
+            }
         }
     }
 

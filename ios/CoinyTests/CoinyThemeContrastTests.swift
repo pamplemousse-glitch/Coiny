@@ -46,20 +46,34 @@ final class CoinyThemeContrastTests: XCTestCase {
     /// screen and measuring an intention. A translucent colour shows the
     /// background through it, so treating it as opaque overstates its
     /// contrast: `Color.secondary.opacity(0.3)` scores well above AA measured
-    /// flat and renders at 1.55:1 on the dark screen, which is what the
+    /// flat and renders at 1.41:1 on the light screen, which is what the
     /// paywall's tier border actually was. Opaque colours have alpha 1 and are
     /// unaffected, so every assertion written before this still means what it
     /// meant.
+    ///
+    /// **Blend the gamma-encoded components, then linearise.** Core Animation
+    /// composites in the layer's colour space, which for ordinary sRGB content
+    /// is the encoded values, not linear light. Getting this backwards is not
+    /// academic: for `Color.secondary.opacity(0.3)` on white, blending in
+    /// linear light predicts `#EBEBEB` and scores the border at 4.01:1, a pass,
+    /// while the screen actually renders `#D9D9DA` at 1.41:1. Blending encoded
+    /// predicts `#DCDCDD`, which is the pixel that is really there. Verified
+    /// against a render rather than reasoned about, because the first version
+    /// of this helper made exactly that mistake and would have let the defect
+    /// it was written to catch straight through.
     private func luminance(_ foreground: Color, over background: Color, _ style: UIUserInterfaceStyle) -> Double {
         let fg = resolve(foreground, style)
         let bg = resolve(background, style)
         let alpha = Double(fg.opacity)
-        func blend(_ f: Float, _ b: Float) -> Double {
-            Double(f) * alpha + Double(b) * (1 - alpha)
+        func linearise(_ channel: Double) -> Double {
+            channel <= 0.04045 ? channel / 12.92 : pow((channel + 0.055) / 1.055, 2.4)
         }
-        return 0.2126 * blend(fg.linearRed, bg.linearRed)
-            + 0.7152 * blend(fg.linearGreen, bg.linearGreen)
-            + 0.0722 * blend(fg.linearBlue, bg.linearBlue)
+        func blend(_ f: Float, _ b: Float) -> Double {
+            linearise(Double(f) * alpha + Double(b) * (1 - alpha))
+        }
+        return 0.2126 * blend(fg.red, bg.red)
+            + 0.7152 * blend(fg.green, bg.green)
+            + 0.0722 * blend(fg.blue, bg.blue)
     }
 
     private func ratio(_ foreground: Color, on background: Color, _ style: UIUserInterfaceStyle) -> Double {
@@ -183,12 +197,6 @@ final class CoinyThemeContrastTests: XCTestCase {
         }
     }
 
-    /// `ink3` used to be exempted rather than fixed: 4.15:1 on `screen` in
-    /// light, permitted by the design document "at caption size and above".
-    /// WCAG's large-text exemption starts at 18pt, or 14pt bold, and `caption`
-    /// is 12pt, so the exemption did not exist and every rung code, unit label
-    /// and section heading in the app was below AA. It is now a real value, and
-    /// this test is the thing that stops the exemption coming back.
     /// WCAG 2.2 1.4.11: a boundary that carries state, rather than decorating,
     /// needs 3:1. The tier card's border is the whole of what says "this is the
     /// plan you picked", and `Color.secondary.opacity(0.3)` measured 1.55:1 on
@@ -225,6 +233,12 @@ final class CoinyThemeContrastTests: XCTestCase {
         }
     }
 
+    /// `ink3` used to be exempted rather than fixed: 4.15:1 on `screen` in
+    /// light, permitted by the design document "at caption size and above".
+    /// WCAG's large-text exemption starts at 18pt, or 14pt bold, and `caption`
+    /// is 12pt, so the exemption did not exist and every rung code, unit label
+    /// and section heading in the app was below AA. It is now a real value, and
+    /// this test is the thing that stops the exemption coming back.
     func testInk3ClearsAAOnEveryBackgroundItIsDrawnOn() {
         for (name, background) in [("screen", CoinyTheme.screen), ("surface", CoinyTheme.surface)] {
             assertAtLeastAA(CoinyTheme.ink3, on: background, .light, "light ink3 on \(name)")

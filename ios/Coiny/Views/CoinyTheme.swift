@@ -46,6 +46,16 @@ enum CoinyTheme {
     /// 5.03:1 and 8.38:1, so this token is mode-aware for a reason and must not
     /// be collapsed to a constant.
     static let onSignal = dynamic(light: 0xFFFFFF, dark: 0x151711)
+    /// The label color on a disabled filled button, whose fill is `field`.
+    ///
+    /// Named rather than spelled `ink2` at each site so the button style and
+    /// anything drawn inside the button cannot drift apart. They already had:
+    /// `OnboardingPrimaryButton` tinted its spinner `onSignal`, which is only
+    /// ever shown while the button is disabled, so once the disabled fill
+    /// became `field` the spinner measured 1.25:1 in light and 1.06:1 in dark
+    /// and the button read as an empty rectangle for the whole time it was
+    /// working. 6.29:1 on `field` in both schemes.
+    static let onDisabledFill = ink2
     /// Positive delta only, never a level (design-direction 4.3 rules 1, 2, 4).
     static let positive = dynamic(light: 0x3D6B44, dark: 0x8FBF8A)
     /// Negative delta, and the low band of the three graded health metrics.
@@ -90,13 +100,28 @@ struct CoinyFilledButtonStyle: ButtonStyle {
         var body: some View {
             configuration.label
                 .font(.body.weight(.semibold))
-                .foregroundStyle(isEnabled ? CoinyTheme.onSignal : CoinyTheme.ink2)
+                .foregroundStyle(isEnabled ? CoinyTheme.onSignal : CoinyTheme.onDisabledFill)
                 .padding(.horizontal, 20)
                 .frame(maxWidth: fillWidth ? .infinity : nil, minHeight: 44)
                 .background(
                     isEnabled ? CoinyTheme.signalFill : CoinyTheme.field,
                     in: RoundedRectangle(cornerRadius: 10)
                 )
+                // `field` on `screen` is 1.08:1, so a disabled button with no
+                // outline is a rectangle you cannot see: swapping the fill
+                // fixed the label and lost the shape. The outline keeps the
+                // control locatable while still reading as unavailable.
+                .overlay {
+                    if !isEnabled {
+                        // `onDisabledFill`, the same token as the label. A 1pt
+                        // stroke antialiases to roughly 60% of its colour at
+                        // 1x, so `ink3` measured 2.96:1 against the light
+                        // screen on the render despite computing 4.86:1. The
+                        // outline and the label are the same statement anyway.
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(CoinyTheme.onDisabledFill, lineWidth: 1)
+                    }
+                }
                 // Pressed still fades, because that is a momentary state a
                 // sighted user is looking straight at. Disabled does not: it
                 // can persist for the whole time the screen is open.
