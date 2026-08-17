@@ -26,7 +26,7 @@ afterEach(async () => {
 // interceptor the second attempt misses the mock and throws something that is
 // not a PlaidApiError, so the drain sees no error_code and the test measures
 // the harness rather than a vendor that is genuinely down.
-function mockItemRemove(reply: { status: number; body: unknown; times?: number }): void {
+function mockItemRemove(reply: { status: number; body: object; times?: number }): void {
   mockAgent
     .get('https://sandbox.plaid.com')
     .intercept({ path: '/item/remove', method: 'POST' })
