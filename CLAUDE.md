@@ -10,7 +10,13 @@ work on the critical path.
 
 **Read these first:**
 - `docs/vision.md`: strategy, positioning, honest state of the build, the hardware gate
-- `docs/prd-app-v2.md`: THE product spec. Onboarding, goal system, debt, mechanics, pricing
+- `docs/prd.md`: **THE product spec.** Adopted 2026-08-12. Its own header states it
+  supersedes `docs/prd-app-v2.md`, and that where it disagrees with any other
+  document it wins, except that `obligations.md` owns legal reasoning and
+  `engineering-budgets.md` owns performance and cost numbers. Requirement IDs
+  (`R-7.12`) live here, section-numbered, and `07-runbook.md` resolves them
+  unqualified. This line used to point at `prd-app-v2.md`, which sent a session
+  to write requirements into a superseded proposal on 2026-08-17.
 - `docs/design-direction.md`: art direction, the character brief, the anti-AI-slop system
 - `docs/global-integration-map.md`: integrations by region, entity unlock checklist, cost model
 - `docs/market-research-2026-08.md`: competitors, pricing, why people quit. §1 argues against the product
@@ -25,7 +31,9 @@ work on the critical path.
 
 **Do not cite these. They are hardware-era and contradict the live spec:**
 `handoff.md`, `architecture.md`, `security.md` (use `.claude/rules/security.md`),
-`product-brief.md` (superseded by the PRD), `business-plan.md` (rests on a churn
+`prd-app-v2.md` (still marked "Proposed"; superseded by `docs/prd.md` on
+2026-08-12, keep it for the app-first argument in §0, do not add requirements to
+it), `product-brief.md` (superseded by the PRD), `business-plan.md` (rests on a churn
 statistic that could not be traced to any source), `tech-stack.md`,
 `implementation-plan.md`, `proposed-changes.md`, `feature-backlog.md`,
 `stack-map.md`, `launch-readiness.md`, `14-day-sprint.md`, `3-day-sprint.md`,

@@ -589,7 +589,7 @@ The full threat model with per-asset analysis is `docs/obligations.md` §5; the 
 | Session integrity | Token theft | Hash-only storage, TTLs (R-15.2) | R-15.3 (revoke-all) |
 | Financial data at rest | Plaintext transaction rows and credit score | Open | R-13.4 |
 
-Logging hygiene is a standing rule, not a requirement row: no merchant names, amounts, emails, or provider `sub` values in any log line; pseudonymous IDs only. The reaction dispatcher and logger serializers already comply; keep them compliant.
+Logging hygiene is §31, which replaced the sentence that used to sit here. That sentence called it "a standing rule, not a requirement row" and said the logger serializers "already comply". The first half was a category error, a rule with no ID gets no test and no runbook row, and the second half was wrong: `plugins/logger.ts` has no `redact` list, so the rule held only by author convention (`01-security.md` 1.8.3). R-31.1 to R-31.14 make it testable.
 
 ## 22. Privacy: collected, retained, deleted, exported
 
@@ -744,6 +744,181 @@ TestFlight to 30.
 **Months 4 to 6:** portfolio guardrails (§7.7); multi-currency + UK groundwork (§12, §3.3); index-based property/vehicle valuation; widgets and Live Activities; Android to parity; stages 6 to 7 and cosmetics; export.
 
 Hardware: not on this roadmap at all; §3.2's gate is the only sentence about it that matters.
+
+---
+
+## 31. Log redaction, error handling, and what the client can see
+
+Added 2026-08-17. Three things forced it. `07-runbook.md` G1.21 schedules a
+logging pass with no requirement row behind it. §21 of this document asserted
+that logging hygiene "is a standing rule, not a requirement row" and that "the
+logger serializers already comply", which `01-security.md` 1.8.3 contradicts:
+the rule holds by author convention, and `plugins/logger.ts` has no `redact`
+path list at all. That sentence in §21 has been corrected and now points here.
+And a finding from 2026-08-17, §31.2, that no redaction list can reach, because
+the leak lives inside a string value rather than under a key.
+
+`.claude/rules/security.md` #2 is the rule this section makes testable. Nothing
+here weakens it. The regulatory backing is narrow and worth stating once:
+Safeguards 314.4(c)(8) wants monitoring of authorised-user activity, which is
+why §31.1 adds `user_id` rather than only removing fields; 314.4(c)(6) disposal
+and the state breach statutes (`docs/obligations.md` §1) are what make a log
+line containing a name plus an account detail a notifiable record rather than an
+untidy one.
+
+### 31.1 Server log redaction
+
+**R-31.1** [Unbuilt, MAJOR before the first tester] `backend/src/plugins/logger.ts`
+gains a pino `redact` path list. Today the file is fourteen lines of serializers
+and nothing else, so every log line in the codebase is safe only because every
+author has so far chosen well. The list censors, at minimum: `req.headers.authorization`,
+any `access_token` / `public_token` / `link_token` / `refresh_token` /
+`identity_token`, `merchant_name` and `merchantName`, `institution_name` and
+`institutionName`, `email`, `sub`, `amount`, `balance`, `mask`, `last4`,
+`creditorName`, `credit_score`. Pino matches by key path, not by key name, so the
+wildcard depth of each entry is a thing to prove, never to assume: R-31.11 is the
+proof.
+
+**R-31.2** [Unbuilt, MAJOR before the first tester] The same file adds what is
+missing in the other direction: `user_id` on the request line and `res.url` on the
+completion line. Without the first, "which account did this" is unanswerable from
+logs (1.0.3). Without the second, a per-route p95 is a stream join across two lines
+keyed by `reqId` rather than a group-by (4.5.2). G1.21 is this requirement plus
+R-31.1 and is correctly sized at an hour; R-31.4 and R-31.5 are not in that row and
+should join it.
+
+**R-31.3** [Standing] The permitted log vocabulary is identifiers and codes:
+`user_id`, `item_id`, `transaction_id`, `debt_id`, `reqId`, `res.url`, HTTP status,
+and programmatic error codes. A log line carrying a value rather than an identifier
+needs a stated reason in the PR body. This exists as a requirement row, not only as
+`.claude/rules/security.md` #2, because a rule with no ID gets no test and no
+runbook row, which is exactly how 1.8.3 came to read "VERIFIED by convention, FAILS
+as a control".
+
+### 31.2 Error object serialisation
+
+The finding, verified 2026-08-17: `PlaidApiError` builds its message as
+`` `${body.error_type}/${body.error_code}: ${body.error_message}` ``
+(`backend/src/plaid/types.ts:208-216`). Plaid's `error_message` is vendor prose and
+has carried institution names. There are 24 sites in `backend/src` across 12 files
+logging a caught error object, including `webhook/plaid.ts:138,171`,
+`api/plaid-link.ts:130,353` and `api/account.ts:58`, and pino's default `err`
+serializer writes `message` and `stack`. So a caught vendor error today writes
+vendor free text into the log, and R-31.1 cannot help: redaction censors keys, and
+this leak lives inside a string value.
+
+**R-31.4** [Unbuilt, MAJOR] `{ err }` is not a log payload. Every site logs fields
+chosen deliberately: a programmatic code, a status, and an identifier. Where a stack
+is genuinely wanted for a bug, it is logged as `err.stack` alone, without `message`.
+`plugins/error-handler.ts:6` is already close to this shape and is the pattern to
+copy, once R-31.5 makes `message` safe.
+
+**R-31.5** [Unbuilt, MAJOR] A vendor error is logged as a code, never as text.
+`PlaidApiError.message` is rebuilt from `error_type` and `error_code` only, and the
+full body stays reachable on the instance for a deliberate, field-selected read.
+This is the version of the fix that also covers the escape route: `plugins/error-handler.ts:6`
+logs `error.message` for anything that reaches Fastify's handler, so leaving the
+vendor prose in `message` and fixing only the 19 call sites leaves the leak intact.
+The same pattern binds every other provider client that constructs an error message
+from a vendor field.
+
+**R-31.6** [Unbuilt, MINOR] `plugins/error-handler.ts:7` returns `error.message`
+verbatim to the client for any status under 500. That is safe today only by
+accident: `PlaidApiError` carries `status`, not `statusCode`, so Fastify defaults it
+to 500 and the caller gets the literal `Internal Server Error`. Make it deliberate.
+Any thrown error whose message can contain vendor or user text must either carry a
+5xx `statusCode` or a written client-facing message; a 4xx message is client-facing
+copy and is written as such.
+
+### 31.3 What the client can see
+
+There is no inspect element: the client is a native iOS app. The four real
+analogues, and which of them have a control today.
+
+| Exposure | Who can reach it | Control today |
+|---|---|---|
+| API responses carrying more than the screen renders | The authenticated owner, by proxying their own traffic | None specific. Note the exposure is to the user's own data, not a third party's; the BOLA sweep in `prd.md` §21 came back clean |
+| Strings and configuration in the app binary | Anyone who downloads the IPA | 1.8.1 VERIFIED: nothing key-shaped is in there |
+| Error text rendered to the user | The user, and anyone they screenshot to | Partial. `CoinyErrorLine` is the written-copy component; one site defeats it |
+| The app-switcher snapshot | Anyone holding the unlocked phone | None. No blur, no overlay, no `scenePhase` handling outside onboarding |
+| The iOS system log, Console.app, a sysdiagnose | Anyone the user sends a sysdiagnose to, plus anything reading the device log | 1.8.5 VERIFIED: one `print`, two telemetry `Logger`s, no `.public` interpolation |
+
+**R-31.7** [Unbuilt, MINOR] Response-shape tests on the widest routes, asserting the
+exact key set rather than the presence of the keys a screen needs, so a field added
+to an upstream type cannot reach the client unnoticed. `GET /api/net-worth` returns
+every asset class while Home renders one number, which is a deliberate design (§3.8)
+and stays; the harm it carries is that the whole payload then lands in
+`NetWorthCache.swift:23-24` at the platform default file protection (1.2.4 FAILS,
+G1.12 fixes the cache side). Field-level justification is the bar: `institution_name`
+on `GET /api/plaid/items` (`api/plaid-link.ts:52`) is justified because
+`SettingsView.swift:378` renders it. A field with no renderer is removed.
+
+**R-31.8** [Standing, VERIFIED today] No API key, shared secret, or per-user value is
+ever added to `Info.plist`, an xcconfig, or a Swift literal, because the IPA is
+readable by anyone who downloads it. What is in there today and stays there:
+`CFBundleDisplayName`, `ITSAppUsesNonExemptEncryption`, the `coiny` URL scheme, the
+two version strings, and `COINY_API_BASE_URL` (`ios/project.yml:59-97,141`). The
+debug route paths in `API+Debug.swift` are discoverable in the binary and that is
+fine, because the defence is server-side registration (`server.ts:59-61,135,146`,
+1.8.2). It must stay server-side: a client-side-only gate on anything is not a
+control.
+
+**R-31.9** [Unbuilt, MAJOR] No rendered string is derived from `localizedDescription`
+or from a response body. `CoinyErrorLine` is the component that exists so a failure
+is carried in written copy, and most of what reaches it is not written copy: 87
+assignments of `error.localizedDescription` into a rendered `errorMessage` or
+`.failed(...)` state, across 25 files in `ios/Coiny/ViewModels` plus
+`SubscriptionsView.swift:125`. For `API.APIError.http` that string is
+`"HTTP \(status): \(body)"` (`API.swift:66`), so a raw server response body can land
+on screen under a themed error line. Two edits, and G1.14 contains only the first:
+map codes to written copy at the call sites, and stop `APIError.errorDescription`
+interpolating `body` at all, because `APIError` is a `LocalizedError` and every one
+of those 87 sites picks the body up through it. Cross-reference 3.6.3b, which found
+the same thing from the craft side and counted twelve rendered rows rather than the
+assignments behind them.
+
+**R-31.10** [Unbuilt, MINOR] Cover the window when the app leaves the foreground, so
+the app-switcher snapshot does not show the net-worth figure. `grep scenePhase
+ios/Coiny` returns only `OnboardingView.swift:25,39-40` and there is no blur or
+overlay anywhere in the app, so this control does not exist. The threat is local and
+physical, an unlocked phone handed to someone, not remote; it is MINOR for that
+reason and it is also the cheapest expectation the category has set. Pairs with the
+app-lock decision B11 in `prd.md` §27.
+
+**R-31.11** [Standing, VERIFIED today] `print` is banned in shipped iOS code, because
+it writes to the system log unconditionally where a sysdiagnose captures it, while
+`Logger` interpolation is private by default. One `print` remains
+(`CoinyApp.swift:126`, an APNs registration error, no financial data) and it becomes
+a `Logger` call. `.public` interpolation is banned outright. Enforced by a SwiftLint
+`custom_rules` entry alongside the existing ones at `ios/.swiftlint.yml:45`, not by
+review.
+
+### 31.4 Verification
+
+**R-31.12** [Unbuilt] One backend test, `backend/tests/logger.test.ts`, is the
+standing proof for §9.1 and §9.2. It builds the app with pino writing to an
+in-memory stream, drives a request through `app.inject()` against a route that
+throws a `PlaidApiError` constructed from a fixture whose `error_message` contains
+an institution name and a dollar amount, then asserts three things about the
+captured JSON: `user_id` is present, `res.url` is present, and none of the forbidden
+strings appears anywhere in the serialised output. The forbidden list lives in the
+test, not in this document. Adding a `redact` path without extending the fixture is
+not the fix, because 1.8.3's grep was a point-in-time check and this is the one that
+has to keep holding.
+
+**R-31.13** [Unbuilt] Response-shape assertions for R-31.7 go in the existing route
+test files as exact-key-set snapshots, not new files.
+
+**R-31.14** [Manual, before the first external tester] Three checks that no test can
+make, each named in the pre-TestFlight list rather than assumed:
+
+1. `strings` and a MobSF pass over the first Release archive (1.8.13, blocked on
+   G1.1), which is the only way to see what actually ships rather than what the
+   source implies.
+2. Background the app on each of Home, Wealth and Activity, screenshot the app
+   switcher, confirm R-31.10 holds.
+3. A proxy pass (mitmproxy or Charles against a simulator run) over every screen,
+   confirming no response carries a field with no renderer.
 
 ---
 
@@ -930,6 +1105,17 @@ Verified against source on 2026-08-13 after the `integration/night-build` block 
 | R-27.1 | Org enrollment | Unverified, BLOCKER at submission | Portal check |
 | R-28.1 | Staged rollout | Unbuilt | Depends on §24 |
 | R-29 | Support address | Unverified | Domain/alias unconfirmed |
+| R-31.1, R-31.2 | Server log redaction and the two missing fields | Unbuilt | `plugins/logger.ts` is 14 lines, no `redact` list. Runbook G1.21 |
+| R-31.3 | Permitted log vocabulary | Standing | Was `.claude/rules/security.md` #2 only; now carries an ID so it can be tested |
+| R-31.4, R-31.5 | `{ err }` is not a log payload; vendor errors log as codes | Unbuilt | 24 sites in 12 files; `plaid/types.ts:208-216` builds `message` from `error_message` |
+| R-31.6 | 4xx bodies are written copy, not `error.message` | Unbuilt | `plugins/error-handler.ts:7`; safe today only because `PlaidApiError` carries `status`, not `statusCode` |
+| R-31.7 | Response-shape tests on the widest routes | Unbuilt | `GET /api/net-worth` returns every class; Home renders one number |
+| R-31.8 | No secret in the IPA | Built | 1.8.1 VERIFIED. `Info.plist` holds display name, encryption flag, URL scheme, versions, `COINY_API_BASE_URL` |
+| R-31.9 | No rendered string from `localizedDescription` | Unbuilt | 87 assignments across 25 ViewModels; `API.swift:67` interpolates the raw body |
+| R-31.10 | App-switcher snapshot cover | Unbuilt | `scenePhase` appears only in `OnboardingView.swift:25,39-40`; no blur or overlay anywhere |
+| R-31.11 | `print` banned in shipped iOS code | Partial | One remains, `CoinyApp.swift:126`; needs a SwiftLint `custom_rules` entry to be a control |
+| R-31.12, R-31.13 | Automated proof for §31.1 to §31.2 | Unbuilt | `backend/tests/logger.test.ts` does not exist |
+| R-31.14 | Manual pre-TestFlight checks | Unbuilt | `strings`/MobSF on the first Release archive, app-switcher pass, proxy pass |
 
 **Corrected 2026-08-13:** `backend/CLAUDE.md` claimed Sydney deployment, 56 tests, and a `migrations/` directory, all false. Fixed, and the journal-ordering trap that silently skipped two migrations this week is now documented there, since that is where a backend session will look.
 
