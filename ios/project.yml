@@ -117,12 +117,14 @@ targets:
         # the commit count (Scripts/stamp-build-number.sh).
         CURRENT_PROJECT_VERSION: "1"
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        # Cleared deliberately. Adding Assets.xcassets (for AccentColor) makes
-        # Xcode look for an app icon set named "AppIcon" and fail the build when
-        # it is absent, and there is no commissioned icon yet
-        # (design-direction section 5). Set this back to AppIcon and add the
-        # icon set in the same commit; App Store submission requires one.
-        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        # Set in the same commit that adds the icon set, as the note this
+        # replaces asked. The art is a PLACEHOLDER, not the commissioned icon
+        # design-direction section 5 still owes: the egg-in-window motif in the
+        # light palette, generated so that TestFlight uploads stop failing
+        # validation. App Store Connect rejects a build with no icon, so an
+        # ugly icon blocks nothing and an absent one blocks everything.
+        # Replace the PNG, keep the asset set.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # Without this the AccentColor colorset compiles into Assets.car and is
         # then never read: nothing writes NSAccentColorName into Info.plist, so
         # `.tint(.accentColor)` keeps resolving to system blue. Shipping the
