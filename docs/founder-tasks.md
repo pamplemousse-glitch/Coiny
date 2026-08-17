@@ -55,10 +55,11 @@ urgent. Everything below section 1 can be done in any order once unblocked.
 
 ## 2. Quick wins, about 30 minutes total, do them while waiting
 
-### 2.1 Turn on MFA everywhere and record the date
-- Fly.io, Neon, Plaid dashboard, Apple Developer, Google Cloud.
-- Required by FTC Safeguards 314.4(c)(5) before a real bank connects.
-- Record the date in `docs/legal/service-providers.md`.
+### 2.1 Turn on MFA everywhere and record the date - DONE 2026-08-17
+- Fly.io, Neon, Plaid dashboard, Apple Developer, GitHub: **all confirmed on
+  by Antoine, 2026-08-17.**
+- Required by FTC Safeguards 314.4(c)(5) before a real bank connects, and
+  attested to directly in Plaid's trial-access form.
 
 ### 2.2 Confirm the support email works
 - `coiny@athanorworks.com` must receive mail.
