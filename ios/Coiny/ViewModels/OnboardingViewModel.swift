@@ -10,7 +10,6 @@ protocol OnboardingAPI: Sendable {
     func createLinkToken() async throws -> String
     @discardableResult
     func exchangePublicToken(_ publicToken: String) async throws -> EmptyResponse
-    func getSubscriptions() async throws -> [DetectedSubscription]
     func getPlaidRecurring() async throws -> PlaidRecurringResponse
     func getNetWorth() async throws -> NetWorthResponse
     func getOnboardingLadderSnapshot() async throws -> OnboardingLadderSnapshot
@@ -295,11 +294,8 @@ final class OnboardingViewModel {
 
         let budget = revealWaitBudget
         let fetched = await withTimeout(budget) { [api] in
-            async let localTask = api.getSubscriptions()
-            async let streamsTask = api.getPlaidRecurring()
-            let local = (try? await localTask) ?? []
-            let streams = (try? await streamsTask)?.outflow ?? []
-            return RevealBuilder.merge(local: local, streams: streams)
+            let streams = (try? await api.getPlaidRecurring())?.outflow ?? []
+            return RevealBuilder.build(streams: streams)
         }
 
         let items = fetched ?? []

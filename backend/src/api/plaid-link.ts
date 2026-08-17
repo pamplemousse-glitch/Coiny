@@ -29,6 +29,7 @@ import {
   upsertItem,
 } from '../store/items.js';
 import { cacheLiabilities } from '../store/plaid-liabilities.js';
+import { deletePlaidDataForUser } from '../store/plaid-purge.js';
 import { upsertRecurringStreams } from '../store/plaid-recurring.js';
 import { SYNC_LIMIT } from './rate-limits.js';
 
@@ -363,7 +364,13 @@ export function registerPlaidLinkApi(app: FastifyInstance): void {
       }),
     );
 
-    req.log.info({ count: items.length }, 'plaid items unlinked');
+    // Disconnect means gone (open decision B7). Runs after the loop, once,
+    // because it is scoped to the user and the loop unlinks every item they
+    // have. Deleting the item rows alone left every transaction, recurring
+    // stream, liability and balance in place indefinitely.
+    const purged = await deletePlaidDataForUser(req.user!.id);
+
+    req.log.info({ count: items.length, purged }, 'plaid items unlinked and data purged');
     return reply.status(204).send();
   });
 }
