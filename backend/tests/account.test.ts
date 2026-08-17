@@ -1,5 +1,5 @@
 import { type Dispatcher, getGlobalDispatcher, MockAgent, setGlobalDispatcher } from 'undici';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { authHeader, resetDatabase, testUserId } from './db-helper.js';
 
 describe('DELETE /api/account', () => {
@@ -213,6 +213,38 @@ describe('DELETE /api/account', () => {
     expect(queued[0]?.accessToken).toBe('access-sandbox-a');
 
     await app.close();
+  });
+
+  // The queue is a billing safeguard and the deletion is a statutory
+  // obligation, so the safeguard must not be able to block it. Before the queue
+  // write was wrapped, a throw here escaped the catch, abandoned the loop and
+  // aborted the whole request.
+  it('still deletes the account when the removal queue write fails', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const { upsertItem } = await import('../src/store/items.js');
+    const { getUserById } = await import('../src/store/users.js');
+    const queue = await import('../src/store/plaid-removal-queue.js');
+
+    await upsertItem({ itemId: 'item_a', accessToken: 'access-sandbox-a', userId: testUserId });
+
+    mockAgent.get('https://sandbox.plaid.com').intercept({ path: '/item/remove', method: 'POST' }).reply(500, {
+      error_type: 'API_ERROR',
+      error_code: 'INTERNAL_SERVER_ERROR',
+      error_message: 'boom',
+      display_message: null,
+      request_id: 'req_test',
+    });
+
+    const spy = vi.spyOn(queue, 'enqueueItemRemoval').mockRejectedValue(new Error('queue write failed'));
+    try {
+      const app = await buildApp();
+      const res = await app.inject({ method: 'DELETE', url: '/api/account', headers: authHeader() });
+      expect(res.statusCode).toBe(204);
+      expect(await getUserById(testUserId)).toBeNull();
+      await app.close();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   // Right-to-delete is not conditional on the queue: nothing about retaining a

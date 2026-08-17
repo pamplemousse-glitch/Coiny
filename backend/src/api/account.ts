@@ -68,11 +68,26 @@ export function registerAccountApi(app: FastifyInstance): void {
           { err, item_id: item.itemId },
           'plaid item_remove failed during account deletion; queued for retry',
         );
-        await enqueueItemRemoval({
-          itemId: item.itemId,
-          accessToken: item.accessToken,
-          errorCode: err instanceof PlaidApiError ? err.body.error_code : null,
-        });
+        // Wrapped, and the wrapping is the point. A throw from the queue write
+        // would escape this catch, abandon the loop and abort the deletion,
+        // which turns a billing safeguard into something that can block a
+        // statutory right-to-delete. The deletion outranks the queue: if the
+        // queue write fails we are back to the old behaviour, a billed Item we
+        // cannot cancel, which is money rather than a legal obligation.
+        // Logged at error because nothing else will ever mention this Item
+        // again.
+        try {
+          await enqueueItemRemoval({
+            itemId: item.itemId,
+            accessToken: item.accessToken,
+            errorCode: err instanceof PlaidApiError ? err.body.error_code : null,
+          });
+        } catch (queueErr) {
+          req.log.error(
+            { err: queueErr, item_id: item.itemId },
+            'could not queue plaid item for removal; this Item will keep billing and cannot be cancelled',
+          );
+        }
       }
     }
 
