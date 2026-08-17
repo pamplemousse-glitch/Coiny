@@ -6,9 +6,49 @@
 
 set -e
 
-export PLAID_CLIENT_ID=$(security find-generic-password -a "$USER" -s "coiny-plaid-sandbox-client-id" -w)
-export PLAID_SECRET=$(security find-generic-password -a "$USER" -s "coiny-plaid-sandbox-secret" -w)
-export PLAID_ENV=sandbox
+# Which Plaid environment this shell targets.
+#
+# Sandbox unless you opt in, and the opt-in is explicit and per-invocation:
+#
+#     COINY_PLAID_ENV=production source bin/load-secrets.sh
+#
+# The default is not a preference, it is the safety property. Sandbox holds
+# fake banks and the fixed user_good / pass_good login, so a shell that forgets
+# to opt in can only ever reach synthetic data. Production reads real balances
+# from a real person's bank. Nothing infers the environment from anything else:
+# a mistake here has to be a deliberate keystroke, not an omission.
+#
+# An unrecognised value is an error rather than a fallback. Falling back would
+# mean a typo silently picks an environment, which is the failure this whole
+# arrangement exists to prevent.
+PLAID_TARGET="${COINY_PLAID_ENV:-sandbox}"
+case "$PLAID_TARGET" in
+  sandbox)
+    export PLAID_CLIENT_ID=$(security find-generic-password -a "$USER" -s "coiny-plaid-sandbox-client-id" -w)
+    export PLAID_SECRET=$(security find-generic-password -a "$USER" -s "coiny-plaid-sandbox-secret" -w)
+    export PLAID_ENV=sandbox
+    ;;
+  production)
+    # Looked up by service name only, with no -a account filter, the same way
+    # the newer entries below are. The sandbox pair above predates that habit.
+    export PLAID_CLIENT_ID=$(security find-generic-password -s "coiny-plaid-production-client-id" -w)
+    export PLAID_SECRET=$(security find-generic-password -s "coiny-plaid-production-secret" -w)
+    export PLAID_ENV=production
+    # An empty credential would otherwise reach config.ts and fail at boot with
+    # a message about the schema rather than about the Keychain.
+    if [ -z "$PLAID_CLIENT_ID" ] || [ -z "$PLAID_SECRET" ]; then
+      echo "load-secrets: production Plaid keys not found in Keychain." >&2
+      echo "  expected services: coiny-plaid-production-client-id, coiny-plaid-production-secret" >&2
+      return 1 2>/dev/null || exit 1
+    fi
+    echo "load-secrets: PLAID_ENV=production. Real bank data." >&2
+    echo "  Each link permanently consumes one of ten trial connections and unlinking does not return it." >&2
+    ;;
+  *)
+    echo "load-secrets: COINY_PLAID_ENV must be 'sandbox' or 'production', got '$PLAID_TARGET'" >&2
+    return 1 2>/dev/null || exit 1
+    ;;
+esac
 # Field encryption key. Optional here on purpose: with no key the server now
 # refuses to boot unless ALLOW_PLAINTEXT_FIELDS=true is set deliberately, which
 # is the point (audit 1.3.5). Generate one with `openssl rand -hex 32` and store
