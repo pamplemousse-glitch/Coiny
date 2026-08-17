@@ -65,6 +65,15 @@ enum CoinyTheme {
 ///
 /// Radius 10 per design-direction 4.4, 44pt minimum target per R-11.5, and the
 /// label always `onSignal` so the pair clears AA in light and dark alike.
+///
+/// **Disabled is a different pair of tokens, never the same pair faded.** This
+/// style used to end in `.opacity(isEnabled ? … : 0.4)`, and #220 wrote the
+/// same rule into `PaywallView` in words while the fade stayed in the code.
+/// Measured on the rendered screen, the "fixed" subscribe button was 2.92:1 in
+/// dark and 2.26:1 in light: `field` and `ink2` compute 6.29:1 and the 0.4
+/// multiply undid it. The arithmetic was right and nobody looked at the pixels.
+/// A `ButtonStyle` owns its disabled rendering completely, so swapping tokens
+/// here is what makes the rule true rather than merely stated.
 struct CoinyFilledButtonStyle: ButtonStyle {
     /// Fill the available width. Off for inline actions inside a row.
     var fillWidth = true
@@ -81,11 +90,17 @@ struct CoinyFilledButtonStyle: ButtonStyle {
         var body: some View {
             configuration.label
                 .font(.body.weight(.semibold))
-                .foregroundStyle(CoinyTheme.onSignal)
+                .foregroundStyle(isEnabled ? CoinyTheme.onSignal : CoinyTheme.ink2)
                 .padding(.horizontal, 20)
                 .frame(maxWidth: fillWidth ? .infinity : nil, minHeight: 44)
-                .background(CoinyTheme.signalFill, in: RoundedRectangle(cornerRadius: 10))
-                .opacity(isEnabled ? (configuration.isPressed ? 0.85 : 1) : 0.4)
+                .background(
+                    isEnabled ? CoinyTheme.signalFill : CoinyTheme.field,
+                    in: RoundedRectangle(cornerRadius: 10)
+                )
+                // Pressed still fades, because that is a momentary state a
+                // sighted user is looking straight at. Disabled does not: it
+                // can persist for the whole time the screen is open.
+                .opacity(isEnabled && configuration.isPressed ? 0.85 : 1)
         }
     }
 }

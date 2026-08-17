@@ -20,7 +20,7 @@ final class CoinyThemeContrastTests: XCTestCase {
 
     // MARK: - WCAG 2.x
 
-    private func luminance(_ color: Color, _ style: UIUserInterfaceStyle) -> Double {
+    private func resolve(_ color: Color, _ style: UIUserInterfaceStyle) -> Color.Resolved {
         // `UIColor(_: Color)` flattens a dynamic color against the traits in
         // force at the moment of the bridge, so resolving afterwards returns
         // the light value in both branches and every dark assertion silently
@@ -29,14 +29,41 @@ final class CoinyThemeContrastTests: XCTestCase {
         // WCAG luminance sum wants.
         var environment = EnvironmentValues()
         environment.colorScheme = style == .dark ? .dark : .light
-        let resolved = color.resolve(in: environment)
+        return color.resolve(in: environment)
+    }
+
+    private func luminance(_ color: Color, _ style: UIUserInterfaceStyle) -> Double {
+        let resolved = resolve(color, style)
         return 0.2126 * Double(resolved.linearRed)
             + 0.7152 * Double(resolved.linearGreen)
             + 0.0722 * Double(resolved.linearBlue)
     }
 
+    /// Foreground luminance *after* compositing it over the background it is
+    /// drawn on.
+    ///
+    /// This is not a refinement, it is the difference between measuring the
+    /// screen and measuring an intention. A translucent colour shows the
+    /// background through it, so treating it as opaque overstates its
+    /// contrast: `Color.secondary.opacity(0.3)` scores well above AA measured
+    /// flat and renders at 1.55:1 on the dark screen, which is what the
+    /// paywall's tier border actually was. Opaque colours have alpha 1 and are
+    /// unaffected, so every assertion written before this still means what it
+    /// meant.
+    private func luminance(_ foreground: Color, over background: Color, _ style: UIUserInterfaceStyle) -> Double {
+        let fg = resolve(foreground, style)
+        let bg = resolve(background, style)
+        let alpha = Double(fg.opacity)
+        func blend(_ f: Float, _ b: Float) -> Double {
+            Double(f) * alpha + Double(b) * (1 - alpha)
+        }
+        return 0.2126 * blend(fg.linearRed, bg.linearRed)
+            + 0.7152 * blend(fg.linearGreen, bg.linearGreen)
+            + 0.0722 * blend(fg.linearBlue, bg.linearBlue)
+    }
+
     private func ratio(_ foreground: Color, on background: Color, _ style: UIUserInterfaceStyle) -> Double {
-        let a = luminance(foreground, style)
+        let a = luminance(foreground, over: background, style)
         let b = luminance(background, style)
         return (max(a, b) + 0.05) / (min(a, b) + 0.05)
     }
@@ -162,6 +189,42 @@ final class CoinyThemeContrastTests: XCTestCase {
     /// is 12pt, so the exemption did not exist and every rung code, unit label
     /// and section heading in the app was below AA. It is now a real value, and
     /// this test is the thing that stops the exemption coming back.
+    /// WCAG 2.2 1.4.11: a boundary that carries state, rather than decorating,
+    /// needs 3:1. The tier card's border is the whole of what says "this is the
+    /// plan you picked", and `Color.secondary.opacity(0.3)` measured 1.55:1 on
+    /// the dark screen and 1.41:1 on the light one. Opacity over a semantic
+    /// colour was the mechanism: it shifts differently per scheme and neither
+    /// result was ever looked at.
+    func testTierCardBordersClearTheNonTextFloorInBothSchemes() {
+        for (name, selected) in [("selected", true), ("unselected", false)] {
+            for style in [UIUserInterfaceStyle.light, .dark] {
+                let border = PaywallView.tierBorderColor(selected: selected)
+                let actual = ratio(border, on: CoinyTheme.screen, style)
+                XCTAssertGreaterThanOrEqual(
+                    actual, 3.0,
+                    "\(style == .dark ? "dark" : "light") \(name) tier border is "
+                    + "\(String(format: "%.2f", actual)):1 on screen, below the 3:1 floor for a control boundary"
+                )
+            }
+        }
+    }
+
+    /// The unavailable refund row measured 2.25:1 in dark and 1.84:1 in light,
+    /// because `.disabled()` fades a Form row's label to the system tertiary
+    /// label. Unavailable still has to be readable: #220 settled this on the
+    /// paywall's subscribe button and the same rule applies here.
+    func testRefundRowIsReadableWhetherOrNotARefundIsAvailable() {
+        for (name, available) in [("available", true), ("unavailable", false)] {
+            for style in [UIUserInterfaceStyle.light, .dark] {
+                let label = SettingsView.refundLabelColor(available: available)
+                assertAtLeastAA(
+                    label, on: CoinyTheme.surface, style,
+                    "\(style == .dark ? "dark" : "light") \(name) refund label on surface"
+                )
+            }
+        }
+    }
+
     func testInk3ClearsAAOnEveryBackgroundItIsDrawnOn() {
         for (name, background) in [("screen", CoinyTheme.screen), ("surface", CoinyTheme.surface)] {
             assertAtLeastAA(CoinyTheme.ink3, on: background, .light, "light ink3 on \(name)")
