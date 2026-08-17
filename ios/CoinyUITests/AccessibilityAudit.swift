@@ -18,6 +18,39 @@ extension XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) throws {
+        // Retry once on a TIMEOUT, and only on a timeout.
+        //
+        // `performAccessibilityAudit` has two separate failure modes and they
+        // were reaching CI as the same red X. One is a finding, which is the
+        // point of the test. The other is `Code=-56`, "Audit failed to complete
+        // in time", which is the audit not finishing rather than the app being
+        // wrong, and it says nothing about accessibility at all.
+        //
+        // Evidence it is not the Xcode 26 bump: the identical error failed #226
+        // on Xcode 16, where it was written off as flake. It predates the
+        // toolchain change and survived it.
+        //
+        // One retry, not a loop. A timeout that reproduces immediately is a
+        // real signal worth surfacing; the flake does not reproduce. Retrying
+        // until green would hide a genuinely hanging audit, which is the thing
+        // this must not do.
+        do {
+            try runAudit(app, types: types, file: file, line: line)
+        } catch let error as NSError where error.isAccessibilityAuditTimeout {
+            // Deliberately visible. A silent retry turns "the audit is
+            // unreliable" into folklore, which is how this went uninvestigated
+            // across two PRs.
+            print("performAccessibilityAudit timed out (Code=-56). Retrying once; this is not a finding.")
+            try runAudit(app, types: types, file: file, line: line)
+        }
+    }
+
+    private func runAudit(
+        _ app: XCUIApplication,
+        types: XCUIAccessibilityAuditType,
+        file: StaticString,
+        line: UInt
+    ) throws {
         let tabBar = app.tabBars.firstMatch
         let tabBarFrame = tabBar.exists ? tabBar.frame : .null
 
@@ -84,5 +117,20 @@ extension XCTestCase {
             // Reported above with a source location, so do not report twice.
             return true
         }
+    }
+}
+
+private extension NSError {
+    /// True for the audit's "failed to complete in time" error, and nothing else.
+    ///
+    /// Matched on the code AND the message rather than on either alone.
+    /// `-56` is not unique across error domains, and the domain XCTest reports
+    /// this under is not contractual, so a code-only match risks swallowing an
+    /// unrelated failure and turning a real defect into a silent retry. Both
+    /// halves have to agree.
+    var isAccessibilityAuditTimeout: Bool {
+        guard code == -56 else { return false }
+        let haystack = "\(localizedDescription) \(userInfo)".lowercased()
+        return haystack.contains("audit") && haystack.contains("time")
     }
 }
