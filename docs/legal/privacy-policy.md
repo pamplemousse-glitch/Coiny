@@ -12,7 +12,7 @@
 
 **Effective date:** not yet published
 **Who we are:** Athanor Works LLC, a Delaware limited liability company ("Coiny", "we").
-**Contact:** coiny@athanorworks.com
+**Contact:** contact@athanorworks.com
 (Unverified: this alias is not yet confirmed live; see docs/prd.md section 29. Do not publish until it receives mail.)
 
 Coiny is an app that shows you your net worth in one number, with a creature that
@@ -252,7 +252,7 @@ what we do with data you already gave us without asking.
 ## 10. Contact
 
 Athanor Works LLC
-coiny@athanorworks.com
+contact@athanorworks.com
 
 ---
 

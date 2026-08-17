@@ -13,7 +13,7 @@ connection, the rest gate paid launch.
    If Individual: start the organization migration immediately (needs the
    LLC's D-U-N-S number; lead time is weeks). Apple 5.1.1(ix) bars
    financial-services apps from individual enrollments.
-2. **Confirm the support address.** Create/verify `coiny@athanorworks.com`
+2. **Confirm the support address.** Create/verify `contact@athanorworks.com`
    receives mail. Both legal documents and the App Store listing use it.
 3. **Attorney review of the two documents.** Send
    `docs/legal/privacy-policy.md` and `docs/legal/terms-of-service.md` with

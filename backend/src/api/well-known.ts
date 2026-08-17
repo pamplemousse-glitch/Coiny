@@ -19,7 +19,7 @@ const SECURITY_POLICY_URL = 'https://github.com/pamplemousse-glitch/Coiny/blob/m
  *  it exists right now, it needs no domain and no mail alias, and it gives the
  *  reporter a tracked, private thread rather than an inbox that may not be read.
  *
- *  Deliberately NOT listing `coiny@athanorworks.com` yet: PRD §29 and audit
+ *  Deliberately NOT listing `contact@athanorworks.com` yet: PRD §29 and audit
  *  §1.11.9 both record that address as Unverified, domain and alias unconfirmed.
  *  Publishing a contact that might bounce is worse than publishing one channel
  *  that works, because the reporter's second move after a bounce is usually to

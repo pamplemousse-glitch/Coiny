@@ -14,7 +14,7 @@
 
 **Effective date:** not yet published
 **Provider:** Athanor Works LLC, a Delaware limited liability company ("Coiny", "we").
-**Contact:** coiny@athanorworks.com (Unverified: alias not yet confirmed live.)
+**Contact:** contact@athanorworks.com (Unverified: alias not yet confirmed live.)
 
 ## 1. Agreement and eligibility
 
@@ -175,4 +175,4 @@ current version always lives at the published terms URL.
 ## 13. Contact
 
 Athanor Works LLC
-coiny@athanorworks.com
+contact@athanorworks.com
