@@ -465,23 +465,19 @@ describe('item health store transitions', () => {
         details: { counterparty: { name: 'Spotify' }, category: 'entertainment' },
       },
     ]);
-    await upsertRecurringStreams(
-      testUserId,
-      [],
-      [
-        {
-          stream_id: 'purge_s1',
-          account_id: 'a1',
-          description: 'SPOTIFY USA',
-          merchant_name: 'Spotify',
-          frequency: 'MONTHLY',
-          average_amount: { amount: 10.99 },
-          last_amount: { amount: 10.99 },
-          last_date: '2026-08-01',
-          status: 'MATURE',
-        },
-      ] as never,
-    );
+    await upsertRecurringStreams(testUserId, [], [
+      {
+        stream_id: 'purge_s1',
+        account_id: 'a1',
+        description: 'SPOTIFY USA',
+        merchant_name: 'Spotify',
+        frequency: 'MONTHLY',
+        average_amount: { amount: 10.99 },
+        last_amount: { amount: 10.99 },
+        last_date: '2026-08-01',
+        status: 'MATURE',
+      },
+    ] as never);
 
     mockAgent
       .get('https://sandbox.plaid.com')
