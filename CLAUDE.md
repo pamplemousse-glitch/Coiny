@@ -18,6 +18,10 @@ work on the critical path.
 - `docs/obligations.md`: what regulation, providers and Apple require, and when
 - `docs/engineering-budgets.md`: performance, cost and freshness budgets; the instrumentation spec
 - `docs/plaid-integration.md`: Plaid API contract reference
+- `docs/prelaunch-verification/`: the seven-part launch audit, 696 rows. Part 7
+  (`07-runbook.md`) orders every failure by the gate it blocks and marks each
+  [Founder] or [Agent]. **Cite it.** A previous handoff listed eight priorities
+  and never referenced it, so the detail existed and went unread.
 
 **Do not cite these. They are hardware-era and contradict the live spec:**
 `handoff.md`, `architecture.md`, `security.md` (use `.claude/rules/security.md`),
