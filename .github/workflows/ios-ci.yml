@@ -35,23 +35,40 @@ jobs:
   test:
     needs: changes
     if: needs.changes.outputs.has_ios == 'true'
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 30
     env:
       SCHEME: Coiny
+      # Pin the MAJOR, float the minor. See the comment on the selection step.
+      XCODE_MAJOR: "26"
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
-      # Pin to the newest Xcode 16.x available on the runner image. Each Xcode
-      # 16 minor bundles a different iOS SDK (16.0→18.0, 16.1→18.1, …) and the
-      # runner image only preinstalls simulator runtimes for the *newer* SDKs.
-      # Pinning 16.0 explicitly broke CI: it wanted an iOS 18.0 runtime that
-      # nobody preinstalls anymore. Take the highest 16.x instead.
-      - name: Select latest Xcode 16.x
+      # Pin the Xcode MAJOR and take the newest minor the image provides.
+      #
+      # Pinning a full version breaks: each minor bundles a different iOS SDK
+      # and the runner image only preinstalls simulator runtimes for the newer
+      # ones, so an exact pin eventually asks for a runtime nobody ships. That
+      # is what happened when 16.0 was pinned explicitly.
+      #
+      # Floating entirely is the opposite failure: an image update lands a new
+      # major on an unrelated PR and the author has no idea why their branch is
+      # red. Pinning the major keeps a toolchain bump a deliberate, reviewable
+      # one-line change instead of a surprise.
+      #
+      # This was 16.x on macos-15 until 2026-08-17 while local development ran
+      # Xcode 26.5, a gap of ten majors that nothing surfaced. `toolchain-drift`
+      # below is what stops that recurring.
+      - name: Select latest Xcode ${{ env.XCODE_MAJOR }}.x
         run: |
-          XCODE_PATH=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
-          if [ -z "$XCODE_PATH" ]; then XCODE_PATH=$(ls -d /Applications/Xcode*.app | sort -V | tail -1); fi
+          set -euo pipefail
+          XCODE_PATH=$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app 2>/dev/null | sort -V | tail -1 || true)
+          if [ -z "${XCODE_PATH:-}" ]; then
+            echo "::error::No Xcode ${XCODE_MAJOR}.x on this runner image. Available:"
+            ls -d /Applications/Xcode*.app
+            exit 1
+          fi
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
           echo "Using $XCODE_PATH"
 

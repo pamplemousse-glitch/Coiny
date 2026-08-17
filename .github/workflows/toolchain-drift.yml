@@ -1,0 +1,128 @@
+name: Toolchain drift
+
+# Why this exists.
+#
+# PR CI pins the Xcode MAJOR on purpose: a runner-image update should never
+# turn an unrelated PR red, and a toolchain bump should be a reviewed one-line
+# change. The cost of that discipline is that a pin goes stale silently, and
+# nothing in a green pipeline ever says so.
+#
+# It went stale by ten majors. CI ran Xcode 16.x on macos-15 while local
+# development ran 26.5, and the only reason anyone noticed was reading a CI log
+# by hand while chasing an unrelated flake. Every run had been green throughout.
+#
+# So: PR CI stays pinned and fast, and this job floats. It runs weekly, builds
+# and tests against the newest Xcode the image offers, and opens ONE issue when
+# reality has moved past the pin. It never gates a PR.
+
+on:
+  schedule:
+    # Mondays, 09:00 UTC. Weekly is enough: Xcode minors land monthly at most.
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      issues: write
+    env:
+      SCHEME: Coiny
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      # The pinned major is read out of the workflow rather than duplicated
+      # here. Two copies of a version number is how they disagree.
+      - name: Compare the pin against what the runner offers
+        id: compare
+        run: |
+          set -euo pipefail
+          PINNED=$(grep -E '^\s+XCODE_MAJOR:' .github/workflows/ios-ci.yml \
+            | head -1 | tr -d ' "' | cut -d: -f2)
+          # Read the version out of each bundle rather than parsing the
+          # filename. A runner usually also has a plain `Xcode.app` symlink,
+          # and `basename Xcode.app .app | cut -d. -f1` yields the string
+          # "Xcode", not a number. Verified against a real /Applications.
+          NEWEST_APP=""; NEWEST_VER="0"
+          for app in /Applications/Xcode*.app; do
+            [ -e "$app" ] || continue
+            v=$(defaults read "$app/Contents/Info" CFBundleShortVersionString 2>/dev/null || true)
+            case "$v" in ''|*[!0-9.]*) continue ;; esac
+            if [ "$(printf '%s\n%s\n' "$NEWEST_VER" "$v" | sort -V | tail -1)" = "$v" ]; then
+              NEWEST_VER="$v"; NEWEST_APP="$app"
+            fi
+          done
+          if [ -z "$NEWEST_APP" ]; then echo "::error::no Xcode found"; exit 1; fi
+          NEWEST=$(echo "$NEWEST_VER" | cut -d. -f1)
+          echo "pinned=$PINNED"  >> "$GITHUB_OUTPUT"
+          echo "newest=$NEWEST"  >> "$GITHUB_OUTPUT"
+          echo "newest_path=$NEWEST_APP" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Toolchain"
+            echo "- PR CI pins Xcode major: **$PINNED**"
+            echo "- Newest on \`macos-latest\`: **Xcode $NEWEST_VER** (\`$NEWEST_APP\`)"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$PINNED" != "$NEWEST" ]; then
+            echo "drifted=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "drifted=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Prove the newer toolchain actually works before asking anyone to move
+      # to it. A drift report that has not been tested is just a version number.
+      - name: Build + test on the newest Xcode
+        id: canary
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          export DEVELOPER_DIR="${{ steps.compare.outputs.newest_path }}/Contents/Developer"
+          xcodebuild -version
+          brew install xcodegen xcbeautify >/dev/null
+          cd ios && xcodegen generate
+          UDID=$(xcrun simctl list devices available --json \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; \
+                          rt=sorted([k for k in d if "iOS" in k]); \
+                          devs=[x for r in rt for x in d[r] if x.get("isAvailable") and "iPhone" in x["name"]]; \
+                          print(devs[0]["udid"]) if devs else sys.exit("no iPhone simulator")')
+          xcodebuild test \
+            -project Coiny.xcodeproj -scheme "$SCHEME" -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$UDID" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" CODE_SIGN_ENTITLEMENTS="" \
+            | xcbeautify --renderer github-actions
+
+      # One issue, reused. A new issue every Monday is a mute button.
+      - name: Open or update the drift issue
+        if: steps.compare.outputs.drifted == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PINNED: ${{ steps.compare.outputs.pinned }}
+          NEWEST: ${{ steps.compare.outputs.newest }}
+          CANARY: ${{ steps.canary.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          TITLE="Toolchain drift: CI pins Xcode $PINNED, runners offer $NEWEST"
+          if [ "$CANARY" = "success" ]; then
+            VERDICT="The suite **passes** on Xcode $NEWEST. Bumping \`XCODE_MAJOR\` in \`.github/workflows/ios-ci.yml\` to \`\"$NEWEST\"\` and \`runs-on\` to the matching image should be a clean one-line change."
+          else
+            VERDICT="The suite **fails** on Xcode $NEWEST. Do not bump the pin until that is understood; the log is the point of this run."
+          fi
+          BODY=$(printf '%s\n\n%s\n\n%s\n' \
+            "PR CI pins Xcode major \`$PINNED\`. \`macos-latest\` now offers \`$NEWEST\`." \
+            "$VERDICT" \
+            "Run: $RUN_URL")
+          EXISTING=$(gh issue list --state open --search "$TITLE" --json number,title \
+            --jq ".[] | select(.title == \"$TITLE\") | .number" | head -1)
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+          else
+            gh issue create --title "$TITLE" --body "$BODY" --label ci || \
+              gh issue create --title "$TITLE" --body "$BODY"
+          fi
