@@ -115,6 +115,13 @@
       </BuildableProductRunnable>
       <CommandLineArguments>
       </CommandLineArguments>
+      <EnvironmentVariables>
+         <EnvironmentVariable
+            key = "COINY_API_BASE_URL"
+            value = "https://coiny-backend.fly.dev"
+            isEnabled = "NO">
+         </EnvironmentVariable>
+      </EnvironmentVariables>
       <StoreKitConfigurationFileReference
          identifier = "../../Coiny.storekit">
       </StoreKitConfigurationFileReference>
