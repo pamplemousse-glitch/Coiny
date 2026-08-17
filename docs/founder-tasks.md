@@ -62,7 +62,7 @@ urgent. Everything below section 1 can be done in any order once unblocked.
   attested to directly in Plaid's trial-access form.
 
 ### 2.2 Confirm the support email works
-- `coiny@athanorworks.com` must receive mail.
+- `contact@athanorworks.com` must receive mail.
 - Used by both legal documents and the App Store listing.
 
 ### 2.3 Send the Discogs email

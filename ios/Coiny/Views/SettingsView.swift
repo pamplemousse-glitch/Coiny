@@ -308,7 +308,7 @@ private extension SettingsView {
                     .accessibilityIdentifier("settings.legal.\(document.rawValue)")
             }
             LabeledContent("Contact") {
-                Link("coiny@athanorworks.com", destination: URL(string: "mailto:coiny@athanorworks.com")!)
+                Link("contact@athanorworks.com", destination: URL(string: "mailto:contact@athanorworks.com")!)
                     .font(.callout)
             }
         }

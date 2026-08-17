@@ -21,7 +21,7 @@ struct LegalDocumentView: View {
                         // Never a blank page. A legal document that silently
                         // fails to render is indistinguishable from one that
                         // was never written.
-                        Text("This document could not be opened on this build. Email coiny@athanorworks.com and we will send it to you.")
+                        Text("This document could not be opened on this build. Email contact@athanorworks.com and we will send it to you.")
                             .font(.body)
                             .foregroundStyle(CoinyTheme.ink)
                     }

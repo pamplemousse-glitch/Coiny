@@ -705,7 +705,7 @@ Google Play, binding when Android reaches parity, worth designing against now be
 
 ## 29. Support
 
-`coiny@athanorworks.com` (Unverified: domain and alias not yet confirmed; settle when the privacy policy is drafted, which needs the same address), linked from Settings as "Contact" and stated in the App Store listing. TestFlight feedback is the second channel. Best-effort 48-hour response, no SLA, no in-app chat, no help center until real users generate real repeated questions. That is the whole section, on purpose: at 30 testers, support process is a distraction from fixing the things they report.
+`contact@athanorworks.com` (Unverified: domain and alias not yet confirmed; settle when the privacy policy is drafted, which needs the same address), linked from Settings as "Contact" and stated in the App Store listing. TestFlight feedback is the second channel. Best-effort 48-hour response, no SLA, no in-app chat, no help center until real users generate real repeated questions. That is the whole section, on purpose: at 30 testers, support process is a distraction from fixing the things they report.
 
 ## 30. Roadmap and phasing
 

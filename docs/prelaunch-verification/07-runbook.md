@@ -72,7 +72,7 @@ The Apple Organization enrollment is the longest pole in the entire document.
 | G1.2 | Make the name call, buy the domain the same day, and stand up static hosting for `/coiny/privacy`, `/coiny/terms`, a deletion-request page, `/.well-known/security.txt` and later `/.well-known/apple-app-site-association`. | [Founder] | 2.1.14, 1.11.8, 1.11.9, 2.3.13, 5.5.14, 5.4.16, 1.4.15 | Days to buy, hours to host, ~$15/yr. **Blocks G1.6, G1.5, G2.1, G2.2, G3.1.** It is the cheapest item on the critical path and it gates the largest one |
 | G1.3 | Send `docs/legal/privacy-policy.md` and `docs/legal/terms-of-service.md` to the attorney with the inline notes and lawyer questions Q3, Q5, Q7 from `docs/obligations.md` §8. | [Founder] | 5.2.9, and the content half of 5.2.2, 5.2.3 | **Weeks of external latency.** Blocks publishing the URLs G1.2 hosts, therefore blocks G1.6's copy being final. Start it the same day as G1.2 so the two run in parallel |
 | G1.4 | Commission the character art. Run `docs/design-direction.md` §7.2 Phase 1 (three to five concepts, paid, ~$700) with two artists in parallel. | [Founder] | 3.4.6h, 3.10.2, 3.7.6, and the re-test trigger on 6.6.10 | **Four to six weeks for the full commission, $3,000 to $6,000.** Blocks G3.5 (the app icon, which blocks submission independently of anything else). Start now because it is calendar time, not work time |
-| G1.5 | Create and verify `coiny@athanorworks.com`. | [Founder] | 1.11.9, and the disclosure destination for 1.11.8 | Thirty minutes. Waits on G1.2 |
+| G1.5 | Create and verify `contact@athanorworks.com`. | [Founder] | 1.11.9, and the disclosure destination for 1.11.8 | Thirty minutes. Waits on G1.2 |
 
 ### The one screen, which is the largest single engineering item in the document
 
@@ -303,7 +303,7 @@ this section on its own; nothing else in the runbook needs you.
 | T8 | Check in the Neon console whether protected branches is on Free | Settles the Part 2 / Part 4 contradiction; either do it or defer to G4.2 | 2 min |
 | G1.29 | Confirm `DATA_ENCRYPTION_KEY` is in the macOS Keychain. Presence only, never print it | The second of the two copies R-20.3 requires | 5 min |
 | G1.30 | Simulator accessibility sweep: Accessibility Inspector audit, then Color Filters at Grayscale, Deuteranopia, Protanopia | Confirms or refutes the whole of 6.3 and 6.6 before any code changes | 30 min |
-| G1.5 | Create and verify `coiny@athanorworks.com` | The support address every legal document and the App Store listing use | 30 min |
+| G1.5 | Create and verify `contact@athanorworks.com` | The support address every legal document and the App Store listing use | 30 min |
 | G1.32 | Record the decision that Android does not ship until iOS reaches App Store parity | Parks nine Android rows across four parts | 10 min |
 | G1.28 | Write the one-page incident plan: the FTC form URL, the consoles to rotate and in what order, the two clocks, and what rotating the encryption key actually costs | The only incident artefact a solo founder will use | 1 hour |
 | G1.31 | Manual VoiceOver pass, all three tabs plus the expanded journey, paywall and eight onboarding screens. **Waits on G1.1** | The R-11.6 gate the PRD set and has never met | 1 hour |
