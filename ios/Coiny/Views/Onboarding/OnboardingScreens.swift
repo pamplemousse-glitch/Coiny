@@ -33,7 +33,11 @@ struct OnboardingPrimaryButton: View {
         Button(action: action) {
             Group {
                 if isBusy {
-                    ProgressView().tint(CoinyTheme.onSignal)
+                    // `onDisabledFill`, not `onSignal`: this spinner only ever
+                    // shows while `isBusy`, which is the same condition that
+                    // disables the button, so it is always drawn on the
+                    // disabled `field` fill and never on `signalFill`.
+                    ProgressView().tint(CoinyTheme.onDisabledFill)
                 } else {
                     Text(title)
                 }

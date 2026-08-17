@@ -44,6 +44,12 @@ struct PaywallView: View {
             }
             .padding()
         }
+        // #218 gave every screen the shared background and this one was
+        // missed, so the paywall rendered on `systemBackground`: pure #FFFFFF
+        // in light and pure #000000 in dark, beside an app whose own screen is
+        // #EDEFE7 / #151711. It is the only screen that asks for money, and it
+        // looked like it belonged to a different app.
+        .background(CoinyTheme.screen)
         .navigationTitle("Coiny Plans")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -53,6 +59,25 @@ struct PaywallView: View {
         .sheet(item: $presentedDocument) { document in
             LegalDocumentView(document: document)
         }
+    }
+}
+
+// MARK: - Colour choices the contrast suite asserts on
+
+extension PaywallView {
+    /// The border of a tier card is the only thing that distinguishes the
+    /// selected plan from the unselected ones, which makes it a control
+    /// boundary rather than decoration: WCAG 2.2 1.4.11 asks 3:1 of it.
+    ///
+    /// Was `Color.secondary.opacity(0.3)`, which rendered at 1.19:1 on the
+    /// light screen. Opacity over a semantic colour was the mechanism: it
+    /// composites against whatever is behind it and lands somewhere different
+    /// in each scheme, and neither result had ever been measured. `ink3` is a
+    /// real value in both schemes and `signal` is the accent stated outright
+    /// rather than inherited, which is the same defect class as the
+    /// AccentColor asset that compiled and was never read.
+    static func tierBorderColor(selected: Bool) -> Color {
+        selected ? CoinyTheme.signal : CoinyTheme.ink3
     }
 }
 
@@ -116,7 +141,7 @@ private extension PaywallView {
             .frame(minHeight: 44)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(selected ? Color.accentColor : Color.secondary.opacity(0.3), lineWidth: selected ? 2 : 1)
+                    .strokeBorder(Self.tierBorderColor(selected: selected), lineWidth: selected ? 2 : 1)
             )
             .contentShape(RoundedRectangle(cornerRadius: 10))
         }
@@ -167,30 +192,17 @@ private extension PaywallView {
             }
         } label: {
             Text(service.purchaseInFlight ? "Processing purchase" : "Subscribe")
-                .frame(maxWidth: .infinity, minHeight: 44)
-                // Explicit fill and label, NOT the inherited accent.
-                //
-                // `.borderedProminent` paints itself in the accent colour and
-                // labels it white. Now that AccentColor is CoinyTheme.signal,
-                // that would be white on the dark-mode amber at 2.15:1, which
-                // is the exact failure the `onSignal` token exists to prevent
-                // (see CoinyTheme). signalFill + onSignal measure 5.03:1 in
-                // light and 8.38:1 in dark.
-                //
-                // The disabled state is a DIFFERENT PAIR of tokens, not the
-                // same pair at reduced opacity. Fading the whole button fades
-                // the fill and the white label together and leaves a label
-                // that is nearly invisible, which the accessibility audit
-                // reports as a contrast failure and which looks broken on the
-                // screen that asks for money. `field` with `ink2` measures
-                // 6.29:1 and still reads as unavailable.
-                .foregroundStyle(isSubscribeDisabled ? CoinyTheme.ink2 : CoinyTheme.onSignal)
-                .background(
-                    isSubscribeDisabled ? CoinyTheme.field : CoinyTheme.signalFill,
-                    in: RoundedRectangle(cornerRadius: 10)
-                )
         }
-        .buttonStyle(.plain)
+        // The token swap this screen needs now lives in the shared style, so
+        // the rule holds everywhere the filled button is used instead of only
+        // where someone remembered to hand-roll it.
+        //
+        // `.borderedProminent` is still wrong here for the original reason:
+        // it paints itself in the accent and labels it white, which is white
+        // on the dark-mode amber at 2.15:1, the exact failure `onSignal`
+        // exists to prevent. Enabled measures 5.03:1 light and 8.38:1 dark;
+        // disabled is `field` with `ink2`, at full opacity.
+        .buttonStyle(.coinyFilled)
         .disabled(isSubscribeDisabled)
     }
 
