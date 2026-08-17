@@ -1105,16 +1105,17 @@ Verified against source on 2026-08-13 after the `integration/night-build` block 
 | R-27.1 | Org enrollment | Unverified, BLOCKER at submission | Portal check |
 | R-28.1 | Staged rollout | Unbuilt | Depends on §24 |
 | R-29 | Support address | Unverified | Domain/alias unconfirmed |
-| R-31.1, R-31.2 | Server log redaction and the two missing fields | Unbuilt | `plugins/logger.ts` is 14 lines, no `redact` list. Runbook G1.21 |
+| R-31.1, R-31.2 | Server log redaction and the two missing fields | **Built** | `plugins/logger.ts` redact list; `user_id` bound in `plugins/auth.ts` at preHandler, because Fastify logs the request line before auth runs. `tests/logger.test.ts` |
 | R-31.3 | Permitted log vocabulary | Standing | Was `.claude/rules/security.md` #2 only; now carries an ID so it can be tested |
-| R-31.4, R-31.5 | `{ err }` is not a log payload; vendor errors log as codes | Unbuilt | 24 sites in 12 files; `plaid/types.ts:208-216` builds `message` from `error_message` |
-| R-31.6 | 4xx bodies are written copy, not `error.message` | Unbuilt | `plugins/error-handler.ts:7`; safe today only because `PlaidApiError` carries `status`, not `statusCode` |
+| R-31.4, R-31.5 | `{ err }` is not a log payload; vendor errors log as codes | **Built** | Solved centrally in the `err` serializer rather than at 24 call sites: `message` is rebuilt from `error_type/error_code` and the stack header is stripped, because `err.stack` begins with "Name: message" and re-leaked what `message` had just removed |
+| R-31.6 | 4xx bodies are written copy, not `error.message` | **Built** | `plugins/error-handler.ts`; only Fastify's own validation codes return a message. `tests/error-handler.test.ts`, which is the first test this file has ever had |
 | R-31.7 | Response-shape tests on the widest routes | Unbuilt | `GET /api/net-worth` returns every class; Home renders one number |
 | R-31.8 | No secret in the IPA | Built | 1.8.1 VERIFIED. `Info.plist` holds display name, encryption flag, URL scheme, versions, `COINY_API_BASE_URL` |
 | R-31.9 | No rendered string from `localizedDescription` | Unbuilt | 87 assignments across 25 ViewModels; `API.swift:67` interpolates the raw body |
 | R-31.10 | App-switcher snapshot cover | Unbuilt | `scenePhase` appears only in `OnboardingView.swift:25,39-40`; no blur or overlay anywhere |
 | R-31.11 | `print` banned in shipped iOS code | Partial | One remains, `CoinyApp.swift:126`; needs a SwiftLint `custom_rules` entry to be a control |
-| R-31.12, R-31.13 | Automated proof for §31.1 to §31.2 | Unbuilt | `backend/tests/logger.test.ts` does not exist |
+| R-31.12 | Automated proof for §31.1 to §31.2 | **Built** | `tests/logger.test.ts`, 12 cases, verified against a reverted fix rather than trusted for passing |
+| R-31.13 | Response-shape assertions | Unbuilt | R-31.7 is still open |
 | R-31.14 | Manual pre-TestFlight checks | Unbuilt | `strings`/MobSF on the first Release archive, app-switcher pass, proxy pass |
 
 **Corrected 2026-08-13:** `backend/CLAUDE.md` claimed Sydney deployment, 56 tests, and a `migrations/` directory, all false. Fixed, and the journal-ordering trap that silently skipped two migrations this week is now documented there, since that is where a backend session will look.
