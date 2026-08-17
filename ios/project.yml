@@ -14,9 +14,13 @@ settings:
     SWIFT_VERSION: "5.10"
     IPHONEOS_DEPLOYMENT_TARGET: "17.0"
     ENABLE_USER_SCRIPT_SANDBOXING: NO
-    # Set your 10-character Apple Developer Team ID here (found at developer.apple.com/account).
-    # Also enable "Sign In with Apple" capability for bundle ID app.coiny.ios in the Developer Portal.
-    DEVELOPMENT_TEAM: ""
+    # Apple Developer Team ID. Empty means device builds cannot sign at all, which
+    # is what "Signing for Coiny requires a development team" means when you see
+    # it. Simulator builds are ad-hoc signed and do not care.
+    #
+    # The App ID app.coiny.ios must have Sign in with Apple and Push enabled in
+    # the Developer Portal for the entitlements below to resolve.
+    DEVELOPMENT_TEAM: UKL98DS9D3
 
 # Build configurations — Debug for local + Simulator, Release for TestFlight + App Store
 configs:
@@ -56,6 +60,11 @@ targets:
       path: Coiny/Info.plist
       properties:
         CFBundleDisplayName: Coiny
+        # Declared once here so App Store Connect never asks per build. false
+        # is correct: Coiny uses only HTTPS and the platform crypto Apple
+        # exempts. A build without this sits in Missing Compliance and cannot
+        # be distributed to TestFlight.
+        ITSAppUsesNonExemptEncryption: false
         CFBundleURLTypes:
           - CFBundleURLName: app.coiny.ios
             CFBundleURLSchemes:
@@ -90,6 +99,13 @@ targets:
       path: Coiny/Coiny.entitlements
       properties:
         aps-environment: development
+        # Without this the SignInWithAppleButton on the first screen builds,
+        # installs, and then fails at runtime with ASAuthorizationError 1000.
+        # It must be declared here rather than in Coiny.entitlements or the
+        # Xcode capabilities UI, because xcodegen rewrites that file on every
+        # generate. Requires the capability enabled on the App ID in the portal.
+        com.apple.developer.applesignin:
+          - Default
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.coiny.ios
@@ -101,12 +117,14 @@ targets:
         # the commit count (Scripts/stamp-build-number.sh).
         CURRENT_PROJECT_VERSION: "1"
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        # Cleared deliberately. Adding Assets.xcassets (for AccentColor) makes
-        # Xcode look for an app icon set named "AppIcon" and fail the build when
-        # it is absent, and there is no commissioned icon yet
-        # (design-direction section 5). Set this back to AppIcon and add the
-        # icon set in the same commit; App Store submission requires one.
-        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        # Set in the same commit that adds the icon set, as the note this
+        # replaces asked. The art is a PLACEHOLDER, not the commissioned icon
+        # design-direction section 5 still owes: the egg-in-window motif in the
+        # light palette, generated so that TestFlight uploads stop failing
+        # validation. App Store Connect rejects a build with no icon, so an
+        # ugly icon blocks nothing and an absent one blocks everything.
+        # Replace the PNG, keep the asset set.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # Without this the AccentColor colorset compiles into Assets.car and is
         # then never read: nothing writes NSAccentColorName into Info.plist, so
         # `.tint(.accentColor)` keeps resolving to system blue. Shipping the
@@ -126,7 +144,6 @@ targets:
         SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
         GCC_TREAT_WARNINGS_AS_ERRORS: YES
         CODE_SIGN_STYLE: Automatic
-        CODE_SIGN_IDENTITY: "Apple Development"
         ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
         SWIFT_EMIT_LOC_STRINGS: YES
     dependencies:
@@ -186,8 +203,18 @@ schemes:
       config: Debug
       # Local StoreKit configuration: makes the subscription products, purchase
       # flow and renewals testable in the simulator with no App Store Connect
-      # products (those are blocked on the org enrollment, R-27.1).
+      # products.
       storeKitConfiguration: Coiny.storekit
+      # Which backend a simulator run talks to. API.swift reads this first, on
+      # simulator and device alike, and falls back to localhost on simulator.
+      #
+      # Declared here rather than set by hand in Xcode because xcodegen
+      # regenerates the scheme on every run and silently discards anything the
+      # UI added. Flip isEnabled to true to point a simulator run at staging.
+      environmentVariables:
+        - variable: COINY_API_BASE_URL
+          value: https://coiny-backend.fly.dev
+          isEnabled: false
     test:
       config: Debug
       targets:

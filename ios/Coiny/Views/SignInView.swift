@@ -19,6 +19,7 @@ struct SignInView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var presentedDocument: LegalDocument?
+    @Environment(\.colorScheme) private var colorScheme
 
     /// Line one of `docs/legal/consent-copy.md:20`, verbatim, with both terms
     /// as links. The `coiny://legal/...` scheme is intercepted below and opens
@@ -95,7 +96,12 @@ struct SignInView: View {
             } onCompletion: { result in
                 Task { @MainActor in await handle(result) }
             }
-            .signInWithAppleButtonStyle(.black)
+            // `.black` in both schemes put a #000000 button on the #151711
+            // dark screen: 1.16:1, so the only call to action on the first
+            // screen anyone sees was an invisible rectangle and the white
+            // label appeared to float. Apple's HIG asks for the light styles
+            // on dark backgrounds for exactly this reason.
+            .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
             .frame(height: 50)
             .accessibilityIdentifier("signin.apple")
 

@@ -45,6 +45,7 @@
 		20F517BEBCCF57EEF08D9D18 /* CreatureWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC3F2AED38087E149BEBF64 /* CreatureWindow.swift */; };
 		21F174C46BF8BF6F3229578E /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3FF4A43F181F21963F8104F /* PaywallView.swift */; };
 		220920B25D14BDCECE977BC9 /* TruelayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18AAE0E838B59D15092CC506 /* TruelayerViewModel.swift */; };
+		22DD3783B968DB6C61DA739A /* DarkModeRenderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62C9B4C739423A364897A88D /* DarkModeRenderingTests.swift */; };
 		2710ACBD593C5409B8EC24C1 /* DebtPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A036120391C5D8C970CDFE5 /* DebtPresentationTests.swift */; };
 		275CC33CEE3B9B10378CEF72 /* ViewSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8973AFCF92D287621A176B77 /* ViewSmokeTests.swift */; };
 		28A8527C9AAB24590B65BDAC /* API+Entitlements.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F16045707E63611441C83A7 /* API+Entitlements.swift */; };
@@ -285,6 +286,7 @@
 		5E69C409A6001E059800119A /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		5EA22C9CCB74F58819DC9960 /* WealthTabUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WealthTabUITests.swift; sourceTree = "<group>"; };
 		618CA9077B0177F449506F80 /* Coiny.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Coiny.entitlements; sourceTree = "<group>"; };
+		62C9B4C739423A364897A88D /* DarkModeRenderingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkModeRenderingTests.swift; sourceTree = "<group>"; };
 		63D1FEEDB72F10002BAC428F /* API+Telemetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Telemetry.swift"; sourceTree = "<group>"; };
 		65284E3BE19D29FB121805ED /* API+ManualAssets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+ManualAssets.swift"; sourceTree = "<group>"; };
 		658AD9ADB0EEB247C3F10450 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -452,6 +454,7 @@
 				B762515DECDB32F8A1DBCF9E /* CoinsViewModelTests.swift */,
 				DDCC857A4023EBFEB99C929F /* CoinyThemeContrastTests.swift */,
 				9BA56E7F280F38672F7A1433 /* ConnectionRepairViewModelTests.swift */,
+				62C9B4C739423A364897A88D /* DarkModeRenderingTests.swift */,
 				8A036120391C5D8C970CDFE5 /* DebtPresentationTests.swift */,
 				8B936C88F05ABE381C2A2220 /* DebtsAPIDecodingTests.swift */,
 				D8B77884117CC28B5E4C7E35 /* DebtStoreTests.swift */,
@@ -793,14 +796,14 @@
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
 					268DB961154BA060157CA1CA = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = UKL98DS9D3;
 					};
 					33A98B7A409CDBE4C489290E = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = UKL98DS9D3;
 						ProvisioningStyle = Automatic;
 					};
 					AE17DDE46EE9343EE4D6AF8E = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = UKL98DS9D3;
 						TestTargetID = 33A98B7A409CDBE4C489290E;
 					};
 				};
@@ -878,6 +881,7 @@
 				FC2DB1160F3F632335CC4951 /* CoinsViewModelTests.swift in Sources */,
 				BFA7E639197CBAA87F96AC0D /* CoinyThemeContrastTests.swift in Sources */,
 				C7A55A81C43EDBA5D944D007 /* ConnectionRepairViewModelTests.swift in Sources */,
+				22DD3783B968DB6C61DA739A /* DarkModeRenderingTests.swift in Sources */,
 				2710ACBD593C5409B8EC24C1 /* DebtPresentationTests.swift in Sources */,
 				58FC8337A768F90FEFCFA226 /* DebtStoreTests.swift in Sources */,
 				CDA7E73CD7433393C6802C65 /* DebtsAPIDecodingTests.swift in Sources */,
@@ -1141,11 +1145,11 @@
 		B7835D887C601CC0D9C229A7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Coiny/Coiny.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				COINY_API_BASE_URL = "https:/$()/coiny-backend.fly.dev";
 				CURRENT_PROJECT_VERSION = 1;
@@ -1202,7 +1206,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = UKL98DS9D3;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -1235,11 +1239,11 @@
 		DAA42EE91F81C33BF6846A4F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Coiny/Coiny.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				COINY_API_BASE_URL = "https:/$()/coiny-backend.fly.dev";
 				CURRENT_PROJECT_VERSION = 1;
@@ -1315,7 +1319,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = UKL98DS9D3;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;

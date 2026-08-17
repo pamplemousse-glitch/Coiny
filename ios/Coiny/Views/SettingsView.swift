@@ -36,16 +36,20 @@ struct SettingsView: View {
                         LabeledContent("Savings target") {
                             Text("$\(goals.savingsGoal)")
                                 .monospacedDigit()
+                                .foregroundStyle(CoinyTheme.ink2)
                         }
                         LabeledContent("Min paycheck") {
                             Text("$\(goals.paycheckMinAmount)")
                                 .monospacedDigit()
+                                .foregroundStyle(CoinyTheme.ink2)
                         }
                         LabeledContent("Large purchase") {
                             Text("$\(goals.largePurchaseThreshold)")
                                 .monospacedDigit()
+                                .foregroundStyle(CoinyTheme.ink2)
                         }
                     }
+                    .listRowBackground(CoinyTheme.surface)
 
                     // Only when there is something in it. A Section renders its
                     // header whether or not the ForEach produces rows, so an
@@ -58,9 +62,11 @@ struct SettingsView: View {
                                 LabeledContent(category.capitalized) {
                                     Text("$\(Int(amount))")
                                         .monospacedDigit()
+                                        .foregroundStyle(CoinyTheme.ink2)
                                 }
                             }
                         }
+                        .listRowBackground(CoinyTheme.surface)
                     }
                 }
 
@@ -80,12 +86,15 @@ struct SettingsView: View {
                     LabeledContent("Backend") {
                         Text(API.Endpoint.baseURL.host ?? API.Endpoint.baseURL.absoluteString)
                             .font(.caption.monospaced())
+                            .foregroundStyle(CoinyTheme.ink2)
                     }
                     LabeledContent("Version") {
                         Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0")
                             .font(.caption.monospaced())
+                            .foregroundStyle(CoinyTheme.ink2)
                     }
                 }
+                .listRowBackground(CoinyTheme.surface)
 
                 Section("Account") {
                     Button("Sign out", role: .destructive) {
@@ -106,6 +115,7 @@ struct SettingsView: View {
                         showDeleteAlert = true
                     }
                 }
+                .listRowBackground(CoinyTheme.surface)
                 .alert("Other devices signed out", isPresented: $showRevokeResult) {
                     Button("OK", role: .cancel) {}
                 } message: {
@@ -149,11 +159,24 @@ struct SettingsView: View {
                         onboardingComplete = false
                     }
                 }
+                .listRowBackground(CoinyTheme.surface)
             }
             // A Form paints its own grouped background, so the theme colour has
             // to replace it rather than sit behind it.
             .scrollContentBackground(.hidden)
             .background(CoinyTheme.screen)
+            // The rows needed the same treatment and never got it: hiding the
+            // scroll background left every row on the system grouped colour,
+            // #FFFFFF in light and #2C2C2E in dark. On dark that is a cold
+            // grey sitting on the warm #151711 screen at 1.30:1, which is why
+            // Settings reads as a different app than the tab it opens from.
+            // Deliberately NOT `.foregroundStyle(ink, ink2)` on the Form. That
+            // fixes the values in one line and silently repaints every button
+            // row in `ink` too: "Restore purchases", "Manage subscription" and
+            // the destructive "Unlink bank" all rendered as plain body text,
+            // losing both the accent that says a row is tappable and the red
+            // that says a row is dangerous. Measured on the render, not
+            // reasoned about. The values are tokenised individually below.
             .navigationTitle("Settings")
             // An explicit dismiss, not just swipe-to-dismiss. A sheet whose
             // only exit is a drag gesture is unreachable for a VoiceOver user
@@ -187,6 +210,23 @@ struct SettingsView: View {
     }
 }
 
+// MARK: - Colour choices the contrast suite asserts on
+
+extension SettingsView {
+    /// A `Form` row's label fades to the system tertiary label when the button
+    /// is disabled, which is the same "faded into near-invisibility" defect
+    /// #220 fixed on the paywall's subscribe button. The unavailable state
+    /// needs a different token, not the same one at reduced opacity.
+    ///
+    /// Measured before the fix: 1.84:1 in light and 2.25:1 in dark. `signal`
+    /// is the accent stated outright rather than inherited through
+    /// `Color.accentColor`, which does not resolve to the asset outside the
+    /// app bundle and measured as the system blue at 3.80:1 here.
+    static func refundLabelColor(available: Bool) -> Color {
+        available ? CoinyTheme.signal : CoinyTheme.ink2
+    }
+}
+
 // MARK: - Consent (docs/legal/consent-copy.md section 2)
 
 private extension SettingsView {
@@ -200,11 +240,12 @@ private extension SettingsView {
             if usageDataSyncFailed {
                 Text(Self.usageDataSyncNotice)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(CoinyTheme.ink2)
             }
         } footer: {
             Text(Self.usageDataFooter)
         }
+        .listRowBackground(CoinyTheme.surface)
     }
 
     /// Footer copy from `docs/legal/consent-copy.md:39-41`, verbatim.
@@ -271,6 +312,7 @@ private extension SettingsView {
                     .font(.callout)
             }
         }
+        .listRowBackground(CoinyTheme.surface)
     }
 
     @MainActor
@@ -304,7 +346,7 @@ private extension SettingsView {
                 if let repairError = repairVM.errorMessage {
                     Text(repairError)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(CoinyTheme.ink2)
                 }
                 Button(isUnlinkingBank ? "Unlinking…" : "Unlink bank", role: .destructive) {
                     Task {
@@ -319,10 +361,11 @@ private extension SettingsView {
             } else {
                 LabeledContent("Status") {
                     Text("Not linked")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(CoinyTheme.ink2)
                 }
             }
         }
+        .listRowBackground(CoinyTheme.surface)
     }
 
     /// One row per Plaid item. Repair opens Link update mode: the existing
@@ -336,7 +379,7 @@ private extension SettingsView {
                     .font(.subheadline)
                 Text(statusText(item))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(CoinyTheme.ink2)
             }
             Spacer()
             if item.repairable {
@@ -374,6 +417,7 @@ private extension SettingsView {
         Section("Subscription") {
             LabeledContent("Plan") {
                 Text(planName)
+                    .foregroundStyle(CoinyTheme.ink2)
             }
             NavigationLink("View plans") {
                 PaywallView()
@@ -385,17 +429,35 @@ private extension SettingsView {
                 showManageSubscriptions = true
             }
             // Refunds route through Apple; this opens Apple's own sheet.
-            Button("Request a refund") {
-                showRefundSheet = true
+            //
+            // When there is nothing to refund this is text, not a disabled
+            // button. `.disabled()` multiplies the label's opacity no matter
+            // what colour it is given, which is why the first attempt at this
+            // fix still measured 2.90:1 in dark and 2.39:1 in light on the
+            // rendered screen while the token pair it used computes 7.17:1. A
+            // row that cannot be tapped is not a control, and saying so gives
+            // VoiceOver something truer than a dimmed button as well.
+            if isRefundAvailable {
+                Button("Request a refund") { showRefundSheet = true }
+                    .foregroundStyle(Self.refundLabelColor(available: true))
+            } else {
+                LabeledContent("Request a refund") {
+                    Text("No purchases yet")
+                        .font(.caption)
+                        .foregroundStyle(Self.refundLabelColor(available: false))
+                }
+                .foregroundStyle(Self.refundLabelColor(available: false))
             }
-            .disabled(StoreKitService.shared.refundableTransactionID == nil)
         }
+        .listRowBackground(CoinyTheme.surface)
         .manageSubscriptionsSheet(isPresented: $showManageSubscriptions)
         .refundRequestSheet(
             for: StoreKitService.shared.refundableTransactionID ?? 0,
             isPresented: $showRefundSheet
         )
     }
+
+    var isRefundAvailable: Bool { StoreKitService.shared.refundableTransactionID != nil }
 
     var planName: String {
         guard let entitlements = StoreKitService.shared.entitlements else { return "Free" }

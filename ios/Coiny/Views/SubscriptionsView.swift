@@ -50,9 +50,13 @@ struct SubscriptionsView: View {
         .listStyle(.plain)
         // The only themed surface here was the error inset, so the list drew
         // on the system background and the screen had a hard seam across it:
-        // warm #151711 down to the inset, pure #000000 below.
+        // warm #151711 down to the inset, pure #000000 below. Same omission as
+        // the paywall's, found the same way, by looking at it in dark.
         .scrollContentBackground(.hidden)
         .background(CoinyTheme.screen)
+        // "Recurring", not "Subscriptions": the screen now carries recurring
+        // income as well as charges, and a paycheck under a heading that says
+        // Subscriptions reads as a bug.
         .navigationTitle("Recurring")
         .refreshable { await load() }
         .task { await load() }
