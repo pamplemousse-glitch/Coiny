@@ -131,12 +131,10 @@ targets:
         # asset alone looked correct in code review and in a green test run, and
         # was visibly wrong on screen.
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
-        # Which backend a device build talks to. Staging, for every
-        # configuration, because production does not exist yet.
-        #
-        # When it does, add a `configs:` block overriding this for Release only.
-        # Staging stays the default so that a build which forgets to opt in
-        # reaches the environment full of fake data, never real bank accounts.
+        # Which backend a device build talks to. This is the BASE value, so it
+        # is what every configuration gets unless one overrides it below.
+        # Staging on purpose: a build which forgets to opt in must reach the
+        # environment full of fake data, never real bank accounts.
         # ($() defeats Xcode's // comment stripping in build settings.)
         COINY_API_BASE_URL: https:/$()/coiny-backend.fly.dev
         SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
@@ -146,6 +144,23 @@ targets:
         CODE_SIGN_STYLE: Automatic
         ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
         SWIFT_EMIT_LOC_STRINGS: YES
+      configs:
+        # The override the base comment above used to ask for, now that a
+        # production backend is being stood up. Release only: TestFlight and App
+        # Store builds reach production, and every Debug build, which is what
+        # `xcodebuild build` and a Run from Xcode produce, still reaches staging.
+        #
+        # This is the iOS half of the same opt-in shape as bin/load-secrets.sh
+        # and fly.toml. Production is named in exactly one place per surface and
+        # is never the default; the failure mode of forgetting is fake data, not
+        # someone's real accounts.
+        #
+        # NOTE: the host must exist before an archive is useful. `coiny-api` is
+        # created by `fly apps create coiny-api` and deployed with
+        # `fly deploy -c fly.production.toml`; until that has happened a Release
+        # build compiles and signs fine and simply cannot reach a backend.
+        Release:
+          COINY_API_BASE_URL: https:/$()/coiny-api.fly.dev
     dependencies:
       - package: LinkKit
         product: LinkKit
