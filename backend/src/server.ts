@@ -83,7 +83,20 @@ export function getRegisteredRoutes(): readonly RegisteredRoute[] {
   return registeredRoutes;
 }
 
-async function buildApp() {
+/** Test seam for the redaction suite (R-31.12). Production passes nothing and
+ *  pino writes to stdout exactly as before; `tests/logger.test.ts` passes a
+ *  stream so it can read what was actually emitted rather than reasoning about
+ *  what the config implies. The audit's existing check for this was a grep,
+ *  which is why it could only ever be true at a point in time. */
+type BuildAppOptions = {
+  loggerStream?: NodeJS.WritableStream;
+  /** Tests default LOG_LEVEL to 'silent' (tests/setup.ts), so a redaction test
+   *  that did not raise it would capture an empty stream and pass by asserting
+   *  nothing. */
+  loggerLevel?: string;
+};
+
+async function buildApp(options: BuildAppOptions = {}) {
   await initDb();
   // Migrations run as a deploy step (fly.toml release_command), not here.
   // On boot, every machine that starts races every other machine to migrate,
@@ -94,11 +107,17 @@ async function buildApp() {
     await runMigrations();
   }
 
+  // Built as two whole objects rather than one with an optional `stream` key:
+  // under exactOptionalPropertyTypes a `stream?: T` does not satisfy Fastify's
+  // logger overload, and the resulting error points at the config rather than
+  // at the optional property that caused it.
+  const level = options.loggerLevel ?? config.LOG_LEVEL;
+  const loggerConfig = options.loggerStream
+    ? { ...loggerOptions, level, stream: options.loggerStream }
+    : { ...loggerOptions, level };
+
   const app = Fastify({
-    logger: {
-      level: config.LOG_LEVEL,
-      ...loggerOptions,
-    },
+    logger: loggerConfig,
     // Both default to disabled in Fastify, which is why nothing bounded the
     // total duration of POST /api/net-worth/refresh: only the individual vendor
     // attempts were bounded, and there can be up to 84 of them.
