@@ -3,25 +3,27 @@ import Foundation
 // Assembly logic for the subscription reveal, onboarding screen 6
 // (PRD sections 5.5 and 5.6, register row DR-19).
 //
-// Two sources feed it: Plaid's own recurring streams (seeded server-side at
-// token exchange, available minutes after link) and the local 120-day
-// detector (`GET /api/subscriptions`). Per R-5.5 the two are deduped by
-// lowercased merchant name, the local detector's numbers win on conflict,
-// rows sort by amount descending, and the headline total is annualised as
-// sum(amount x 365 / cadenceDays).
+// One source: Plaid's own recurring streams, seeded server-side at token
+// exchange and available minutes after link.
+//
+// There used to be two. A local 120-day detector re-derived subscriptions from
+// our own stored transactions and, per R-5.5, its numbers overrode Plaid's on
+// a merchant conflict. That rule had it backwards: the local detector could
+// only ever find a 25-35 day cadence, so it was blind to weekly and annual
+// subscriptions by construction, and letting the weaker source win meant a
+// yearly charge Plaid had correctly classified could be replaced by nothing at
+// all. Deduping two sources of the same fact is also just how the two of them
+// drift. The detector is gone; R-5.5's merge rule is moot with one source.
+//
+// Rows still sort by amount descending and the headline total is still
+// annualised as sum(amount x 365 / cadenceDays).
 
 // MARK: - Reveal rows
 
 struct RevealItem: Equatable, Identifiable, Sendable {
-    enum Source: Equatable, Sendable {
-        case localDetector
-        case plaidStream
-    }
-
     let merchantName: String
     let cadenceDays: Int
     let amountUSD: Double
-    let source: Source
 
     var id: String { merchantName.lowercased() }
 
@@ -58,12 +60,10 @@ enum RevealBuilder {
         }
     }
 
-    /// Merges the two sources per R-5.5. Only active outflow streams with a
-    /// usable amount and cadence qualify from the Plaid side.
-    static func merge(
-        local: [DetectedSubscription],
-        streams: [PlaidRecurringStream]
-    ) -> [RevealItem] {
+    /// Builds the reveal rows. Only active outflow streams with a usable
+    /// amount and cadence qualify: an inflow is the user's paycheck, and a
+    /// tombstoned stream is a subscription they already cancelled.
+    static func build(streams: [PlaidRecurringStream]) -> [RevealItem] {
         var byMerchant: [String: RevealItem] = [:]
 
         for stream in streams where stream.direction == "outflow" && stream.isActive {
@@ -73,29 +73,12 @@ enum RevealBuilder {
                 let amount = stream.bestAmountUSD,
                 amount > 0
             else { continue }
-            let item = RevealItem(
-                merchantName: name,
-                cadenceDays: cadence,
-                amountUSD: amount,
-                source: .plaidStream
-            )
+            let item = RevealItem(merchantName: name, cadenceDays: cadence, amountUSD: amount)
             // Two streams for the same merchant (for example two cadences):
             // keep the larger annualised one so the total is not double-counted.
             if let existing = byMerchant[item.id], existing.annualisedUSD >= item.annualisedUSD {
                 continue
             }
-            byMerchant[item.id] = item
-        }
-
-        // Local detector rows override Plaid rows for the same merchant:
-        // they reflect what this user's stored data actually shows.
-        for sub in local where sub.amount > 0 && sub.cadenceDays > 0 {
-            let item = RevealItem(
-                merchantName: sub.merchantName,
-                cadenceDays: sub.cadenceDays,
-                amountUSD: sub.amount,
-                source: .localDetector
-            )
             byMerchant[item.id] = item
         }
 

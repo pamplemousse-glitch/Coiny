@@ -512,11 +512,29 @@ struct SpendingOverride: Decodable, Identifiable {
     var id: String { merchantName }
 }
 
-struct DetectedSubscription: Decodable, Identifiable {
-    let merchantName: String
-    let cadenceDays: Int
+/// One recurring charge or income stream, as Plaid classified it.
+///
+/// `monthlyAmount` is null when Plaid could not name a cadence. It is not
+/// defaulted to zero: a made-up number inside a spending total is worse than
+/// an absent one, so those rows are shown and excluded from the sum.
+struct RecurringItem: Decodable, Identifiable {
+    let id: String
+    let name: String
+    let frequency: String
     let amount: Double
-    let count: Int
-    let lastDate: String
-    var id: String { merchantName }
+    let monthlyAmount: Double?
+    let lastDate: String?
+}
+
+struct RecurringSummary: Decodable {
+    let outflow: [RecurringItem]
+    let inflow: [RecurringItem]
+    let monthlyOutflowTotal: Double
+    let monthlyInflowTotal: Double
+    /// Streams left out of the totals because their cadence is unknown.
+    let excludedFromTotals: Int
+
+    static let empty = RecurringSummary(
+        outflow: [], inflow: [], monthlyOutflowTotal: 0, monthlyInflowTotal: 0, excludedFromTotals: 0
+    )
 }

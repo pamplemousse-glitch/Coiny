@@ -443,6 +443,61 @@ describe('item health store transitions', () => {
     await app.close();
   });
 
+  // Open decision B7, settled: disconnect deletes immediately. Before this,
+  // unlinking dropped the `plaid_items` row and nothing else, so every
+  // transaction, recurring stream, liability and balance survived forever with
+  // no record the item had gone. None of them reference `item_id`, so nothing
+  // cascaded and nothing could have been purged on a timer either.
+  it('unlinking purges every Plaid-derived row, not just the item', async () => {
+    const { persistTransactions } = await import('../src/store/transactions.js');
+    const { upsertRecurringStreams } = await import('../src/store/plaid-recurring.js');
+
+    await persistTransactions(testUserId, [
+      {
+        id: 'purge_t1',
+        account_id: 'a1',
+        amount: '-10.99',
+        date: '2026-08-01',
+        description: 'Spotify',
+        status: 'posted',
+        type: 'card_payment',
+        running_balance: null,
+        details: { counterparty: { name: 'Spotify' }, category: 'entertainment' },
+      },
+    ]);
+    await upsertRecurringStreams(testUserId, [], [
+      {
+        stream_id: 'purge_s1',
+        account_id: 'a1',
+        description: 'SPOTIFY USA',
+        merchant_name: 'Spotify',
+        frequency: 'MONTHLY',
+        average_amount: { amount: 10.99 },
+        last_amount: { amount: 10.99 },
+        last_date: '2026-08-01',
+        status: 'MATURE',
+      },
+    ] as never);
+
+    mockAgent
+      .get('https://sandbox.plaid.com')
+      .intercept({ path: '/item/remove', method: 'POST' })
+      .reply(200, { request_id: 'req_rm' });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'DELETE', url: '/api/plaid/item', headers: authHeader() });
+    expect(res.statusCode).toBe(204);
+
+    const { getRecentOutflows } = await import('../src/store/transactions.js');
+    const { getRecurringStreams } = await import('../src/store/plaid-recurring.js');
+    expect(await getRecentOutflows(testUserId, 365)).toHaveLength(0);
+    const streams = await getRecurringStreams(testUserId);
+    expect([...streams.inflow, ...streams.outflow]).toHaveLength(0);
+
+    await app.close();
+  });
+
   // Deleting the row must not cost the observability the disable path provides:
   // item_state_changed is emitted while the row still exists (R-24.2).
   it('unlinking still emits item_state_changed before the row goes', async () => {

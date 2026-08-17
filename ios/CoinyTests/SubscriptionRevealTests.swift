@@ -22,10 +22,6 @@ final class SubscriptionRevealTests: XCTestCase {
         )
     }
 
-    private func local(_ merchant: String, cadence: Int = 30, amount: Double) -> DetectedSubscription {
-        DetectedSubscription(merchantName: merchant, cadenceDays: cadence, amount: amount, count: 4, lastDate: "2026-08-01")
-    }
-
     // MARK: - Cadence mapping
 
     func testPlaidFrequencyMapping() {
@@ -37,48 +33,51 @@ final class SubscriptionRevealTests: XCTestCase {
         XCTAssertNil(RevealBuilder.cadenceDays(forPlaidFrequency: "UNKNOWN"))
     }
 
-    // MARK: - Merge (R-5.5)
+    // MARK: - Build
 
-    func testMergeDedupesByLowercasedMerchantPreferringLocalDetector() {
-        let merged = RevealBuilder.merge(
-            local: [local("Netflix", amount: 17.99)],
-            streams: [stream(merchant: "NETFLIX", average: "15.49")]
-        )
-        XCTAssertEqual(merged.count, 1)
-        XCTAssertEqual(merged[0].source, .localDetector)
-        XCTAssertEqual(merged[0].amountUSD, 17.99, accuracy: 0.001)
+    // Was testMergeDedupesByLowercasedMerchantPreferringLocalDetector. The
+    // local detector is gone, so there is nothing to prefer; what still has to
+    // hold is that one merchant produces one row even when Plaid reports the
+    // same merchant on two cadences.
+    func testCollapsesTwoStreamsForTheSameMerchantKeepingTheLargerAnnualised() {
+        let built = RevealBuilder.build(streams: [
+            stream(merchant: "NETFLIX", average: "15.49"),
+            stream(merchant: "Netflix", frequency: "ANNUALLY", average: "199.00"),
+        ])
+        XCTAssertEqual(built.count, 1)
+        XCTAssertEqual(built[0].amountUSD, 199.00, accuracy: 0.001)
     }
 
-    func testMergeExcludesInflowInactiveAndUnknownFrequencyStreams() {
-        let merged = RevealBuilder.merge(local: [], streams: [
+    func testExcludesInflowInactiveAndUnknownFrequencyStreams() {
+        let built = RevealBuilder.build(streams: [
             stream(merchant: "Payroll Inc", direction: "inflow"),
             stream(merchant: "Old Gym", active: false),
             stream(merchant: "Mystery", frequency: "UNKNOWN"),
         ])
-        XCTAssertTrue(merged.isEmpty)
+        XCTAssertTrue(built.isEmpty)
     }
 
-    func testMergeFallsBackToStreamDescriptionWhenMerchantMissing() {
-        let merged = RevealBuilder.merge(local: [], streams: [
+    func testFallsBackToStreamDescriptionWhenMerchantMissing() {
+        let built = RevealBuilder.build(streams: [
             stream(merchant: nil, description: "SPOTIFY P0B"),
         ])
-        XCTAssertEqual(merged.map(\.merchantName), ["SPOTIFY P0B"])
+        XCTAssertEqual(built.map(\.merchantName), ["SPOTIFY P0B"])
     }
 
-    func testMergeSortsByAmountDescending() {
-        let merged = RevealBuilder.merge(
-            local: [local("Small", amount: 4.99), local("Big", amount: 59.99)],
-            streams: []
-        )
-        XCTAssertEqual(merged.map(\.merchantName), ["Big", "Small"])
+    func testSortsByAmountDescending() {
+        let built = RevealBuilder.build(streams: [
+            stream(merchant: "Small", average: "4.99"),
+            stream(merchant: "Big", average: "59.99"),
+        ])
+        XCTAssertEqual(built.map(\.merchantName), ["Big", "Small"])
     }
 
     // MARK: - Annualisation
 
     func testAnnualTotalUsesAmountTimes365OverCadence() {
         let items = [
-            RevealItem(merchantName: "A", cadenceDays: 30, amountUSD: 10, source: .localDetector),
-            RevealItem(merchantName: "B", cadenceDays: 365, amountUSD: 100, source: .plaidStream),
+            RevealItem(merchantName: "A", cadenceDays: 30, amountUSD: 10),
+            RevealItem(merchantName: "B", cadenceDays: 365, amountUSD: 100),
         ]
         // 10 * 365/30 + 100 = 121.666... + 100
         XCTAssertEqual(RevealBuilder.annualTotalUSD(items), 221.6, accuracy: 0.1)

@@ -9,7 +9,6 @@ final class FakeOnboardingAPI: OnboardingAPI, @unchecked Sendable {
     private let lock = NSLock()
 
     private var _linkTokenResult: Result<String, Error> = .success("link-sandbox-token")
-    private var _subscriptions: [DetectedSubscription] = []
     private var _recurring = PlaidRecurringResponse(inflow: [], outflow: [])
     private var _netWorthJSON: String?
     private var _ladder: OnboardingLadderSnapshot = OnboardingLadderSnapshot(ladder: nil)
@@ -25,9 +24,9 @@ final class FakeOnboardingAPI: OnboardingAPI, @unchecked Sendable {
         _linkTokenResult = .failure(error)
     }
 
-    func setSubscriptions(_ subs: [DetectedSubscription]) {
+    func setRecurring(_ response: PlaidRecurringResponse) {
         lock.lock(); defer { lock.unlock() }
-        _subscriptions = subs
+        _recurring = response
     }
 
     func setNetWorthJSON(_ json: String) {
@@ -52,10 +51,6 @@ final class FakeOnboardingAPI: OnboardingAPI, @unchecked Sendable {
         return try JSONDecoder().decode(EmptyResponse.self, from: Data("{}".utf8))
     }
 
-    func getSubscriptions() async throws -> [DetectedSubscription] {
-        lock.lock(); defer { lock.unlock() }
-        return _subscriptions
-    }
 
     func getPlaidRecurring() async throws -> PlaidRecurringResponse {
         lock.lock(); defer { lock.unlock() }
@@ -276,9 +271,18 @@ final class OnboardingViewModelTests: XCTestCase {
     }
 
     func testSuccessfulLinkWithSubscriptionsShowsReveal() async {
-        api.setSubscriptions([
-            DetectedSubscription(merchantName: "Netflix", cadenceDays: 30, amount: 17.99, count: 5, lastDate: "2026-08-01"),
-        ])
+        api.setRecurring(PlaidRecurringResponse(inflow: [], outflow: [
+            PlaidRecurringStream(
+                streamId: "s1",
+                direction: "outflow",
+                merchantName: "Netflix",
+                description: "NETFLIX.COM",
+                frequency: "MONTHLY",
+                averageAmount: "17.99",
+                lastAmount: "17.99",
+                isActive: true
+            ),
+        ]))
         let viewModel = makeViewModel()
         await viewModel.linkSucceeded(publicToken: "public-token")
         XCTAssertEqual(viewModel.step, .reveal)

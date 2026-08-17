@@ -242,7 +242,7 @@ extension API {
         )
     }
 
-    func getSubscriptions() async throws -> [DetectedSubscription] {
+    func getSubscriptions() async throws -> RecurringSummary {
         try await get("/api/subscriptions")
     }
 
