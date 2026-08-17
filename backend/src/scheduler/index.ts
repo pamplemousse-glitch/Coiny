@@ -35,6 +35,7 @@ import { coinbaseConnections, plaidItems, spinwheelConnections, zerionWallets } 
 import { refreshScheduledClass, runGoalRefreshFromCache, type ScheduledClass } from '../networth/refresh.js';
 import { getClassCacheForUsers } from '../store/asset-cache.js';
 import { usersMissingDailyPoint } from '../store/goals.js';
+import { drainPlaidRemovalQueue, type RemovalDrainSummary } from './plaid-removals.js';
 import { isPurgeDue, type PurgeSummary, runRetentionPurge } from './purge.js';
 
 const HOUR = 60 * 60 * 1000;
@@ -121,6 +122,8 @@ export type TickSummary = {
   goalRefreshes: number;
   /** Null on the ticks that were not the day's purge tick. */
   purge: PurgeSummary | null;
+  /** Every tick, unlike the purge: a queued Item is being billed monthly. */
+  removals: RemovalDrainSummary;
 };
 
 export async function runSchedulerTick(
@@ -129,13 +132,30 @@ export async function runSchedulerTick(
 ): Promise<TickSummary> {
   if (inFlight) {
     log.info({}, 'scheduler_tick_skipped');
-    return { skipped: true, refreshed: 0, failed: 0, goalRefreshes: 0, purge: null };
+    return { skipped: true, refreshed: 0, failed: 0, goalRefreshes: 0, purge: null, removals: emptyDrain() };
   }
   inFlight = true;
-  const summary: TickSummary = { skipped: false, refreshed: 0, failed: 0, goalRefreshes: 0, purge: null };
+  const summary: TickSummary = {
+    skipped: false,
+    refreshed: 0,
+    failed: 0,
+    goalRefreshes: 0,
+    purge: null,
+    removals: emptyDrain(),
+  };
   const startedTick = Date.now();
 
   try {
+    // First, and every tick. An Item stuck in the removal queue is accruing a
+    // monthly Plaid charge that nothing else can cancel, so it must not queue
+    // behind a slow refresh sweep. Isolated like every other unit: a failure
+    // here costs the drain, never the tick.
+    try {
+      summary.removals = await drainPlaidRemovalQueue(now, log);
+    } catch (err) {
+      log.warn({ err }, 'plaid removal queue drain failed');
+    }
+
     const work = await findDueClassRefreshes(now);
     await runWithConcurrency(CONCURRENCY, work, async ({ userId, cls }) => {
       try {
@@ -178,6 +198,8 @@ export async function runSchedulerTick(
         refreshed: summary.refreshed,
         failed: summary.failed,
         goal_refreshes: summary.goalRefreshes,
+        removals_completed: summary.removals.removed,
+        removals_pending: summary.removals.failed,
       },
       'scheduler_tick_completed',
     );
@@ -186,6 +208,10 @@ export async function runSchedulerTick(
   }
 
   return summary;
+}
+
+function emptyDrain(): RemovalDrainSummary {
+  return { attempted: 0, removed: 0, alreadyGone: 0, failed: 0 };
 }
 
 type RefreshUnit = { userId: string; cls: ScheduledClass };

@@ -31,6 +31,7 @@ import {
 import { cacheLiabilities } from '../store/plaid-liabilities.js';
 import { deletePlaidDataForUser } from '../store/plaid-purge.js';
 import { upsertRecurringStreams } from '../store/plaid-recurring.js';
+import { enqueueItemRemoval } from '../store/plaid-removal-queue.js';
 import { SYNC_LIMIT } from './rate-limits.js';
 
 const ExchangeBodySchema = z.object({
@@ -350,14 +351,27 @@ export function registerPlaidLinkApi(app: FastifyInstance): void {
         try {
           await itemRemove(item.accessToken);
         } catch (err) {
-          req.log.warn({ err, item_id: item.itemId }, 'plaid item_remove failed during unlink');
+          // Unlinking is still not blocked by Plaid being unreachable: the
+          // user's disconnect completes below either way. What changed is that
+          // the ACCESS TOKEN now outlives the failure, in the removal queue,
+          // instead of being destroyed along with the item row.
+          //
+          // Without this, a failed /item/remove left an Item that Plaid bills
+          // monthly "even if no API calls are made for the Item", that cannot
+          // be cancelled without the token, and that has permanently consumed
+          // one of ten Trial connections. Harmless against sandbox, which is
+          // why it survived until production keys existed.
+          req.log.warn({ err, item_id: item.itemId }, 'plaid item_remove failed during unlink; queued for retry');
+          await enqueueItemRemoval({
+            itemId: item.itemId,
+            accessToken: item.accessToken,
+            errorCode: err instanceof PlaidApiError ? err.body.error_code : null,
+          });
         }
         // The status transition and the disable both stay: they are what emit
         // item_state_changed (R-24.2), and they must run while the row exists.
         // The row then goes, taking the encrypted access token with it, the
         // same way every other provider's disconnect drops its credential row.
-        // Unlinking is not blocked by Plaid being unreachable, so the delete
-        // runs whether or not item_remove succeeded.
         await setItemStatus(item.itemId, 'revoked', { errorCode: null });
         await disableItem(item.itemId);
         await deleteItem(item.itemId);

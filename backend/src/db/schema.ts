@@ -136,6 +136,46 @@ export const plaidItems = pgTable(
   (t) => [index('plaid_items_user_idx').on(t.userId)],
 );
 
+// Items whose /item/remove call failed, held only until it succeeds.
+//
+// The defect this exists for: both unlink paths swallowed an /item/remove
+// failure and then destroyed the row, which is the only copy of the access
+// token. In sandbox that costs nothing. In production it leaves an Item that
+// Plaid bills monthly "even if no API calls are made for the Item", that
+// cannot be cancelled without the token we just deleted, and that has
+// permanently consumed one of ten trial connections (removing a Trial Item
+// does not return the slot).
+//
+// A separate table rather than a flag on plaid_items, for two reasons:
+//
+//   1. plaid_items is read by twelve call sites (net worth, goal snapshots,
+//      debts, the refresh sweep, item health, the connection gate). A retained
+//      row needs an exclusion filter at every one of them, and the cost of
+//      missing one is a bank the user unlinked still showing a balance.
+//   2. DELETE /api/account cascades plaid_items away via the user FK, so a
+//      flag on that table cannot survive the case it is most needed in.
+//
+// It carries NO user_id, deliberately. Nothing here is retained for our
+// benefit or joined back to a person: it is an item id and the credential
+// needed to complete the removal the user already asked for, and the row is
+// deleted the moment that succeeds. See docs/legal/data-disposal-schedule.md,
+// which names this as the one bounded exception to "nothing retains a revoked
+// credential".
+export const plaidRemovalQueue = pgTable('plaid_removal_queue', {
+  itemId: text('item_id').primaryKey(),
+  // AES-256-GCM, same envelope as plaid_items.access_token. Registered in
+  // db/rotate-encryption-key.ts: a column that misses the rotation sweep
+  // becomes unreadable at the next key change, which here means the leak the
+  // table exists to close reopens silently.
+  accessToken: text('access_token').notNull(),
+  attempts: integer('attempts').notNull().default(0),
+  lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+  // Plaid error_code only, never error_message: the message is vendor prose
+  // that has carried institution names before now.
+  lastErrorCode: text('last_error_code'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Encryption-at-rest decision for this table (PRD R-13.4, Appendix B item B8,
 // docs/obligations.md section 1):
 //
