@@ -42,3 +42,51 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+
+  # The Docker base image the server actually runs on.
+  #
+  # Until this entry existed, a CVE in `node:26-alpine` was raised by nothing:
+  # Trivy scans the built image on a PR, which catches it only if someone
+  # happens to open one, and no bot ever proposed the bump. This is the image
+  # production runs, so it is the one whose CVEs matter most.
+  #
+  # Node MAJOR bumps are ignored deliberately. Dependabot would raise
+  # `node:27-alpine` here while every workflow still says `node-version: '26'`,
+  # which is precisely the split that bin/check-node-versions.sh now fails on.
+  # A major is a decision made in one commit across both files, not a bot PR.
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 3
+    labels:
+      - deps
+      - security
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+
+  # shared/ is live code: cross-package types imported by the backend
+  # (shared/mqtt-schema, pet-model, spending-schema). Only /backend was
+  # watched, so its lockfile aged with nothing to say so.
+  #
+  # mobile/ stays unwatched on purpose. It is the dead Expo client, superseded
+  # by ios/, and watching it would generate PRs nobody should merge.
+  - package-ecosystem: npm
+    directory: /shared
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 3
+    labels:
+      - deps
+    groups:
+      shared-minor-patch:
+        update-types:
+          - minor
+          - patch
