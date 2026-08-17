@@ -19,13 +19,21 @@ vi.mock('../src/spinwheel/client.js', () => ({
 }));
 vi.mock('../src/plaid/client.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../src/plaid/client.js')>();
-  return { ...original, accountsBalanceGet: vi.fn(), investmentsHoldingsGet: vi.fn(), liabilitiesGet: vi.fn() };
+  return {
+    ...original,
+    accountsBalanceGet: vi.fn(),
+    investmentsHoldingsGet: vi.fn(),
+    liabilitiesGet: vi.fn(),
+    itemRemove: vi.fn(),
+  };
 });
 
 import { getAccounts, getSpotPrices } from '../src/coinbase/client.js';
+import { itemRemove } from '../src/plaid/client.js';
 import { getDebtProfile } from '../src/spinwheel/client.js';
 import { getPortfolio } from '../src/zerion/client.js';
 
+const mockedItemRemove = vi.mocked(itemRemove);
 const mockedGetAccounts = vi.mocked(getAccounts);
 const mockedGetSpotPrices = vi.mocked(getSpotPrices);
 const mockedGetPortfolio = vi.mocked(getPortfolio);
@@ -71,6 +79,23 @@ describe('runSchedulerTick', () => {
     expect(summary.refreshed).toBeGreaterThanOrEqual(1);
     const row = await getClassCacheRow(testUserId, 'crypto');
     expect(parseFloat(row!.valueUsd!)).toBe(100000);
+  });
+
+  // The queue is drained by the tick and by nothing else, so if this wiring is
+  // ever dropped the leak reopens silently: the row is written, the log line
+  // reads "queued for retry", and no retry ever happens.
+  it('drains the Plaid removal queue every tick', async () => {
+    const { enqueueItemRemoval, countPendingRemovals } = await import('../src/store/plaid-removal-queue.js');
+    await enqueueItemRemoval({ itemId: 'item_stuck', accessToken: 'access-sandbox-stuck' });
+    mockedItemRemove.mockResolvedValue({ request_id: 'req_rm' });
+
+    const { runSchedulerTick } = await import('../src/scheduler/index.js');
+    // An hour on, so the row's first backoff has elapsed.
+    const summary = await runSchedulerTick(new Date(NOW.getTime() + HOUR));
+
+    expect(mockedItemRemove).toHaveBeenCalledWith('access-sandbox-stuck');
+    expect(summary.removals).toMatchObject({ attempted: 1, removed: 1 });
+    expect(await countPendingRemovals()).toBe(0);
   });
 
   it('does not refresh a class that is still fresh', async () => {

@@ -36,6 +36,7 @@ import {
   krakenConnections,
   plaidItems,
   plaidRecurringStreams,
+  plaidRemovalQueue,
   reactionHistory,
   transactions,
   truelayerConnections,
@@ -69,6 +70,10 @@ const TARGETS: RotationTarget[] = [
   target(users, 'id', ['email']),
   target(reactionHistory, 'id', ['reaction']),
   target(plaidItems, 'itemId', ['accessToken']),
+  // Usually empty, and it is the row you can least afford to lose to a
+  // rotation: an unreadable token here means an Item that keeps billing with
+  // no way left to cancel it, which is the exact leak the queue closes.
+  target(plaidRemovalQueue, 'itemId', ['accessToken']),
   target(transactions, 'transactionId', ['merchantName']),
   target(plaidRecurringStreams, 'streamId', ['merchantName', 'description']),
   target(coinbaseConnections, 'userId', ['accessToken', 'refreshToken']),

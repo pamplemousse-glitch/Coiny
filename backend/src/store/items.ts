@@ -186,6 +186,11 @@ export async function disableItem(itemId: string): Promise<void> {
  * `docs/legal/data-disposal-schedule.md` says nothing retains a revoked
  * credential.
  *
+ * The caller is responsible for having removed the Item at Plaid FIRST, or
+ * for having queued it via `store/plaid-removal-queue.ts` when that call
+ * failed. This function destroys the only copy of the token, and an Item that
+ * outlives its token is billed monthly with no way left to cancel it.
+ *
  * Nothing has a foreign key to `plaid_items`, so this deletes exactly one row.
  * Transactions, recurring streams and the balance cache are keyed by user, not
  * by item, and stay for their own retention window; the net-worth read already

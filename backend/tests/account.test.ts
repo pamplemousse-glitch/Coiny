@@ -1,5 +1,5 @@
 import { type Dispatcher, getGlobalDispatcher, MockAgent, setGlobalDispatcher } from 'undici';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { authHeader, resetDatabase, testUserId } from './db-helper.js';
 
 describe('DELETE /api/account', () => {
@@ -176,6 +176,95 @@ describe('DELETE /api/account', () => {
     const res = await app.inject({ method: 'DELETE', url: '/api/account', headers: authHeader() });
     expect(res.statusCode).toBe(204);
     expect(await getUserById(testUserId)).toBeNull();
+
+    await app.close();
+  });
+
+  // The account-deletion half of the billing leak, and the harder half:
+  // deleteUser cascades plaid_items away through the user foreign key, so
+  // before the removal queue existed a Plaid outage during a deletion
+  // destroyed the only credential that could ever cancel the Item. The queue
+  // row carries no user_id and no foreign key precisely so it survives here.
+  it('keeps the access token for retry when Plaid item/remove fails', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const { upsertItem } = await import('../src/store/items.js');
+    const { getUserById } = await import('../src/store/users.js');
+    const { listDueRemovals } = await import('../src/store/plaid-removal-queue.js');
+
+    await upsertItem({ itemId: 'item_a', accessToken: 'access-sandbox-a', userId: testUserId });
+
+    const pool = mockAgent.get('https://sandbox.plaid.com');
+    pool.intercept({ path: '/item/remove', method: 'POST' }).reply(500, {
+      error_type: 'API_ERROR',
+      error_code: 'INTERNAL_SERVER_ERROR',
+      error_message: 'boom',
+      display_message: null,
+      request_id: 'req_test',
+    });
+
+    const app = await buildApp();
+    const res = await app.inject({ method: 'DELETE', url: '/api/account', headers: authHeader() });
+    expect(res.statusCode).toBe(204);
+    expect(await getUserById(testUserId)).toBeNull();
+
+    const queued = await listDueRemovals(new Date(Date.now() + 60 * 60 * 1000));
+    expect(queued).toHaveLength(1);
+    expect(queued[0]?.itemId).toBe('item_a');
+    expect(queued[0]?.accessToken).toBe('access-sandbox-a');
+
+    await app.close();
+  });
+
+  // The queue is a billing safeguard and the deletion is a statutory
+  // obligation, so the safeguard must not be able to block it. Before the queue
+  // write was wrapped, a throw here escaped the catch, abandoned the loop and
+  // aborted the whole request.
+  it('still deletes the account when the removal queue write fails', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const { upsertItem } = await import('../src/store/items.js');
+    const { getUserById } = await import('../src/store/users.js');
+    const queue = await import('../src/store/plaid-removal-queue.js');
+
+    await upsertItem({ itemId: 'item_a', accessToken: 'access-sandbox-a', userId: testUserId });
+
+    mockAgent.get('https://sandbox.plaid.com').intercept({ path: '/item/remove', method: 'POST' }).reply(500, {
+      error_type: 'API_ERROR',
+      error_code: 'INTERNAL_SERVER_ERROR',
+      error_message: 'boom',
+      display_message: null,
+      request_id: 'req_test',
+    });
+
+    const spy = vi.spyOn(queue, 'enqueueItemRemoval').mockRejectedValue(new Error('queue write failed'));
+    try {
+      const app = await buildApp();
+      const res = await app.inject({ method: 'DELETE', url: '/api/account', headers: authHeader() });
+      expect(res.statusCode).toBe(204);
+      expect(await getUserById(testUserId)).toBeNull();
+      await app.close();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  // Right-to-delete is not conditional on the queue: nothing about retaining a
+  // credential for cancellation may leave user-linked data behind.
+  it('queues nothing when Plaid accepts the removal', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const { upsertItem } = await import('../src/store/items.js');
+    const { countPendingRemovals } = await import('../src/store/plaid-removal-queue.js');
+
+    await upsertItem({ itemId: 'item_a', accessToken: 'access-sandbox-a', userId: testUserId });
+
+    mockAgent
+      .get('https://sandbox.plaid.com')
+      .intercept({ path: '/item/remove', method: 'POST' })
+      .reply(200, { request_id: 'req_test' });
+
+    const app = await buildApp();
+    const res = await app.inject({ method: 'DELETE', url: '/api/account', headers: authHeader() });
+    expect(res.statusCode).toBe(204);
+    expect(await countPendingRemovals()).toBe(0);
 
     await app.close();
   });

@@ -517,7 +517,7 @@ describe('item health store transitions', () => {
     await app.close();
   });
 
-  // Right-to-disconnect cannot depend on Plaid being reachable: the credential
+  // Right-to-disconnect cannot depend on Plaid being reachable: the item row
   // has to go even when item/remove fails.
   it('unlinking deletes the row even when item/remove fails', async () => {
     mockAgent.get('https://sandbox.plaid.com').intercept({ path: '/item/remove', method: 'POST' }).reply(500, {
@@ -535,6 +535,61 @@ describe('item health store transitions', () => {
 
     const { getItem } = await import('../src/store/items.js');
     expect(await getItem(TEST_ITEM_ID)).toBeNull();
+    await app.close();
+  });
+
+  // The other half of the test above, and the reason the queue exists. Deleting
+  // the row destroys the only copy of the access token, and without it a failed
+  // /item/remove leaves an Item that Plaid bills monthly, that cannot be
+  // cancelled, and that has permanently consumed one of ten Trial connections.
+  it('unlinking queues the access token when item/remove fails', async () => {
+    // .times(3) because fetchWithRetry treats a 5xx as retryable (util/fetch.ts
+    // RETRYABLE_STATUSES). A single-shot mock would make attempts 2 and 3 miss
+    // the interceptor and throw something that is not a PlaidApiError, which is
+    // the test harness behaving unlike a vendor that is genuinely down.
+    mockAgent
+      .get('https://sandbox.plaid.com')
+      .intercept({ path: '/item/remove', method: 'POST' })
+      .reply(500, {
+        error_type: 'API_ERROR',
+        error_code: 'INTERNAL_SERVER_ERROR',
+        error_message: 'boom',
+        display_message: null,
+        request_id: 'req_rm',
+      })
+      .times(3);
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'DELETE', url: '/api/plaid/item', headers: authHeader() });
+    expect(res.statusCode).toBe(204);
+
+    const { listDueRemovals } = await import('../src/store/plaid-removal-queue.js');
+    // Past the first backoff: enqueue stamps last_attempt_at, so a read at
+    // "now" correctly sees nothing due yet.
+    const queued = await listDueRemovals(new Date(Date.now() + 60 * 60 * 1000));
+    expect(queued).toHaveLength(1);
+    expect(queued[0]?.itemId).toBe(TEST_ITEM_ID);
+    // The token survives the row that held it, which is the entire point.
+    expect(queued[0]?.accessToken).toBe(TEST_ACCESS_TOKEN);
+    await app.close();
+  });
+
+  // The queue must stay empty on the happy path, or the drain retries removals
+  // Plaid has already accepted and the log fills with noise nobody can act on.
+  it('unlinking queues nothing when item/remove succeeds', async () => {
+    mockAgent
+      .get('https://sandbox.plaid.com')
+      .intercept({ path: '/item/remove', method: 'POST' })
+      .reply(200, { request_id: 'req_rm' });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'DELETE', url: '/api/plaid/item', headers: authHeader() });
+    expect(res.statusCode).toBe(204);
+
+    const { countPendingRemovals } = await import('../src/store/plaid-removal-queue.js');
+    expect(await countPendingRemovals()).toBe(0);
     await app.close();
   });
 });

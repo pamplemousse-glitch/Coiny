@@ -372,6 +372,13 @@
       "when": 1786882296449,
       "tag": "0052_investment_transactions",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1786982400000,
+      "tag": "0053_plaid_removal_queue",
+      "breakpoints": true
     }
   ]
 }

@@ -1,8 +1,10 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { itemRemove } from '../plaid/client.js';
+import { PlaidApiError } from '../plaid/types.js';
 import { revokeUpstreamGrants } from '../revoke/upstream.js';
 import { getItemsByUser } from '../store/items.js';
+import { enqueueItemRemoval } from '../store/plaid-removal-queue.js';
 import { deleteOtherSessions } from '../store/sessions.js';
 import { deleteUser, updateDisplayName } from '../store/users.js';
 
@@ -55,7 +57,37 @@ export function registerAccountApi(app: FastifyInstance): void {
       } catch (err) {
         // Right-to-delete must not be blocked by Plaid availability or by an
         // item that's already been removed upstream. Log and continue.
-        req.log.warn({ err, item_id: item.itemId }, 'plaid item_remove failed during account deletion');
+        //
+        // But do not let the token go with it. deleteUser below cascades
+        // plaid_items away via the user foreign key, so before this queue
+        // existed a Plaid outage during an account deletion left an Item
+        // billed monthly that we had no credential left to cancel. The queue
+        // row carries no user_id and no foreign key, so it survives the
+        // cascade, and it is deleted the moment the removal succeeds.
+        req.log.warn(
+          { err, item_id: item.itemId },
+          'plaid item_remove failed during account deletion; queued for retry',
+        );
+        // Wrapped, and the wrapping is the point. A throw from the queue write
+        // would escape this catch, abandon the loop and abort the deletion,
+        // which turns a billing safeguard into something that can block a
+        // statutory right-to-delete. The deletion outranks the queue: if the
+        // queue write fails we are back to the old behaviour, a billed Item we
+        // cannot cancel, which is money rather than a legal obligation.
+        // Logged at error because nothing else will ever mention this Item
+        // again.
+        try {
+          await enqueueItemRemoval({
+            itemId: item.itemId,
+            accessToken: item.accessToken,
+            errorCode: err instanceof PlaidApiError ? err.body.error_code : null,
+          });
+        } catch (queueErr) {
+          req.log.error(
+            { err: queueErr, item_id: item.itemId },
+            'could not queue plaid item for removal; this Item will keep billing and cannot be cancelled',
+          );
+        }
       }
     }
 

@@ -29,7 +29,12 @@ export async function resetDatabase(): Promise<void> {
   // A table only escapes this if it has no FK path to users, in which case add
   // it by name below.
   await db().execute(
-    sql`TRUNCATE sessions, reaction_history, processed_events, plaid_items, category_overrides, device_tokens, transactions, pet_state, app_store_notifications, users RESTART IDENTITY CASCADE`,
+    // plaid_removal_queue is named explicitly because it is the case the
+    // paragraph above describes: it holds no user_id and no foreign key, on
+    // purpose (it has to survive the account-deletion cascade), so nothing
+    // truncates it by association and a leftover row would leak into the next
+    // test's drain.
+    sql`TRUNCATE sessions, reaction_history, processed_events, plaid_items, plaid_removal_queue, category_overrides, device_tokens, transactions, pet_state, app_store_notifications, users RESTART IDENTITY CASCADE`,
   );
   _resetOverrideCache();
 
