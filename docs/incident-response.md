@@ -217,6 +217,20 @@ analytics_events 7, `max(net_worth_daily.date)` = 2026-08-17.
 **The restore half has NOT been rehearsed.** Do not read this section as
 evidence that a restore works here. Nobody has ever performed one.
 
+**Decided 2026-08-17: the rehearsal folds into G1.27 rather than happening on
+its own.** The reasoning, so it is not relitigated. Of the four questions a
+drill answers, three are already answered without one: whether Neon's
+point-in-time restore works is a question about Neon's core product rather than
+about Coiny; whether the restored data is readable was answered better by the
+baseline below, which found the tokens are not all encrypted in the first place;
+and whether anyone knows the procedure is answered by this section existing. The
+only unanswered one is the wall clock.
+
+That is not worth a standalone task, and G1.27 has to test a restore from the
+nightly dump anyway, which is the more meaningful drill: Neon's six hours is a
+vendor feature, the dump is ours and is the thing that has never worked once.
+Fold it there, measure the wall clock then.
+
 The baseline pass did find something the drill was not looking for, recorded
 here because it changes what the third assertion means:
 
@@ -232,6 +246,21 @@ Impact today is nil: sandbox tokens against synthetic data. It matters for two
 reasons. It violates `.claude/rules/security.md` #4 as written, and it means the
 "one known access_token decrypts" assertion in G1.26 cannot pass on `staging`
 today, because two of the three are not encrypted at all.
+
+**Fixing it is a founder task, and it must not be run locally.** The backfill
+encrypts with whatever `DATA_ENCRYPTION_KEY` the process holds. The local
+Keychain copy and the Fly secret are not known to be the same value, and
+encrypting `staging` rows under a key the deployed app does not have would make
+them unreadable, which is worse than leaving them plaintext. Run it on the
+machine that holds the right key:
+
+```bash
+fly ssh console -a coiny-backend -C "node /app/backend/dist/scripts/backfill-encrypt-pii.js"
+```
+
+Then set `ALLOW_LEGACY_PLAINTEXT_READS=false` once it reports zero rewrites,
+which is what `config.ts:86-89` asks for and what turns a legacy tolerance back
+into a control.
 
 ---
 
