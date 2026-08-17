@@ -51,7 +51,27 @@ jobs:
 
       - name: Install XcodeGen (Swift only)
         if: matrix.language == 'swift'
-        run: brew install xcodegen
+        # `arch -arm64` is load-bearing, not decoration. The CodeQL Swift
+        # extractor injects an x86_64 libtrace.dylib through
+        # DYLD_INSERT_LIBRARIES so it can trace the build. Homebrew reads that
+        # as "I am running under Rosetta 2", and on an ARM runner with the
+        # default /opt/homebrew prefix it refuses outright:
+        #
+        #   Cannot install under Rosetta 2 in ARM default prefix (/opt/homebrew)!
+        #
+        # This is why this job had been red on main. It is a setup failure, not
+        # a finding, so Swift static analysis was producing no results at all
+        # while the badge was the only thing anyone could have noticed.
+        run: |
+          arch -arm64 brew install xcodegen
+          {
+            echo "### Swift toolchain, resolved at run time"
+            echo ""
+            echo "| Tool | Version |"
+            echo "|---|---|"
+            echo "| xcodegen | $(xcodegen --version 2>&1 | tail -1) |"
+            echo "| Xcode | $(xcodebuild -version 2>/dev/null | head -1) |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Generate Xcode project (Swift only)
         if: matrix.language == 'swift'

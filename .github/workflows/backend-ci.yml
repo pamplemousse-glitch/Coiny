@@ -19,6 +19,13 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
+      # Runs before anything installs, because a mismatch here means every step
+      # after it is proving something about a runtime production does not use.
+      # Cheap, no dependencies, and it is the only thing that compares the two
+      # places Node's version is declared.
+      - name: Node version agrees with the Dockerfile
+        run: bin/check-node-versions.sh
+
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86  # v6.0.10
         with:
           version: 11.1.3

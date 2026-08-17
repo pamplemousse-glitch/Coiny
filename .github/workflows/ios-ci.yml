@@ -61,8 +61,31 @@ jobs:
           xcrun simctl list devices available iOS
 
       - name: Install build tools
+        # NOT pinned, on purpose. Brew publishes no versioned formulae for
+        # these three, and pinning would freeze CI the way the Xcode major pin
+        # did, which is the bug this records rather than repeats.
+        #
+        # The defect was never that they float. It is that nothing recorded what
+        # they floated TO, so a PR that was green in the morning and red in the
+        # afternoon with no repository change looked like your own bug. The
+        # versions go in the job summary so that break is self-explaining.
         run: |
           brew install xcodegen xcbeautify swiftlint
+          {
+            echo "### Build tools, resolved at run time"
+            echo ""
+            echo "Unpinned by design. If this job broke with no change to the"
+            echo "repository, diff these against the last green run before"
+            echo "looking anywhere else."
+            echo ""
+            echo "| Tool | Version |"
+            echo "|---|---|"
+            echo "| xcodegen | $(xcodegen --version 2>&1 | tail -1) |"
+            echo "| xcbeautify | $(xcbeautify --version 2>&1 | tail -1) |"
+            echo "| swiftlint | $(swiftlint version 2>&1 | tail -1) |"
+            echo "| Xcode | $(xcodebuild -version 2>/dev/null | head -1) |"
+            echo "| macOS image | $(sw_vers -productVersion) |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Cache SwiftPM dependencies
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
