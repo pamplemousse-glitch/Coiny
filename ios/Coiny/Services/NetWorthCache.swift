@@ -33,7 +33,22 @@ struct NetWorthCache: NetWorthCaching {
                 at: fileURL.deletingLastPathComponent(),
                 withIntermediateDirectories: true
             )
-            try data.write(to: fileURL, options: .atomic)
+            // `.completeFileProtection`, and it is the point of this line.
+            //
+            // Without it the file sits at the platform default,
+            // `completeUntilFirstUserAuthentication`, which means it is
+            // readable by anything with filesystem access from first unlock
+            // until reboot. This file is the whole net-worth response: every
+            // asset class, every balance, the total. The session token that
+            // fetched it is stored at
+            // `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly`, the strictest
+            // class there is, so the credential was protected far better than
+            // the data it retrieves. Audit row 1.2.4.
+            //
+            // `.completeFileProtection` keeps it encrypted whenever the device
+            // is locked. The cache is only ever read to render a screen the
+            // user is looking at, so there is no background-read path to break.
+            try data.write(to: fileURL, options: [.atomic, .completeFileProtection])
             excludeFromBackup()
         } catch {
             // Cache write failure only costs the offline fallback; the live
