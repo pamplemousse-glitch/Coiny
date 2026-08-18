@@ -13,6 +13,18 @@ struct CoinyApp: App {
 
     private static let isUITesting = CommandLine.arguments.contains("--ui-testing")
 
+    /// Signs in against a REAL local backend, for the one test CI cannot run.
+    ///
+    /// Distinct from `--ui-testing`, which swaps the API for fixtures and
+    /// therefore never reaches Plaid. This flag keeps the real API client and
+    /// only skips Sign in with Apple, which does not work in the Simulator.
+    /// `injectDebugSession` calls `/api/debug/session`, a route the server only
+    /// registers when NODE_ENV is not production AND PLAID_ENV is sandbox
+    /// (`server.ts` isDebugBuild), so it cannot exist in a shipping backend.
+    ///
+    /// DEBUG-only, so it is compiled out of every Release build entirely.
+    private static let isDebugSessionRun = CommandLine.arguments.contains("--uitest-debug-session")
+
     /// UI tests bypass sign-in, so live API calls would 401; serve a fixture
     /// instead so the Home journey surface is deterministic under test.
     private static func makePetStore() -> PetStore {
@@ -24,7 +36,8 @@ struct CoinyApp: App {
 
     // Auth state — seeded synchronously from Keychain on launch.
     // In UITest mode the Keychain is unavailable; bypass to land on RootView directly.
-    @State private var isSignedIn: Bool = CoinyApp.isUITesting || KeychainSessionStore().load() != nil
+    @State private var isSignedIn: Bool =
+        CoinyApp.isUITesting || CoinyApp.isDebugSessionRun || KeychainSessionStore().load() != nil
     @AppStorage("onboardingComplete") private var onboardingComplete: Bool = false
     /// Name from Apple Sign In on first login; carried into OnboardingView's name step.
     @State private var pendingDisplayName: String = ""
@@ -37,12 +50,20 @@ struct CoinyApp: App {
                         pendingDisplayName = name
                         isSignedIn = true
                     }
-                } else if !onboardingComplete && !CoinyApp.isUITesting {
+                } else if !onboardingComplete && !CoinyApp.isUITesting && !CoinyApp.isDebugSessionRun {
                     OnboardingView(onboardingComplete: $onboardingComplete, appleDisplayName: pendingDisplayName)
                 } else {
                     RootView()
                         .environment(petStore)
                         .task {
+                            // The debug-session run signs in against the real
+                            // local backend before anything renders, so the
+                            // connect affordance is reachable.
+                            #if DEBUG
+                            if CoinyApp.isDebugSessionRun {
+                                try? await API.shared.injectDebugSession()
+                            }
+                            #endif
                             // Detached: cache repair for the declaration sheet
                             // (fresh install pulls the server copy back) must
                             // never delay the pet or the permission prompt.
