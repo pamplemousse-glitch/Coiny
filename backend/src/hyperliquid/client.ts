@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { fetchWithRetry } from '../util/fetch.js';
+import { log } from '../util/log.js';
 
 const HYPERLIQUID_URL = 'https://api.hyperliquid.xyz/info';
 
@@ -116,7 +117,7 @@ export async function getHyperliquidSpot(
 
     const price = priceOf(entry.coin);
     if (price === null) {
-      console.warn(`[hyperliquid] no mid for spot token ${entry.coin}, balance excluded`);
+      log.warn(`[hyperliquid] no mid for spot token ${entry.coin}, balance excluded`);
       continue;
     }
 

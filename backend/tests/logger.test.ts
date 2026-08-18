@@ -22,6 +22,7 @@ const FORBIDDEN = [
   'access-sandbox-must-not-log', // credential
   '001234.abcdef0123456789.0000', // Apple `sub`
   '4821.55', // amount
+  '0xdeadbeef00000000000000000000000000000001', // crypto wallet address
 ];
 
 /** Captures every line pino writes, parsed. */
@@ -125,6 +126,40 @@ describe('the request log line', () => {
   });
 });
 
+describe('the URL, which is the leak redact cannot reach', () => {
+  // Verified as a live leak before this was fixed: a request to
+  // /api/truelayer/callback?code=... logged the OAuth authorization code IN
+  // FULL, TWICE, on the request line and the completion line. redact keys on
+  // field names and cannot see inside a string value.
+  it('never logs a query string, because OAuth codes arrive in one', async () => {
+    const app = await buildAppWithCapturedLogs();
+    app.get('/log-test/oauth-callback', async () => ({ ok: true }));
+    await app.ready();
+
+    await app.inject({ method: 'GET', url: '/log-test/oauth-callback?code=SECRET-OAUTH-CODE&state=xyz' });
+    await app.close();
+
+    const all = capture.raw.join('\n');
+    expect(all).not.toContain('SECRET-OAUTH-CODE');
+    expect(all).not.toContain('state=xyz');
+    // The route identity survives, which is what per-route latency groups by.
+    expect(all).toContain('/log-test/oauth-callback');
+  });
+
+  it('keeps the path intact so a per-route p95 is still possible', async () => {
+    const app = await buildAppWithCapturedLogs();
+    await app.inject({ method: 'GET', url: '/api/pets?verbose=1', headers: authHeader() });
+    await app.close();
+
+    const completions = capture.lines.filter((l) => (l.res as { url?: unknown } | undefined)?.url !== undefined);
+    expect(completions.length).toBeGreaterThan(0);
+    // Read through an optional type: see #257. Casting and then dereferencing
+    // throws on an empty array instead of failing the assertion.
+    const firstRes = completions[0]?.res as { url?: string } | undefined;
+    expect(firstRes?.url).toBe('/api/pets');
+  });
+});
+
 describe('redaction', () => {
   it('censors a forbidden key at the top level', async () => {
     const app = await buildAppWithCapturedLogs();
@@ -154,6 +189,10 @@ describe('redaction', () => {
         access_token: 'access-sandbox-must-not-log',
         sub: '001234.abcdef0123456789.0000',
         amount: '4821.55',
+        // Found logged in the clear at api/nft.ts:86. A wallet address is a
+        // PERMANENT global identifier whose entire holdings and transaction
+        // history are publicly queryable by anyone who has it.
+        address: '0xdeadbeef00000000000000000000000000000001',
       },
       'credentials line',
     );

@@ -4,6 +4,13 @@ vi.mock('../src/push/apns.js', () => ({
   sendApnsPush: vi.fn(),
 }));
 
+// dispatch.ts logs through pino now, not console: console bypassed the redact
+// list and the err serializer entirely, which is the whole point of that
+// change. These tests watch the logger they actually use.
+vi.mock('../src/util/log.js', () => ({
+  log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), fatal: vi.fn(), debug: vi.fn() },
+}));
+
 vi.mock('../src/store/devices.js', () => ({
   listDeviceTokens: vi.fn(),
   latestDeviceTimezone: vi.fn(),
@@ -19,8 +26,10 @@ import { dispatchReaction, PUSHABLE_EVENTS } from '../src/reactions/dispatch.js'
 import type { Reaction } from '../src/reactions/types.js';
 import { latestDeviceTimezone, listDeviceTokens } from '../src/store/devices.js';
 import { canSendPush, recordNotification } from '../src/store/notifications.js';
+import { log } from '../src/util/log.js';
 
 const mockedSendApnsPush = vi.mocked(sendApnsPush);
+const mockedLog = vi.mocked(log);
 const mockedListDeviceTokens = vi.mocked(listDeviceTokens);
 const mockedLatestDeviceTimezone = vi.mocked(latestDeviceTimezone);
 const mockedCanSendPush = vi.mocked(canSendPush);
@@ -96,15 +105,17 @@ describe('dispatchReaction', () => {
 
   it('never logs the reaction reason', async () => {
     mockedListDeviceTokens.mockResolvedValue([]);
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
     dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
-    for (const call of consoleSpy.mock.calls) {
-      expect(String(call[0])).not.toContain('Emergency fund');
-    }
-    consoleSpy.mockRestore();
+    // Every argument of every call, not just the first: the reason could ride
+    // in the structured object as easily as in the message.
+    const everything = JSON.stringify([
+      ...mockedLog.info.mock.calls,
+      ...mockedLog.warn.mock.calls,
+      ...mockedLog.error.mock.calls,
+    ]);
+    expect(everything).not.toContain('Emergency fund');
   });
 
   it('does not push when the notification budget is exhausted', async () => {
@@ -183,13 +194,11 @@ describe('dispatchReaction', () => {
   it('does not record the notification when every push fails', async () => {
     mockedListDeviceTokens.mockResolvedValue([{ token: 'bad-token', platform: 'ios' }]);
     mockedSendApnsPush.mockRejectedValue(new Error('BadDeviceToken'));
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
     expect(mockedRecordNotification).not.toHaveBeenCalled();
-    errorSpy.mockRestore();
   });
 
   it('does not push when there are no device tokens', async () => {
@@ -214,25 +223,19 @@ describe('dispatchReaction', () => {
     mockedListDeviceTokens.mockResolvedValue([{ token: 'bad-token', platform: 'ios' }]);
     mockedSendApnsPush.mockRejectedValue(new Error('APNs 400 for token bad-tok…: BadDeviceToken'));
 
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
     dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
-    expect(errorSpy).toHaveBeenCalledWith('APNs push failed:', expect.any(Error));
-    errorSpy.mockRestore();
+    expect(mockedLog.error).toHaveBeenCalledWith({ err: expect.any(Error) }, 'APNs push failed');
   });
 
   it('logs error but does not throw when listDeviceTokens fails', async () => {
     mockedListDeviceTokens.mockRejectedValue(new Error('DB connection lost'));
 
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
     dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
-    expect(errorSpy).toHaveBeenCalledWith('Push fan-out error:', expect.any(Error));
-    errorSpy.mockRestore();
+    expect(mockedLog.error).toHaveBeenCalledWith({ err: expect.any(Error) }, 'Push fan-out error');
   });
 
   it('falls back to a generic title for an animation with no push copy', async () => {
@@ -285,14 +288,11 @@ describe('dispatchReaction', () => {
   it('logs quiet_hours_unknown_tz when no device timezone is stored', async () => {
     mockedLatestDeviceTimezone.mockResolvedValue(null);
     mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
     dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
-    const logged = consoleSpy.mock.calls.map((c) => String(c[0]));
-    expect(logged.some((line) => line.includes('quiet_hours_unknown_tz'))).toBe(true);
-    consoleSpy.mockRestore();
+    const logged = JSON.stringify(mockedLog.info.mock.calls);
+    expect(logged).toContain('quiet_hours_unknown_tz');
   });
 
   // R-9.7: no emoji in any user-facing string. The titles used to carry them.

@@ -22,6 +22,7 @@ import {
   upsertGoalPeriod,
 } from '../store/target-goals.js';
 import { decryptNullable } from '../util/crypto.js';
+import { log } from '../util/log.js';
 import {
   closedPeriods,
   evaluateGuardrail,
@@ -305,7 +306,7 @@ export async function evaluateGoalSystem(userId: string, inputs: GoalEvaluationI
     try {
       await performReactions(userId, candidates, now);
     } catch (err) {
-      console.warn('goal system reaction failed:', err);
+      log.warn({ err }, 'goal system reaction failed');
     }
   }
 }

@@ -1,5 +1,6 @@
 import { createHash, createHmac } from 'node:crypto';
 import { convertToUsd } from '../fx/client.js';
+import { log } from '../util/log.js';
 
 const BASE = 'https://api.kraken.com';
 
@@ -109,7 +110,7 @@ export async function getTotalUsd(
       try {
         total += await convertToUsd(amount, asset);
       } catch {
-        console.warn(`[kraken] fx lookup failed for ${asset}, balance excluded`);
+        log.warn(`[kraken] fx lookup failed for ${asset}, balance excluded`);
       }
       continue;
     }
@@ -118,7 +119,7 @@ export async function getTotalUsd(
       const price = await getSpotPrice(asset);
       total += amount * price;
     } catch {
-      console.warn(`[kraken] skipping unknown asset ${rawAsset} (normalized: ${asset})`);
+      log.warn(`[kraken] skipping unknown asset ${rawAsset} (normalized: ${asset})`);
     }
   }
 
