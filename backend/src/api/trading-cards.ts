@@ -68,7 +68,7 @@ export function registerTradingCardsApi(app: FastifyInstance): void {
   // PATCH /api/trading-cards/:id
   app.patch('/api/trading-cards/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
+    if (Number.isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
 
     const parsed = UpdateCardBodySchema.safeParse(req.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
@@ -91,7 +91,7 @@ export function registerTradingCardsApi(app: FastifyInstance): void {
   // DELETE /api/trading-cards/:id
   app.delete('/api/trading-cards/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
+    if (Number.isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
 
     await db()
       .delete(tradingCardHoldings)

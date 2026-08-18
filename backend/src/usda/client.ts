@@ -112,5 +112,5 @@ export async function getFarmlandPricePerAcre(stateCode: string, apiKey: string)
   // NASS values may include commas (e.g. "3,850")
   const raw_value = rows[0]!.Value.replace(/,/g, '');
   const price = parseFloat(raw_value);
-  return isNaN(price) ? null : price;
+  return Number.isNaN(price) ? null : price;
 }
