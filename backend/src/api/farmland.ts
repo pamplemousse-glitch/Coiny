@@ -59,7 +59,7 @@ export function registerFarmlandApi(app: FastifyInstance): void {
   // PATCH /api/farmland/:id
   app.patch('/api/farmland/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
+    if (Number.isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
 
     const parsed = UpdateParcelBodySchema.safeParse(req.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
@@ -82,7 +82,7 @@ export function registerFarmlandApi(app: FastifyInstance): void {
   // DELETE /api/farmland/:id
   app.delete('/api/farmland/:id', async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
+    if (Number.isNaN(id)) return reply.status(400).send({ error: 'invalid id' });
 
     await db()
       .delete(farmlandParcels)
