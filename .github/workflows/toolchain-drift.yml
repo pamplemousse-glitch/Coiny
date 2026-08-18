@@ -39,6 +39,17 @@ jobs:
 
       # The pinned major is read out of the workflow rather than duplicated
       # here. Two copies of a version number is how they disagree.
+      # Weekly, not per-PR: this makes one API call per pinned action and would
+      # spend rate limit re-answering a question that only changes when
+      # Dependabot moves a SHA. Non-fatal on its own, since a stale COMMENT
+      # never breaks a build; it breaks the reader, which is why it belongs
+      # next to the other drift checks rather than in the merge gate.
+      - name: Action pin comments still tell the truth
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bin/check-action-pins.sh
+
       - name: Compare the pin against what the runner offers
         id: compare
         run: |
