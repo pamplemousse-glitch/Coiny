@@ -156,6 +156,12 @@ export type StatusInput = {
 export function deriveStatus(input: StatusInput): ClassStatus {
   if (!input.connected) return 'not_connected';
   if (input.disconnected) return 'disconnected';
+  // A class with NO value never reports a lifecycle state, however broken the
+  // connection is. 'reauth_required' and 'expiring' are both included in the
+  // total (includedInTotal), so letting them win here would quietly drop a
+  // failing class out of the `excluded` counter, which is the one thing that
+  // makes a vendor outage visible instead of reading as a smaller number.
+  // Pinned by tests/networth-classes.test.ts.
   if (input.value === null) return input.failed ? 'error' : 'pending';
   if (input.asOf === null) return input.health ?? 'stale';
   const age = input.now.getTime() - input.asOf.getTime();
