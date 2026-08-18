@@ -1389,7 +1389,7 @@
 			repositoryURL = "https://github.com/plaid/plaid-ios";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 5.6.0;
+				minimumVersion = 7.1.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

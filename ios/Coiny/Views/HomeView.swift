@@ -58,9 +58,8 @@ struct HomeView: View {
             SettingsView()
         }
         .sheet(isPresented: Bindable(connectFlow).isPresentingLink) {
-            if let handler = connectFlow.handler {
-                PlaidLinkPresenter(handler: handler)
-                    .ignoresSafeArea()
+            if let session = connectFlow.session {
+                session.sheet()
             }
         }
         .task {

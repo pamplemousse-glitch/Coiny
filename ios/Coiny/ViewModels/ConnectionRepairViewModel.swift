@@ -31,7 +31,7 @@ final class ConnectionRepairViewModel {
     private(set) var isRepairing = false
     private(set) var errorMessage: String?
     var isPresentingLink = false
-    private(set) var handler: Handler?
+    private(set) var session: PlaidLinkSession?
     /// Called after a confirmed repair so the owner can reload the numbers.
     var onRepaired: (() -> Void)?
 
@@ -166,17 +166,19 @@ final class ConnectionRepairViewModel {
     /// hosting pattern; the success callback carries a public token that
     /// update mode never exchanges.
     private func openLinkKit(token: String, completion: @escaping (Bool) -> Void) {
-        var config = LinkTokenConfiguration(token: token) { _ in
-            completion(true)
-        }
-        config.onExit = { _ in
-            completion(false)
-        }
-        switch Plaid.create(config) {
-        case .success(let handler):
-            self.handler = handler
+        // LinkKit 7: every callback is supplied at initialisation, and
+        // session creation throws where `Plaid.create` returned a Result.
+        let config = LinkTokenConfiguration(
+            token: token,
+            onSuccess: { _ in completion(true) },
+            onExit: { _ in completion(false) },
+            onEvent: nil,
+            onLoad: nil
+        )
+        do {
+            session = try Plaid.createPlaidLinkSession(configuration: config)
             isPresentingLink = true
-        case .failure:
+        } catch {
             errorMessage = "Could not start the repair. Try again."
         }
     }

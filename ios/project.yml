@@ -30,7 +30,7 @@ configs:
 packages:
   LinkKit:
     url: https://github.com/plaid/plaid-ios
-    from: "5.6.0"
+    from: "7.1.0"
 
 targets:
   Coiny:
