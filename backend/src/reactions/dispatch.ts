@@ -3,6 +3,7 @@ import { isQuietHours } from '../push/quiet-hours.js';
 import { trackServerEvent } from '../store/analytics.js';
 import { latestDeviceTimezone, listDeviceTokens } from '../store/devices.js';
 import { canSendPush, recordNotification } from '../store/notifications.js';
+import { log } from '../util/log.js';
 import { contractFor, PUSHABLE_EVENTS } from './contract.js';
 import type { Reaction } from './types.js';
 
@@ -42,7 +43,7 @@ const PUSH_BODIES: Record<string, string> = {
 export function dispatchReaction(userId: string, reaction: Reaction, eventType: string): void {
   // Log the shape of the reaction, never the reason: it contains merchant names
   // and amounts (see .claude/rules/security.md #2).
-  console.log(
+  log.info(
     `reaction dispatched animation=${reaction.animation} sound=${reaction.sound} led=${reaction.led} duration=${reaction.duration} event=${eventType}`,
   );
 
@@ -70,7 +71,7 @@ async function fanOutPush(userId: string, reaction: Reaction, eventType: string)
     // to UTC or the server's zone.
     const timezone = await latestDeviceTimezone(userId);
     if (timezone === null) {
-      console.log(`push suppressed reason=quiet_hours_unknown_tz event=${eventType}`);
+      log.info(`push suppressed reason=quiet_hours_unknown_tz event=${eventType}`);
       return;
     }
     if (isQuietHours(timezone)) return;
@@ -95,10 +96,10 @@ async function fanOutPush(userId: string, reaction: Reaction, eventType: string)
 
     for (const r of results) {
       if (r.status === 'rejected') {
-        console.error('APNs push failed:', r.reason);
+        log.error({ err: r.reason }, 'APNs push failed');
       }
     }
   } catch (err) {
-    console.error('Push fan-out error:', err);
+    log.error({ err }, 'Push fan-out error');
   }
 }

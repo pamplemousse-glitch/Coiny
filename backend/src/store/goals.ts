@@ -18,6 +18,7 @@ import {
 import { evaluateLadder, type LadderContext, type LadderState, stageForLadder } from '../goals/ladder.js';
 import { reactionForEvent } from '../reactions/contract.js';
 import { performReactions } from '../reactions/perform.js';
+import { log } from '../util/log.js';
 import { trackServerEvent } from './analytics.js';
 
 /** Bumped when the derived-state computation changes in a way that makes stored
@@ -160,7 +161,7 @@ export async function refreshLadder(userId: string, ctx: LadderContext, now: Dat
         }));
       await performReactions(userId, candidates, now);
     } catch (err) {
-      console.warn('rung completion reaction failed:', err);
+      log.warn({ err }, 'rung completion reaction failed');
     }
   }
 

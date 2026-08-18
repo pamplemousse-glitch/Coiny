@@ -51,6 +51,7 @@ import { registerErrorHandler } from './plugins/error-handler.js';
 import { loggerOptions } from './plugins/logger.js';
 import { registerSecurityHeaders } from './plugins/security-headers.js';
 import { getSchedulerStatus, isSchedulerStale, startScheduler } from './scheduler/index.js';
+import { installProcessLogging } from './util/log.js';
 import { registerAppStoreWebhook } from './webhook/appstore.js';
 import { registerPlaidWebhook } from './webhook/plaid.js';
 
@@ -272,6 +273,12 @@ async function buildApp(options: BuildAppOptions = {}) {
 }
 
 async function start() {
+  // Before anything can throw. Node prints an uncaught exception itself, with
+  // the full message and stack, and that output never passes through pino, so
+  // every redaction control is bypassed at exactly the moment the most
+  // diagnostic detail is emitted.
+  installProcessLogging();
+
   const app = await buildApp();
 
   try {

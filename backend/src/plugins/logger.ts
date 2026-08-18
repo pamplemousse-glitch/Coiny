@@ -81,7 +81,35 @@ const FORBIDDEN_KEYS = [
   'creditScore',
   'mask',
   'last4',
+  // A crypto wallet address is the single most identifying value that reaches
+  // these logs. Unlike a merchant name it is a PERMANENT global identifier
+  // whose entire holdings and transaction history are publicly queryable by
+  // anyone holding it, forever. Found being logged in the clear at
+  // api/nft.ts:86.
+  'address',
+  'walletAddress',
+  'wallet_address',
+  // OAuth and handshake material that arrives as a field rather than in a URL.
+  'code',
+  'codeChallenge',
+  'code_challenge',
+  'oauthToken',
+  'oauth_token',
+  'oauthTokenSecret',
+  'pin',
+  'otp',
 ];
+
+/** The path, with any query string removed.
+ *
+ *  Deliberately drops the whole query rather than allowlisting parameter
+ *  names: the set of parameters is open (every new route can add one) and the
+ *  cost of missing one is a credential in the log stream. A route's identity
+ *  is its path, and that is what per-route latency and error rates group by. */
+function pathOnly(url: string): string {
+  const q = url.indexOf('?');
+  return q === -1 ? url : url.slice(0, q);
+}
 
 /** Every place a forbidden key realistically appears.
  *
@@ -124,9 +152,18 @@ export const loggerOptions = {
     req(req: FastifyRequest) {
       return {
         method: req.method,
-        // Path only. Never the Authorization header: it may carry a live
-        // session token.
-        url: req.url,
+        // PATH ONLY, query string discarded. This is not tidiness, it is the
+        // second leak `redact` structurally cannot reach.
+        //
+        // OAuth authorization codes arrive as query parameters
+        // (api/truelayer.ts:30 reads `code`, api/ynab.ts:49 reads
+        // `codeChallenge`), and Fastify's `req.url` is the raw URL including
+        // the query. Measured before this line existed: a request to
+        // /api/truelayer/callback?code=... logged the code IN FULL, TWICE,
+        // once on the request line and once on the completion line. `redact`
+        // keys on field names and cannot see inside a string value, so no
+        // path list would ever have caught it.
+        url: pathOnly(req.url),
         // R-31.2. Without this, "which account did this" cannot be answered
         // from logs at all (audit 1.0.3), which is the monitoring Safeguards
         // 314.4(c)(8) asks for. Pseudonymous by construction: it is our own
@@ -147,10 +184,9 @@ export const loggerOptions = {
     res(res: ResSerializerReply<RawServerDefault, FastifyReply>) {
       return {
         statusCode: res.statusCode,
-        // R-31.2. Without it, a per-route p95 is a stream join across two
-        // lines keyed by reqId rather than a group-by
-        // (04-performance-reliability.md 4.5.2).
-        url: res.request?.url ?? null,
+        // R-31.2, and path-only for the same reason as the request line
+        // above. A per-route p95 wants the route, never the parameters.
+        url: res.request?.url ? pathOnly(res.request.url) : null,
       };
     },
     /**

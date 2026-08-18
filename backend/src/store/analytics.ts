@@ -12,6 +12,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { SERVER_EVENT_SCHEMAS, type ServerEventName } from '../analytics/events.js';
 import { db } from '../db/client.js';
 import { analyticsEvents, users } from '../db/schema.js';
+import { log } from '../util/log.js';
 
 export type AnalyticsEventRow = typeof analyticsEvents.$inferSelect;
 
@@ -78,13 +79,13 @@ export async function trackServerEvent(
   try {
     const parsed = SERVER_EVENT_SCHEMAS[event].safeParse(properties);
     if (!parsed.success) {
-      console.warn(`analytics: dropped server event '${event}': properties failed the catalog schema`);
+      log.warn(`analytics: dropped server event '${event}': properties failed the catalog schema`);
       return;
     }
     await insertAnalyticsEvents(userId, [
       { event, properties: parsed.data as Record<string, unknown>, clientTs: null },
     ]);
   } catch {
-    console.warn(`analytics: failed to persist server event '${event}'`);
+    log.warn(`analytics: failed to persist server event '${event}'`);
   }
 }
