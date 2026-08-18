@@ -1,8 +1,21 @@
 import { createHash, webcrypto } from 'node:crypto';
+
 import type { FastifyInstance } from 'fastify';
 import { exportJWK, type JWK, SignJWT } from 'jose';
 import { type Dispatcher, getGlobalDispatcher, MockAgent, setGlobalDispatcher } from 'undici';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// APNs is stubbed so a push counts as DELIVERED and therefore reaches
+// recordNotification. Without this the connection-notification tests below
+// would assert on an empty notification_log and pass for the wrong reason: no
+// APNs credentials are configured in tests, so every send fails and nothing is
+// ever recorded. Everything else in the dispatch path stays real, which is the
+// point: quiet hours, the two-a-week budget and the same-type cooldown are all
+// still exercised.
+vi.mock('../src/push/apns.js', () => ({
+  sendApnsPush: vi.fn(async () => undefined),
+}));
+
 import { resetDatabase, testUserId } from './db-helper.js';
 
 // Waits for the actual background work rather than guessing at a number of
@@ -510,6 +523,135 @@ describe('POST /webhooks/plaid', () => {
     const { getItem } = await import('../src/store/items.js');
     const item = await getItem(TEST_ITEM_ID);
     expect(item?.status).toBe('expiring');
+
+    await app.close();
+  });
+
+  // testing-strategy.md section 8, items 1 and 2. Plaid sends the expiry
+  // warning seven days early; Coiny used to record it and let it lapse, so a
+  // user's net worth went quietly stale with the server knowing the whole time.
+
+  /// A device that can actually receive a push: iOS token plus a timezone.
+  /// Without the timezone the dispatcher suppresses rather than guessing a zone
+  /// (R-9.3), so a test that forgot it would pass while pushing nothing.
+  async function registerPushableDevice(): Promise<void> {
+    const { upsertDeviceToken } = await import('../src/store/devices.js');
+    // A zone where it is reliably NOT 21:00-08:00 local during a CI run is not
+    // knowable, so quiet hours are neutralised by freezing the clock instead,
+    // in each test that needs it.
+    await upsertDeviceToken({ token: 'tok_push_1', platform: 'ios', userId: testUserId, timezone: 'UTC' });
+  }
+
+  /// Midday UTC: outside the 21:00-08:00 quiet window for the UTC device above.
+  ///
+  /// `toFake: ['Date']` is load-bearing. A bare `useFakeTimers()` also freezes
+  /// setImmediate, and `awaitWebhookWork()` waits on setImmediate, so the whole
+  /// suite deadlocks rather than failing. Same reason dispatch.test.ts fakes
+  /// only Date.
+  function freezeToMidday(): void {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-17T12:00:00Z'));
+  }
+
+  it('pushes the seven-day warning on PENDING_EXPIRATION', async () => {
+    await registerPushableDevice();
+    freezeToMidday();
+    try {
+      const { buildApp } = await import('../src/server.js');
+      const app = await buildApp();
+
+      expect(await postItemWebhook(app, 'PENDING_EXPIRATION')).toBe(200);
+
+      const { listAnalyticsEvents } = await import('../src/store/analytics.js');
+      const sent = await listAnalyticsEvents(testUserId, 'push_sent');
+      expect(sent.map((e) => e.properties)).toContainEqual({ type: 'connection_expiring' });
+
+      await app.close();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('pushes on the already-broken transition too', async () => {
+    await registerPushableDevice();
+    freezeToMidday();
+    try {
+      const { buildApp } = await import('../src/server.js');
+      const app = await buildApp();
+
+      expect(
+        await postItemWebhook(app, 'ERROR', {
+          error: {
+            error_type: 'ITEM_ERROR',
+            error_code: 'ITEM_LOGIN_REQUIRED',
+            error_message: 'the login details of this item have changed',
+          },
+        }),
+      ).toBe(200);
+
+      const { listAnalyticsEvents } = await import('../src/store/analytics.js');
+      const sent = await listAnalyticsEvents(testUserId, 'push_sent');
+      expect(sent.map((e) => e.properties)).toContainEqual({ type: 'connection_broken' });
+
+      await app.close();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // The per-break rate limit section 8 asks for, and it needs no new state:
+  // transitionItemStatus returns early when nothing changed, so a flapping
+  // institution resending the same webhook cannot buzz twice.
+  it('does not push again when the same webhook repeats', async () => {
+    await registerPushableDevice();
+    freezeToMidday();
+    try {
+      const { buildApp } = await import('../src/server.js');
+      const app = await buildApp();
+
+      await postItemWebhook(app, 'PENDING_EXPIRATION');
+      await postItemWebhook(app, 'PENDING_EXPIRATION');
+      await postItemWebhook(app, 'PENDING_DISCONNECT');
+
+      const { listAnalyticsEvents } = await import('../src/store/analytics.js');
+      const sent = await listAnalyticsEvents(testUserId, 'push_sent');
+      expect(sent.filter((e) => JSON.stringify(e.properties).includes('connection_expiring'))).toHaveLength(1);
+
+      await app.close();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // THE RULE (vision.md): the creature reacts to what the user controls, never
+  // to anything else. A consent timer lapsing is not the user failing at money,
+  // so it must not cost the pet health. If this ever fails, the fix is the
+  // contract row, not this test.
+  it('does not change pet health when a connection breaks', async () => {
+    await registerPushableDevice();
+    const { getState } = await import('../src/store/pet.js');
+    const before = await getState(testUserId);
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    await postItemWebhook(app, 'PENDING_EXPIRATION');
+
+    const after = await getState(testUserId);
+    expect(after.healthScore).toBe(before.healthScore);
+
+    await app.close();
+  });
+
+  it('sends no push when the device has no timezone', async () => {
+    const { upsertDeviceToken } = await import('../src/store/devices.js');
+    await upsertDeviceToken({ token: 'tok_no_tz', platform: 'ios', userId: testUserId });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    await postItemWebhook(app, 'PENDING_EXPIRATION');
+
+    const { listAnalyticsEvents } = await import('../src/store/analytics.js');
+    expect(await listAnalyticsEvents(testUserId, 'push_sent')).toHaveLength(0);
 
     await app.close();
   });
