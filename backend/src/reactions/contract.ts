@@ -70,6 +70,35 @@ export const REACTION_CONTRACT = {
   // Spinwheel's view of the same real-world fact as bill_overdue.
   debt_missed_payment: { class: 'direct', priority: 41, push: 'once', healthDelta: -5, budgetExempt: true },
 
+  // A bank connection that needs the user's hands (testing-strategy section 8,
+  // R-8.7). Plaid sends PENDING_DISCONNECT / PENDING_EXPIRATION seven days
+  // before consent lapses, which is enough time to fix it before anything
+  // breaks at all; Coiny recorded that warning and let it lapse, because
+  // repair was in-app only and nobody opens a net worth tracker daily.
+  //
+  // `healthDelta: 0` on BOTH, and this is the important line in these two rows.
+  // The creature reacts to what the user controls and never to anything else
+  // (vision.md, THE RULE). A consent timer expiring is not the user failing at
+  // money, and an institution's OAuth breaking is not a financial event. Making
+  // the pet sad about it would teach the user that the creature's mood is
+  // noise, which is the one thing that cannot be repaired later.
+  //
+  // 'once' rather than 'always': the same-type 24h cooldown in canSendPush is
+  // what stops a flapping institution buzzing repeatedly. The stronger guard is
+  // upstream, in transitionItemStatus, which only fires on an actual status
+  // CHANGE, so a repeated webhook for an already-expiring item is silent.
+  //
+  // `budgetExempt: false` deliberately, so these ride the same two-a-week
+  // promise as everything else. That is a real trade: a broken connection means
+  // the displayed number is wrong, which is arguably the most important push
+  // Coiny can send, and it can still be crowded out by a celebration earlier
+  // the same day. Raising it means giving canSendPush a push-budget exemption,
+  // which it does not have today (budgetExempt is read only by the REACTION
+  // budget in perform.ts:73), and that is a product decision rather than a
+  // wiring one.
+  connection_expiring: { class: 'direct', priority: 42, push: 'once', healthDelta: 0, budgetExempt: false },
+  connection_broken: { class: 'direct', priority: 43, push: 'once', healthDelta: 0, budgetExempt: false },
+
   // --- Routine positives: happy in-app, never a buzz --------------------------
   paycheck_received: { class: 'direct', priority: 50, push: 'no', healthDelta: 10, budgetExempt: false },
   extra_debt_payment: { class: 'direct', priority: 51, push: 'no', healthDelta: 10, budgetExempt: false },
@@ -189,6 +218,12 @@ const REACTION_PRESETS: Partial<Record<ReactionEventName, Omit<Reaction, 'reason
   goal_achieved: { animation: 'celebrate', sound: 'fanfare', led: 'green', duration: 3000 },
   subscription_cancelled: { animation: 'celebrate', sound: 'chime', led: 'green', duration: 2000 },
   bill_overdue: { animation: 'concerned', sound: 'warning', led: 'amber', duration: 2000 },
+  // 'concerned', not 'sad'. The distinction carries into the push copy: both
+  // map to the S-21 "Coiny noticed something" title, and concerned reads as
+  // "there is something to do" rather than "you did badly", which is the honest
+  // framing for a connection the user can repair in two taps.
+  connection_expiring: { animation: 'concerned', sound: 'warning', led: 'amber', duration: 2000 },
+  connection_broken: { animation: 'concerned', sound: 'warning', led: 'amber', duration: 2000 },
   goal_period_passed: { animation: 'happy', sound: 'chime', led: 'green', duration: 2000 },
   streak_extended: { animation: 'happy', sound: 'chime', led: 'green', duration: 2000 },
   connection_added: { animation: 'happy', sound: 'chime', led: 'green', duration: 2000 },

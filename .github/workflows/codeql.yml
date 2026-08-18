@@ -1,14 +1,28 @@
-name: CodeQL (nightly deep SAST)
+name: CodeQL (deep SAST)
 
-# Semgrep runs on every PR (fast, shallow). CodeQL runs nightly (slow, deep
-# semantic/dataflow analysis). Together they cover different vulnerability
-# classes — CodeQL catches multi-step tainted data flows that Semgrep misses.
+# Semgrep runs on every PR (fast, shallow). CodeQL is the slow, deep
+# semantic/dataflow pass. Together they cover different vulnerability classes:
+# CodeQL catches multi-step tainted data flows that Semgrep misses.
+#
+# `pull_request` was added 2026-08-17, and the reason is worth keeping. This
+# workflow ran on `schedule` and `push: [main]` only, so it gated nothing. The
+# Swift leg was failing on main for an unknown length of time and every PR
+# stayed green beside it, which meant Swift static analysis was producing NO
+# results at all and the only signal was a badge on a branch nobody watches. A
+# check that cannot fail a PR is a check that rots unseen.
+#
+# The cost is real and is why the `changes` gate below exists: the Swift leg
+# needs a macOS runner, which bills at 10x Linux. A backend-only PR runs the
+# JavaScript leg alone; a docs-only PR runs neither.
 on:
   schedule:
-    # 02:00 UTC nightly — off-peak, won't compete with PR runs.
+    # 02:00 UTC nightly — off-peak, won't compete with PR runs. Kept even now
+    # that PRs are covered: the scheduled run is what catches a CVE published
+    # against code nobody has touched, and it is the only leg that sees main.
     - cron: '0 2 * * *'
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 concurrency:
@@ -21,22 +35,70 @@ permissions:
   actions: read           # Required by analyze step to read workflow-run info for telemetry — without this the run fails post-analysis with "Resource not accessible by integration".
 
 jobs:
+  # Which languages this run actually needs to analyse.
+  #
+  # The matrix is BUILT here rather than filtered with a job-level `if`, because
+  # a skipped matrix leg and an absent one report differently to branch
+  # protection, and an empty include list simply produces no analyze jobs. On
+  # anything that is not a pull request every language runs, which keeps the
+  # nightly and push runs complete.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+      any: ${{ steps.pick.outputs.any }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0
+      - id: pick
+        env:
+          # Via env, never interpolated into the script body: a ref is
+          # attacker-controllable on a fork PR and this is a shell.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -euo pipefail
+          JS='{"language":"javascript-typescript","os":"ubuntu-latest"}'
+          SWIFT='{"language":"swift","os":"macos-latest"}'
+
+          if [ "$IS_PR" != "true" ]; then
+            echo "matrix={\"include\":[$JS,$SWIFT]}" >> "$GITHUB_OUTPUT"
+            echo "any=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE_SHA"...HEAD)
+          INCLUDE=""
+          if echo "$CHANGED" | grep -qE '^(backend/|shared/|mobile/|\.github/workflows/codeql\.yml)'; then
+            INCLUDE="$JS"
+          fi
+          if echo "$CHANGED" | grep -qE '^(ios/|\.github/workflows/codeql\.yml)'; then
+            [ -n "$INCLUDE" ] && INCLUDE="$INCLUDE,$SWIFT" || INCLUDE="$SWIFT"
+          fi
+
+          if [ -z "$INCLUDE" ]; then
+            echo "No analysable code changed; skipping CodeQL."
+            echo "matrix={\"include\":[]}" >> "$GITHUB_OUTPUT"
+            echo "any=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "matrix={\"include\":[$INCLUDE]}" >> "$GITHUB_OUTPUT"
+            echo "any=true" >> "$GITHUB_OUTPUT"
+          fi
+
   analyze:
+    needs: changes
+    if: needs.changes.outputs.any == 'true'
     name: CodeQL — ${{ matrix.language }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
 
     strategy:
       fail-fast: false
-      matrix:
-        # javascript-typescript covers backend (Node/TS) + any JS. Runs on Linux.
-        # Swift's CodeQL extractor is macOS-only — Linux fails Initialize with
-        # "Swift analysis is only supported on macOS runner images."
-        include:
-          - language: javascript-typescript
-            os: ubuntu-latest
-          - language: swift
-            os: macos-latest
+      # javascript-typescript covers backend (Node/TS) + any JS, on Linux.
+      # Swift's CodeQL extractor is macOS-only: Linux fails Initialize with
+      # "Swift analysis is only supported on macOS runner images."
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
@@ -84,3 +146,28 @@ jobs:
         uses: github/codeql-action/analyze@7211b7c8077ea37d8641b6271f6a365a22a5fbfa  # v4.36.0
         with:
           category: /language:${{ matrix.language }}
+
+  # A single always-reporting status, so this can be made a required check
+  # without deadlocking. `analyze` is skipped entirely on a docs-only PR, and a
+  # skipped job never satisfies a required check; this one always runs and
+  # reports. Same shape as the `result` job in ios-ci.yml, for the same reason.
+  result:
+    needs: [changes, analyze]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate
+        env:
+          ANY: ${{ needs.changes.outputs.any }}
+          ANALYZE: ${{ needs.analyze.result }}
+        run: |
+          set -euo pipefail
+          if [ "$ANY" != "true" ]; then
+            echo "No analysable code changed; CodeQL not required for this PR."
+            exit 0
+          fi
+          if [ "$ANALYZE" = "success" ]; then
+            exit 0
+          fi
+          echo "CodeQL analyze: $ANALYZE"
+          exit 1
