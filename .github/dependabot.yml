@@ -82,6 +82,30 @@ updates:
       - dependency-name: "node"
         update-types: ["version-update:semver-major"]
 
+  # Swift packages that ship INSIDE the app binary.
+  #
+  # This was the last unwatched ecosystem, and it is the one with the highest
+  # supply-chain exposure: Package.resolved pins Plaid LinkKit, which is the
+  # only third-party code that reaches a user's device. Everything else
+  # Dependabot watches runs on our own servers, where a bad version is a deploy
+  # away from being rolled back. This one is in a build someone has installed.
+  #
+  # Majors are NOT ignored here, unlike the docker entry. A LinkKit major can
+  # carry a Link flow change or an iOS deployment-target bump, which is exactly
+  # the kind of thing that should arrive as a reviewable PR rather than be
+  # discovered at the next archive.
+  - package-ecosystem: swift
+    directory: /ios
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 3
+    labels:
+      - deps
+      - ios
+
   # shared/ is live code: cross-package types imported by the backend
   # (shared/mqtt-schema, pet-model, spending-schema). Only /backend was
   # watched, so its lockfile aged with nothing to say so.
