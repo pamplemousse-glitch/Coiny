@@ -6,7 +6,24 @@ DerivedData/
 xcuserdata/
 
 # Generated Xcode project (regenerate via `xcodegen generate`)
-*.xcodeproj/
+# Per-developer Xcode state, which is the only genuinely generated noise inside
+# the project bundle. The bundle itself is NOT blanket-ignored, and that is a
+# deliberate correction.
+#
+# `*.xcodeproj/` used to sit here. It swept up
+# project.xcworkspace/xcshareddata/swiftpm/Package.resolved, the SPM lockfile,
+# which is not generated: it is the resolved dependency graph. Two consequences,
+# both real. Every clean build resolved fresh, so a dependency change was
+# invisible in review, with no iOS equivalent of the backend's
+# --frozen-lockfile guarantee. And the `swift` Dependabot entry added in #259
+# had nothing to read, so it could never open a PR. That PR claimed every
+# ecosystem was now watched. For Swift it was not.
+#
+# Note that a blanket rule could not simply be negated: git cannot re-include a
+# file whose parent directory is excluded, so the fix has to be a narrower
+# ignore rather than an exception to a broad one.
+*.xcodeproj/**/xcuserdata/
+*.xcworkspace/**/xcuserdata/
 *.xcworkspace/
 
 # SPM artifacts
