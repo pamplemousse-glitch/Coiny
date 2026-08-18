@@ -204,3 +204,26 @@ export async function deleteItem(itemId: string): Promise<void> {
 export async function resetCursor(itemId: string): Promise<void> {
   await db().update(plaidItems).set({ cursor: null }).where(eq(plaidItems.itemId, itemId));
 }
+
+/**
+ * Live items for the daily connection-health sweep
+ * (scheduler/plaid-health.ts, testing-strategy section 8 item 3).
+ *
+ * Disabled items are excluded: they are unlinked or revoked, nothing about
+ * them is displayed, and asking Plaid about them would spend calls to learn
+ * something nobody reads. Items with no user are excluded for the same reason,
+ * and because a transition with no owner can notify nobody.
+ */
+export async function listActiveItemsForHealthCheck(): Promise<
+  { itemId: string; accessToken: string; status: PlaidItemStatus; userId: string }[]
+> {
+  const rows = await db().select().from(plaidItems).where(eq(plaidItems.disabled, false));
+  return rows
+    .filter((row): row is typeof row & { userId: string } => row.userId !== null)
+    .map((row) => ({
+      itemId: row.itemId,
+      accessToken: decryptString(row.accessToken),
+      status: row.status,
+      userId: row.userId,
+    }));
+}

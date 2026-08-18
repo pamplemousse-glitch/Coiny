@@ -137,6 +137,30 @@ function num(v: string | null): number | null {
   return v !== null ? parseFloat(v) : null;
 }
 
+/**
+ * A revoked or rejected credential, read off the cache row (testing-strategy
+ * section 8 item 4).
+ *
+ * The per-class health machinery was Plaid-shaped: `bankHealth` is computed
+ * from `plaid_items.status` and every other class passed no `health` at all, so
+ * a Coinbase key the user revoked read as a generic `error` or, worse, as
+ * `stale` beside a confident total. Coinbase, Kraken, Zerion and the rest can
+ * all revoke or expire a key, and the user cannot fix what the app does not
+ * name.
+ *
+ * No schema change is needed for this: `classifyError` already maps 401 and 403
+ * to `'auth'` and `recordClassFailure` already stores it, so the fact was being
+ * recorded and thrown away at the read. A later success clears `lastErrorClass`
+ * (`recordClassSuccess`), so this cannot latch on after the user re-links.
+ *
+ * Narrow on purpose. Only `'auth'`: a `429`, a `5xx` or a `timeout` is the
+ * vendor's problem and asking the user to re-authenticate over it is how a
+ * warning becomes noise.
+ */
+function credentialHealth(row: { lastErrorClass: string | null } | undefined): 'reauth_required' | null {
+  return row?.lastErrorClass === 'auth' ? 'reauth_required' : null;
+}
+
 export async function assembleNetWorth(userId: string, now: Date = new Date()): Promise<NetWorthAssembly> {
   const classCache = await getClassCache(userId);
   const classes = {} as Record<NetWorthClassName, ClassReading>;
@@ -276,6 +300,7 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
     []) as CryptoPosition[];
   const cryptoStatus = deriveStatus({
     connected: coinbaseUsable,
+    health: credentialHealth(cryptoRow),
     value: num(cryptoRow?.valueUsd ?? null),
     asOf: cryptoRow?.asOf ?? null,
     failed: !!cryptoRow?.lastErrorClass && cryptoRow?.asOf === null,
@@ -289,6 +314,7 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
   const defiRow = classCache.get('defi');
   const defiStatus = deriveStatus({
     connected: zerionRows.length > 0,
+    health: credentialHealth(defiRow),
     value: num(defiRow?.valueUsd ?? null),
     asOf: defiRow?.asOf ?? null,
     failed: !!defiRow?.lastErrorClass && defiRow?.asOf === null,
@@ -304,6 +330,7 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
   const debtItems = (debtsPayload?.items ?? []) as DebtItem[];
   const debtsStatus = deriveStatus({
     connected: !!spinwheelRow,
+    health: credentialHealth(debtsRow),
     value: num(debtsRow?.valueUsd ?? null),
     asOf: debtsRow?.asOf ?? null,
     failed: !!debtsRow?.lastErrorClass && debtsRow?.asOf === null,

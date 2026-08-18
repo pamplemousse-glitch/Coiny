@@ -3,25 +3,16 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { plaidTxToInternal } from '../plaid/adapter.js';
 import { liabilitiesGet, recurringTransactionsGet, transactionsSync } from '../plaid/client.js';
+import { transitionItemStatus } from '../plaid/item-lifecycle.js';
 import { verifyPlaidSignature } from '../plaid/signature.js';
 import { type PlaidAccount, PlaidApiError, type PlaidWebhookEnvelope } from '../plaid/types.js';
 import { reactionForEvent } from '../reactions/contract.js';
-import { dispatchReaction } from '../reactions/dispatch.js';
 import { performReactions } from '../reactions/perform.js';
 import type { RuleContext } from '../rules/engine.js';
 import { evaluateAll } from '../rules/engine.js';
-import { trackServerEvent } from '../store/analytics.js';
 import { upsertPlaidAccountBalances } from '../store/asset-cache.js';
 import { claimEvent, claimWebhookDelivery, releaseWebhookDelivery } from '../store/events.js';
-import {
-  disableItem,
-  getItem,
-  markInitialSyncComplete,
-  type PlaidItemStatus,
-  setCursor,
-  setItemStatus,
-  setNewAccountsAvailable,
-} from '../store/items.js';
+import { disableItem, getItem, markInitialSyncComplete, setCursor, setNewAccountsAvailable } from '../store/items.js';
 import { getGoals } from '../store/pet.js';
 import { cacheLiabilities } from '../store/plaid-liabilities.js';
 import { upsertRecurringStreams } from '../store/plaid-recurring.js';
@@ -36,95 +27,6 @@ const ItemWebhookSchema = z.object({
   item_id: z.string().min(1),
   error: z.object({ error_code: z.string() }).nullable().optional(),
 });
-
-/**
- * Persist a lifecycle transition and, when the state actually changed, emit
- * `item_state_changed` (docs/prd.md R-8.5, section 24).
- *
- * SEAM: this is the single place instrumentation hooks into item lifecycle
- * events, and since 2026-08-17 it is also where the user gets told.
- *
- * This docstring used to end "Deliberately no push from here: the notification
- * budget is owned by reactions/dispatch.ts, and recording state must never
- * spend it." Half of that is still true and is why the push goes through
- * `dispatchReaction` rather than calling APNs: quiet hours, the two-a-week
- * budget and the same-type cooldown all still live in dispatch.ts and all still
- * apply. What was wrong was the conclusion. Recording a broken connection and
- * telling nobody is not budget discipline, it is the gap in
- * testing-strategy.md section 8: the server knew the number on screen was
- * wrong and waited for the user to notice.
- */
-async function transitionItemStatus(
-  app: FastifyInstance,
-  itemId: string,
-  to: PlaidItemStatus,
-  opts?: { errorCode?: string | null; onlyIfCurrent?: readonly PlaidItemStatus[] },
-): Promise<void> {
-  const result = await setItemStatus(itemId, to, opts ?? {});
-  if (!result) {
-    app.log.warn({ item_id: itemId }, 'plaid item webhook for unknown item');
-    return;
-  }
-  if (!result.changed) {
-    app.log.info({ item_id: itemId, status: result.previous }, 'plaid item status unchanged');
-    return;
-  }
-  app.log.info(
-    {
-      event: 'item_state_changed',
-      item_id: itemId,
-      from: result.previous,
-      to,
-      error_code: opts?.errorCode ?? null,
-    },
-    'plaid item state changed',
-  );
-
-  // Connection breakage is the documented number one churn cause in this
-  // category, so every lifecycle transition is a measurable server-observed
-  // fact (R-24.2), not just the revoked edge that disableItem already emits.
-  // The Plaid error code is a closed vocabulary from Plaid, never message text.
-  if (result.userId) {
-    await trackServerEvent(result.userId, 'item_state_changed', {
-      state: to,
-      ...(opts?.errorCode ? { error_code: opts.errorCode.toLowerCase() } : {}),
-    });
-
-    // Tell the user (testing-strategy section 8 items 1 and 2, R-8.7).
-    //
-    // Until this line, Coiny recorded a broken connection perfectly and then
-    // waited for the user to happen to open the app. For a net worth tracker
-    // that wait IS the problem: break on the 3rd, open on the 24th, and they
-    // spent three weeks trusting a number the server knew was wrong.
-    //
-    // Placed here rather than in the switch above because this is the one point
-    // that knows the transition actually HAPPENED. `result.changed` is already
-    // guaranteed by the early return, so a repeated webhook for an
-    // already-expiring item pushes nothing, which is the per-break rate limit
-    // section 8 asks for without needing any new state to track it.
-    const event = PUSH_ON_STATUS[to];
-    if (event) {
-      dispatchReaction(result.userId, reactionForEvent(event), event);
-    }
-  }
-}
-
-/** Which lifecycle transitions are worth interrupting someone for.
- *
- *  `expiring` is the seven-day warning and the highest-value one: a break the
- *  user fixes before it happens is not a break. `reauth_required` and `revoked`
- *  are already-broken, where the number on screen is stale and only the user
- *  can fix it.
- *
- *  `healthy` is deliberately absent. A connection healing is not worth a buzz;
- *  it shows up in-app on next open, and spending one of two weekly pushes on
- *  good news about plumbing is the kind of thing that gets notifications turned
- *  off permanently. */
-const PUSH_ON_STATUS: Partial<Record<PlaidItemStatus, 'connection_expiring' | 'connection_broken'>> = {
-  expiring: 'connection_expiring',
-  reauth_required: 'connection_broken',
-  revoked: 'connection_broken',
-};
 
 // Webhook processing deliberately happens after the 200 (Plaid retries on a
 // slow response, and a sync can take seconds). That makes the work invisible to
@@ -203,7 +105,7 @@ export function registerPlaidWebhook(app: FastifyInstance): void {
           // broken even if the ITEM/ERROR webhook was missed or is delayed.
           if (err instanceof PlaidApiError && err.body.error_code === 'ITEM_LOGIN_REQUIRED' && envelope.item_id) {
             try {
-              await transitionItemStatus(app, envelope.item_id, 'reauth_required', {
+              await transitionItemStatus(app.log, envelope.item_id, 'reauth_required', {
                 errorCode: 'ITEM_LOGIN_REQUIRED',
               });
             } catch (transitionErr) {
@@ -238,7 +140,7 @@ async function handleItemWebhook(app: FastifyInstance, webhook: z.infer<typeof I
     case 'ERROR': {
       const errorCode = webhook.error?.error_code ?? 'UNKNOWN';
       app.log.warn({ item_id, error_code: errorCode }, 'plaid item error, re-auth required');
-      await transitionItemStatus(app, item_id, 'reauth_required', { errorCode });
+      await transitionItemStatus(app.log, item_id, 'reauth_required', { errorCode });
       return;
     }
     case 'PENDING_DISCONNECT':
@@ -246,7 +148,7 @@ async function handleItemWebhook(app: FastifyInstance, webhook: z.infer<typeof I
       app.log.warn({ item_id, webhook_code }, 'plaid item consent expiring');
       // Only a healthy item moves to expiring: an item already needing
       // re-auth (or revoked) must not be downgraded to a softer state.
-      await transitionItemStatus(app, item_id, 'expiring', {
+      await transitionItemStatus(app.log, item_id, 'expiring', {
         errorCode: webhook_code,
         onlyIfCurrent: ['healthy'],
       });
@@ -255,7 +157,7 @@ async function handleItemWebhook(app: FastifyInstance, webhook: z.infer<typeof I
       app.log.info({ item_id }, 'plaid item healed outside our update-mode flow');
       // A revoked item stays revoked: LOGIN_REPAIRED covers recovery from
       // ITEM_LOGIN_REQUIRED, not from revocation.
-      await transitionItemStatus(app, item_id, 'healthy', {
+      await transitionItemStatus(app.log, item_id, 'healthy', {
         onlyIfCurrent: ['reauth_required', 'expiring'],
       });
       return;
@@ -265,7 +167,7 @@ async function handleItemWebhook(app: FastifyInstance, webhook: z.infer<typeof I
       return;
     case 'USER_PERMISSION_REVOKED':
       app.log.warn({ item_id }, 'plaid item permission revoked, disabling');
-      await transitionItemStatus(app, item_id, 'revoked', { errorCode: 'USER_PERMISSION_REVOKED' });
+      await transitionItemStatus(app.log, item_id, 'revoked', { errorCode: 'USER_PERMISSION_REVOKED' });
       await disableItem(item_id);
       return;
     default:
