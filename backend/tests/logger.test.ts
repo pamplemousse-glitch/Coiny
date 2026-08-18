@@ -99,7 +99,12 @@ describe('the request log line', () => {
 
     const completions = capture.lines.filter((l) => (l.res as { url?: unknown } | undefined)?.url !== undefined);
     expect(completions.length).toBeGreaterThan(0);
-    expect((completions[0]?.res as { url: string }).url).toBe('/api/pets');
+    // Read through an optional type rather than casting and dereferencing.
+    // `(completions[0]?.res as { url: string }).url` throws a TypeError when
+    // the array is empty, which turns a clean assertion failure into a crash
+    // that hides which assertion failed.
+    const firstRes = completions[0]?.res as { url?: string } | undefined;
+    expect(firstRes?.url).toBe('/api/pets');
   });
 
   it('never carries the Authorization header', async () => {
