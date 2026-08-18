@@ -13,6 +13,19 @@ updates:
     labels:
       - deps
       - ci
+    groups:
+      # codeql-action/init, /autobuild and /analyze MUST move together.
+      # Ungrouped, Dependabot raises one PR per sub-action, and each one alone
+      # is unmergeable by construction: the analyze step reads the config the
+      # init step wrote and refuses a version mismatch outright with
+      #
+      #   Loaded a configuration file for version '4.36.0', but running '4.37.7'
+      #
+      # which is exactly how PR #248 failed. Grouping them makes the bump one
+      # reviewable change instead of three that are each individually broken.
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
 
   # Backend npm packages (package.json lives in /backend)
   - package-ecosystem: npm
