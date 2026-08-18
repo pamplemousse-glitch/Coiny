@@ -281,4 +281,24 @@ final class APITests: XCTestCase {
         XCTAssertFalse(isSignedIn)
         XCTAssertNil(store.load())
     }
+
+    // PRD R-31.9. APIError is a LocalizedError, and 86 assignments across 25
+    // ViewModels put `localizedDescription` straight into rendered error
+    // state. Interpolating the response body here meant a raw server response
+    // could be drawn on screen under a themed error line.
+    func testHTTPErrorTextNeverCarriesTheResponseBody() {
+        let body = #"{"error":"column merchant_name violates constraint","user":"a@b.com"}"#
+        let error = API.APIError.http(status: 500, body: body)
+
+        let rendered = error.localizedDescription
+
+        XCTAssertFalse(
+            rendered.contains("merchant_name"),
+            "the response body reached rendered error text: \(rendered)"
+        )
+        XCTAssertFalse(rendered.contains("a@b.com"), "an email reached rendered error text: \(rendered)")
+        // The status still survives, which is the part a user or a support
+        // conversation can actually act on.
+        XCTAssertTrue(rendered.contains("500"), "the status code was lost: \(rendered)")
+    }
 }

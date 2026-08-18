@@ -64,7 +64,13 @@ actor API {
         var errorDescription: String? {
             switch self {
             case .invalidURL: return "Invalid request URL"
-            case let .http(status, body): return "HTTP \(status): \(body)"
+            // The status ONLY. `body` is deliberately not interpolated: this
+            // type is a LocalizedError, so 86 assignments across 25 ViewModels
+            // put `localizedDescription` into rendered error state, and a raw
+            // server response could be drawn on screen under a themed error
+            // line. PRD R-31.9. This one edit retires the largest share of
+            // those sites because they all inherit it.
+            case let .http(status, _): return "HTTP \(status)"
             case let .decode(error): return "Decode failed: \(error.localizedDescription)"
             case let .transport(error): return "Network failed: \(error.localizedDescription)"
             case .unauthenticated: return "Not signed in"
