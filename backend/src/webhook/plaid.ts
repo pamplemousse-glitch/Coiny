@@ -6,6 +6,7 @@ import { liabilitiesGet, recurringTransactionsGet, transactionsSync } from '../p
 import { verifyPlaidSignature } from '../plaid/signature.js';
 import { type PlaidAccount, PlaidApiError, type PlaidWebhookEnvelope } from '../plaid/types.js';
 import { reactionForEvent } from '../reactions/contract.js';
+import { dispatchReaction } from '../reactions/dispatch.js';
 import { performReactions } from '../reactions/perform.js';
 import type { RuleContext } from '../rules/engine.js';
 import { evaluateAll } from '../rules/engine.js';
@@ -40,11 +41,18 @@ const ItemWebhookSchema = z.object({
  * Persist a lifecycle transition and, when the state actually changed, emit
  * `item_state_changed` (docs/prd.md R-8.5, section 24).
  *
- * SEAM: this log line is the single place instrumentation hooks into item
- * lifecycle events, and where a future "should we prompt the user?" decision
- * would attach. Deliberately no push from here: the notification budget
- * (2 per rolling 7 days, allowlisted animations) is owned by
- * reactions/dispatch.ts, and recording state must never spend it.
+ * SEAM: this is the single place instrumentation hooks into item lifecycle
+ * events, and since 2026-08-17 it is also where the user gets told.
+ *
+ * This docstring used to end "Deliberately no push from here: the notification
+ * budget is owned by reactions/dispatch.ts, and recording state must never
+ * spend it." Half of that is still true and is why the push goes through
+ * `dispatchReaction` rather than calling APNs: quiet hours, the two-a-week
+ * budget and the same-type cooldown all still live in dispatch.ts and all still
+ * apply. What was wrong was the conclusion. Recording a broken connection and
+ * telling nobody is not budget discipline, it is the gap in
+ * testing-strategy.md section 8: the server knew the number on screen was
+ * wrong and waited for the user to notice.
  */
 async function transitionItemStatus(
   app: FastifyInstance,
@@ -81,8 +89,42 @@ async function transitionItemStatus(
       state: to,
       ...(opts?.errorCode ? { error_code: opts.errorCode.toLowerCase() } : {}),
     });
+
+    // Tell the user (testing-strategy section 8 items 1 and 2, R-8.7).
+    //
+    // Until this line, Coiny recorded a broken connection perfectly and then
+    // waited for the user to happen to open the app. For a net worth tracker
+    // that wait IS the problem: break on the 3rd, open on the 24th, and they
+    // spent three weeks trusting a number the server knew was wrong.
+    //
+    // Placed here rather than in the switch above because this is the one point
+    // that knows the transition actually HAPPENED. `result.changed` is already
+    // guaranteed by the early return, so a repeated webhook for an
+    // already-expiring item pushes nothing, which is the per-break rate limit
+    // section 8 asks for without needing any new state to track it.
+    const event = PUSH_ON_STATUS[to];
+    if (event) {
+      dispatchReaction(result.userId, reactionForEvent(event), event);
+    }
   }
 }
+
+/** Which lifecycle transitions are worth interrupting someone for.
+ *
+ *  `expiring` is the seven-day warning and the highest-value one: a break the
+ *  user fixes before it happens is not a break. `reauth_required` and `revoked`
+ *  are already-broken, where the number on screen is stale and only the user
+ *  can fix it.
+ *
+ *  `healthy` is deliberately absent. A connection healing is not worth a buzz;
+ *  it shows up in-app on next open, and spending one of two weekly pushes on
+ *  good news about plumbing is the kind of thing that gets notifications turned
+ *  off permanently. */
+const PUSH_ON_STATUS: Partial<Record<PlaidItemStatus, 'connection_expiring' | 'connection_broken'>> = {
+  expiring: 'connection_expiring',
+  reauth_required: 'connection_broken',
+  revoked: 'connection_broken',
+};
 
 // Webhook processing deliberately happens after the 200 (Plaid retries on a
 // slow response, and a sync can take seconds). That makes the work invisible to
