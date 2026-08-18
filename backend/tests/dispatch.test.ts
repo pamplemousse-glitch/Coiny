@@ -316,6 +316,10 @@ describe('dispatchReaction', () => {
   it('pins the pushable event allowlist exactly', () => {
     expect(Array.from(PUSHABLE_EVENTS).sort()).toEqual([
       'bill_overdue',
+      // Widened 2026-08-17 for the connection-notification gap
+      // (testing-strategy section 8). See tests/contract.test.ts for the why.
+      'connection_broken',
+      'connection_expiring',
       'debt_cleared',
       'debt_missed_payment',
       'debug',
