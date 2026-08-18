@@ -417,4 +417,94 @@ final class DarkModeRenderingTests: XCTestCase {
             )
         }
     }
+
+    // MARK: - The Wealth rows the accessibility audit keeps flagging
+
+    /// Settles, deterministically, whether `WealthRowView` has the contrast
+    /// defect `performAccessibilityAudit` keeps reporting (PR #231).
+    ///
+    /// It does not. Measured on an iOS 26 simulator, `ink2` subheadline text on
+    /// `surface` renders at 7.58:1 in light and 7.25:1 in dark, against tokens
+    /// of 7.46:1 and 7.17:1. The audit's contrast findings on `'Debts'` and
+    /// `'$4,300.00'` are false positives, which is consistent with the audit
+    /// giving a different answer on each of four runs.
+    ///
+    /// TWO METHOD NOTES, both learned by getting it wrong here first, because
+    /// this harness can produce a confident wrong number as easily as a right
+    /// one.
+    ///
+    /// 1. THE PERCENTILE IS CALIBRATED, NOT CHOSEN. `percentileExtreme` sorts
+    ///    by absolute luminance distance from the reference, so the useful
+    ///    percentile depends on what fraction of the box is glyph. Calibrated
+    ///    by measuring a pair whose answer is already known: at p=0.999 the
+    ///    `ink` render lands within 0.2 of its 16.27:1 token, so the percentile
+    ///    is finding glyph cores. At p=0.99 the same pair reads 15.21:1, and on
+    ///    a full-screen box it read 6.24:1, which is fringe, not text.
+    ///
+    /// 2. THE VIEW IS RENDERED IN ISOLATION ON PURPOSE. Rendering the whole
+    ///    `WealthRowView` and taking a percentile over the background's
+    ///    bounding box does NOT work: that box also contains `CoinyHairline`
+    ///    and a `.bordered` button, both darker than either text token, so the
+    ///    high percentiles return `#0E0E0E` and the measurement describes the
+    ///    hairline. That approach reported a 3.91:1 "defect" that does not
+    ///    exist. If you extend this, scope the box to the glyphs or keep the
+    ///    render isolated.
+    ///
+    /// What this DOES still catch, which a palette test cannot: an `.opacity()`
+    /// or `.disabled()` applied to these styles, which multiplies the label's
+    /// alpha after its colour is chosen and is how #220 shipped a 2.92:1
+    /// button while its comment claimed the opposite.
+    func testWealthRowTextStylesMeetContrastWhenRendered() {
+        // Exactly the (font, colour) pairs WealthRowView draws:
+        // `NetWorthView+Groups.swift` uses .subheadline/ink for the value,
+        // .subheadline/ink2 for the muted value, and .caption/ink2 for the
+        // subtitle.
+        let pairs: [(name: String, color: Color, font: Font)] = [
+            ("value", CoinyTheme.ink, .subheadline),
+            ("mutedValue", CoinyTheme.ink2, .subheadline),
+            ("subtitle", CoinyTheme.ink2, .caption),
+        ]
+
+        for scheme in [ColorScheme.light, .dark] {
+            for pair in pairs {
+                let view = Text("Debts $4,300.00")
+                    .font(pair.font)
+                    .foregroundStyle(pair.color)
+                    .padding(4)
+                    .background(CoinyTheme.surface)
+                    .fixedSize()
+
+                let raster = render(view, scheme, named: "wealth-\(pair.name)-\(scheme)")
+                let background = rgb(CoinyTheme.surface, scheme)
+                guard let box = raster.boundingBox(of: background) else {
+                    XCTFail("\(scheme) \(pair.name): nothing rendered on the theme surface")
+                    continue
+                }
+
+                let text = raster.percentileExtreme(
+                    in: box, from: background, percentile: 0.999, luminance: luminance
+                )
+                XCTAssertNotNil(text, "\(scheme) \(pair.name): no glyph pixels, so this would pass vacuously")
+                guard let text else { continue }
+
+                let ratio = contrast(text, background)
+                XCTAssertGreaterThanOrEqual(
+                    ratio, 4.5,
+                    "\(scheme) wealth \(pair.name): rendered \(text.hex) on \(background.hex) at "
+                    + "\(String(format: "%.2f", ratio)):1, below AA 4.5:1"
+                )
+
+                // The render must track the token. A large gap means something
+                // is fading the text after its colour is chosen, which is the
+                // failure a token test cannot see and this test exists for.
+                let token = rgb(pair.color, scheme)
+                let tokenRatio = contrast(token, background)
+                XCTAssertGreaterThan(
+                    ratio, tokenRatio * 0.7,
+                    "\(scheme) wealth \(pair.name): renders at \(String(format: "%.2f", ratio)):1 but its "
+                    + "token pair is \(String(format: "%.2f", tokenRatio)):1. Something is fading it."
+                )
+            }
+        }
+    }
 }
