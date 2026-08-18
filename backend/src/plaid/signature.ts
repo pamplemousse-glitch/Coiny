@@ -40,7 +40,7 @@ async function getKey(kid: string): Promise<CryptoKeyLike | null> {
 
   try {
     const jwk = await fetchKey(kid);
-    if (!jwk || jwk.kty !== 'EC' || jwk.crv !== 'P-256') return null;
+    if (jwk?.kty !== 'EC' || jwk?.crv !== 'P-256') return null;
     const key = await importJWK(jwk as unknown as JWK, 'ES256');
     // jose returns CryptoKeyLike for asymmetric algs in modern Node.
     keyCache.set(kid, key as CryptoKeyLike);
