@@ -83,6 +83,16 @@ export type ItemGetResponse = {
     item_id: string;
     institution_id: string | null;
     institution_name: string | null;
+    // The item's CURRENT error, null when healthy. This is what makes the
+    // connection-health sweep possible: webhooks can be missed (a delivery
+    // fails, a signature is rejected, the server is mid-deploy), and this field
+    // is the authoritative answer that does not depend on having received one.
+    // Only `error_code` is ever read; `error_message` is vendor prose.
+    error: { error_code: string; error_type?: string } | null;
+    // ISO 8601, or null for institutions that do not expire consent. Where
+    // consent does expire, this is the seven-day warning's ground truth, again
+    // without depending on a PENDING_* webhook having arrived.
+    consent_expiration_time?: string | null;
   };
   request_id: string;
 };

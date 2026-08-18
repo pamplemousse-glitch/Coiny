@@ -35,6 +35,7 @@ import { coinbaseConnections, plaidItems, spinwheelConnections, zerionWallets } 
 import { refreshScheduledClass, runGoalRefreshFromCache, type ScheduledClass } from '../networth/refresh.js';
 import { getClassCacheForUsers } from '../store/asset-cache.js';
 import { usersMissingDailyPoint } from '../store/goals.js';
+import { type HealthSweepSummary, isHealthSweepDue, runConnectionHealthSweep } from './plaid-health.js';
 import { drainPlaidRemovalQueue, type RemovalDrainSummary } from './plaid-removals.js';
 import { isPurgeDue, type PurgeSummary, runRetentionPurge } from './purge.js';
 
@@ -124,6 +125,8 @@ export type TickSummary = {
   purge: PurgeSummary | null;
   /** Every tick, unlike the purge: a queued Item is being billed monthly. */
   removals: RemovalDrainSummary;
+  /** Null on the ticks that were not the day's health-sweep tick. */
+  health: HealthSweepSummary | null;
 };
 
 export async function runSchedulerTick(
@@ -132,7 +135,15 @@ export async function runSchedulerTick(
 ): Promise<TickSummary> {
   if (inFlight) {
     log.info({}, 'scheduler_tick_skipped');
-    return { skipped: true, refreshed: 0, failed: 0, goalRefreshes: 0, purge: null, removals: emptyDrain() };
+    return {
+      skipped: true,
+      refreshed: 0,
+      failed: 0,
+      goalRefreshes: 0,
+      purge: null,
+      removals: emptyDrain(),
+      health: null,
+    };
   }
   inFlight = true;
   const summary: TickSummary = {
@@ -142,6 +153,7 @@ export async function runSchedulerTick(
     goalRefreshes: 0,
     purge: null,
     removals: emptyDrain(),
+    health: null,
   };
   const startedTick = Date.now();
 
@@ -178,6 +190,19 @@ export async function runSchedulerTick(
         log.warn({ user_id: userId, err }, 'daily goal refresh failed');
       }
     });
+
+    // Connection-health sweep, once a day (testing-strategy section 8 item 3).
+    // Webhooks are the fast path and are not a guarantee; this is what finds
+    // the items that broke while no webhook arrived. Isolated like every other
+    // unit: a Plaid outage costs the sweep, never the tick.
+    if (isHealthSweepDue(now)) {
+      try {
+        summary.health = await runConnectionHealthSweep(now, log);
+        log.info({ ...summary.health }, 'connection_health_sweep_completed');
+      } catch (err) {
+        log.warn({ err }, 'connection health sweep failed');
+      }
+    }
 
     // Retention purge, once a day. Counts only, never contents. A failing
     // purge is an operational problem and must not cost the tick its
