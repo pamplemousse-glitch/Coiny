@@ -60,6 +60,13 @@ describe('reaction contract', () => {
     it('pins the pushable event set exactly', () => {
       expect([...PUSHABLE_EVENTS].sort()).toEqual([
         'bill_overdue',
+        // Added 2026-08-17 (testing-strategy section 8). Deliberately widened:
+        // Plaid warns seven days before consent lapses and Coiny used to record
+        // that and tell nobody, so a user's net worth went quietly stale. Both
+        // carry healthDelta 0, because a consent timer is not the user failing
+        // at money.
+        'connection_broken',
+        'connection_expiring',
         'debt_cleared',
         'debt_missed_payment',
         'debug',
