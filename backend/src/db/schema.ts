@@ -401,6 +401,18 @@ export const vehicleAssets = pgTable(
     label: text('label'),
     lastValueUsd: numeric('last_value_usd'),
     lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    // NHTSA vPIC decode, cached at add time (0055). A VIN decodes to the same
+    // answer forever, so this is one free call per vehicle, not per read.
+    // All nullable: vPIC is enrichment, never a gate on recording a car.
+    make: text('make'),
+    model: text('model'),
+    modelYear: integer('model_year'),
+    trim: text('trim'),
+    bodyClass: text('body_class'),
+    vinDecodeErrorCode: text('vin_decode_error_code'),
+    // null = never decoded, false = vPIC found no make/year, so the sync skips
+    // it rather than spending one of MarketCheck's 500 free monthly calls.
+    vinUsable: boolean('vin_usable'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('vehicle_assets_user_vin_idx').on(t.userId, t.vin)],

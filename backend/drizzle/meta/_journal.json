@@ -386,6 +386,13 @@
       "when": 1787102035549,
       "tag": "0054_drop_user_identity_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1787169099911,
+      "tag": "0055_vehicle_vin_decode",
+      "breakpoints": true
     }
   ]
 }
