@@ -89,4 +89,49 @@ describe('asset class cache', () => {
     // A new day resets the budget.
     expect(await tryConsumeManualRefresh(testUserId, 2, '2026-08-14')).toBe(true);
   });
+
+  // Plaid bills /accounts/balance/get per request, and one refresh calls it
+  // once per Item. A budget counting refreshes let a five-bank user spend five
+  // times the money for the same nominal allowance.
+  it('charges the budget per call, so a multi-item refresh costs more', async () => {
+    const { tryConsumeManualRefresh } = await import('../src/store/asset-cache.js');
+    const today = '2026-08-13';
+
+    // Three items, budget of 4: the first refresh costs 3.
+    expect(await tryConsumeManualRefresh(testUserId, 4, today, 3)).toBe(true);
+    // A second would take it to 6, past the ceiling.
+    expect(await tryConsumeManualRefresh(testUserId, 4, today, 3)).toBe(false);
+    // A single-call refresh still fits in the remaining 1.
+    expect(await tryConsumeManualRefresh(testUserId, 4, today, 1)).toBe(true);
+  });
+
+  // Otherwise a cost control becomes an outage for the users who linked most.
+  it('always allows the first refresh of the day, even above the budget', async () => {
+    const { tryConsumeManualRefresh } = await import('../src/store/asset-cache.js');
+    const today = '2026-08-13';
+
+    // Nine items against a budget of 4.
+    expect(await tryConsumeManualRefresh(testUserId, 4, today, 9)).toBe(true);
+    // But only the first: the allowance is now spent for the day.
+    expect(await tryConsumeManualRefresh(testUserId, 4, today, 9)).toBe(false);
+    expect(await tryConsumeManualRefresh(testUserId, 4, today, 1)).toBe(false);
+  });
+
+  // The defect that motivated the rewrite: read, check, write is not a budget.
+  // Two refreshes arriving together both read the same count, both passed, and
+  // both wrote count+1.
+  it('does not overspend when refreshes arrive concurrently', async () => {
+    const { tryConsumeManualRefresh, getClassCacheRow } = await import('../src/store/asset-cache.js');
+    const today = '2026-08-13';
+    const LIMIT = 4;
+
+    const results = await Promise.all(
+      Array.from({ length: 10 }, () => tryConsumeManualRefresh(testUserId, LIMIT, today, 1)),
+    );
+
+    // Exactly the budget, never more, however many raced.
+    expect(results.filter(Boolean)).toHaveLength(LIMIT);
+    const row = await getClassCacheRow(testUserId, 'bank');
+    expect(row?.manualRefreshCount).toBe(LIMIT);
+  });
 });

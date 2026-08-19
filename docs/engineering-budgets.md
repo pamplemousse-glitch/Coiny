@@ -133,7 +133,21 @@ Variable model per paying user under the §2 contract. Plaid publishes billing m
 | Collectibles + real-asset vendors | Per-call, vendor-priced; several free tiers with hard daily quotas (TCGapi 100 req/day, `config.ts:108`) | ~$0.10 blended | Weekly/monthly cadence keeps most inside free tiers |
 | **Total** | | **~$0.90-1.30** | Consistent with the integration map's "$0.30 to ~$4" range, held at the low end by the §2 schedule |
 
-The sync frequency that holds it, stated as the dial it is: **bank data rides webhooks (free), everything scheduled refreshes at 6 h or slower, and the only per-call-billed endpoint a user can drive is capped at 4/day.** The single most expensive behaviour available to this codebase is the one it ships today: per-call-billed Plaid endpoints inside `GET /api/net-worth`, plus every item silently enrolled in three subscriptions at link time via `plaid/client.ts:71`. Two app opens a day is ~60 billed Balance calls per item per month before anyone pulls to refresh, because the iOS Wealth tab calls the endpoint on every appearance and every pull (`NetWorthView.swift:35-38`). At any plausible per-call price this exceeds the whole $1.25 budget on its own. The §2 contract is the cost model, not just the freshness model. BLOCKER before pay-as-you-go billing starts; harmless in sandbox, which is why it has survived.
+The sync frequency that holds it, stated as the dial it is: **bank data rides webhooks (free), everything scheduled refreshes at 6 h or slower, and the only per-call-billed endpoint a user can drive is capped at 4 calls/day.**
+
+**Corrected 2026-08-19.** This paragraph used to name, as a live BLOCKER, "per-call-billed Plaid endpoints inside `GET /api/net-worth`" costing ~60 Balance calls per item per month. That is no longer true and the wording outlived the fix. Verified against the code:
+
+- `GET /api/net-worth` is a pure DB read (`api/net-worth.ts:1`, R-16.1). No external call, no write.
+- The billed pull moved to `POST /api/net-worth/refresh`, behind `REFRESH_LIMIT` (5/min) and the daily budget.
+- The scheduler cannot reach it: `ScheduledClass` is `investments | crypto | defi | debts`. `bank` is not a scheduled class.
+- The `required_if_supported_products` fix is in place at `plaid/client.ts:87`.
+
+**Two things this table still gets wrong, both found 2026-08-19 and both fixed in code:**
+
+1. **The budget counted refreshes, not calls.** `fetchPlaidSnapshot` calls `/accounts/balance/get` once per Item, so "4/day" meant 4 x item count billed calls. At five linked banks that is 600 calls/month against an estimate written for 20. The budget is now spent in calls (`MANUAL_BANK_BALANCE_CALLS_PER_DAY`), so the ceiling is max(4, item count) per day regardless of how many banks are linked.
+2. **`/transactions/recurring/get` is a FOURTH monthly subscription**, not part of Transactions. Plaid's billing page lists Recurring Transactions as its own subscription-fee product, and `recurring_transactions` is a distinct `products` value. It is absent from the table below and from both product arrays in `linkTokenCreate`, yet `api/plaid-link.ts:137` calls it on every link. Confirm on the first invoice whether that call enrolls the Item. Plaid also gates the endpoint behind a product access request, so confirm it is enabled at all.
+
+The §2 contract is the cost model, not just the freshness model.
 
 Measured by: monthly vendor invoices divided by MAU, one line per month in this doc's git history. Breach action: lengthen the §2 interval for the offending class (tiers were chosen so a 2x slowdown stays inside the never-show ages), then re-tier pricing if that is not enough.
 
