@@ -7,7 +7,7 @@
 // here logs; callers own logging and must keep amounts and merchant names out of
 // log sinks (#2).
 
-import { and, eq, inArray, notInArray } from 'drizzle-orm';
+import { and, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { assetClassCache, plaidAccountBalances } from '../db/schema.js';
 
@@ -175,28 +175,57 @@ export async function getClassCacheForUsers(
   return new Map(rows.map((r) => [r.userId, r]));
 }
 
-/** Consumes one unit of the daily manual-refresh budget for the billed Plaid
- *  balance pull (engineering-budgets.md section 2: 4/day). Returns false and
- *  consumes nothing when the budget is exhausted. Tracked on the `bank` row. */
-export async function tryConsumeManualRefresh(userId: string, limit: number, today: string): Promise<boolean> {
-  const existing = await getClassCacheRow(userId, 'bank');
+/**
+ * Consumes `cost` units of the daily budget for the billed Plaid balance pull,
+ * atomically. Returns false and consumes nothing when the budget is spent.
+ *
+ * `cost` is the number of CALLS the refresh will make, not the number of
+ * refreshes. Plaid bills `/accounts/balance/get` per request
+ * (plaid.com/docs/account/billing: "a flat fee is charged for each successful
+ * API call to that product endpoint"), and fetchPlaidSnapshot calls it once
+ * per Item. Counting refreshes therefore capped the wrong unit: a user with
+ * five linked banks spent five times the money for the same "4 a day".
+ *
+ * WHY ONE STATEMENT. This was a read, a check, then a write. Two refreshes
+ * arriving together both read the same count, both passed the check and both
+ * wrote count+1, so the ceiling could be exceeded by however many requests
+ * were in flight. The rate limiter bounded that to a leak rather than a flood,
+ * but a budget that can be beaten by tapping twice is not a budget. The
+ * conditional upsert below decides and consumes under one row lock.
+ *
+ * The `manual_refresh_count = 0` branch guarantees the FIRST refresh of a day
+ * always runs. Without it a user with more linked banks than the daily budget
+ * could never refresh at all, which would turn a cost control into an outage
+ * for exactly the users who linked the most.
+ */
+export async function tryConsumeManualRefresh(
+  userId: string,
+  limit: number,
+  today: string,
+  cost = 1,
+): Promise<boolean> {
+  const result = await db().execute(sql`
+    INSERT INTO asset_class_cache (user_id, asset_class, manual_refresh_date, manual_refresh_count)
+    VALUES (${userId}, 'bank', ${today}, ${cost})
+    ON CONFLICT (user_id, asset_class) DO UPDATE
+      SET manual_refresh_date = ${today},
+          manual_refresh_count = CASE
+            WHEN asset_class_cache.manual_refresh_date IS DISTINCT FROM ${today} THEN ${cost}
+            ELSE asset_class_cache.manual_refresh_count + ${cost}
+          END
+      WHERE asset_class_cache.manual_refresh_date IS DISTINCT FROM ${today}
+         OR asset_class_cache.manual_refresh_count = 0
+         OR asset_class_cache.manual_refresh_count + ${cost} <= ${limit}
+    RETURNING manual_refresh_count
+  `);
 
-  if (!existing) {
-    await db().insert(assetClassCache).values({
-      userId,
-      assetClass: 'bank',
-      manualRefreshDate: today,
-      manualRefreshCount: 1,
-    });
-    return true;
-  }
-
-  const count = existing.manualRefreshDate === today ? existing.manualRefreshCount : 0;
-  if (count >= limit) return false;
-
-  await db()
-    .update(assetClassCache)
-    .set({ manualRefreshDate: today, manualRefreshCount: count + 1 })
-    .where(and(eq(assetClassCache.userId, userId), eq(assetClassCache.assetClass, 'bank')));
-  return true;
+  // A row comes back only when the INSERT landed or the DO UPDATE's WHERE
+  // passed. No row means the budget was already spent.
+  //
+  // The result shape is driver-level and differs between the PGlite adapter
+  // used in tests and the Neon one used in production, so both spellings are
+  // read, exactly as store/events.ts does for rowCount.
+  // biome-ignore lint/suspicious/noExplicitAny: driver-level result shape varies by adapter
+  const rows = (result as any).rows ?? result;
+  return Array.isArray(rows) && rows.length > 0;
 }

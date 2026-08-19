@@ -17,7 +17,23 @@ import { tryConsumeManualRefresh } from '../store/asset-cache.js';
 import { getItemsByUser } from '../store/items.js';
 import { REFRESH_LIMIT } from './rate-limits.js';
 
-export const MANUAL_BANK_REFRESH_PER_DAY = 4;
+/**
+ * Daily ceiling on billed `/accounts/balance/get` CALLS per user, not on
+ * refreshes. Held at 4 so the single-item case is unchanged: one bank, four
+ * refreshes a day, exactly as before.
+ *
+ * A user with more banks than this still gets one refresh a day, because
+ * tryConsumeManualRefresh always lets the first one of the day through. Their
+ * ceiling is therefore max(4, item count) calls a day rather than 4 x items,
+ * which is what it was when the budget counted refreshes: at five banks that
+ * was 600 billed calls a month against an estimate written for 20.
+ */
+export const MANUAL_BANK_BALANCE_CALLS_PER_DAY = 4;
+
+/** @deprecated Renamed to MANUAL_BANK_BALANCE_CALLS_PER_DAY, which says what
+ *  the number actually bounds. Kept as an alias for one release because the
+ *  old name is referenced in engineering-budgets.md and in tests. */
+export const MANUAL_BANK_REFRESH_PER_DAY = MANUAL_BANK_BALANCE_CALLS_PER_DAY;
 
 export function registerNetWorthApi(app: FastifyInstance): void {
   app.get('/api/net-worth', async (req, _reply) => {
@@ -31,12 +47,22 @@ export function registerNetWorthApi(app: FastifyInstance): void {
   app.post('/api/net-worth/refresh', REFRESH_LIMIT, async (req, _reply) => {
     const userId = req.user!.id;
 
-    // The balance pull is the only per-call-billed request a user can drive;
-    // consume the daily budget only when there is an item to pull for.
+    // The balance pull is the only per-call-billed request a user can drive
+    // (plaid.com/docs/account/billing lists /accounts/balance/get under
+    // per-request flat fee); consume the daily budget only when there is an
+    // item to pull for.
+    //
+    // The budget is spent in CALLS, and one refresh costs one call PER ITEM
+    // because fetchPlaidSnapshot fans out over items. Charging one unit per
+    // refresh meant a user with five linked banks cost five times as much for
+    // the same nominal allowance, which is the opposite of what a cost control
+    // is for.
     const items = await getItemsByUser(userId);
     const today = new Date().toISOString().slice(0, 10);
     const bankAllowed =
-      items.length > 0 ? await tryConsumeManualRefresh(userId, MANUAL_BANK_REFRESH_PER_DAY, today) : true;
+      items.length > 0
+        ? await tryConsumeManualRefresh(userId, MANUAL_BANK_BALANCE_CALLS_PER_DAY, today, items.length)
+        : true;
 
     const result = await refreshAllForUser(userId, { bankAllowed });
 
