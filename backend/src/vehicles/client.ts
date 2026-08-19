@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { config } from '../config.js';
+import { fetchWithRetry } from '../util/fetch.js';
 
 const MarketCheckResponseSchema = z.object({
   marketcheck_price: z.number(),
@@ -23,7 +24,7 @@ export async function getVehicleValue(
     zip,
   });
   const url = `https://api.marketcheck.com/v2/predict/car/us/marketcheck_price?${params}`;
-  const res = await fetch(url);
+  const res = await fetchWithRetry(url);
 
   if (!res.ok) throw new Error(`MarketCheck API error: ${res.status}`);
 

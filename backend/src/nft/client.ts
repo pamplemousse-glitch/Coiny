@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fetchWithRetry } from '../util/fetch.js';
 
 export class AlchemyError extends Error {
   status: number;
@@ -51,7 +52,7 @@ async function fetchNftsForOwner(address: string, apiKey: string): Promise<Alche
     // returned inside contract.openSeaMetadata.floorPrice when metadata is included.
     if (pageKey) url.searchParams.set('pageKey', pageKey);
 
-    const res = await fetch(url.toString());
+    const res = await fetchWithRetry(url.toString());
 
     if (!res.ok) {
       throw new AlchemyError(`Alchemy API error: ${res.status}`, res.status);

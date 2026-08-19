@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fetchWithRetry } from '../util/fetch.js';
 
 const BASE_URL = 'https://www.pokemonpricetracker.com';
 
@@ -26,7 +27,7 @@ export async function getPokemonCardPrice(
   apiKey: string,
 ): Promise<number | null> {
   const params = new URLSearchParams({ search: cardName, limit: '20' });
-  const res = await fetch(`${BASE_URL}/api/v2/cards?${params}`, {
+  const res = await fetchWithRetry(`${BASE_URL}/api/v2/cards?${params}`, {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
 

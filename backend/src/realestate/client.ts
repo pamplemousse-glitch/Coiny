@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { config } from '../config.js';
+import { fetchWithRetry } from '../util/fetch.js';
 
 const RentcastResponseSchema = z.object({
   price: z.number(),
@@ -9,7 +10,7 @@ export async function getPropertyValue(address: string): Promise<number> {
   if (!config.RENTCAST_API_KEY) throw new Error('RENTCAST_API_KEY not configured');
 
   const url = `https://api.rentcast.io/v1/avm/value?address=${encodeURIComponent(address)}`;
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     headers: { 'X-Api-Key': config.RENTCAST_API_KEY },
   });
 

@@ -1,3 +1,4 @@
+import { fetchWithRetry } from '../util/fetch.js';
 // Alpaca Markets REST API v2.
 // Auth: APCA-API-KEY-ID + APCA-API-SECRET-KEY headers.
 // env: 'live' → api.alpaca.markets, 'paper' → paper-api.alpaca.markets
@@ -28,7 +29,7 @@ interface AlpacaAccount {
 }
 
 export async function getAccount(apiKeyId: string, apiSecretKey: string, env: AlpacaEnv): Promise<AlpacaAccount> {
-  const res = await fetch(`${baseUrl(env)}/v2/account`, {
+  const res = await fetchWithRetry(`${baseUrl(env)}/v2/account`, {
     headers: {
       'APCA-API-KEY-ID': apiKeyId,
       'APCA-API-SECRET-KEY': apiSecretKey,
@@ -95,7 +96,7 @@ const num = (v: string | undefined): number => {
  * holdings, not history.
  */
 export async function getPositions(apiKeyId: string, apiSecretKey: string, env: AlpacaEnv): Promise<AlpacaPosition[]> {
-  const res = await fetch(`${baseUrl(env)}/v2/positions`, {
+  const res = await fetchWithRetry(`${baseUrl(env)}/v2/positions`, {
     headers: {
       'APCA-API-KEY-ID': apiKeyId,
       'APCA-API-SECRET-KEY': apiSecretKey,

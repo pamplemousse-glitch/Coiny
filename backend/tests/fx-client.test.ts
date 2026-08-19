@@ -22,6 +22,41 @@ describe('Frankfurter FX client', () => {
     vi.unstubAllGlobals();
   });
 
+  // Audit 4.8.5 to 4.8.9. This client called `fetch` directly, so a 502 from
+  // Frankfurter failed the whole conversion on the first try and a hung
+  // connection had no timeout at all. Asserted on one representative client
+  // rather than all seventeen; `vendor-fetch-discipline.test.ts` is what keeps
+  // the other sixteen honest.
+  describe('transient failure handling', () => {
+    it('retries a 5xx and succeeds on a later attempt', async () => {
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(makeFetchResponse({}, 502))
+        .mockResolvedValueOnce(makeFetchResponse({}, 502))
+        .mockResolvedValueOnce(
+          makeFetchResponse({ amount: 1.0, base: 'GBP', date: '2026-05-28', rates: { USD: 1.34 } }),
+        );
+
+      const { getExchangeRate } = await import('../src/fx/client.js');
+
+      expect(await getExchangeRate('GBP', 'USD')).toBe(1.34);
+      expect(vi.mocked(fetch)).toHaveBeenCalledTimes(3);
+    });
+
+    it('applies a per-attempt timeout', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        makeFetchResponse({ amount: 1.0, base: 'GBP', date: '2026-05-28', rates: { USD: 1.34 } }),
+      );
+
+      const { getExchangeRate } = await import('../src/fx/client.js');
+      await getExchangeRate('GBP', 'USD');
+
+      // A bare fetch passed no signal, so a vendor that accepted the connection
+      // and never answered held the request until Fastify's requestTimeout.
+      const init = vi.mocked(fetch).mock.calls[0]?.[1] as RequestInit | undefined;
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+    });
+  });
+
   describe('getExchangeRate', () => {
     it('returns the correct rate for the target currency', async () => {
       vi.mocked(fetch).mockResolvedValue(

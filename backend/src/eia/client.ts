@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fetchWithRetry } from '../util/fetch.js';
 
 // EIA Open Data API v2 — https://www.eia.gov/opendata/
 // Free key: https://www.eia.gov/opendata/register.php
@@ -59,7 +60,7 @@ export async function getEiaSpotPrice(commodity: EiaCommodity, apiKey: string): 
   url.searchParams.set('sort[0][direction]', 'desc');
   url.searchParams.set('length', '1');
 
-  const res = await fetch(url.toString());
+  const res = await fetchWithRetry(url.toString());
   if (!res.ok) return null;
 
   const raw: unknown = await res.json();

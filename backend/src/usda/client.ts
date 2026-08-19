@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fetchWithRetry } from '../util/fetch.js';
 
 // USDA NASS Quick Stats API — https://quickstats.nass.usda.gov/api
 // Free key: https://quickstats.nass.usda.gov/api
@@ -95,7 +96,7 @@ export async function getFarmlandPricePerAcre(stateCode: string, apiKey: string)
   url.searchParams.set('short_desc', 'LAND & BUILDINGS, INCL GOVT PROGRAMS - VALUE, MEASURED IN $ / ACRE');
   url.searchParams.set('format', 'JSON');
 
-  const res = await fetch(url.toString());
+  const res = await fetchWithRetry(url.toString());
   if (!res.ok) return null;
 
   const raw: unknown = await res.json();

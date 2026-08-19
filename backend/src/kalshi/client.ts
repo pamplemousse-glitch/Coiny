@@ -1,5 +1,6 @@
 import { constants, createSign } from 'node:crypto';
 import { config } from '../config.js';
+import { fetchWithRetry } from '../util/fetch.js';
 
 const BASE_URLS = {
   demo: 'https://demo-api.kalshi.co/trade-api/v2',
@@ -49,7 +50,7 @@ async function kalshiGet<T>(keyId: string, privateKeyBase64: string, endpoint: s
   const pem = decodePrivateKey(privateKeyBase64);
   const headers = buildHeaders('GET', path, keyId, pem);
 
-  const res = await fetch(`${baseUrl()}${endpoint}`, { headers });
+  const res = await fetchWithRetry(`${baseUrl()}${endpoint}`, { headers });
   if (!res.ok) {
     const text = await res.text();
     throw new KalshiError(res.status, `Kalshi error ${res.status}: ${text.slice(0, 200)}`);

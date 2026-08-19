@@ -1,3 +1,5 @@
+import { fetchWithRetry } from '../util/fetch.js';
+
 // TrueLayer Data API client.
 // Sandbox auth base:  https://auth.truelayer-sandbox.com
 // Sandbox data base:  https://api.truelayer-sandbox.com/data/v1
@@ -114,7 +116,7 @@ async function postToken(
   env: TrueLayerEnv,
   params: URLSearchParams,
 ): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
-  const res = await fetch(`${authBase(env)}/connect/token`, {
+  const res = await fetchWithRetry(`${authBase(env)}/connect/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),
@@ -170,7 +172,7 @@ export async function refreshAccessToken(
 // ---------------------------------------------------------------------------
 
 async function tlGet<T>(accessToken: string, url: string): Promise<T> {
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!res.ok) throw new Error(`TrueLayer GET ${url} → ${res.status}`);
@@ -253,7 +255,7 @@ export async function getTransactions(
 // authorized at TrueLayer with no way for them to see it from our side.
 // https://docs.truelayer.com/reference/deletecredential
 export async function deleteCredential(accessToken: string, env: TrueLayerEnv = 'sandbox'): Promise<void> {
-  const res = await fetch(`${authBase(env)}/api/delete`, {
+  const res = await fetchWithRetry(`${authBase(env)}/api/delete`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${accessToken}` },
   });

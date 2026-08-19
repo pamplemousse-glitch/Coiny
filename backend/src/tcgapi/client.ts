@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fetchWithRetry } from '../util/fetch.js';
 
 // TCGapi — https://tcgapi.dev
 // Free tier: 100 req/day. Auth: X-API-Key header.
@@ -36,7 +37,7 @@ export async function getTradingCardPrice(
   url.searchParams.set('q', cardName);
   url.searchParams.set('game', game);
 
-  const res = await fetch(url.toString(), {
+  const res = await fetchWithRetry(url.toString(), {
     headers: { 'X-API-Key': apiKey },
   });
   if (!res.ok) return null;

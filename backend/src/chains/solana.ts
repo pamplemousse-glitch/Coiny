@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fetchWithRetry } from '../util/fetch.js';
 
 const HELIUS_RPC_BASE = 'https://mainnet.helius-rpc.com/';
 const STAKE_PROGRAM_ID = 'Stake11111111111111111111111111111111111111112';
@@ -35,7 +36,7 @@ export async function getSolanaBalance(address: string, apiKey: string): Promise
   }
 
   const url = `${HELIUS_RPC_BASE}?api-key=${encodeURIComponent(apiKey)}`;
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -66,7 +67,7 @@ export async function getSolanaStakedBalance(address: string, apiKey: string): P
   if (!apiKey) return 0;
 
   const url = `${HELIUS_RPC_BASE}?api-key=${encodeURIComponent(apiKey)}`;
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
