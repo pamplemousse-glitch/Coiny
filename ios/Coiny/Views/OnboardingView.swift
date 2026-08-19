@@ -19,7 +19,7 @@ struct OnboardingView: View {
 
     @State private var viewModel = OnboardingViewModel()
     @State private var showLink = false
-    @State private var linkHandler: Handler?
+    @State private var linkSession: PlaidLinkSession?
     // SwiftUI qualified: LinkKit also exports an `Environment` type.
     @SwiftUI.Environment(\.accessibilityReduceMotion) private var reduceMotion
     @SwiftUI.Environment(\.scenePhase) private var scenePhase
@@ -42,9 +42,9 @@ struct OnboardingView: View {
             }
         }
         .sheet(isPresented: $showLink) {
-            if let handler = linkHandler {
-                LinkPresenter(handler: handler)
-                    .ignoresSafeArea()
+            // LinkKit 7 presents itself; the representable below is gone.
+            if let session = linkSession {
+                session.sheet()
             }
         }
     }
@@ -117,64 +117,33 @@ struct OnboardingView: View {
     private func startLink() {
         Task { @MainActor in
             guard let token = await viewModel.prepareLink() else { return }
-            var config = LinkTokenConfiguration(token: token) { success in
-                showLink = false
-                Task { @MainActor in
-                    await viewModel.linkSucceeded(publicToken: success.publicToken)
-                }
-            }
-            config.onExit = { exit in
-                showLink = false
-                Task { @MainActor in
-                    await viewModel.linkExited(
-                        hadError: exit.error != nil,
-                        exitStatus: exit.metadata.status?.description
-                    )
-                }
-            }
-            switch Plaid.create(config) {
-            case .success(let handler):
-                linkHandler = handler
+            // LinkKit 7: callbacks at initialisation, throwing session create.
+            let config = LinkTokenConfiguration(
+                token: token,
+                onSuccess: { success in
+                    showLink = false
+                    Task { @MainActor in
+                        await viewModel.linkSucceeded(publicToken: success.publicToken)
+                    }
+                },
+                onExit: { exit in
+                    showLink = false
+                    Task { @MainActor in
+                        await viewModel.linkExited(
+                            hadError: exit.error != nil,
+                            exitStatus: exit.metadata.status?.description
+                        )
+                    }
+                },
+                onEvent: nil,
+                onLoad: nil
+            )
+            do {
+                linkSession = try Plaid.createPlaidLinkSession(configuration: config)
                 showLink = true
-            case .failure:
+            } catch {
                 await viewModel.linkExited(hadError: true, exitStatus: "sdk_create_failed")
             }
         }
     }
-}
-
-// MARK: - Plaid Link presenter
-
-/// Thin UIViewControllerRepresentable that opens the Plaid Link flow.
-/// Placed inside a .sheet so dismissal is handled by setting showLink=false
-/// in the LinkTokenConfiguration callbacks.
-private struct LinkPresenter: UIViewControllerRepresentable {
-    let handler: Handler
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    func makeUIViewController(context: Context) -> UIViewController {
-        UIViewController()
-    }
-
-    func updateUIViewController(_ vc: UIViewController, context: Context) {
-        guard !context.coordinator.hasOpened else { return }
-        context.coordinator.hasOpened = true
-        handler.open(presentUsing: .custom { linkVC in
-            guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                  let window = scene.keyWindow else { return }
-            var presenter: UIViewController = window.rootViewController!
-            while let next = presenter.presentedViewController { presenter = next }
-            presenter.present(linkVC, animated: true)
-        })
-    }
-
-    final class Coordinator {
-        var hasOpened = false
-    }
-}
-
-#Preview {
-    @Previewable @State var done = false
-    OnboardingView(onboardingComplete: $done)
 }

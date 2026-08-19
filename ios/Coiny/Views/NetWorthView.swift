@@ -31,8 +31,10 @@ struct NetWorthView: View {
             get: { repairVM.isPresentingLink },
             set: { repairVM.isPresentingLink = $0 }
         )) {
-            if let handler = repairVM.handler {
-                PlaidLinkPresenter(handler: handler)
+            // LinkKit 7 presents itself: `session.sheet()` replaces the
+            // UIViewControllerRepresentable this used to need.
+            if let session = repairVM.session {
+                session.sheet()
             }
         }
     }

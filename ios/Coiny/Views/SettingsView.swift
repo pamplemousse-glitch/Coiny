@@ -197,8 +197,8 @@ struct SettingsView: View {
                 get: { repairVM.isPresentingLink },
                 set: { repairVM.isPresentingLink = $0 }
             )) {
-                if let handler = repairVM.handler {
-                    PlaidLinkPresenter(handler: handler)
+                if let session = repairVM.session {
+                    session.sheet()
                 }
             }
         }
