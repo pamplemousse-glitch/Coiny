@@ -39,6 +39,7 @@ struct CoinyApp: App {
     @State private var isSignedIn: Bool =
         CoinyApp.isUITesting || CoinyApp.isDebugSessionRun || KeychainSessionStore().load() != nil
     @AppStorage("onboardingComplete") private var onboardingComplete: Bool = false
+    @SwiftUI.Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -77,6 +78,16 @@ struct CoinyApp: App {
             }
             .animation(.easeInOut, value: isSignedIn)
             .animation(.easeInOut, value: onboardingComplete)
+            // app_open (audit 4.3.6): once at launch, and again on a real
+            // return from the background. Deliberately NOT on every .active:
+            // Control Centre, the app switcher and a system permission alert
+            // all take the app through .inactive and back, and counting those
+            // would inflate the W4 denominator with opens that never happened.
+            .task { await TelemetryAppOpen.emit() }
+            .onChange(of: scenePhase) { previous, current in
+                guard previous == .background, current == .active else { return }
+                Task { await TelemetryAppOpen.emit() }
+            }
             // The Transaction.updates listener runs for the whole app lifetime:
             // a purchase can complete while the app is backgrounded (ask-to-buy,
             // billing recovery, another device) and must never be dropped.
@@ -161,5 +172,21 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
         completionHandler([.banner, .sound])
+    }
+
+    /// The user tapped a notification. This is the only signal that separates
+    /// `source: "push"` from `source: "icon"` on the `app_open` that follows:
+    /// `didReceiveRemoteNotification` above fires for silent background
+    /// delivery too, so treating that as an open would count pushes the user
+    /// never saw. The flag is consumed by the next emit.
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        Task { @MainActor in
+            TelemetryAppOpen.openedFromPush = true
+        }
+        completionHandler()
     }
 }

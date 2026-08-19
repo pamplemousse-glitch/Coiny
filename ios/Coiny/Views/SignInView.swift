@@ -223,6 +223,11 @@ struct SignInView: View {
             }
 
             TelemetryConsent.recordAcknowledgement()
+            // Day 0 for this install's retention cohort. Stamped here rather
+            // than on first launch so it means "signed up", which is what
+            // days_since_signup claims to be, for every user who signs up from
+            // this build onward.
+            TelemetryAppOpen.recordFirstSeenIfNeeded()
             onSignedIn()
 
         case .failure(let error):
