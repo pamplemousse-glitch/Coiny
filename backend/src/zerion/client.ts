@@ -231,11 +231,36 @@ const ZerionPositionSchema = z.object({
   id: z.string(),
   attributes: z.object({
     value: z.number().nullable().optional(),
+    price: z.number().nullable().optional(),
     quantity: z.object({ float: z.number() }).optional(),
+    // Zerion's own spam classification, per position. We already pass
+    // `filter[trash]=only_non_trash` on the request, but the flag is also
+    // returned and is worth carrying: the request filter is all-or-nothing
+    // while the flag lets a caller show a junk token as junk rather than
+    // silently omitting it.
+    flags: z
+      .object({
+        displayable: z.boolean().optional(),
+        is_trash: z.boolean().optional(),
+      })
+      .optional(),
     fungible_info: z
       .object({
         symbol: z.string().nullable().optional(),
         name: z.string().nullable().optional(),
+        flags: z.object({ verified: z.boolean().optional() }).optional(),
+        // The contract address, and the ONLY safe identifier for this token.
+        // Symbols are neither unique nor owned, so anything that resolves a
+        // holding by ticker can be pointed at an impostor token. `address` is
+        // null for a chain's native asset (ETH, SOL), which is not an error.
+        implementations: z
+          .array(
+            z.object({
+              chain_id: z.string().nullable().optional(),
+              address: z.string().nullable().optional(),
+            }),
+          )
+          .optional(),
       })
       .optional(),
   }),
@@ -250,7 +275,30 @@ export type ZerionPosition = {
   symbol: string;
   name: string;
   quantity: number;
-  value_usd: number;
+  /**
+   * Null when Zerion has no reliable price, NOT zero.
+   *
+   * Zerion's docs say it plainly: "price and value are null for tokens without
+   * a reliable price. Guard for null before summing or formatting." This used
+   * to be `?? 0`, so a token Zerion declined to price was reported to the user
+   * as worthless — the same silent-zero failure R-8.1 bans, and the same one
+   * fixed for Coinbase and chain wallets.
+   */
+  value_usd: number | null;
+  /** Zerion's `verified` contract flag, null when absent. */
+  verified: boolean | null;
+  /** Zerion's own spam classification. */
+  isTrash: boolean | null;
+  /** Chain id for the token's primary implementation, e.g. `ethereum`. */
+  chainId: string | null;
+  /**
+   * Contract address, or null for a chain's native asset.
+   *
+   * The only safe key for a follow-up price or liquidity lookup: symbols are
+   * neither unique nor owned, so resolving by ticker lets an impostor token
+   * choose the number we display. See dexscreener/client.ts.
+   */
+  tokenAddress: string | null;
 };
 
 const ZerionPnlSchema = z.object({
@@ -269,6 +317,30 @@ export type ZerionPnl = {
   total_gain: number | null;
 };
 
+/** One position, with the fields a caller needs to price or distrust it.
+ *
+ *  Extracted because both list endpoints built this shape independently, which
+ *  is how the two could drift: adding a field to one and not the other would
+ *  produce positions that sometimes carry an address and sometimes do not. */
+function toPosition(item: z.infer<typeof ZerionPositionSchema>): ZerionPosition {
+  const info = item.attributes.fungible_info;
+  // First implementation is the token's primary chain deployment. A token
+  // bridged to several chains has several; any of them resolves the same asset
+  // for a liquidity lookup, and the first is the one Zerion orders on.
+  const impl = info?.implementations?.[0];
+  return {
+    id: item.id,
+    symbol: info?.symbol ?? '',
+    name: info?.name ?? '',
+    quantity: item.attributes.quantity?.float ?? 0,
+    value_usd: item.attributes.value ?? null,
+    verified: info?.flags?.verified ?? null,
+    isTrash: item.attributes.flags?.is_trash ?? null,
+    chainId: impl?.chain_id ?? null,
+    tokenAddress: impl?.address ?? null,
+  };
+}
+
 export async function getPositions(walletAddress: string): Promise<ZerionPosition[]> {
   if (!config.ZERION_API_KEY) throw new ZerionError(0, 'ZERION_API_KEY is not configured');
 
@@ -284,13 +356,7 @@ export async function getPositions(walletAddress: string): Promise<ZerionPositio
   const parsed = ZerionPositionsResponseSchema.safeParse(raw);
   if (!parsed.success) return [];
 
-  return parsed.data.data.map((item) => ({
-    id: item.id,
-    symbol: item.attributes.fungible_info?.symbol ?? '',
-    name: item.attributes.fungible_info?.name ?? '',
-    quantity: item.attributes.quantity?.float ?? 0,
-    value_usd: item.attributes.value ?? 0,
-  }));
+  return parsed.data.data.map(toPosition);
 }
 
 export async function getDeFiPositions(walletAddress: string): Promise<ZerionPosition[]> {
@@ -307,13 +373,7 @@ export async function getDeFiPositions(walletAddress: string): Promise<ZerionPos
   const parsed = ZerionPositionsResponseSchema.safeParse(raw);
   if (!parsed.success) return [];
 
-  return parsed.data.data.map((item) => ({
-    id: item.id,
-    symbol: item.attributes.fungible_info?.symbol ?? '',
-    name: item.attributes.fungible_info?.name ?? '',
-    quantity: item.attributes.quantity?.float ?? 0,
-    value_usd: item.attributes.value ?? 0,
-  }));
+  return parsed.data.data.map(toPosition);
 }
 
 export async function getPnl(walletAddress: string): Promise<ZerionPnl> {
