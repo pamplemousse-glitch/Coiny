@@ -41,7 +41,10 @@ export const CHAIN_SYMBOLS: Record<string, string> = {
 };
 
 // Returns native-unit balance for the given chain and address.
-// Returns null when no client is available for the chain yet — each chain PR adds a case.
+// Returns null when no client is available for the chain yet — each chain PR
+// adds a case — AND when the chain's client could not determine the balance.
+// Both mean "unknown", and the caller must treat them the same way: leave the
+// stored balance alone. Only a number is an assertion about the wallet.
 export async function fetchNativeBalance(chain: string, address: string): Promise<number | null> {
   switch (chain) {
     case 'bitcoin':
@@ -162,11 +165,24 @@ export function registerChainWalletsApi(app: FastifyInstance): void {
 
     let updated = 0;
     let unpriced = 0;
+    let unresolved = 0;
     const now = new Date();
 
     for (const row of rows) {
       const nativeBalance = await fetchNativeBalance(row.chain, row.address);
-      if (nativeBalance === null) continue;
+
+      // The balance half of the same rule the price half enforces below: a
+      // balance we could not read is NOT a balance of zero. Every chain client
+      // used to answer 0 for a missing API key, an upstream outage or a shape
+      // it did not recognise, and 0 is not null, so those sailed past this
+      // guard and were multiplied by a good price and persisted. An expired
+      // Blockfrost key was enough to write a user's whole ADA position to
+      // nothing, with no error raised anywhere.
+      if (nativeBalance === null) {
+        unresolved++;
+        req.log.warn({ userId, chain: row.chain }, 'balance unresolved for chain; leaving last known balance');
+        continue;
+      }
 
       const symbol = CHAIN_SYMBOLS[row.chain];
       const price = symbol ? prices.get(symbol) : undefined;
@@ -201,7 +217,7 @@ export function registerChainWalletsApi(app: FastifyInstance): void {
       updated++;
     }
 
-    req.log.info({ userId, updated, unpriced }, 'chain wallets sync complete');
-    return { updated, unpriced };
+    req.log.info({ userId, updated, unpriced, unresolved }, 'chain wallets sync complete');
+    return { updated, unpriced, unresolved };
   });
 }

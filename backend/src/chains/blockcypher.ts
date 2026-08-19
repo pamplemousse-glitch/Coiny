@@ -27,7 +27,7 @@ const CHAIN_PATHS: Record<string, string> = {
 
 // Returns confirmed balance in native units for DOGE, LTC, or BCH address.
 // Returns 0 for addresses not found (404). Throws BlockcypherError on API errors.
-export async function getBlockcypherBalance(chain: string, address: string): Promise<number> {
+export async function getBlockcypherBalance(chain: string, address: string): Promise<number | null> {
   const path = CHAIN_PATHS[chain];
   if (!path) throw new BlockcypherError(0, `Unsupported chain: ${chain}`);
 
@@ -38,7 +38,7 @@ export async function getBlockcypherBalance(chain: string, address: string): Pro
 
   const raw: unknown = await res.json();
   const parsed = BalanceSchema.safeParse(raw);
-  if (!parsed.success) return 0;
+  if (!parsed.success) return null;
 
   return parsed.data.balance / 1e8;
 }

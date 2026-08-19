@@ -30,9 +30,11 @@ const BalancesSchema = z.object({
   ),
 });
 
-// Returns native token balance (ATOM or OSMO) for a Cosmos-SDK address.
+// Returns LIQUID native token balance (ATOM or OSMO) for a Cosmos-SDK address,
+// or null when it could not be determined. Staked and unbonding balances live
+// at /cosmos/staking/v1beta1/delegations and are NOT included here.
 // Returns 0 for addresses not found (404) or with no native balance. Throws CosmosLcdError on API errors.
-export async function getCosmosBalance(chain: string, address: string): Promise<number> {
+export async function getCosmosBalance(chain: string, address: string): Promise<number | null> {
   const baseUrl = LCD_URLS[chain];
   const denom = NATIVE_DENOMS[chain];
   if (!baseUrl || !denom) throw new CosmosLcdError(0, `Unsupported chain: ${chain}`);
@@ -44,9 +46,11 @@ export async function getCosmosBalance(chain: string, address: string): Promise<
 
   const raw: unknown = await res.json();
   const parsed = BalancesSchema.safeParse(raw);
-  if (!parsed.success) return 0;
+  // Unrecognised shape: unknown, not empty. See getCardanoBalance.
+  if (!parsed.success) return null;
 
   const native = parsed.data.balances.find((b) => b.denom === denom);
+  // A parsed balance list without our denom really does mean none held.
   if (!native) return 0;
 
   return Number(native.amount) / 1e6;

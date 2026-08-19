@@ -27,7 +27,7 @@ const RpcErrorSchema = z.object({
   }),
 });
 
-export async function getNearBalance(address: string): Promise<number> {
+export async function getNearBalance(address: string): Promise<number | null> {
   const res = await fetchWithRetry(NEAR_RPC_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -54,7 +54,7 @@ export async function getNearBalance(address: string): Promise<number> {
   }
 
   const parsed = AccountResultSchema.safeParse(raw);
-  if (!parsed.success) return 0;
+  if (!parsed.success) return null;
 
   return Number(parsed.data.result.amount) / 1e24;
 }

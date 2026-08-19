@@ -30,7 +30,7 @@ const StakeProgramAccountsSchema = z.object({
   result: z.array(StakeAccountSchema),
 });
 
-export async function getSolanaBalance(address: string, apiKey: string): Promise<number> {
+export async function getSolanaBalance(address: string, apiKey: string): Promise<number | null> {
   if (!apiKey) {
     throw new Error('HELIUS_API_KEY is required to fetch Solana balances');
   }
@@ -53,18 +53,24 @@ export async function getSolanaBalance(address: string, apiKey: string): Promise
 
   const raw: unknown = await res.json();
   const parsed = BalanceResponseSchema.safeParse(raw);
-  if (!parsed.success) return 0;
+  // Unrecognised shape is unknown, not empty. See chains/cardano.ts.
+  if (!parsed.success) return null;
 
   return parsed.data.result.value / 1e9;
 }
 
 /**
- * Returns the total lamports held across all stake accounts where
- * the given address is the authorized staker (offset 12 in stake account data).
- * Returns 0 silently on any failure — staking is additive to liquid balance.
+ * Returns the total SOL held across all stake accounts where the given address
+ * is the authorized staker (offset 12 in stake account data), or null when
+ * that could not be determined.
+ *
+ * This used to return 0 on any failure, described as safe because "staking is
+ * additive to liquid balance". It is not safe: for a staker the delegated
+ * balance is usually the larger half, so one failed call quietly reported a
+ * fraction of the position as the whole of it.
  */
-export async function getSolanaStakedBalance(address: string, apiKey: string): Promise<number> {
-  if (!apiKey) return 0;
+export async function getSolanaStakedBalance(address: string, apiKey: string): Promise<number | null> {
+  if (!apiKey) return null;
 
   const url = `${HELIUS_RPC_BASE}?api-key=${encodeURIComponent(apiKey)}`;
   const res = await fetchWithRetry(url, {
@@ -91,24 +97,31 @@ export async function getSolanaStakedBalance(address: string, apiKey: string): P
     }),
   });
 
-  if (!res.ok) return 0;
+  if (!res.ok) return null;
 
   const raw: unknown = await res.json();
   const parsed = StakeProgramAccountsSchema.safeParse(raw);
-  if (!parsed.success) return 0;
+  if (!parsed.success) return null;
 
+  // An empty result list is a real zero: the address stakes nothing.
   const totalLamports = parsed.data.result.reduce((sum, a) => sum + a.account.lamports, 0);
   return totalLamports / 1e9;
 }
 
 /**
- * Returns liquid SOL balance + staked SOL across all delegated stake accounts.
- * Staking errors are swallowed — the liquid balance is always returned.
+ * Liquid SOL plus staked SOL across all delegated stake accounts, or null when
+ * either half could not be determined.
+ *
+ * Both halves must succeed. Returning the liquid balance alone when staking
+ * fails is the partial sum that networth/refresh.ts refuses for the same
+ * reason: it undercounts silently, and a number that is quietly wrong is worse
+ * than one the caller knows it does not have.
  */
-export async function getSolanaTotalBalance(address: string, apiKey: string): Promise<number> {
+export async function getSolanaTotalBalance(address: string, apiKey: string): Promise<number | null> {
   const [liquid, staked] = await Promise.all([
     getSolanaBalance(address, apiKey),
-    getSolanaStakedBalance(address, apiKey).catch(() => 0),
+    getSolanaStakedBalance(address, apiKey).catch(() => null),
   ]);
+  if (liquid === null || staked === null) return null;
   return liquid + staked;
 }

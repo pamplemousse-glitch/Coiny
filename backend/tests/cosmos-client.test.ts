@@ -76,12 +76,12 @@ describe('getCosmosBalance', () => {
     expect(balance).toBe(0);
   });
 
-  it('returns 0 when response shape is invalid', async () => {
+  it('returns null when response shape is invalid', async () => {
     vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ unexpected: true }));
 
     const { getCosmosBalance } = await import('../src/chains/cosmos.js');
     const balance = await getCosmosBalance('cosmos', 'cosmos1bad');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
   it('throws CosmosLcdError on non-ok non-404 response', async () => {

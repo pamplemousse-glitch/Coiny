@@ -72,12 +72,12 @@ describe('getAptosBalance', () => {
     expect(balance).toBe(0);
   });
 
-  it('returns 0 when response shape is invalid', async () => {
+  it('returns null when response shape is invalid', async () => {
     vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ unexpected: true }));
 
     const { getAptosBalance } = await import('../src/chains/aptos.js');
     const balance = await getAptosBalance('0xbad');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
   it('throws AptosApiError on non-ok non-404 response', async () => {

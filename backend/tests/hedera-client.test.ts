@@ -57,12 +57,12 @@ describe('getHederaBalance', () => {
     expect(balance).toBe(0);
   });
 
-  it('returns 0 when response shape is invalid', async () => {
+  it('returns null when response shape is invalid', async () => {
     vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ unexpected: true }));
 
     const { getHederaBalance } = await import('../src/chains/hedera.js');
     const balance = await getHederaBalance('0.0.bad');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
   it('throws HederaMirrorError on non-ok non-404 response', async () => {

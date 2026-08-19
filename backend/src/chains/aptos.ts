@@ -26,7 +26,7 @@ const ResourcesSchema = z.array(z.unknown());
 
 const APT_COIN_TYPE = '0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>';
 
-export async function getAptosBalance(address: string): Promise<number> {
+export async function getAptosBalance(address: string): Promise<number | null> {
   const res = await fetchWithRetry(`${APTOS_BASE_URL}/accounts/${encodeURIComponent(address)}/resources`);
 
   if (res.status === 404) return 0;
@@ -34,7 +34,7 @@ export async function getAptosBalance(address: string): Promise<number> {
 
   const raw: unknown = await res.json();
   const parsed = ResourcesSchema.safeParse(raw);
-  if (!parsed.success) return 0;
+  if (!parsed.success) return null;
 
   for (const item of parsed.data) {
     const resource = CoinStoreResourceSchema.safeParse(item);

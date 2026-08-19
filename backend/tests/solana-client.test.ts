@@ -69,12 +69,12 @@ describe('getSolanaBalance', () => {
     await expect(getSolanaBalance('SomeAddress123', '')).rejects.toThrow('HELIUS_API_KEY is required');
   });
 
-  it('returns 0 when response shape is unexpected', async () => {
+  it('returns null when response shape is unexpected', async () => {
     vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ unexpected: true }));
 
     const { getSolanaBalance } = await import('../src/chains/solana.js');
     const balance = await getSolanaBalance('SomeAddress123', 'test-api-key');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
   it('handles zero lamports balance', async () => {
@@ -122,26 +122,26 @@ describe('getSolanaStakedBalance', () => {
     expect(balance).toBe(0);
   });
 
-  it('returns 0 when API key is empty', async () => {
+  it('returns null when API key is empty', async () => {
     const { getSolanaStakedBalance } = await import('../src/chains/solana.js');
     const balance = await getSolanaStakedBalance('MyWallet', '');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
-  it('returns 0 on non-2xx response', async () => {
+  it('returns null on non-2xx response', async () => {
     vi.mocked(fetch).mockResolvedValue(makeFetchResponse(null, 500));
 
     const { getSolanaStakedBalance } = await import('../src/chains/solana.js');
     const balance = await getSolanaStakedBalance('MyWallet', 'test-key');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
-  it('returns 0 on unexpected response shape', async () => {
+  it('returns null on unexpected response shape', async () => {
     vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ unexpected: true }));
 
     const { getSolanaStakedBalance } = await import('../src/chains/solana.js');
     const balance = await getSolanaStakedBalance('MyWallet', 'test-key');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
   it('sends getProgramAccounts with staker memcmp filter at offset 12', async () => {
@@ -180,13 +180,26 @@ describe('getSolanaTotalBalance', () => {
     expect(total).toBeCloseTo(5, 9);
   });
 
-  it('returns only liquid balance if staking call fails', async () => {
+  // Was 'returns only liquid balance if staking call fails', asserting a
+  // partial sum. For a staker the delegated half is usually the larger one, so
+  // that answer understated the position without saying it had. The caller
+  // leaves the last known balance in place on null.
+  it('returns null when the staking call fails, rather than a partial sum', async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(makeFetchResponse(makeBalanceResponse(4_000_000_000)))
       .mockRejectedValueOnce(new Error('network error'));
 
     const { getSolanaTotalBalance } = await import('../src/chains/solana.js');
     const total = await getSolanaTotalBalance('MyWallet', 'test-key');
-    expect(total).toBeCloseTo(4, 9);
+    expect(total).toBeNull();
+  });
+
+  it('returns null when the liquid call fails even if staking succeeds', async () => {
+    vi.mocked(fetch)
+      .mockRejectedValueOnce(new Error('network error'))
+      .mockResolvedValueOnce(makeFetchResponse({ jsonrpc: '2.0', id: 1, result: [] }));
+
+    const { getSolanaTotalBalance } = await import('../src/chains/solana.js');
+    await expect(getSolanaTotalBalance('MyWallet', 'test-key')).rejects.toThrow();
   });
 });

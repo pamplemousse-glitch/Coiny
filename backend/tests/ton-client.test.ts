@@ -45,12 +45,12 @@ describe('getTonBalance', () => {
     expect((call[1] as RequestInit).headers).toMatchObject({ 'X-API-Key': 'test-toncenter-key' });
   });
 
-  it('returns 0 when ok is false', async () => {
+  it('returns null when ok is false', async () => {
     vi.mocked(fetch).mockResolvedValue(makeResponse({ ok: false, result: '0' }));
 
     const { getTonBalance } = await import('../src/chains/ton.js');
     const balance = await getTonBalance('EQbad');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
   it('returns 0 on 404', async () => {
@@ -61,29 +61,29 @@ describe('getTonBalance', () => {
     expect(balance).toBe(0);
   });
 
-  it('returns 0 on non-ok HTTP response', async () => {
+  it('returns null on non-ok HTTP response', async () => {
     vi.mocked(fetch).mockResolvedValue(makeResponse({ error: 'server error' }, 500));
 
     const { getTonBalance } = await import('../src/chains/ton.js');
     const balance = await getTonBalance('EQfail');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
-  it('returns 0 when response shape is invalid', async () => {
+  it('returns null when response shape is invalid', async () => {
     vi.mocked(fetch).mockResolvedValue(makeResponse({ unexpected: true }));
 
     const { getTonBalance } = await import('../src/chains/ton.js');
     const balance = await getTonBalance('EQbadshape');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
-  it('returns 0 when TONCENTER_API_KEY is empty', async () => {
+  it('returns null when TONCENTER_API_KEY is empty', async () => {
     vi.resetModules();
     vi.doMock('../src/config.js', () => ({ config: { TONCENTER_API_KEY: '' } }));
 
     const { getTonBalance } = await import('../src/chains/ton.js');
     const balance = await getTonBalance('EQsomeaddress');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   });
 });
