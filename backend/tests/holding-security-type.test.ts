@@ -12,13 +12,19 @@ vi.mock('../src/plaid/client.js', async (importOriginal) => {
 });
 
 import { accountsBalanceGet, investmentsHoldingsGet, liabilitiesGet } from '../src/plaid/client.js';
+import type { InvestmentsHoldingsGetResponse } from '../src/plaid/types.js';
 
 const mockedBalances = vi.mocked(accountsBalanceGet);
 const mockedHoldings = vi.mocked(investmentsHoldingsGet);
 const mockedLiabilities = vi.mocked(liabilitiesGet);
 
-/** One ETF held inside a Roth IRA, and one cash sweep in the same account. */
-function holdingsResponse() {
+/** One ETF held inside a Roth IRA, and one cash sweep in the same account.
+ *
+ *  Annotated with the real response type rather than left to inference: from
+ *  the literal alone TypeScript infers `type: string`, so the test below that
+ *  overrides it with `null` (the case where Plaid cannot classify a security)
+ *  fails to compile. */
+function holdingsResponse(): InvestmentsHoldingsGetResponse {
   return {
     accounts: [],
     holdings: [
