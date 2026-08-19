@@ -10,6 +10,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { spinwheelConnections } from '../db/schema.js';
+import { countsAsLiquidCash } from '../networth/account-taxonomy.js';
 import { accountsBalanceGet, investmentsHoldingsGet, liabilitiesGet } from '../plaid/client.js';
 import { getDebtProfile, type SpinwheelDebt } from '../spinwheel/client.js';
 import { getItemsByUser } from '../store/items.js';
@@ -20,6 +21,9 @@ export type BankAccountSummary = {
   accountId: string;
   name: string;
   type: string;
+  /** Plaid's precise account subtype (`401k`, `hsa`, `cash isa`, `cd`, ...).
+   *  Null for accounts Plaid could not classify. See networth/account-taxonomy.ts. */
+  subtype: string | null;
   balance: number;
   minPayment: number | null;
   nextDueDate: string | null;
@@ -179,7 +183,13 @@ export async function fetchPlaidSnapshot(userId: string): Promise<PlaidSnapshot>
         const balance = acct.balances.current ?? acct.balances.available ?? 0;
         if (acct.type === 'depository') {
           bankTotal += balance;
-          liquidDeposits += Math.max(0, balance);
+          // Only genuinely spendable balances count toward the ladder's
+          // emergency-fund rungs. A CD, an HSA, a GIC and an EBT balance are
+          // all `depository` to Plaid and none of them is money the user can
+          // reach in an emergency. See networth/account-taxonomy.ts.
+          if (countsAsLiquidCash(acct.type, acct.subtype)) {
+            liquidDeposits += Math.max(0, balance);
+          }
         } else if (acct.type === 'credit' || acct.type === 'loan') {
           plaidDebtTotal += balance;
         }
@@ -188,6 +198,7 @@ export async function fetchPlaidSnapshot(userId: string): Promise<PlaidSnapshot>
           accountId: acct.account_id,
           name: acct.name,
           type: acct.type,
+          subtype: acct.subtype,
           balance,
           minPayment: meta?.minPayment ?? null,
           nextDueDate: meta?.nextDueDate ?? null,
