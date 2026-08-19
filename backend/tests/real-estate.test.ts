@@ -5,13 +5,22 @@ vi.mock('../src/realestate/client.js', () => ({
   getPropertyValue: vi.fn(),
 }));
 
+vi.mock('../src/fred/client.js', () => ({
+  deriveValueFromPurchase: vi.fn(),
+}));
+
+import { deriveValueFromPurchase } from '../src/fred/client.js';
 import { getPropertyValue } from '../src/realestate/client.js';
 
 const mockedGetPropertyValue = vi.mocked(getPropertyValue);
+const mockedDerive = vi.mocked(deriveValueFromPurchase);
 
 describe('GET /api/real-estate', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    // Default: no derived valuation available, which is the pre-0056 world and
+    // keeps the existing expectations meaning what they meant.
+    mockedDerive.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -58,6 +67,9 @@ describe('GET /api/real-estate', () => {
 describe('POST /api/real-estate', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    // Default: no derived valuation available, which is the pre-0056 world and
+    // keeps the existing expectations meaning what they meant.
+    mockedDerive.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -116,6 +128,9 @@ describe('POST /api/real-estate', () => {
 describe('DELETE /api/real-estate/:id', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    // Default: no derived valuation available, which is the pre-0056 world and
+    // keeps the existing expectations meaning what they meant.
+    mockedDerive.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -154,6 +169,9 @@ describe('DELETE /api/real-estate/:id', () => {
 describe('POST /api/real-estate/sync', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    // Default: no derived valuation available, which is the pre-0056 world and
+    // keeps the existing expectations meaning what they meant.
+    mockedDerive.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -163,7 +181,7 @@ describe('POST /api/real-estate/sync', () => {
 
     const res = await app.inject({ method: 'POST', url: '/api/real-estate/sync', headers: authHeader() });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ synced: 0, errors: 0 });
+    expect(res.json()).toEqual({ synced: 0, derived: 0, errors: 0 });
 
     await app.close();
   });
@@ -180,7 +198,7 @@ describe('POST /api/real-estate/sync', () => {
 
     const res = await app.inject({ method: 'POST', url: '/api/real-estate/sync', headers: authHeader() });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ synced: 1, errors: 0 });
+    expect(res.json()).toEqual({ synced: 1, derived: 0, errors: 0 });
 
     const list = await app.inject({ method: 'GET', url: '/api/real-estate', headers: authHeader() });
     const asset = list.json<{ lastValueUsd: number }[]>()[0];
@@ -223,7 +241,7 @@ describe('POST /api/real-estate/sync', () => {
 
     const res = await app.inject({ method: 'POST', url: '/api/real-estate/sync', headers: authHeader() });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ synced: 1, errors: 1 });
+    expect(res.json()).toEqual({ synced: 1, derived: 0, errors: 1 });
 
     await app.close();
   });
@@ -232,6 +250,9 @@ describe('POST /api/real-estate/sync', () => {
 describe('GET /api/net-worth — realEstate field', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    // Default: no derived valuation available, which is the pre-0056 world and
+    // keeps the existing expectations meaning what they meant.
+    mockedDerive.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -264,6 +285,126 @@ describe('GET /api/net-worth — realEstate field', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json<{ realEstate: number }>();
     expect(body.realEstate).toBeCloseTo(770000.5, 1);
+
+    await app.close();
+  });
+});
+
+describe('derived valuation (DR-21)', () => {
+  beforeEach(async () => {
+    vi.resetAllMocks();
+    mockedDerive.mockResolvedValue(null);
+    await resetDatabase();
+  });
+
+  it('stores purchase price and date on add', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const add = await app.inject({
+      method: 'POST',
+      url: '/api/real-estate',
+      headers: authHeader(),
+      payload: { address: '1 Test St', purchasePriceUsd: 250000, purchaseDate: '2010-06-01' },
+    });
+    expect(add.statusCode).toBe(201);
+
+    const list = await app.inject({ method: 'GET', url: '/api/real-estate', headers: authHeader() });
+    const asset = list.json<{ purchasePriceUsd: number; purchaseDate: string }[]>()[0];
+    expect(asset?.purchasePriceUsd).toBeCloseTo(250000, 0);
+    expect(asset?.purchaseDate).toBe('2010-06-01');
+
+    await app.close();
+  });
+
+  it('rejects a malformed purchase date', async () => {
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/real-estate',
+      headers: authHeader(),
+      payload: { address: '1 Test St', purchasePriceUsd: 250000, purchaseDate: '06/01/2010' },
+    });
+    expect(res.statusCode).toBe(400);
+
+    await app.close();
+  });
+
+  // The reason this integration exists. Property is the largest asset most
+  // Americans own and it throws on every call today because the key is unset.
+  it('values a property with no RentCast key when a purchase price is on file', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { realEstateAssets } = await import('../src/db/schema.js');
+    await db().insert(realEstateAssets).values({
+      userId: testUserId,
+      address: '1 Test St',
+      purchasePriceUsd: '250000',
+      purchaseDate: '2010-06-01',
+    });
+
+    mockedGetPropertyValue.mockRejectedValue(new Error('RENTCAST_API_KEY not configured'));
+    mockedDerive.mockResolvedValue({
+      valueUsd: 666666.67,
+      purchaseIndex: { date: '2010-01-01', value: 300 },
+      latestIndex: { date: '2026-01-01', value: 800 },
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'POST', url: '/api/real-estate/sync', headers: authHeader() });
+    // Not a 402. The key is missing but a figure was still produced.
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ synced: 0, derived: 1, errors: 0 });
+
+    const list = await app.inject({ method: 'GET', url: '/api/real-estate', headers: authHeader() });
+    const asset = list.json<{ lastValueUsd: number; valuationSource: string }[]>()[0];
+    expect(asset?.lastValueUsd).toBeCloseTo(666666.67, 1);
+    // Labelled honestly: an index-tracked estimate, not an appraisal.
+    expect(asset?.valuationSource).toBe('derived');
+
+    await app.close();
+  });
+
+  it('still returns 402 when the key is missing and nothing can be derived', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { realEstateAssets } = await import('../src/db/schema.js');
+    await db().insert(realEstateAssets).values({ userId: testUserId, address: '1 Test St' });
+
+    mockedGetPropertyValue.mockRejectedValue(new Error('RENTCAST_API_KEY not configured'));
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'POST', url: '/api/real-estate/sync', headers: authHeader() });
+    expect(res.statusCode).toBe(402);
+
+    await app.close();
+  });
+
+  it('prefers the AVM over the derived figure when RentCast answers', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { realEstateAssets } = await import('../src/db/schema.js');
+    await db().insert(realEstateAssets).values({
+      userId: testUserId,
+      address: '1 Test St',
+      purchasePriceUsd: '250000',
+      purchaseDate: '2010-06-01',
+    });
+
+    mockedGetPropertyValue.mockResolvedValue(700000);
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'POST', url: '/api/real-estate/sync', headers: authHeader() });
+    expect(res.json()).toEqual({ synced: 1, derived: 0, errors: 0 });
+    expect(mockedDerive).not.toHaveBeenCalled();
+
+    const list = await app.inject({ method: 'GET', url: '/api/real-estate', headers: authHeader() });
+    expect(list.json<{ valuationSource: string }[]>()[0]?.valuationSource).toBe('avm');
 
     await app.close();
   });

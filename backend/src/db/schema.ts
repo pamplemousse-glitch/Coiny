@@ -383,6 +383,17 @@ export const realEstateAssets = pgTable(
     label: text('label'),
     lastValueUsd: numeric('last_value_usd'),
     lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    // DR-21's derived tier (0056): purchase price tracked by the FHFA house
+    // price index, which needs no credential and no maintenance. A historical
+    // fact, so it never goes stale. RentCast returns the same figure as
+    // `lastSalePrice`, so this can later be filled without asking the user.
+    purchasePriceUsd: numeric('purchase_price_usd'),
+    purchaseDate: date('purchase_date'),
+    // Which method produced lastValueUsd: 'avm' | 'derived' | null. Stored, not
+    // inferred: an AVM is an opinion about THIS house, a derived figure is what
+    // a typical US home bought at that price on that date would be worth now,
+    // and R-8.1 requires that a number never be presented as something it is not.
+    valuationSource: text('valuation_source').$type<'avm' | 'derived'>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('real_estate_assets_user_address_idx').on(t.userId, t.address)],
