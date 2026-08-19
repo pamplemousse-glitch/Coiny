@@ -3,12 +3,21 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/client.js';
 import { realEstateAssets } from '../db/schema.js';
+import { deriveValueFromPurchase } from '../fred/client.js';
 import { getPropertyValue } from '../realestate/client.js';
 import { SYNC_LIMIT } from './rate-limits.js';
 
 const AddAssetBodySchema = z.object({
   address: z.string().min(1).max(500),
   label: z.string().max(100).optional(),
+  // Both optional, and only useful together. Supplying them enables DR-21's
+  // derived valuation, which is what lets a property carry a value at all
+  // while RENTCAST_API_KEY is unset — its state today.
+  purchasePriceUsd: z.number().positive().optional(),
+  purchaseDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD')
+    .optional(),
 });
 
 export function registerRealEstateApi(app: FastifyInstance): void {
@@ -20,6 +29,12 @@ export function registerRealEstateApi(app: FastifyInstance): void {
       address: r.address,
       label: r.label ?? null,
       lastValueUsd: r.lastValueUsd !== null ? parseFloat(r.lastValueUsd) : null,
+      // The client needs this to label the figure honestly. A derived value is
+      // an index-tracked estimate of what a typical home bought at that price
+      // would be worth, not an appraisal of this one.
+      valuationSource: r.valuationSource ?? null,
+      purchasePriceUsd: r.purchasePriceUsd !== null ? parseFloat(r.purchasePriceUsd) : null,
+      purchaseDate: r.purchaseDate ?? null,
       lastSyncedAt: r.lastSyncedAt?.toISOString() ?? null,
       createdAt: r.createdAt.toISOString(),
     }));
@@ -30,15 +45,27 @@ export function registerRealEstateApi(app: FastifyInstance): void {
     const parsed = AddAssetBodySchema.safeParse(req.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
-    const { address, label } = parsed.data;
+    const { address, label, purchasePriceUsd, purchaseDate } = parsed.data;
     const userId = req.user!.id;
 
     await db()
       .insert(realEstateAssets)
-      .values({ userId, address, label: label ?? null })
+      .values({
+        userId,
+        address,
+        label: label ?? null,
+        purchasePriceUsd: purchasePriceUsd !== undefined ? purchasePriceUsd.toString() : null,
+        purchaseDate: purchaseDate ?? null,
+      })
       .onConflictDoNothing();
 
-    req.log.info({ userId }, 'real estate asset added');
+    // Never log the address: it identifies a home and through it a person
+    // (.claude/rules/security.md #2). Whether a derived valuation is possible
+    // is not identifying.
+    req.log.info(
+      { userId, derivable: purchasePriceUsd !== undefined && purchaseDate !== undefined },
+      'real estate asset added',
+    );
     return reply.status(201).send({ ok: true, address });
   });
 
@@ -61,27 +88,56 @@ export function registerRealEstateApi(app: FastifyInstance): void {
     const rows = await db().select().from(realEstateAssets).where(eq(realEstateAssets.userId, userId));
 
     let synced = 0;
+    let derived = 0;
     let errors = 0;
+    let missingKey = false;
     const now = new Date();
+
+    // Falls back to DR-21's derived tier rather than returning 402 the moment
+    // RentCast is unavailable. Property is the largest asset most Americans
+    // own and it currently throws on every call because RENTCAST_API_KEY is
+    // unset, so an index-tracked figure the user can see beats a correct error
+    // they cannot act on. The AVM is still preferred whenever it answers.
+    async function deriveFor(row: (typeof rows)[number]): Promise<boolean> {
+      if (row.purchasePriceUsd === null || row.purchaseDate === null) return false;
+      const valuation = await deriveValueFromPurchase(Number.parseFloat(row.purchasePriceUsd), row.purchaseDate);
+      if (valuation === null) return false;
+
+      await db()
+        .update(realEstateAssets)
+        .set({ lastValueUsd: valuation.valueUsd.toString(), lastSyncedAt: now, valuationSource: 'derived' })
+        .where(and(eq(realEstateAssets.userId, userId), eq(realEstateAssets.id, row.id)));
+      return true;
+    }
 
     for (const row of rows) {
       try {
         const value = await getPropertyValue(row.address);
         await db()
           .update(realEstateAssets)
-          .set({ lastValueUsd: value.toString(), lastSyncedAt: now })
+          .set({ lastValueUsd: value.toString(), lastSyncedAt: now, valuationSource: 'avm' })
           .where(and(eq(realEstateAssets.userId, userId), eq(realEstateAssets.id, row.id)));
         synced++;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        if (msg === 'RENTCAST_API_KEY not configured') {
-          return reply.status(402).send({ error: 'RENTCAST_API_KEY not configured' });
-        }
-        errors++;
+        if (msg === 'RENTCAST_API_KEY not configured') missingKey = true;
+
+        // A derived figure needs no credential, so it is worth trying for
+        // every AVM failure, not only the missing-key one.
+        const ok = await deriveFor(row).catch(() => false);
+        if (ok) derived++;
+        else errors++;
       }
     }
 
-    req.log.info({ userId, synced, errors }, 'real estate sync complete');
-    return { synced, errors };
+    // 402 only when nothing could be valued at all. With a purchase price on
+    // file the missing key is no longer a dead end, and reporting it as one
+    // would hide a figure we successfully produced.
+    if (missingKey && derived === 0 && synced === 0) {
+      return reply.status(402).send({ error: 'RENTCAST_API_KEY not configured' });
+    }
+
+    req.log.info({ userId, synced, derived, errors }, 'real estate sync complete');
+    return { synced, derived, errors };
   });
 }
