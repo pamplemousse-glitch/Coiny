@@ -32,6 +32,81 @@ describe('claimEvent', () => {
   });
 });
 
+describe('claimEvents', () => {
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  it('claims every id in a fresh batch', async () => {
+    const { claimEvents } = await import('../src/store/events.js');
+    const claimed = await claimEvents(['b1', 'b2', 'b3']);
+    expect([...claimed].sort()).toEqual(['b1', 'b2', 'b3']);
+  });
+
+  it('returns only the ids not already claimed', async () => {
+    const { claimEvent, claimEvents } = await import('../src/store/events.js');
+    await claimEvent('taken');
+
+    const claimed = await claimEvents(['taken', 'fresh']);
+
+    expect(claimed.has('taken')).toBe(false);
+    expect(claimed.has('fresh')).toBe(true);
+  });
+
+  // A Plaid sync can carry the same transaction id twice. ON CONFLICT DO
+  // NOTHING tolerates that inside one VALUES list, but the returned set has to
+  // be a set of ids regardless.
+  it('handles a duplicate id inside one batch', async () => {
+    const { claimEvents } = await import('../src/store/events.js');
+    const claimed = await claimEvents(['dup', 'dup', 'other']);
+    expect([...claimed].sort()).toEqual(['dup', 'other']);
+  });
+
+  it('is a no-op on an empty batch', async () => {
+    const { claimEvents } = await import('../src/store/events.js');
+    expect((await claimEvents([])).size).toBe(0);
+  });
+
+  it('resolves concurrent batches so each id is won exactly once', async () => {
+    const { claimEvents } = await import('../src/store/events.js');
+    const [first, second] = await Promise.all([claimEvents(['race1', 'race2']), claimEvents(['race1', 'race2'])]);
+
+    expect(first.size + second.size).toBe(2);
+  });
+
+  // Batching only pays if it is actually one statement per chunk. Claiming
+  // ids one at a time inside claimEvents would satisfy every assertion above.
+  it('claims a batch larger than one chunk', async () => {
+    const { claimEvents } = await import('../src/store/events.js');
+    const ids = Array.from({ length: 2_500 }, (_, i) => `bulk_${i}`);
+
+    const claimed = await claimEvents(ids);
+
+    expect(claimed.size).toBe(2_500);
+    expect(await claimEvents(['bulk_0'])).toEqual(new Set());
+  });
+});
+
+describe('releaseEvents', () => {
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  it('makes a released id claimable again', async () => {
+    const { claimEvents, releaseEvents } = await import('../src/store/events.js');
+    await claimEvents(['r1', 'r2']);
+
+    await releaseEvents(['r1']);
+
+    expect(await claimEvents(['r1', 'r2'])).toEqual(new Set(['r1']));
+  });
+
+  it('is a no-op on an empty list', async () => {
+    const { releaseEvents } = await import('../src/store/events.js');
+    await expect(releaseEvents([])).resolves.toBeUndefined();
+  });
+});
+
 describe('claimWebhookDelivery', () => {
   beforeEach(async () => {
     await resetDatabase();

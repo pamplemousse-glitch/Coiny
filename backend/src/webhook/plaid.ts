@@ -11,7 +11,7 @@ import { performReactions } from '../reactions/perform.js';
 import type { RuleContext } from '../rules/engine.js';
 import { evaluateAll } from '../rules/engine.js';
 import { upsertPlaidAccountBalances } from '../store/asset-cache.js';
-import { claimEvent, claimWebhookDelivery, releaseWebhookDelivery } from '../store/events.js';
+import { claimEvents, claimWebhookDelivery, releaseEvents, releaseWebhookDelivery } from '../store/events.js';
 import { disableItem, getItem, markInitialSyncComplete, setCursor, setNewAccountsAvailable } from '../store/items.js';
 import { getGoals } from '../store/pet.js';
 import { cacheLiabilities } from '../store/plaid-liabilities.js';
@@ -407,37 +407,57 @@ async function syncItem(
   // an accurate cumulative total and allowing it to fire exactly once per threshold crossing.
   const runningSpend = { ...weeklySpendSnapshot };
 
-  for (const tx of adapted) {
-    if (!(await claimEvent(tx.id))) {
-      app.log.debug({ transaction_id: tx.id }, 'plaid tx already processed');
-      continue;
-    }
+  // One round trip for the whole sync instead of one per transaction (audit
+  // 4.7.10). Evaluation below still walks `adapted` in order, because
+  // runningSpend is cumulative and overspent_in_category must fire on the
+  // transaction that crosses the threshold, not on whichever one a reordering
+  // happened to put there.
+  const claimed = await claimEvents(adapted.map((tx) => tx.id));
 
-    // Add this transaction to the running total before evaluating so the rule
-    // sees the post-transaction weekly spend (including this tx).
-    const cat = tx.details?.category;
-    if (cat && parseFloat(tx.amount) < 0) {
-      runningSpend[cat] = (runningSpend[cat] ?? 0) + Math.abs(parseFloat(tx.amount));
-    }
+  // Claimed but not yet evaluated. Emptied as the loop goes; whatever is left
+  // if the loop throws is released, so a Plaid redelivery retries it rather
+  // than finding it marked processed with no reaction ever performed.
+  const unprocessed = new Set(claimed);
 
-    const context: RuleContext = { weeklySpendByCategory: runningSpend };
-    // R-7.25: collect EVERY matching rule; the reaction contract then performs
-    // exactly one and records the rest as suppressed, so a transaction that is
-    // both a paycheck and a contribution loses nothing to array order.
-    const matches = evaluateAll(tx, goals, context);
-    // No `amount`: logging it puts financial detail in every log sink, which
-    // .claude/rules/security.md #2 forbids. transaction_id is pseudonymous and
-    // is enough to correlate; the amount can be read from the DB when debugging.
-    app.log.info(
-      {
-        transaction_id: tx.id,
-        category: tx.details?.category ?? null,
-        rules_matched: matches.map((m) => m.name),
-      },
-      'rule evaluation',
-    );
-    if (matches.length > 0) {
-      await performReactions(userId, matches);
+  try {
+    for (const tx of adapted) {
+      if (!claimed.has(tx.id)) {
+        app.log.debug({ transaction_id: tx.id }, 'plaid tx already processed');
+        continue;
+      }
+
+      // Add this transaction to the running total before evaluating so the rule
+      // sees the post-transaction weekly spend (including this tx).
+      const cat = tx.details?.category;
+      if (cat && parseFloat(tx.amount) < 0) {
+        runningSpend[cat] = (runningSpend[cat] ?? 0) + Math.abs(parseFloat(tx.amount));
+      }
+
+      const context: RuleContext = { weeklySpendByCategory: runningSpend };
+      // R-7.25: collect EVERY matching rule; the reaction contract then performs
+      // exactly one and records the rest as suppressed, so a transaction that is
+      // both a paycheck and a contribution loses nothing to array order.
+      const matches = evaluateAll(tx, goals, context);
+      // No `amount`: logging it puts financial detail in every log sink, which
+      // .claude/rules/security.md #2 forbids. transaction_id is pseudonymous and
+      // is enough to correlate; the amount can be read from the DB when debugging.
+      app.log.info(
+        {
+          transaction_id: tx.id,
+          category: tx.details?.category ?? null,
+          rules_matched: matches.map((m) => m.name),
+        },
+        'rule evaluation',
+      );
+      if (matches.length > 0) {
+        await performReactions(userId, matches);
+      }
+
+      unprocessed.delete(tx.id);
+    }
+  } finally {
+    if (unprocessed.size > 0) {
+      await releaseEvents([...unprocessed]);
     }
   }
 }
