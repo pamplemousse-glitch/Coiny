@@ -150,12 +150,21 @@ struct InvestmentHolding: Codable, Identifiable {
     let name: String?
     let ticker: String?
     let value: Double
+    /// Plaid's security type: `equity`, `etf`, `mutual fund`, `fixed income`,
+    /// `cash`, `derivative`. Optional because the holdings list is served from
+    /// a cached payload that may predate the field.
+    let securityType: String?
+    /// The account this sits inside, so a holding can be attributed to the
+    /// wrapper that holds it (a Roth IRA rather than a taxable brokerage).
+    let accountId: String?
 
     enum CodingKeys: String, CodingKey {
         case id = "securityId"
         case name
         case ticker
         case value
+        case securityType
+        case accountId
     }
 }
 
@@ -226,6 +235,15 @@ extension NetWorthResponse {
             classes: [:], excluded: ExcludedSummary(count: 0, classes: []),
             generatedAt: Date(timeIntervalSince1970: 0), bankRefresh: nil
         )
+    }
+}
+
+extension InvestmentHolding {
+    /// Convenience initialiser for fixtures and previews. The additive fields
+    /// default to nil, which is also what a cached payload written before they
+    /// existed decodes to, so fixtures exercise the fallback path.
+    init(id: String, name: String?, ticker: String?, value: Double) {
+        self.init(id: id, name: name, ticker: ticker, value: value, securityType: nil, accountId: nil)
     }
 }
 

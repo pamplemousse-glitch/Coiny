@@ -36,6 +36,24 @@ export type HoldingSummary = {
   name: string | null;
   ticker: string | null;
   value: number;
+  /**
+   * Plaid's security type: `equity`, `etf`, `mutual fund`, `fixed income`,
+   * `cash`, `derivative`, `cryptocurrency`, ... Without it a bond fund, an
+   * uninvested cash sweep and a stock are the same row to the client.
+   *
+   * Optional, not `| null`: these summaries are cached as a JSON payload
+   * (`asset_cache.payload`), so a payload written before this field existed
+   * decodes with the key absent rather than null. Declaring it required would
+   * be a type that lies about what is actually in the database.
+   */
+  securityType?: string | null;
+  /**
+   * Which account holds it. Plaid returns this on every holding and we dropped
+   * it, so there was no way to say "this ETF is inside your Roth IRA" even
+   * after account subtypes landed (networth/account-taxonomy.ts). Same
+   * optionality reasoning as above.
+   */
+  accountId?: string | null;
 };
 
 export type SyncedAccountBalances = {
@@ -227,6 +245,8 @@ export async function fetchPlaidSnapshot(userId: string): Promise<PlaidSnapshot>
           name: sec?.name ?? null,
           ticker: sec?.ticker_symbol ?? null,
           value,
+          securityType: sec?.type ?? null,
+          accountId: h.account_id ?? null,
         });
       }
     }
