@@ -146,6 +146,66 @@ enum TelemetryConsent {
     }
 }
 
+// MARK: - App open
+
+/// The `app_open` event (PRD section 24, audit 4.3.6).
+///
+/// The server has defined the schema since `analytics/events.ts:49` and no
+/// client has ever sent it, so "the W4 signal" has been a contract with nothing
+/// on the other end. This matters more than most gaps because **retention
+/// cohorts cannot be backfilled**: an open that was never recorded is not
+/// recoverable later from any other table.
+///
+/// `days_since_signup` is informational. The retention query recomputes day
+/// offsets from server timestamps (`events.ts:47-48`), so this field is a
+/// convenience for reading a single event, never the basis of a cohort.
+enum TelemetryAppOpen {
+    /// First launch we observed for this install. Not necessarily the signup
+    /// date: an install that predates this code has no record of when it signed
+    /// up, and inventing one would be worse than a low number. Both cases are
+    /// stamped the same way and `days_since_signup` is a lower bound, which the
+    /// server's own recomputation makes harmless.
+    static let firstSeenKey = "telemetryFirstSeenAt"
+
+    /// Set by the notification delegate when the user taps a push, read and
+    /// cleared by the next open. Main-actor because both sides run there.
+    @MainActor static var openedFromPush = false
+
+    /// Stamps the first-seen date if this install has none. Idempotent, so it
+    /// can be called on every launch and at sign-in without moving the date.
+    static func recordFirstSeenIfNeeded(now: Date = Date()) {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: firstSeenKey) == nil else { return }
+        defaults.set(now.timeIntervalSince1970, forKey: firstSeenKey)
+    }
+
+    /// Whole days since `firstSeenKey`, clamped to the 0...3650 the server
+    /// schema accepts. A value outside that range is rejected by the strict
+    /// object and would cost the whole batch, so it is clamped here rather than
+    /// discovered as a 400 in production.
+    static func daysSinceFirstSeen(now: Date = Date()) -> Int {
+        let defaults = UserDefaults.standard
+        guard let stamp = defaults.object(forKey: firstSeenKey) as? TimeInterval else { return 0 }
+        let elapsed = now.timeIntervalSince1970 - stamp
+        guard elapsed > 0 else { return 0 }
+        return min(3650, Int(elapsed / 86_400))
+    }
+
+    /// Emits one `app_open`. Consent is enforced inside `TelemetryClient.emit`,
+    /// so an unacknowledged or opted-out user drops this without a special case
+    /// here.
+    @MainActor
+    static func emit(to client: TelemetryClient = .shared, now: Date = Date()) async {
+        recordFirstSeenIfNeeded(now: now)
+        let source = openedFromPush ? "push" : "icon"
+        openedFromPush = false
+        await client.emit("app_open", [
+            "source": .string(source),
+            "days_since_signup": .int(daysSinceFirstSeen(now: now)),
+        ])
+    }
+}
+
 // MARK: - Client
 
 /// Queueing emitter per R-24.1: events accumulate and flush 25 at a time or on

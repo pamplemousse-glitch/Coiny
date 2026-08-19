@@ -185,6 +185,7 @@
 		EFAF67196DAA3990A2B59658 /* NftViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE864FE76E73AB4892D0EFA8 /* NftViewModelTests.swift */; };
 		F2E6476046E44C11561AA329 /* SpinwheelInlineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8A82CF82C3C90B06D0E4C4C /* SpinwheelInlineView.swift */; };
 		F507AEF30B1975F896BDAF76 /* API+ManualAssets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65284E3BE19D29FB121805ED /* API+ManualAssets.swift */; };
+		F698E6205F6144B5626DE235 /* TelemetryAppOpenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EEA2D2C5FF478E246824F36 /* TelemetryAppOpenTests.swift */; };
 		F7C6A403CEA5B9C47336B2C6 /* HomeJourneyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD2C6606F05DB7D791D4F74E /* HomeJourneyView.swift */; };
 		F9F2B818A2F1E1602720D3E3 /* NetWorthView+CollectibleInlines.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03ABBE17E2D60E545CC0A547 /* NetWorthView+CollectibleInlines.swift */; };
 		FAC96919A888EBFD62B70071 /* WealthTabUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EA22C9CCB74F58819DC9960 /* WealthTabUITests.swift */; };
@@ -285,6 +286,7 @@
 		5CF3B9CB6ADCE331E98E1D43 /* CreaturePlaceholderArt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreaturePlaceholderArt.swift; sourceTree = "<group>"; };
 		5E69C409A6001E059800119A /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		5EA22C9CCB74F58819DC9960 /* WealthTabUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WealthTabUITests.swift; sourceTree = "<group>"; };
+		5EEA2D2C5FF478E246824F36 /* TelemetryAppOpenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryAppOpenTests.swift; sourceTree = "<group>"; };
 		618CA9077B0177F449506F80 /* Coiny.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Coiny.entitlements; sourceTree = "<group>"; };
 		62C9B4C739423A364897A88D /* DarkModeRenderingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkModeRenderingTests.swift; sourceTree = "<group>"; };
 		63D1FEEDB72F10002BAC428F /* API+Telemetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Telemetry.swift"; sourceTree = "<group>"; };
@@ -494,6 +496,7 @@
 				1FFDEA6743F2696C59BE5D6F /* SubscriptionCatalogTests.swift */,
 				8EDCB67E2D7747D22E2FA134 /* SubscriptionRevealTests.swift */,
 				E3A2C30ECC9D272BFA5F02EE /* TargetGoalsDecodingTests.swift */,
+				5EEA2D2C5FF478E246824F36 /* TelemetryAppOpenTests.swift */,
 				29DA515E0776BB4B8140D824 /* TelemetryTests.swift */,
 				6C8A559C5C1CE5E41BC91F87 /* TradingCardsViewModelTests.swift */,
 				5135E8290813E446256D3BE9 /* TruelayerViewModelTests.swift */,
@@ -921,6 +924,7 @@
 				C6B61D744A511AC9D6D0F26E /* SubscriptionCatalogTests.swift in Sources */,
 				80817EEBF492B7211F42CB01 /* SubscriptionRevealTests.swift in Sources */,
 				BCCAC21FE716D0E0DE25A45B /* TargetGoalsDecodingTests.swift in Sources */,
+				F698E6205F6144B5626DE235 /* TelemetryAppOpenTests.swift in Sources */,
 				5B0254B2B791693C4BE7DA3D /* TelemetryTests.swift in Sources */,
 				B44D95DEE0C06BBD3D13DFAF /* TradingCardsViewModelTests.swift in Sources */,
 				6673B3C5A8E68BD5050CB46B /* TruelayerViewModelTests.swift in Sources */,
