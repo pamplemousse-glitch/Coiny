@@ -23,8 +23,17 @@ pnpm --filter coiny-backend test:local
 # good candidate for why they never went away. Use test:local, or run
 # `npx vitest run --maxWorkers=3` from backend/.
 
-# What CI actually runs. Catches races that reduced parallelism hides.
-pnpm --filter coiny-backend test:coverage
+# CI runs THREE steps (backend-ci.yml:75,78,81), in this order. Run all three
+# before claiming green, and run them AFTER your last edit.
+#
+# This line used to read "what CI actually runs" above test:coverage alone,
+# which is how a PR shipped with a type error in a test file while every local
+# signal was green: vitest transpiles WITHOUT typechecking, so a fully passing
+# suite says nothing about types. Typechecking before writing a test and not
+# again after is the same mistake in slow motion.
+pnpm --filter coiny-backend lint && \
+  pnpm --filter coiny-backend typecheck && \
+  pnpm --filter coiny-backend test:coverage   # also catches races reduced parallelism hides
 
 # Lint + format. Run these from backend/, NOT the repo root: biome resolves a
 # different config from the root and reports files as unfixable that it fixes
