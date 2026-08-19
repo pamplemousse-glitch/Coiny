@@ -5,13 +5,23 @@ vi.mock('../src/vehicles/client.js', () => ({
   getVehicleValue: vi.fn(),
 }));
 
+vi.mock('../src/vpic/client.js', async (importOriginal) => ({
+  // describeVehicle is pure, so the real one is kept: mocking it would make
+  // the displayName assertions test the mock instead of the formatting.
+  ...(await importOriginal<typeof import('../src/vpic/client.js')>()),
+  decodeVin: vi.fn(),
+}));
+
 import { getVehicleValue } from '../src/vehicles/client.js';
+import { decodeVin } from '../src/vpic/client.js';
 
 const mockedGetVehicleValue = vi.mocked(getVehicleValue);
+const mockedDecodeVin = vi.mocked(decodeVin);
 
 describe('GET /api/vehicles', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    mockedDecodeVin.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -58,6 +68,7 @@ describe('GET /api/vehicles', () => {
 describe('POST /api/vehicles', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    mockedDecodeVin.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -116,6 +127,7 @@ describe('POST /api/vehicles', () => {
 describe('DELETE /api/vehicles/:id', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    mockedDecodeVin.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -154,6 +166,7 @@ describe('DELETE /api/vehicles/:id', () => {
 describe('POST /api/vehicles/sync', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    mockedDecodeVin.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -163,7 +176,7 @@ describe('POST /api/vehicles/sync', () => {
 
     const res = await app.inject({ method: 'POST', url: '/api/vehicles/sync', headers: authHeader() });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ synced: 0, errors: 0 });
+    expect(res.json()).toEqual({ synced: 0, errors: 0, skippedUndecodable: 0 });
 
     await app.close();
   });
@@ -180,7 +193,7 @@ describe('POST /api/vehicles/sync', () => {
 
     const res = await app.inject({ method: 'POST', url: '/api/vehicles/sync', headers: authHeader() });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ synced: 1, errors: 0 });
+    expect(res.json()).toEqual({ synced: 1, errors: 0, skippedUndecodable: 0 });
 
     const list = await app.inject({ method: 'GET', url: '/api/vehicles', headers: authHeader() });
     const vehicle = list.json<{ lastValueUsd: number }[]>()[0];
@@ -223,7 +236,7 @@ describe('POST /api/vehicles/sync', () => {
 
     const res = await app.inject({ method: 'POST', url: '/api/vehicles/sync', headers: authHeader() });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ synced: 1, errors: 1 });
+    expect(res.json()).toEqual({ synced: 1, errors: 1, skippedUndecodable: 0 });
 
     await app.close();
   });
@@ -232,6 +245,7 @@ describe('POST /api/vehicles/sync', () => {
 describe('GET /api/net-worth — vehicles field', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    mockedDecodeVin.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -264,6 +278,141 @@ describe('GET /api/net-worth — vehicles field', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json<{ vehicles: number }>();
     expect(body.vehicles).toBeCloseTo(31250.25, 1);
+
+    await app.close();
+  });
+});
+
+describe('vPIC VIN decode', () => {
+  beforeEach(async () => {
+    vi.resetAllMocks();
+    mockedDecodeVin.mockResolvedValue(null);
+    await resetDatabase();
+  });
+
+  it('stores the decode on add and names the car in the listing', async () => {
+    mockedDecodeVin.mockResolvedValue({
+      make: 'HONDA',
+      model: 'Accord',
+      modelYear: 2003,
+      trim: 'EX-V6',
+      bodyClass: 'Coupe',
+      vehicleType: 'PASSENGER CAR',
+      errorCode: '0',
+      usable: true,
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const add = await app.inject({
+      method: 'POST',
+      url: '/api/vehicles',
+      headers: authHeader(),
+      payload: { vin: '1HGCM82633A004352' },
+    });
+    expect(add.statusCode).toBe(201);
+    expect(add.json()).toMatchObject({ make: 'HONDA', modelYear: 2003, vinUsable: true });
+
+    const list = await app.inject({ method: 'GET', url: '/api/vehicles', headers: authHeader() });
+    const vehicle = list.json<{ displayName: string; make: string }[]>()[0];
+    expect(vehicle?.displayName).toBe('2003 HONDA Accord EX-V6');
+
+    await app.close();
+  });
+
+  it('prefers the user label over the decoded name', async () => {
+    mockedDecodeVin.mockResolvedValue({
+      make: 'HONDA',
+      model: 'Accord',
+      modelYear: 2003,
+      trim: null,
+      bodyClass: null,
+      vehicleType: null,
+      errorCode: '0',
+      usable: true,
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/vehicles',
+      headers: authHeader(),
+      payload: { vin: '1HGCM82633A004352', label: "Dad's car" },
+    });
+
+    const list = await app.inject({ method: 'GET', url: '/api/vehicles', headers: authHeader() });
+    expect(list.json<{ displayName: string }[]>()[0]?.displayName).toBe("Dad's car");
+
+    await app.close();
+  });
+
+  // The whole reason this integration earns its place: MarketCheck's free tier
+  // is 500 calls/month and the next step up is $299/month.
+  it('skips the paid valuation call for a VIN vPIC could not decode', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { vehicleAssets } = await import('../src/db/schema.js');
+    await db()
+      .insert(vehicleAssets)
+      .values([
+        { userId: testUserId, vin: 'GOODVIN1234567', vinUsable: true },
+        { userId: testUserId, vin: 'NOTAVIN', vinUsable: false },
+      ]);
+
+    mockedGetVehicleValue.mockResolvedValue(22500);
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'POST', url: '/api/vehicles/sync', headers: authHeader() });
+    expect(res.json()).toEqual({ synced: 1, errors: 0, skippedUndecodable: 1 });
+    // The point of the whole feature: one call, not two.
+    expect(mockedGetVehicleValue).toHaveBeenCalledTimes(1);
+    expect(mockedGetVehicleValue).toHaveBeenCalledWith('GOODVIN1234567');
+
+    await app.close();
+  });
+
+  // An absent opinion is not a negative one. Rows predating 0055, and rows
+  // added while vPIC was down, must still reach MarketCheck.
+  it('still values a vehicle whose VIN was never decoded', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { vehicleAssets } = await import('../src/db/schema.js');
+    await db().insert(vehicleAssets).values({ userId: testUserId, vin: 'LEGACYVIN12345', vinUsable: null });
+
+    mockedGetVehicleValue.mockResolvedValue(15000);
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'POST', url: '/api/vehicles/sync', headers: authHeader() });
+    expect(res.json()).toEqual({ synced: 1, errors: 0, skippedUndecodable: 0 });
+    expect(mockedGetVehicleValue).toHaveBeenCalledTimes(1);
+
+    await app.close();
+  });
+
+  it('still records the vehicle when vPIC is unreachable', async () => {
+    mockedDecodeVin.mockResolvedValue(null);
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const add = await app.inject({
+      method: 'POST',
+      url: '/api/vehicles',
+      headers: authHeader(),
+      payload: { vin: '1HGCM82633A004352' },
+    });
+    expect(add.statusCode).toBe(201);
+
+    const list = await app.inject({ method: 'GET', url: '/api/vehicles', headers: authHeader() });
+    const vehicle = list.json<{ displayName: string; vinUsable: boolean | null }[]>()[0];
+    // Falls back to the VIN, exactly as every row read before 0055.
+    expect(vehicle?.displayName).toBe('1HGCM82633A004352');
+    expect(vehicle?.vinUsable).toBeNull();
 
     await app.close();
   });
