@@ -235,7 +235,7 @@ describe('POST /api/entitlements/transaction', () => {
     const app = await makeApp();
     const { findOrCreateUser } = await import('../src/store/users.js');
     const { createSession } = await import('../src/store/sessions.js');
-    const otherUserId = await findOrCreateUser({ appleSub: 'other_sub', email: 'other@coiny.test' });
+    const otherUserId = await findOrCreateUser({ appleSub: 'other_sub' });
     const { rawToken: otherToken } = await createSession(otherUserId);
 
     const jws = signJws(transactionPayload({ originalTransactionId: 'orig_shared' }), chain);

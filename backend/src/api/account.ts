@@ -6,11 +6,7 @@ import { revokeUpstreamGrants } from '../revoke/upstream.js';
 import { getItemsByUser } from '../store/items.js';
 import { enqueueItemRemoval } from '../store/plaid-removal-queue.js';
 import { deleteOtherSessions } from '../store/sessions.js';
-import { deleteUser, updateDisplayName } from '../store/users.js';
-
-const PatchAccountSchema = z.object({
-  display_name: z.string().min(1).max(100),
-});
+import { deleteUser } from '../store/users.js';
 
 // DELETE carries an optional body. Fastify gives `undefined` when the client
 // sends none, which is the shipped iOS build's behaviour, so every field is
@@ -23,15 +19,10 @@ const DeleteAccountSchema = z.object({
   apple_authorization_code: z.string().min(1).max(2048).nullish(),
 });
 
+// `PATCH /api/account` used to live here and set a display name. It was the
+// only writer of a column nothing read, no view ever called it, and no test
+// covered it (audit 2.2.2). Removed with the column in 0054.
 export function registerAccountApi(app: FastifyInstance): void {
-  app.patch('/api/account', async (req: FastifyRequest, reply: FastifyReply) => {
-    const parsed = PatchAccountSchema.safeParse(req.body);
-    if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
-
-    await updateDisplayName(req.user!.id, parsed.data.display_name);
-    return reply.status(200).send({ ok: true });
-  });
-
   // GLBA/CCPA right-to-delete. Revokes every upstream authorization we can
   // revoke, then deletes the user row. All child tables cascade via FK
   // constraints.

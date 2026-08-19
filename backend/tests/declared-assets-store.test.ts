@@ -99,7 +99,7 @@ describe('replaceDeclaredAssets', () => {
   it('never returns another user lines', async () => {
     const { findOrCreateUser } = await import('../src/store/users.js');
     const { listDeclaredAssets, replaceDeclaredAssets } = await import('../src/store/declared-assets.js');
-    const otherId = await findOrCreateUser({ appleSub: 'other_sub', email: 'other@coiny.test' });
+    const otherId = await findOrCreateUser({ appleSub: 'other_sub' });
     const now = new Date();
     await replaceDeclaredAssets(otherId, [{ assetClass: 'home', bucketedValueUsd: 900000, declaredAt: now }], now);
 
@@ -144,7 +144,7 @@ describe('updateDeclaredAsset', () => {
     const { listDeclaredAssets, replaceDeclaredAssets, updateDeclaredAsset } = await import(
       '../src/store/declared-assets.js'
     );
-    const otherId = await findOrCreateUser({ appleSub: 'other_sub2', email: 'other2@coiny.test' });
+    const otherId = await findOrCreateUser({ appleSub: 'other_sub2' });
     const now = new Date();
     await replaceDeclaredAssets(otherId, [{ assetClass: 'car', bucketedValueUsd: 12000, declaredAt: now }], now);
 

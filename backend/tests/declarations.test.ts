@@ -42,7 +42,7 @@ describe('declarations store', () => {
   it('scopes declarations by user', async () => {
     const { getDeclarations, updateDeclarations } = await import('../src/store/declarations.js');
     const { findOrCreateUser } = await import('../src/store/users.js');
-    const otherUser = await findOrCreateUser({ appleSub: 'other_sub_decl', email: 'other@coiny.test' });
+    const otherUser = await findOrCreateUser({ appleSub: 'other_sub_decl' });
 
     await updateDeclarations(testUserId, { shelteredTargetRate: 0.12 }, NOW);
     expect((await getDeclarations(otherUser)).shelteredTargetRate).toBeNull();

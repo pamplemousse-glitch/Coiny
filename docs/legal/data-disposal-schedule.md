@@ -31,7 +31,7 @@ disconnect remain the immediate mechanisms.
 | Daily net worth snapshots (`net_worth_daily`) | While the account is active; this is the product's history feature, tier-limited at display time (30 days free, 2 years Individual) | Account deletion only. Judgment call: the data is the user's own history and disposing of it would delete a paid feature; the two-year Safeguards clock runs from *last use*, and an active account uses its history continuously |
 | Derived state, goals, ladder, pet state | While the account is active | Account deletion; these are live product state, recomputed or user-owned |
 | Inactive accounts (no sign-in, no webhook-driven activity) | **15 months** after last activity | **Not enforced.** Warning email at 12 months, deletion at 15; no transactional email path exists, and deleting an account unprompted without the warning is not acceptable. Comfortably inside the 24-month ceiling, and an account nobody has opened in a year is a liability, not an asset |
-| User identity row (email, subs) | Life of the account | Account deletion or the inactive-account rule above |
+| User identity row (subs only) | Life of the account | Account deletion or the inactive-account rule above. Migration 0054 dropped `email` and `display_name`: both were written at sign-in and read by nothing in `src/` (audit 2.2.1), so the row now holds the provider subject identifier and consent state and no contact detail at all. The cheapest disposal obligation is the one you never incur |
 
 ## Mechanics
 

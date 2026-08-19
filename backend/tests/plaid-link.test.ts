@@ -83,7 +83,7 @@ describe('GET /api/plaid/items', () => {
   it('does not return another user item', async () => {
     const { findOrCreateUser } = await import('../src/store/users.js');
     const { upsertItem } = await import('../src/store/items.js');
-    const otherUserId = await findOrCreateUser({ appleSub: 'other_apple_sub', email: 'other@coiny.test' });
+    const otherUserId = await findOrCreateUser({ appleSub: 'other_apple_sub' });
     await upsertItem({ itemId: 'item_other_user', accessToken: 'access-other', userId: otherUserId });
 
     const { buildApp } = await import('../src/server.js');
@@ -264,7 +264,7 @@ describe('POST /api/plaid/update-link-token', () => {
   it('returns 404 for an item belonging to another user', async () => {
     const { findOrCreateUser } = await import('../src/store/users.js');
     const { upsertItem } = await import('../src/store/items.js');
-    const otherUserId = await findOrCreateUser({ appleSub: 'other_apple_sub_2', email: 'other2@coiny.test' });
+    const otherUserId = await findOrCreateUser({ appleSub: 'other_apple_sub_2' });
     await upsertItem({ itemId: 'item_of_other', accessToken: 'access-other-2', userId: otherUserId });
 
     const { buildApp } = await import('../src/server.js');
@@ -369,7 +369,7 @@ describe('POST /api/plaid/item-repaired', () => {
   it('returns 404 for an item the caller does not own', async () => {
     const { findOrCreateUser } = await import('../src/store/users.js');
     const { upsertItem, setItemStatus } = await import('../src/store/items.js');
-    const otherUserId = await findOrCreateUser({ appleSub: 'other_apple_sub_3', email: 'other3@coiny.test' });
+    const otherUserId = await findOrCreateUser({ appleSub: 'other_apple_sub_3' });
     await upsertItem({ itemId: 'item_of_other_3', accessToken: 'access-other-3', userId: otherUserId });
     await setItemStatus('item_of_other_3', 'reauth_required', { errorCode: 'ITEM_LOGIN_REQUIRED' });
 

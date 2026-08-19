@@ -38,7 +38,7 @@ describe('per-user rate limit', () => {
     }
 
     // User B (different session token, same in-process IP) should still get 200.
-    const userBId = await findOrCreateUser({ appleSub: 'test_user_b', email: null });
+    const userBId = await findOrCreateUser({ appleSub: 'test_user_b' });
     const { rawToken: userBToken } = await createSession(userBId);
     const res = await app.inject({
       method: 'GET',

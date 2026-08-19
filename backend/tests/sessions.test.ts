@@ -63,7 +63,7 @@ describe('session cap', () => {
     const { createSession, MAX_SESSIONS_PER_USER } = await import('../src/store/sessions.js');
     const { findOrCreateUser } = await import('../src/store/users.js');
 
-    const otherUserId = await findOrCreateUser({ appleSub: 'other_user_cap', email: null });
+    const otherUserId = await findOrCreateUser({ appleSub: 'other_user_cap' });
     await createSession(otherUserId);
 
     for (let i = 0; i < MAX_SESSIONS_PER_USER + 4; i++) {
@@ -98,7 +98,7 @@ describe('deleteOtherSessions', () => {
     const { createSession, deleteOtherSessions, validateSession } = await import('../src/store/sessions.js');
     const { findOrCreateUser } = await import('../src/store/users.js');
 
-    const otherUserId = await findOrCreateUser({ appleSub: 'other_user_revoke', email: null });
+    const otherUserId = await findOrCreateUser({ appleSub: 'other_user_revoke' });
     const other = await createSession(otherUserId);
 
     await deleteOtherSessions(testUserId, testToken);

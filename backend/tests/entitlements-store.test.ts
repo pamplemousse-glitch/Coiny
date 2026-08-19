@@ -130,8 +130,8 @@ describe('household membership', () => {
   beforeEach(async () => {
     await resetDatabase();
     const { findOrCreateUser } = await import('../src/store/users.js');
-    ownerId = await findOrCreateUser({ appleSub: 'owner_sub', email: 'owner@coiny.test' });
-    memberId = await findOrCreateUser({ appleSub: 'member_sub', email: 'member@coiny.test' });
+    ownerId = await findOrCreateUser({ appleSub: 'owner_sub' });
+    memberId = await findOrCreateUser({ appleSub: 'member_sub' });
   });
 
   async function subscribeHousehold(userId: string): Promise<void> {
@@ -173,17 +173,17 @@ describe('household membership', () => {
     await subscribeHousehold(ownerId);
     const { findOrCreateUser } = await import('../src/store/users.js');
     for (let i = 0; i < 4; i++) {
-      const uid = await findOrCreateUser({ appleSub: `member_${i}`, email: `m${i}@coiny.test` });
+      const uid = await findOrCreateUser({ appleSub: `member_${i}` });
       expect(await addHouseholdMember(ownerId, uid)).toEqual({ ok: true });
     }
-    const sixth = await findOrCreateUser({ appleSub: 'member_5', email: 'm5@coiny.test' });
+    const sixth = await findOrCreateUser({ appleSub: 'member_5' });
     expect(await addHouseholdMember(ownerId, sixth)).toEqual({ ok: false, reason: 'household_full' });
   });
 
   it('a user can belong to at most one household', async () => {
     await subscribeHousehold(ownerId);
     const { findOrCreateUser } = await import('../src/store/users.js');
-    const secondOwner = await findOrCreateUser({ appleSub: 'owner2_sub', email: 'owner2@coiny.test' });
+    const secondOwner = await findOrCreateUser({ appleSub: 'owner2_sub' });
     await subscribeHousehold(secondOwner);
 
     expect(await addHouseholdMember(ownerId, memberId)).toEqual({ ok: true });

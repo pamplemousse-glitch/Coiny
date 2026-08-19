@@ -39,19 +39,16 @@ struct CoinyApp: App {
     @State private var isSignedIn: Bool =
         CoinyApp.isUITesting || CoinyApp.isDebugSessionRun || KeychainSessionStore().load() != nil
     @AppStorage("onboardingComplete") private var onboardingComplete: Bool = false
-    /// Name from Apple Sign In on first login; carried into OnboardingView's name step.
-    @State private var pendingDisplayName: String = ""
 
     var body: some Scene {
         WindowGroup {
             Group {
                 if !isSignedIn {
-                    SignInView { name in
-                        pendingDisplayName = name
+                    SignInView {
                         isSignedIn = true
                     }
                 } else if !onboardingComplete && !CoinyApp.isUITesting && !CoinyApp.isDebugSessionRun {
-                    OnboardingView(onboardingComplete: $onboardingComplete, appleDisplayName: pendingDisplayName)
+                    OnboardingView(onboardingComplete: $onboardingComplete)
                 } else {
                     RootView()
                         .environment(petStore)

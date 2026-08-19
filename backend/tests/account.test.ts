@@ -270,43 +270,6 @@ describe('DELETE /api/account', () => {
   });
 });
 
-describe('PATCH /api/account', () => {
-  beforeEach(async () => {
-    await resetDatabase();
-  });
-
-  it('updates display name and returns ok', async () => {
-    const { buildApp } = await import('../src/server.js');
-    const app = await buildApp();
-
-    const res = await app.inject({
-      method: 'PATCH',
-      url: '/api/account',
-      headers: { ...authHeader(), 'content-type': 'application/json' },
-      body: JSON.stringify({ display_name: 'Coiny Test' }),
-    });
-    expect(res.statusCode).toBe(200);
-    expect(res.json<{ ok: boolean }>().ok).toBe(true);
-
-    await app.close();
-  });
-
-  it('returns 400 for missing display_name', async () => {
-    const { buildApp } = await import('../src/server.js');
-    const app = await buildApp();
-
-    const res = await app.inject({
-      method: 'PATCH',
-      url: '/api/account',
-      headers: { ...authHeader(), 'content-type': 'application/json' },
-      body: JSON.stringify({}),
-    });
-    expect(res.statusCode).toBe(400);
-
-    await app.close();
-  });
-});
-
 // Part 1 row 1.4.5, the stolen-phone case. The user signs in on a replacement
 // device and ends every other session from there.
 describe('POST /api/account/sessions/revoke-all', () => {
@@ -362,7 +325,7 @@ describe('POST /api/account/sessions/revoke-all', () => {
     const { findOrCreateUser } = await import('../src/store/users.js');
     const app = await buildApp();
 
-    const otherUserId = await findOrCreateUser({ appleSub: 'revoke_all_other', email: null });
+    const otherUserId = await findOrCreateUser({ appleSub: 'revoke_all_other' });
     const other = await createSession(otherUserId);
 
     const res = await app.inject({

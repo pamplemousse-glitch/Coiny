@@ -12,9 +12,10 @@ import SwiftUI
 /// standing in for the creature (tells 1 and 2) under "Your pocket-sized
 /// financial companion" (tell 9).
 struct SignInView: View {
-    /// Called after a successful sign-in. Receives the display name if Apple
-    /// provided one (first sign-in only); empty string on repeat logins.
-    let onSignedIn: (String) -> Void
+    /// Called after a successful sign-in. Carries no payload: it used to hand
+    /// back the Apple display name, which reached `OnboardingView` and was read
+    /// by nothing there once the name-entry screen went away (R-5.2).
+    let onSignedIn: () -> Void
 
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -92,7 +93,14 @@ struct SignInView: View {
                 .accessibilityLabel("Signing in")
         } else {
             SignInWithAppleButton(.signIn) { request in
-                request.requestedScopes = [.fullName, .email]
+                // No requested scopes, deliberately. Coiny authenticates on the
+                // Apple `sub` alone and has nothing that reads a name or an
+                // email: no mail is ever sent and no screen displays either.
+                // Asking anyway would show the user a consent sheet listing
+                // data we then store and never use, which is the collection
+                // audit 2.2.1 found. Adding a scope back means naming the
+                // reader first.
+                request.requestedScopes = []
             } onCompletion: { result in
                 Task { @MainActor in await handle(result) }
             }
@@ -112,7 +120,7 @@ struct SignInView: View {
                     // The consent line is on screen above this button, so the
                     // disclosure was delivered on this path too.
                     TelemetryConsent.recordAcknowledgement()
-                    onSignedIn("")
+                    onSignedIn()
                 }
             }
             .font(.footnote)
@@ -181,13 +189,6 @@ struct SignInView: View {
             errorMessage = nil
             defer { isLoading = false }
 
-            // fullName is only populated on first sign-in; nil on repeat logins.
-            let displayName: String? = {
-                guard let name = credential.fullName else { return nil }
-                let components = [name.givenName, name.familyName].compactMap { $0 }
-                return components.isEmpty ? nil : components.joined(separator: " ")
-            }()
-
             // Apple hands this over on every sign-in and it is the only way the
             // server can ever obtain a token that revokes the grant at deletion
             // time (TN3194). It is single-use, expires in five minutes, and is
@@ -200,8 +201,6 @@ struct SignInView: View {
                 try await API.shared.signInWithApple(
                     identityToken: identityToken,
                     userId: credential.user,
-                    email: credential.email,
-                    displayName: displayName,
                     authorizationCode: authorizationCode
                 )
             } catch {
@@ -224,7 +223,7 @@ struct SignInView: View {
             }
 
             TelemetryConsent.recordAcknowledgement()
-            onSignedIn(displayName ?? "")
+            onSignedIn()
 
         case .failure(let error):
             let asError = error as? ASAuthorizationError
@@ -236,5 +235,5 @@ struct SignInView: View {
 }
 
 #Preview {
-    SignInView(onSignedIn: { _ in })
+    SignInView(onSignedIn: {})
 }
