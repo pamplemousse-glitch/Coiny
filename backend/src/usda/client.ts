@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { fetchWithRetry } from '../util/fetch.js';
+import { cachedByKey, PRICE_TTL } from '../util/price-cache.js';
 
 // USDA NASS Quick Stats API — https://quickstats.nass.usda.gov/api
 // Free key: https://quickstats.nass.usda.gov/api
@@ -76,7 +77,7 @@ const NassResponseSchema = z.object({
  * Uses NASS "LAND & BUILDINGS" > "LAND, CROPLAND" > "VALUE PER ACRE" survey.
  * Returns null if the key is absent, the API errors, or no data is found.
  */
-export async function getFarmlandPricePerAcre(stateCode: string, apiKey: string): Promise<number | null> {
+async function fetchFarmlandPricePerAcre(stateCode: string, apiKey: string): Promise<number | null> {
   if (!apiKey) return null;
 
   const stateName = STATE_NAMES[stateCode.toUpperCase()];
@@ -115,3 +116,24 @@ export async function getFarmlandPricePerAcre(stateCode: string, apiKey: string)
   const price = parseFloat(raw_value);
   return Number.isNaN(price) ? null : price;
 }
+
+/**
+ * Shared across users: this figure is identical for everyone who holds it, so
+ * it is fetched once per TTL rather than once per user per refresh.
+ *
+ * Keyed WITHOUT the API key. A secret has no business in a cache key, and it
+ * is the same on every call so it would add nothing anyway.
+ */
+const cachedFarmlandPrice = cachedByKey(
+  PRICE_TTL.STATISTICAL,
+  (stateCode: string, _apiKey: string) => stateCode.toUpperCase(),
+  fetchFarmlandPricePerAcre,
+  (v) => v !== null,
+);
+
+export async function getFarmlandPricePerAcre(stateCode: string, apiKey: string): Promise<number | null> {
+  if (!apiKey) return null;
+  return cachedFarmlandPrice(stateCode, apiKey);
+}
+
+export const _clearFarmlandCache = cachedFarmlandPrice.clear;
