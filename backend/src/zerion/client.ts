@@ -74,6 +74,28 @@ const ZerionPortfolioResponseSchema = z.object({
       total: z.object({
         positions: z.number(),
       }),
+      // Zerion returns the portfolio split five ways and we were reading only
+      // the aggregate, so a wallet with everything locked in a staking contract
+      // was indistinguishable from one holding spendable tokens. All five keys
+      // are `required` in Zerion's own schema (see the docs reference for
+      // GET /v1/wallets/{address}/portfolio), but they are parsed optionally
+      // here: a missing field must degrade the breakdown, never fail the whole
+      // portfolio read and zero a user's DeFi total.
+      // `.catch(undefined)` rather than `.optional()`: optional tolerates an
+      // ABSENT distribution but still fails the whole parse on a present-but-
+      // malformed one, and a failed parse here throws away the portfolio total
+      // and zeroes the user's DeFi class. The breakdown is a nice-to-have; the
+      // total is the number on the screen. Degrade the first, never the second.
+      positions_distribution_by_type: z
+        .object({
+          wallet: z.number().optional(),
+          deposited: z.number().optional(),
+          borrowed: z.number().optional(),
+          locked: z.number().optional(),
+          staked: z.number().optional(),
+        })
+        .optional()
+        .catch(undefined),
       changes: z
         .object({
           absolute_1d: z.number().nullable().optional(),
@@ -84,10 +106,36 @@ const ZerionPortfolioResponseSchema = z.object({
   }),
 });
 
+/**
+ * How a wallet's value is actually held.
+ *
+ * `wallet` is spendable today. `staked`, `locked` and `deposited` are the
+ * user's money but not reachable without unbonding, waiting out a lock, or
+ * withdrawing from a protocol. `borrowed` is a debt secured against the rest.
+ *
+ * Kept as a breakdown rather than folded into one figure for the same reason
+ * account subtypes are (networth/account-taxonomy.ts): "you have $40,000" and
+ * "you have $2,000, and $38,000 you cannot touch until the unbonding period
+ * ends" are different facts, and only one of them is an emergency fund.
+ */
+export type ZerionPositionBreakdown = {
+  wallet: number;
+  deposited: number;
+  borrowed: number;
+  locked: number;
+  staked: number;
+};
+
 export type ZerionPortfolio = {
   total_usd: number;
   change_1d_abs: number | null;
   change_1d_pct: number | null;
+  /**
+   * Null when Zerion omitted the distribution, which must read as "unknown"
+   * rather than as five zeroes: a breakdown of all-zero is a claim that the
+   * wallet holds nothing, and that is the silent-zero failure R-8.1 bans.
+   */
+  breakdown: ZerionPositionBreakdown | null;
 };
 
 const ZerionTransactionSchema = z.object({
@@ -149,10 +197,33 @@ export async function getPortfolio(walletAddress: string, options: { sync?: bool
   if (!parsed.success) throw new ZerionError(200, 'Zerion portfolio response failed schema parse');
 
   const attrs = parsed.data.data.attributes;
+  const dist = attrs.positions_distribution_by_type;
+
+  // NOTE, and it is deliberately not acted on here: Zerion documents
+  // `total.positions` as "Total value of all positions" and does not say
+  // whether `borrowed` is subtracted from it. If it is not, a wallet with a
+  // loan against its collateral is currently OVERSTATED in net worth by the
+  // borrowed amount.
+  //
+  // The total is left exactly as it was rather than adjusted on a guess,
+  // because guessing wrong in the other direction would understate every
+  // leveraged wallet instead. Settle it with one observation against a real
+  // wallet holding a loan: compare `total.positions` to
+  // `wallet + deposited + locked + staked - borrowed`. The breakdown returned
+  // below is what makes that check possible.
   return {
     total_usd: attrs.total.positions,
     change_1d_abs: attrs.changes?.absolute_1d ?? null,
     change_1d_pct: attrs.changes?.percent_1d ?? null,
+    breakdown: dist
+      ? {
+          wallet: dist.wallet ?? 0,
+          deposited: dist.deposited ?? 0,
+          borrowed: dist.borrowed ?? 0,
+          locked: dist.locked ?? 0,
+          staked: dist.staked ?? 0,
+        }
+      : null,
   };
 }
 

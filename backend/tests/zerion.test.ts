@@ -147,7 +147,12 @@ describe('GET /api/zerion/portfolio', () => {
     const { zerionWallets } = await import('../src/db/schema.js');
     await db().insert(zerionWallets).values({ userId: testUserId, address: '0xwlt1', label: 'Main' });
 
-    mockedGetPortfolio.mockResolvedValue({ total_usd: 12500, change_1d_abs: null, change_1d_pct: 0.015 });
+    mockedGetPortfolio.mockResolvedValue({
+      total_usd: 12500,
+      change_1d_abs: null,
+      change_1d_pct: 0.015,
+      breakdown: null,
+    });
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
