@@ -217,10 +217,42 @@ describe('GET /api/zerion/defi-positions', () => {
       ]);
 
     mockedGetDeFiPositions
-      .mockResolvedValueOnce([{ id: 'pos-1', symbol: 'ETH', name: 'Ethereum', quantity: 1.5, value_usd: 3000 }])
       .mockResolvedValueOnce([
-        { id: 'pos-2', symbol: 'USDC', name: 'USD Coin', quantity: 500, value_usd: 500 },
-        { id: 'pos-3', symbol: 'BTC', name: 'Bitcoin', quantity: 0.01, value_usd: 600 },
+        {
+          id: 'pos-1',
+          symbol: 'ETH',
+          name: 'Ethereum',
+          quantity: 1.5,
+          value_usd: 3000,
+          verified: true,
+          isTrash: false,
+          chainId: 'ethereum',
+          tokenAddress: null,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'pos-2',
+          symbol: 'USDC',
+          name: 'USD Coin',
+          quantity: 500,
+          value_usd: 500,
+          verified: true,
+          isTrash: false,
+          chainId: 'ethereum',
+          tokenAddress: null,
+        },
+        {
+          id: 'pos-3',
+          symbol: 'BTC',
+          name: 'Bitcoin',
+          quantity: 0.01,
+          value_usd: 600,
+          verified: true,
+          isTrash: false,
+          chainId: 'ethereum',
+          tokenAddress: null,
+        },
       ]);
 
     const { buildApp } = await import('../src/server.js');

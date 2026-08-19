@@ -166,7 +166,8 @@ export function registerZerionApi(app: FastifyInstance): void {
       symbol: string;
       name: string;
       quantity: number;
-      valueUsd: number;
+      /** Null when Zerion has no reliable price. Never coerce to 0. */
+      valueUsd: number | null;
       walletAddress: string;
     }> = [];
 
@@ -182,6 +183,11 @@ export function registerZerionApi(app: FastifyInstance): void {
             symbol: pos.symbol,
             name: pos.name,
             quantity: pos.quantity,
+            // Null is carried through rather than coerced to 0. Zerion's docs
+            // are explicit that price and value are null for tokens without a
+            // reliable price, and reporting one of those as $0 tells the user
+            // their holding is worthless rather than that we could not price
+            // it. The client renders the quantity with an unpriced label.
             valueUsd: pos.value_usd,
             walletAddress: row.address,
           });
