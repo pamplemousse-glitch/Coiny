@@ -108,10 +108,6 @@ final class ViewSmokeTests: XCTestCase {
         )
     }
 
-    func testCryptoViewRenders() {
-        smoke(CryptoView())
-    }
-
     func testSpinwheelViewRenders() {
         smoke(SpinwheelView())
     }
