@@ -58,6 +58,15 @@ export function registerAuthApi(app: FastifyInstance): void {
     try {
       const { payload } = await jwtVerify(identity_token, appleJwks, {
         issuer: 'https://appleid.apple.com',
+        // RFC 8725 §3.1: state the allowlist rather than relying on an
+        // invariant. Without it the only thing refusing an `alg: HS256` token
+        // signed with the public key as the HMAC secret is jose declining to
+        // use an asymmetric key for a symmetric algorithm, which is a library
+        // behaviour and not a decision this file has made. Apple signs identity
+        // tokens with RS256; if that ever changes, sign-in fails loudly at 401
+        // rather than quietly widening what is accepted, which is the correct
+        // direction to fail.
+        algorithms: ['RS256'],
         audience: config.APPLE_BUNDLE_ID,
       });
       sub = payload.sub as string;
@@ -99,6 +108,10 @@ export function registerAuthApi(app: FastifyInstance): void {
       const { payload } = await jwtVerify(parsed.data.id_token, googleJwks, {
         // Google's ID tokens use either issuer form; accept both.
         issuer: ['https://accounts.google.com', 'accounts.google.com'],
+        // Same reasoning as the Apple verifier above. Google's OpenID
+        // discovery document advertises RS256 as the only value of
+        // `id_token_signing_alg_values_supported`.
+        algorithms: ['RS256'],
         audience: config.GOOGLE_AUTH_CLIENT_ID,
       });
       sub = payload.sub as string;
