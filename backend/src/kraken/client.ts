@@ -1,5 +1,6 @@
 import { createHash, createHmac } from 'node:crypto';
 import { convertToUsd } from '../fx/client.js';
+import { fetchWithRetry } from '../util/fetch.js';
 import { log } from '../util/log.js';
 
 const BASE = 'https://api.kraken.com';
@@ -27,7 +28,7 @@ async function krakenPost<T>(
   const postData = new URLSearchParams({ nonce, ...params }).toString();
   const signature = sign(path, nonce, postData, privateKey);
 
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetchWithRetry(`${BASE}${path}`, {
     method: 'POST',
     headers: {
       'API-Key': apiKey,

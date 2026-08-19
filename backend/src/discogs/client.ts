@@ -1,5 +1,6 @@
 import { createHmac, randomBytes } from 'node:crypto';
 import { config } from '../config.js';
+import { fetchWithRetry } from '../util/fetch.js';
 
 const BASE_URL = 'https://api.discogs.com';
 const UA = 'Coiny/1.0 +support@coiny.app';
@@ -75,7 +76,7 @@ export async function getRequestToken(): Promise<{
     oauth_callback: 'oob',
   });
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     headers: { Authorization: auth, 'User-Agent': UA },
   });
   if (!res.ok) throw new DiscogsError(res.status, `request_token failed: ${res.status}`);
@@ -103,7 +104,7 @@ export async function getAccessToken(
     oauth_verifier: oauthVerifier,
   });
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     method: 'POST',
     headers: { Authorization: auth, 'User-Agent': UA, 'Content-Length': '0' },
   });
@@ -123,7 +124,7 @@ export async function getUsername(accessToken: string, accessTokenSecret: string
     oauth_token: accessToken,
   });
 
-  const res = await fetch(url, {
+  const res = await fetchWithRetry(url, {
     headers: { Authorization: auth, 'User-Agent': UA },
   });
   if (!res.ok) throw new DiscogsError(res.status, `identity failed: ${res.status}`);
@@ -139,7 +140,7 @@ interface MarketplaceStats {
 }
 
 async function getMarketplaceStats(releaseId: number): Promise<MarketplaceStats> {
-  const res = await fetch(`${BASE_URL}/marketplace/stats/${releaseId}`, {
+  const res = await fetchWithRetry(`${BASE_URL}/marketplace/stats/${releaseId}`, {
     headers: { 'User-Agent': UA },
   });
   if (!res.ok) return { lowestPriceUsd: null, numForSale: 0 };
@@ -165,7 +166,7 @@ export async function syncCollection(
     oauth_token: accessToken,
   });
 
-  const res = await fetch(collectionUrl, {
+  const res = await fetchWithRetry(collectionUrl, {
     headers: { Authorization: auth, 'User-Agent': UA },
   });
   if (!res.ok) throw new DiscogsError(res.status, `collection fetch failed: ${res.status}`);

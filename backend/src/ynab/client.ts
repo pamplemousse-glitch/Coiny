@@ -1,7 +1,9 @@
+import { fetchWithRetry } from '../util/fetch.js';
+
 const BASE = 'https://api.ynab.com/v1'; // milliunits = currency ÷ 1000
 
 async function ynabGet<T>(apiKey: string, path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetchWithRetry(`${BASE}${path}`, {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
   if (!res.ok) throw new Error(`YNAB GET ${path} → ${res.status}`);
@@ -54,7 +56,7 @@ interface TokenResponse {
 async function postToken(
   params: URLSearchParams,
 ): Promise<{ accessToken: string; refreshToken: string; expiresAt: Date }> {
-  const res = await fetch('https://api.ynab.com/oauth/token', {
+  const res = await fetchWithRetry('https://api.ynab.com/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),

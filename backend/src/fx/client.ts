@@ -6,6 +6,7 @@
 // Response: { "amount": 1.0, "base": "GBP", "date": "2026-05-28", "rates": { "USD": 1.34, "EUR": 1.15 } }
 
 import { z } from 'zod';
+import { fetchWithRetry } from '../util/fetch.js';
 
 const BASE_URL = 'https://api.frankfurter.dev/v1';
 
@@ -32,7 +33,7 @@ async function fetchRates(from: string, to: string[]): Promise<RatesResponse> {
   const params = new URLSearchParams({ from, to: to.join(',') });
   const url = `${BASE_URL}/latest?${params}`;
 
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  const res = await fetchWithRetry(url, { headers: { Accept: 'application/json' } });
 
   if (!res.ok) {
     throw new FrankfurterError(res.status, `Frankfurter API error: ${res.status} ${res.statusText}`);

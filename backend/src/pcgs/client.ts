@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fetchWithRetry } from '../util/fetch.js';
 
 // PCGS Public API — https://api.pcgs.com/publicapi
 // Bearer token generated at pcgs.com/publicapi. Daily limit: 1,000 calls.
@@ -36,7 +37,7 @@ export async function getPcgsCoinFacts(
   url.searchParams.set('GradeNo', gradeNo.toString());
   url.searchParams.set('PlusGrade', plusGrade.toString());
 
-  const res = await fetch(url.toString(), {
+  const res = await fetchWithRetry(url.toString(), {
     headers: { authorization: `bearer ${apiKey}` },
   });
   if (!res.ok) return null;
