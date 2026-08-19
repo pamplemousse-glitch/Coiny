@@ -56,6 +56,7 @@ import { getClassCache, getPlaidAccountBalances } from '../store/asset-cache.js'
 import { declaredNetUsd, listDeclaredAssets, oldestRefreshedAt } from '../store/declared-assets.js';
 import { getCachedLiabilities } from '../store/plaid-liabilities.js';
 import { getRecentOutflows } from '../store/transactions.js';
+import { type AccountCategory, classifyAccount } from './account-taxonomy.js';
 import {
   type ClassReading,
   type ClassStatus,
@@ -69,7 +70,16 @@ import {
 
 export type CryptoPosition = { id: string; name: string; symbol: string; amount: number; valueUSD: number };
 
-export type BankAccountReading = BankAccountSummary & { asOf: string | null };
+export type BankAccountReading = BankAccountSummary & {
+  asOf: string | null;
+  /** The coarse bucket a user thinks in, derived from type + subtype. */
+  category: AccountCategory;
+  /** Human-readable wrapper name: "Roth IRA", "Cash ISA", "Certificate of Deposit". */
+  subtypeLabel: string;
+  taxAdvantaged: boolean;
+  /** Spendable today. Drives what counts toward the emergency fund. */
+  liquid: boolean;
+};
 
 export type NetWorthResponse = {
   total: number;
@@ -278,10 +288,16 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
     if (acct.type === 'investment' || acct.type === 'brokerage') continue;
     const balance = num(acct.balance) ?? 0;
     const meta = liabilityMeta.get(acct.accountId);
+    const classification = classifyAccount(acct.type, acct.subtype);
     bankAccounts.push({
       accountId: acct.accountId,
       name: acct.name,
       type: acct.type,
+      subtype: acct.subtype,
+      category: classification.category,
+      subtypeLabel: classification.label,
+      taxAdvantaged: classification.taxAdvantaged,
+      liquid: classification.liquid,
       balance,
       minPayment: meta?.minPayment ?? null,
       nextDueDate: meta?.nextDueDate ?? null,
@@ -296,7 +312,10 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
     if (bankOldestAsOf === null || acct.asOf.getTime() < bankOldestAsOf.getTime()) bankOldestAsOf = acct.asOf;
     if (acct.type === 'depository') {
       bankDepositoryTotal += balance;
-      liquidDeposits += Math.max(0, balance);
+      // Same correction as goals/snapshot.ts: a CD or an HSA is `depository`
+      // and is not emergency cash. This figure reaches liquidCashMonths below
+      // and the ladder's emergency-fund rungs.
+      if (classification.liquid) liquidDeposits += Math.max(0, balance);
     } else if (acct.type === 'credit' || acct.type === 'loan') {
       plaidDebtTotal += balance;
     }

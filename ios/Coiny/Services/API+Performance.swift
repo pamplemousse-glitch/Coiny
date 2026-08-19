@@ -104,15 +104,40 @@ struct BankAccount: Codable, Identifiable {
     let id: String
     let name: String
     let type: String
+    /// Plaid's precise subtype (`401k`, `hsa`, `cash isa`, `cd`). Optional so a
+    /// cached response written by an older build still decodes.
+    let subtype: String?
+    /// The coarse bucket the server derived: cash, retirement, education,
+    /// health, investment, insurance, credit, loan, other.
+    let category: String?
+    /// Ready-to-display wrapper name: "Roth IRA", "Certificate of Deposit".
+    /// Named by the server so the taxonomy lives in one place rather than being
+    /// re-derived, and differently, on each client.
+    let subtypeLabel: String?
+    let taxAdvantaged: Bool?
+    /// Whether this balance counts as spendable cash. False for a CD, an HSA,
+    /// a GIC and an EBT balance.
+    let liquid: Bool?
     let balance: Double
     let minPayment: Double?
     let nextDueDate: String?
     let asOf: Date?
 
+    /// What to show under the account name. Falls back to the raw type for a
+    /// response that predates the taxonomy, so the row is never blank.
+    var displayKind: String {
+        subtypeLabel ?? type.capitalized
+    }
+
     enum CodingKeys: String, CodingKey {
         case id = "accountId"
         case name
         case type
+        case subtype
+        case category
+        case subtypeLabel
+        case taxAdvantaged
+        case liquid
         case balance
         case minPayment
         case nextDueDate
@@ -205,10 +230,28 @@ extension NetWorthResponse {
 }
 
 extension BankAccount {
-    init(id: String, name: String, type: String, balance: Double, minPayment: Double?, nextDueDate: String?) {
+    /// Convenience initialiser for fixtures and previews. The taxonomy fields
+    /// default to nil, which is the same shape a cached response from an older
+    /// build decodes to, so callers exercise the fallback path rather than a
+    /// privileged one.
+    init(
+        id: String,
+        name: String,
+        type: String,
+        balance: Double,
+        minPayment: Double?,
+        nextDueDate: String?,
+        subtype: String? = nil,
+        category: String? = nil,
+        subtypeLabel: String? = nil,
+        taxAdvantaged: Bool? = nil,
+        liquid: Bool? = nil
+    ) {
         self.init(
-            id: id, name: name, type: type, balance: balance,
-            minPayment: minPayment, nextDueDate: nextDueDate, asOf: nil
+            id: id, name: name, type: type,
+            subtype: subtype, category: category, subtypeLabel: subtypeLabel,
+            taxAdvantaged: taxAdvantaged, liquid: liquid,
+            balance: balance, minPayment: minPayment, nextDueDate: nextDueDate, asOf: nil
         )
     }
 }

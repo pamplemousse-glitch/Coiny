@@ -191,6 +191,7 @@ describe('highAprDebtBalances', () => {
     accountId: 'a',
     name: 'Card',
     type: 'credit',
+    subtype: 'credit card',
     balance: 1000,
     minPayment: null,
     nextDueDate: null,
