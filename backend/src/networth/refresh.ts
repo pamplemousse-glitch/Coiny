@@ -11,7 +11,7 @@ import { isSharedCoinbaseKeyAllowed } from '../config.js';
 import { db } from '../db/client.js';
 import { coinbaseConnections, petState, zerionWallets } from '../db/schema.js';
 import { refreshGoalSystem } from '../goals/refresh.js';
-import { fetchDebtSnapshot, fetchPlaidSnapshot } from '../goals/snapshot.js';
+import { fetchDebtSnapshot, fetchPlaidSnapshot, type HoldingSummary } from '../goals/snapshot.js';
 import { investmentsHoldingsGet, liabilitiesGet } from '../plaid/client.js';
 import { dispatchReaction } from '../reactions/dispatch.js';
 import { evaluateExternalEvent } from '../reactions/external.js';
@@ -111,7 +111,13 @@ export async function refreshInvestments(userId: string): Promise<RefreshOutcome
   }
 
   let total = 0;
-  const holdings: Array<{ securityId: string; name: string | null; ticker: string | null; value: number }> = [];
+  // Typed as HoldingSummary rather than restating the shape inline. This
+  // function and goals/snapshot.ts both assemble holdings into the SAME cache
+  // payload, and the inline structural type here meant the two could drift
+  // without the compiler noticing: adding a field in one left the scheduler
+  // quietly writing the older, thinner shape. That drift is the thing
+  // snapshot.ts's header comment says the extraction existed to prevent.
+  const holdings: HoldingSummary[] = [];
   for (const result of results) {
     if (result.status !== 'fulfilled') continue;
     const secMap = new Map(result.value.securities.map((s) => [s.security_id, s]));
@@ -124,6 +130,8 @@ export async function refreshInvestments(userId: string): Promise<RefreshOutcome
         name: sec?.name ?? null,
         ticker: sec?.ticker_symbol ?? null,
         value,
+        securityType: sec?.type ?? null,
+        accountId: h.account_id ?? null,
       });
     }
   }
