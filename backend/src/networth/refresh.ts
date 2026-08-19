@@ -19,6 +19,7 @@ import { recordClassFailure, recordClassSuccess, upsertPlaidAccountBalances } fr
 import { getItemsByUser } from '../store/items.js';
 import { recordReaction } from '../store/pet.js';
 import { cacheLiabilities, getCachedLiabilities } from '../store/plaid-liabilities.js';
+import { log } from '../util/log.js';
 import { getPortfolio } from '../zerion/client.js';
 import type { CryptoPosition } from './read.js';
 import { assembleNetWorth } from './read.js';
@@ -150,6 +151,7 @@ export async function refreshCrypto(userId: string): Promise<RefreshOutcome> {
     const prices = symbols.length > 0 ? await getSpotPrices(symbols) : new Map<string, number>();
 
     let total = 0;
+    let unpriced = 0;
     const positions: CryptoPosition[] = [];
     for (const acct of accounts) {
       // Available PLUS held. `hold` is money reserved against pending
@@ -160,9 +162,27 @@ export async function refreshCrypto(userId: string): Promise<RefreshOutcome> {
       const amount = (Number.isFinite(available) ? available : 0) + (Number.isFinite(held) ? held : 0);
       if (amount <= 0) continue;
       const usd = prices.get(acct.currency);
-      const valueUSD = usd ? amount * usd : 0;
+      // Same rule as chain-wallets.ts: an asset we cannot price is not an
+      // asset worth zero. This used to be `usd ? amount * usd : 0`, which both
+      // added nothing to the total AND showed the holding to the user as $0,
+      // which reads as "this is worthless" rather than "we could not price
+      // this". Coinbase lists what it lists; a token it has no spot feed for
+      // is exactly the long-tail case, and telling someone their holding is
+      // worth nothing is a worse error than omitting it.
+      if (usd === undefined) {
+        unpriced++;
+        continue;
+      }
+      const valueUSD = amount * usd;
       total += valueUSD;
       positions.push({ id: acct.uuid, name: acct.currency, symbol: acct.currency, amount, valueUSD });
+    }
+
+    // Recorded so the omission is visible in logs rather than being a total
+    // that quietly excludes holdings. A user asking "why is my meme coin
+    // missing" has an answer here instead of nothing.
+    if (unpriced > 0) {
+      log.warn({ user_id: userId, unpriced }, 'coinbase assets omitted for want of a spot price');
     }
 
     await recordClassSuccess(userId, 'crypto', { valueUsd: total, payload: { positions } });

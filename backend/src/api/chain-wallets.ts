@@ -161,6 +161,7 @@ export function registerChainWalletsApi(app: FastifyInstance): void {
     const prices = symbols.length > 0 ? await getSpotPrices(symbols) : new Map<string, number>();
 
     let updated = 0;
+    let unpriced = 0;
     const now = new Date();
 
     for (const row of rows) {
@@ -168,7 +169,28 @@ export function registerChainWalletsApi(app: FastifyInstance): void {
       if (nativeBalance === null) continue;
 
       const symbol = CHAIN_SYMBOLS[row.chain];
-      const price = symbol ? (prices.get(symbol) ?? 0) : 0;
+      const price = symbol ? prices.get(symbol) : undefined;
+
+      // An unpriced coin is NOT a coin worth nothing.
+      //
+      // This used to be `prices.get(symbol) ?? 0`, so a missing price produced
+      // balanceUsd = 0 and PERSISTED it over the last known good value. And
+      // getSpotPrices never throws: its own contract is "symbols that fail are
+      // omitted", so a Coinbase outage returns an empty map and every one of
+      // the sixteen chains here would have been written to zero at once, with
+      // no error anywhere. A user's whole crypto column could go to nothing
+      // because a third party had a bad minute.
+      //
+      // Skipping leaves the previous balance and `lastSyncedAt` untouched, so
+      // the value reads as stale (which it is) rather than as zero (which it
+      // is not). Same reasoning the Hyperliquid client already applies to a
+      // token with no mid.
+      if (price === undefined) {
+        unpriced++;
+        req.log.warn({ userId, chain: row.chain }, 'no spot price for chain; leaving last known balance');
+        continue;
+      }
+
       const balanceUsd = nativeBalance * price;
 
       await db()
@@ -179,7 +201,7 @@ export function registerChainWalletsApi(app: FastifyInstance): void {
       updated++;
     }
 
-    req.log.info({ userId, updated }, 'chain wallets sync complete');
-    return { updated };
+    req.log.info({ userId, updated, unpriced }, 'chain wallets sync complete');
+    return { updated, unpriced };
   });
 }

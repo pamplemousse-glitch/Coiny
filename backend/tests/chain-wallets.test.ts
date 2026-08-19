@@ -297,7 +297,7 @@ describe('POST /api/chain-wallets/sync', () => {
       headers: authHeader(),
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ updated: 1 });
+    expect(res.json()).toEqual({ updated: 1, unpriced: 0 });
 
     const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
     const wallet = list.json<{ lastBalanceUsd: number }[]>()[0];
@@ -319,7 +319,7 @@ describe('POST /api/chain-wallets/sync', () => {
 
     const res = await app.inject({ method: 'POST', url: '/api/chain-wallets/sync', headers: authHeader() });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ updated: 1 });
+    expect(res.json()).toEqual({ updated: 1, unpriced: 0 });
 
     const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
     const wallet = list.json<{ lastBalanceUsd: number }[]>()[0];
@@ -341,7 +341,7 @@ describe('POST /api/chain-wallets/sync', () => {
 
     const res = await app.inject({ method: 'POST', url: '/api/chain-wallets/sync', headers: authHeader() });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ updated: 1 });
+    expect(res.json()).toEqual({ updated: 1, unpriced: 0 });
 
     const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
     const wallet = list.json<{ lastBalanceUsd: number }[]>()[0];
@@ -363,7 +363,7 @@ describe('POST /api/chain-wallets/sync', () => {
 
     const res = await app.inject({ method: 'POST', url: '/api/chain-wallets/sync', headers: authHeader() });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ updated: 1 });
+    expect(res.json()).toEqual({ updated: 1, unpriced: 0 });
 
     const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
     const wallet = list.json<{ lastBalanceUsd: number }[]>()[0];
@@ -385,7 +385,7 @@ describe('POST /api/chain-wallets/sync', () => {
 
     const res = await app.inject({ method: 'POST', url: '/api/chain-wallets/sync', headers: authHeader() });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ updated: 1 });
+    expect(res.json()).toEqual({ updated: 1, unpriced: 0 });
 
     const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
     const wallet = list.json<{ lastBalanceUsd: number }[]>()[0];
