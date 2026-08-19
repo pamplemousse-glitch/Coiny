@@ -22,7 +22,7 @@ const AddressSchema = z.object({
 
 // Returns confirmed BTC balance for a Bitcoin address.
 // Returns 0 for addresses with no history (404). Throws BlockstreamError on API errors.
-export async function getBitcoinBalance(address: string): Promise<number> {
+export async function getBitcoinBalance(address: string): Promise<number | null> {
   const res = await fetchWithRetry(`${BASE_URL}/address/${encodeURIComponent(address)}`);
 
   if (res.status === 404) return 0;
@@ -30,7 +30,7 @@ export async function getBitcoinBalance(address: string): Promise<number> {
 
   const raw: unknown = await res.json();
   const parsed = AddressSchema.safeParse(raw);
-  if (!parsed.success) return 0;
+  if (!parsed.success) return null;
 
   const { funded_txo_sum, spent_txo_sum } = parsed.data.chain_stats;
   return (funded_txo_sum - spent_txo_sum) / 1e8;

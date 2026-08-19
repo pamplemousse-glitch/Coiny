@@ -60,20 +60,20 @@ describe('getSuiBalance', () => {
     expect(body.params[1]).toBe('0x2::sui::SUI');
   });
 
-  it('returns 0 when RPC returns an error', async () => {
+  it('returns null when RPC returns an error', async () => {
     vi.mocked(fetch).mockResolvedValue(makeFetchResponse(rpcErrorResponse()));
 
     const { getSuiBalance } = await import('../src/chains/sui.js');
     const balance = await getSuiBalance('0xnotfound');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
-  it('returns 0 when response shape is invalid', async () => {
+  it('returns null when response shape is invalid', async () => {
     vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ unexpected: true }));
 
     const { getSuiBalance } = await import('../src/chains/sui.js');
     const balance = await getSuiBalance('0xbad');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
   it('throws SuiRpcError on non-ok HTTP response', async () => {

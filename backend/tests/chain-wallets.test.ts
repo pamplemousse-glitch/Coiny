@@ -297,7 +297,7 @@ describe('POST /api/chain-wallets/sync', () => {
       headers: authHeader(),
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ updated: 1, unpriced: 0 });
+    expect(res.json()).toEqual({ updated: 1, unpriced: 0, unresolved: 0 });
 
     const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
     const wallet = list.json<{ lastBalanceUsd: number }[]>()[0];
@@ -319,7 +319,7 @@ describe('POST /api/chain-wallets/sync', () => {
 
     const res = await app.inject({ method: 'POST', url: '/api/chain-wallets/sync', headers: authHeader() });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ updated: 1, unpriced: 0 });
+    expect(res.json()).toEqual({ updated: 1, unpriced: 0, unresolved: 0 });
 
     const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
     const wallet = list.json<{ lastBalanceUsd: number }[]>()[0];
@@ -341,7 +341,7 @@ describe('POST /api/chain-wallets/sync', () => {
 
     const res = await app.inject({ method: 'POST', url: '/api/chain-wallets/sync', headers: authHeader() });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ updated: 1, unpriced: 0 });
+    expect(res.json()).toEqual({ updated: 1, unpriced: 0, unresolved: 0 });
 
     const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
     const wallet = list.json<{ lastBalanceUsd: number }[]>()[0];
@@ -363,7 +363,40 @@ describe('POST /api/chain-wallets/sync', () => {
 
     const res = await app.inject({ method: 'POST', url: '/api/chain-wallets/sync', headers: authHeader() });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ updated: 1, unpriced: 0 });
+    expect(res.json()).toEqual({ updated: 1, unpriced: 0, unresolved: 0 });
+
+    const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
+    const wallet = list.json<{ lastBalanceUsd: number }[]>()[0];
+    expect(wallet?.lastBalanceUsd).toBeCloseTo(800, 0);
+
+    await app.close();
+  });
+
+  // The regression this whole change exists for. Every chain client used to
+  // answer 0 when it could not read the balance — missing key, upstream
+  // outage, unrecognised shape — and 0 multiplied by a perfectly good price
+  // was persisted over the last known good value. One expired vendor key was
+  // enough to zero a user's position with no error raised anywhere.
+  it('leaves the stored balance alone when the balance cannot be resolved', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { chainWallets } = await import('../src/db/schema.js');
+    await db().insert(chainWallets).values({
+      userId: testUserId,
+      chain: 'doge',
+      address: 'DTestDoge',
+      lastBalanceUsd: '800',
+    });
+
+    // null is the client saying "I could not tell you", not "it is empty".
+    mockedGetBlockcypherBalance.mockResolvedValue(null);
+    mockedGetSpotPrices.mockResolvedValue(new Map([['DOGE', 0.08]]));
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const res = await app.inject({ method: 'POST', url: '/api/chain-wallets/sync', headers: authHeader() });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ updated: 0, unpriced: 0, unresolved: 1 });
 
     const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
     const wallet = list.json<{ lastBalanceUsd: number }[]>()[0];
@@ -385,7 +418,7 @@ describe('POST /api/chain-wallets/sync', () => {
 
     const res = await app.inject({ method: 'POST', url: '/api/chain-wallets/sync', headers: authHeader() });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ updated: 1, unpriced: 0 });
+    expect(res.json()).toEqual({ updated: 1, unpriced: 0, unresolved: 0 });
 
     const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
     const wallet = list.json<{ lastBalanceUsd: number }[]>()[0];

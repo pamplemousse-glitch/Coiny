@@ -24,7 +24,7 @@ const AccountSchema = z.object({
 
 // Returns native XLM balance for a Stellar account address.
 // Returns 0 for accounts that don't exist (404). Throws HorizonError on API errors.
-export async function getStellarBalance(address: string): Promise<number> {
+export async function getStellarBalance(address: string): Promise<number | null> {
   const res = await fetchWithRetry(`${HORIZON_URL}/accounts/${encodeURIComponent(address)}`);
 
   if (res.status === 404) return 0;
@@ -32,7 +32,7 @@ export async function getStellarBalance(address: string): Promise<number> {
 
   const raw: unknown = await res.json();
   const parsed = AccountSchema.safeParse(raw);
-  if (!parsed.success) return 0;
+  if (!parsed.success) return null;
 
   const native = parsed.data.balances.find((b) => b.asset_type === 'native');
   if (!native) return 0;

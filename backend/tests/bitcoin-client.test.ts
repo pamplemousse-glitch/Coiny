@@ -56,12 +56,12 @@ describe('getBitcoinBalance', () => {
     expect(balance).toBe(0);
   });
 
-  it('returns 0 when response shape is invalid', async () => {
+  it('returns null when response shape is invalid', async () => {
     vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ unexpected: true }));
 
     const { getBitcoinBalance } = await import('../src/chains/bitcoin.js');
     const balance = await getBitcoinBalance('bc1qbad');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
   it('throws BlockstreamError on non-ok non-404 response', async () => {

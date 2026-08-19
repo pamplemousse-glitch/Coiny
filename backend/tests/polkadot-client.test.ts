@@ -44,12 +44,12 @@ describe('getPolkadotBalance', () => {
     expect(JSON.parse((call[1] as RequestInit).body as string)).toMatchObject({ key: '1dotaddress' });
   });
 
-  it('returns 0 when API response code != 0', async () => {
+  it('returns null when API response code != 0', async () => {
     vi.mocked(fetch).mockResolvedValue(makeResponse({ code: 10004, data: null }));
 
     const { getPolkadotBalance } = await import('../src/chains/polkadot.js');
     const balance = await getPolkadotBalance('1bad');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
   it('returns 0 when data is null', async () => {
@@ -76,29 +76,29 @@ describe('getPolkadotBalance', () => {
     expect(balance).toBe(0);
   });
 
-  it('returns 0 on non-ok response', async () => {
+  it('returns null on non-ok response', async () => {
     vi.mocked(fetch).mockResolvedValue(makeResponse({ error: 'server error' }, 500));
 
     const { getPolkadotBalance } = await import('../src/chains/polkadot.js');
     const balance = await getPolkadotBalance('1fail');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
-  it('returns 0 when response shape is invalid', async () => {
+  it('returns null when response shape is invalid', async () => {
     vi.mocked(fetch).mockResolvedValue(makeResponse({ unexpected: true }));
 
     const { getPolkadotBalance } = await import('../src/chains/polkadot.js');
     const balance = await getPolkadotBalance('1bad');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
-  it('returns 0 when SUBSCAN_API_KEY is empty', async () => {
+  it('returns null when SUBSCAN_API_KEY is empty', async () => {
     vi.resetModules();
     vi.doMock('../src/config.js', () => ({ config: { SUBSCAN_API_KEY: '' } }));
 
     const { getPolkadotBalance } = await import('../src/chains/polkadot.js');
     const balance = await getPolkadotBalance('1someaddress');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   });
 });

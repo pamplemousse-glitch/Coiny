@@ -52,12 +52,12 @@ describe('getCardanoBalance', () => {
     expect(balance).toBe(0);
   });
 
-  it('returns 0 on non-ok response', async () => {
+  it('returns null on non-ok response', async () => {
     vi.mocked(fetch).mockResolvedValue(makeResponse({ error: 'server error' }, 500));
 
     const { getCardanoBalance } = await import('../src/chains/cardano.js');
     const balance = await getCardanoBalance('addr1fail');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
   it('returns 0 when lovelace unit is absent from amount array', async () => {
@@ -68,21 +68,21 @@ describe('getCardanoBalance', () => {
     expect(balance).toBe(0);
   });
 
-  it('returns 0 when response shape is invalid', async () => {
+  it('returns null when response shape is invalid', async () => {
     vi.mocked(fetch).mockResolvedValue(makeResponse({ unexpected: true }));
 
     const { getCardanoBalance } = await import('../src/chains/cardano.js');
     const balance = await getCardanoBalance('addr1bad');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
-  it('returns 0 when BLOCKFROST_PROJECT_ID is empty', async () => {
+  it('returns null when BLOCKFROST_PROJECT_ID is empty', async () => {
     vi.resetModules();
     vi.doMock('../src/config.js', () => ({ config: { BLOCKFROST_PROJECT_ID: '' } }));
 
     const { getCardanoBalance } = await import('../src/chains/cardano.js');
     const balance = await getCardanoBalance('addr1someaddress');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   });
 });

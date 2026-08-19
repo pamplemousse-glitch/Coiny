@@ -60,12 +60,12 @@ describe('getXrpBalance', () => {
     expect(balance).toBe(0);
   });
 
-  it('returns 0 when response shape is invalid', async () => {
+  it('returns null when response shape is invalid', async () => {
     vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ unexpected: true }));
 
     const { getXrpBalance } = await import('../src/chains/xrp.js');
     const balance = await getXrpBalance('rBad');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
   it('throws XrplError on non-ok HTTP response', async () => {

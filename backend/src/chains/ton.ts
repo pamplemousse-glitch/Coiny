@@ -9,8 +9,10 @@ const ResponseSchema = z.object({
   result: z.string(),
 });
 
-export async function getTonBalance(address: string): Promise<number> {
-  if (!config.TONCENTER_API_KEY) return 0;
+/** TON held at an address, or null when the balance could not be determined.
+ *  See getCardanoBalance for why the distinction matters. */
+export async function getTonBalance(address: string): Promise<number | null> {
+  if (!config.TONCENTER_API_KEY) return null;
 
   const url = `${BASE_URL}?address=${encodeURIComponent(address)}`;
   const res = await fetchWithRetry(url, {
@@ -20,12 +22,13 @@ export async function getTonBalance(address: string): Promise<number> {
   });
 
   if (res.status === 404) return 0;
-  if (!res.ok) return 0;
+  if (!res.ok) return null;
 
   const raw: unknown = await res.json();
   const parsed = ResponseSchema.safeParse(raw);
-  if (!parsed.success) return 0;
-  if (!parsed.data.ok) return 0;
+  if (!parsed.success) return null;
+  // `ok: false` is TonCenter reporting its own failure in a 200 body.
+  if (!parsed.data.ok) return null;
 
   return parseInt(parsed.data.result, 10) / 1e9;
 }

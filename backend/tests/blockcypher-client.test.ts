@@ -61,12 +61,12 @@ describe('getBlockcypherBalance', () => {
     expect(balance).toBe(0);
   });
 
-  it('returns 0 when response shape is invalid', async () => {
+  it('returns null when response shape is invalid', async () => {
     vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ unexpected: true }));
 
     const { getBlockcypherBalance } = await import('../src/chains/blockcypher.js');
     const balance = await getBlockcypherBalance('bch', 'qBad');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
   it('throws BlockcypherError on non-ok non-404 response', async () => {

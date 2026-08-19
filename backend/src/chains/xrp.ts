@@ -24,7 +24,7 @@ const AccountInfoSchema = z.object({
 
 // Returns confirmed XRP balance for an XRPL account address.
 // Returns 0 for accounts that don't exist (actNotFound). Throws XrplError on API errors.
-export async function getXrpBalance(address: string): Promise<number> {
+export async function getXrpBalance(address: string): Promise<number | null> {
   const res = await fetchWithRetry(XRPL_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -45,7 +45,7 @@ export async function getXrpBalance(address: string): Promise<number> {
   }
 
   const parsed = AccountInfoSchema.safeParse(raw);
-  if (!parsed.success) return 0;
+  if (!parsed.success) return null;
 
   return Number(parsed.data.result.account_data.Balance) / 1e6;
 }

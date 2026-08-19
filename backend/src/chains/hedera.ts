@@ -21,7 +21,7 @@ const BalancesSchema = z.object({
   ),
 });
 
-export async function getHederaBalance(address: string): Promise<number> {
+export async function getHederaBalance(address: string): Promise<number | null> {
   const res = await fetchWithRetry(`${HEDERA_MIRROR_URL}/balances?account.id=${encodeURIComponent(address)}`);
 
   if (res.status === 404) return 0;
@@ -29,7 +29,7 @@ export async function getHederaBalance(address: string): Promise<number> {
 
   const raw: unknown = await res.json();
   const parsed = BalancesSchema.safeParse(raw);
-  if (!parsed.success) return 0;
+  if (!parsed.success) return null;
 
   const first = parsed.data.balances[0];
   if (!first) return 0;

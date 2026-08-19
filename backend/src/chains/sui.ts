@@ -19,7 +19,7 @@ const BalanceSchema = z.object({
   }),
 });
 
-export async function getSuiBalance(address: string): Promise<number> {
+export async function getSuiBalance(address: string): Promise<number | null> {
   const res = await fetchWithRetry(SUI_RPC_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -35,13 +35,16 @@ export async function getSuiBalance(address: string): Promise<number> {
 
   const raw: unknown = await res.json();
 
+  // A JSON-RPC error object is the node refusing to answer. That is unknown,
+  // not zero: suix_getBalance reports an unfunded address as totalBalance "0"
+  // in a normal result, so the error branch is never the empty-wallet case.
   const maybeError = z.object({ error: z.unknown() }).safeParse(raw);
   if (maybeError.success && maybeError.data.error !== undefined && maybeError.data.error !== null) {
-    return 0;
+    return null;
   }
 
   const parsed = BalanceSchema.safeParse(raw);
-  if (!parsed.success) return 0;
+  if (!parsed.success) return null;
 
   return Number(parsed.data.result.totalBalance) / 1e9;
 }

@@ -57,12 +57,12 @@ describe('getStellarBalance', () => {
     expect(balance).toBe(0);
   });
 
-  it('returns 0 when response shape is invalid', async () => {
+  it('returns null when response shape is invalid', async () => {
     vi.mocked(fetch).mockResolvedValue(makeFetchResponse({ unexpected: true }));
 
     const { getStellarBalance } = await import('../src/chains/stellar.js');
     const balance = await getStellarBalance('GBAD');
-    expect(balance).toBe(0);
+    expect(balance).toBeNull();
   });
 
   it('throws HorizonError on non-ok non-404 response', async () => {
