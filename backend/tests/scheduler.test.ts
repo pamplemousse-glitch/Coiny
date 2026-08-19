@@ -123,7 +123,7 @@ describe('runSchedulerTick', () => {
     await db().insert(zerionWallets).values({ userId: testUserId, address: '0xabc' });
 
     mockedGetAccounts.mockRejectedValue(new Error('coinbase down'));
-    mockedGetPortfolio.mockResolvedValue({ total_usd: 777, change_1d_abs: null, change_1d_pct: null });
+    mockedGetPortfolio.mockResolvedValue({ total_usd: 777, change_1d_abs: null, change_1d_pct: null, breakdown: null });
 
     const { runSchedulerTick } = await import('../src/scheduler/index.js');
     const summary = await runSchedulerTick(NOW);
