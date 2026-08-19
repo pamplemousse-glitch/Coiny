@@ -85,14 +85,15 @@ describe('sendApnsPush — send path', () => {
     mockConnect.mockReset();
   });
 
-  async function getSender() {
+  async function getSender(env: { NODE_ENV?: string; APP_ENV?: string } = {}) {
     vi.doMock('../src/config.js', () => ({
       config: {
         APNS_KEY: TEST_PEM,
         APNS_KEY_ID: 'test-kid',
         APNS_TEAM_ID: 'test-team',
         APNS_BUNDLE_ID: 'app.coiny.ios',
-        NODE_ENV: 'test',
+        NODE_ENV: env.NODE_ENV ?? 'test',
+        APP_ENV: env.APP_ENV ?? 'local',
       },
     }));
     const { sendApnsPush } = await import('../src/push/apns.js');
@@ -111,11 +112,29 @@ describe('sendApnsPush — send path', () => {
     await expect(sendApnsPush('aabbcc', 'Title', 'Body')).rejects.toThrow('APNs 400');
   });
 
-  it('connects to sandbox host when NODE_ENV is not production', async () => {
+  it('connects to the sandbox host when APP_ENV is local', async () => {
     mockConnect.mockReturnValue(makeSession(200) as never);
-    const sendApnsPush = await getSender();
+    const sendApnsPush = await getSender({ APP_ENV: 'local' });
     await sendApnsPush('aabbcc', 'Title', 'Body');
     expect(mockConnect).toHaveBeenCalledWith(expect.stringContaining('sandbox.push.apple.com'));
+  });
+
+  // The regression. NODE_ENV is 'production' on staging by design, so a
+  // gateway chosen from it sent staging's pushes to the production endpoint,
+  // where the sandbox tokens that development builds register are rejected
+  // with 400 BadDeviceToken.
+  it('connects to the sandbox host on staging, where NODE_ENV is production', async () => {
+    mockConnect.mockReturnValue(makeSession(200) as never);
+    const sendApnsPush = await getSender({ NODE_ENV: 'production', APP_ENV: 'staging' });
+    await sendApnsPush('aabbcc', 'Title', 'Body');
+    expect(mockConnect).toHaveBeenCalledWith(expect.stringContaining('sandbox.push.apple.com'));
+  });
+
+  it('connects to the production host only when APP_ENV is production', async () => {
+    mockConnect.mockReturnValue(makeSession(200) as never);
+    const sendApnsPush = await getSender({ NODE_ENV: 'production', APP_ENV: 'production' });
+    await sendApnsPush('aabbcc', 'Title', 'Body');
+    expect(mockConnect).toHaveBeenCalledWith('https://api.push.apple.com');
   });
 
   it('rejects when the http2 session emits an error', async () => {

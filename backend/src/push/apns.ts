@@ -25,7 +25,21 @@ export async function sendApnsPush(deviceToken: string, title: string, body: str
   if (!config.APNS_KEY || !config.APNS_KEY_ID || !config.APNS_TEAM_ID) return;
 
   const jwt = await getJwt();
-  const host = config.NODE_ENV === 'production' ? 'api.push.apple.com' : 'api.sandbox.push.apple.com';
+  // APP_ENV, never NODE_ENV. NODE_ENV is 'production' on staging too, and
+  // deliberately so (config.ts): staging must exercise the same library
+  // behaviour as production. Keying the gateway off it sent every staging push
+  // to api.push.apple.com, while the builds that talk to staging are signed
+  // with a development profile and therefore hold SANDBOX device tokens. APNs
+  // answers that pairing with 400 BadDeviceToken, so push was silently dead on
+  // every development build. Same trap as PLAID_ENV, different variable.
+  //
+  // The mapping is really "which aps-environment issued this token", and that
+  // follows the signing profile, which follows the build configuration, which
+  // is what selects the backend: Debug -> staging -> development/sandbox,
+  // Release -> production -> production. So APP_ENV is a faithful proxy for as
+  // long as that correspondence holds. If a Release build is ever pointed at
+  // staging, this has to become a per-token column instead.
+  const host = config.APP_ENV === 'production' ? 'api.push.apple.com' : 'api.sandbox.push.apple.com';
 
   const payload = JSON.stringify({
     aps: { alert: { title, body }, sound: 'default', 'content-available': 1 },
