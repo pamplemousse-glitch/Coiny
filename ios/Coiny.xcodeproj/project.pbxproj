@@ -22,6 +22,7 @@
 		0C8AF273592749659B799E17 /* RealEstateViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1982E38AAF84E0EBD37280C /* RealEstateViewModelTests.swift */; };
 		0CF24FA4098C346E92794323 /* NetWorthView+Groups.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EE7414F36633701047A8F2B /* NetWorthView+Groups.swift */; };
 		0DC2CF24A06C131798445C92 /* DebtView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 251277E2692F81FEA50C3274 /* DebtView.swift */; };
+		0DDD5F8ED1AF9E30AA8E0864 /* PlaidLinkPresentationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FECB8796E2213654F95A9F2 /* PlaidLinkPresentationUITests.swift */; };
 		0E7D6C47EF0A4BE01D4B7CF2 /* ManualAssetsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0845CBE9430D01E8553CC30 /* ManualAssetsView.swift */; };
 		0E9FE6015AB88116714973B8 /* API+Consent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8258ECA2A45F98233BFA406 /* API+Consent.swift */; };
 		0F097E7D8CE3F20A14D2A1BA /* UITestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B4AE1CF8595A51EED7A10A /* UITestSupport.swift */; };
@@ -120,7 +121,6 @@
 		889025576576A1A9B2CADDF2 /* DeclaredAssets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B65907D7899776DD5BB0C2D /* DeclaredAssets.swift */; };
 		8A8F78B146E48EFF8A58F174 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B6A8E10BF5FCB655B6812F7B /* Assets.xcassets */; };
 		8B40FFC2A30781989B478D05 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD7615652A7C923819AF7530 /* HomeView.swift */; };
-		8C2AA7F42179EF88E24EB1AF /* CryptoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF2E7165A1DFF7A44B19A9F1 /* CryptoView.swift */; };
 		8CE69BC29AA540C1C0ABB97A /* CoinsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3447DE65D62287EFD555F19F /* CoinsViewModel.swift */; };
 		8E1C9F4FA6B6E66DE8D0DB9E /* CoinbaseViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC98E27CF369EBBC46D60901 /* CoinbaseViewModel.swift */; };
 		8E4727FA9D52350A986742E4 /* PetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A06878870CA56FC423814E62 /* PetStore.swift */; };
@@ -301,6 +301,7 @@
 		72C7535454658617CF1DE53E /* DebtDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebtDetailView.swift; sourceTree = "<group>"; };
 		7C6F512453CA990E88C3A680 /* NetWorthView+NewAssets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NetWorthView+NewAssets.swift"; sourceTree = "<group>"; };
 		7CD092210531C4F7D09643CA /* Ladder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ladder.swift; sourceTree = "<group>"; };
+		7FECB8796E2213654F95A9F2 /* PlaidLinkPresentationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaidLinkPresentationUITests.swift; sourceTree = "<group>"; };
 		81CC75C64283FC4C17486D50 /* API+Wealth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Wealth.swift"; sourceTree = "<group>"; };
 		823FA6E826200014C4EE9D0A /* ManualAssetsViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualAssetsViewModelTests.swift; sourceTree = "<group>"; };
 		851CD4156E2005F77706A82A /* API+Debug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Debug.swift"; sourceTree = "<group>"; };
@@ -396,7 +397,6 @@
 		EE76DBB2ADBE7304B1D5E143 /* NetWorthCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetWorthCache.swift; sourceTree = "<group>"; };
 		EE864FE76E73AB4892D0EFA8 /* NftViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NftViewModelTests.swift; sourceTree = "<group>"; };
 		EED3C361F69A4969C6339AD0 /* JourneyGuardrailsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JourneyGuardrailsSection.swift; sourceTree = "<group>"; };
-		EF2E7165A1DFF7A44B19A9F1 /* CryptoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CryptoView.swift; sourceTree = "<group>"; };
 		F010A54AD91567CB1A42C4DD /* EnergyViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnergyViewModelTests.swift; sourceTree = "<group>"; };
 		F352C2FF0F32520B7704A7E9 /* SneakersViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SneakersViewModel.swift; sourceTree = "<group>"; };
 		F85559CFD70FC379B8FFAC58 /* FarmlandViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FarmlandViewModelTests.swift; sourceTree = "<group>"; };
@@ -577,6 +577,7 @@
 				9044185A2145890BDCC4E96E /* HomeTabUITests.swift */,
 				B9D7A31FF840B964A6B679CA /* JourneyUITests.swift */,
 				C25CD58983B1DE8884967F35 /* PaywallUITests.swift */,
+				7FECB8796E2213654F95A9F2 /* PlaidLinkPresentationUITests.swift */,
 				9ABFBF4FEA310EB336444E6C /* TabNavigationUITests.swift */,
 				5EA22C9CCB74F58819DC9960 /* WealthTabUITests.swift */,
 			);
@@ -596,7 +597,6 @@
 				45CCA2994B67365F13AE2F32 /* ConnectAccountFlow.swift */,
 				5CF3B9CB6ADCE331E98E1D43 /* CreaturePlaceholderArt.swift */,
 				2DC3F2AED38087E149BEBF64 /* CreatureWindow.swift */,
-				EF2E7165A1DFF7A44B19A9F1 /* CryptoView.swift */,
 				72C7535454658617CF1DE53E /* DebtDetailView.swift */,
 				11BDD7CA3F6FCCA09057A94E /* DebtPlanSection.swift */,
 				251277E2692F81FEA50C3274 /* DebtView.swift */,
@@ -969,7 +969,6 @@
 				AD4B609E5537D4EFE2EE7D93 /* ConnectionRepairViewModel.swift in Sources */,
 				49605D7EAB8872075DC99F24 /* CreaturePlaceholderArt.swift in Sources */,
 				20F517BEBCCF57EEF08D9D18 /* CreatureWindow.swift in Sources */,
-				8C2AA7F42179EF88E24EB1AF /* CryptoView.swift in Sources */,
 				D414D60442C603919789E0AE /* DebtDetailView.swift in Sources */,
 				11375735739E24836B9E9F62 /* DebtPlanSection.swift in Sources */,
 				6E88F37417B9FEFD40A96188 /* DebtPresentation.swift in Sources */,
@@ -1066,6 +1065,7 @@
 				3C397BA178634116F5947E26 /* HomeTabUITests.swift in Sources */,
 				5F383346FE6CADB1E61552F3 /* JourneyUITests.swift in Sources */,
 				C4E5C36A68F4521B92EBD45D /* PaywallUITests.swift in Sources */,
+				0DDD5F8ED1AF9E30AA8E0864 /* PlaidLinkPresentationUITests.swift in Sources */,
 				DBE346706AEA00CEFC43F53D /* TabNavigationUITests.swift in Sources */,
 				FAC96919A888EBFD62B70071 /* WealthTabUITests.swift in Sources */,
 			);
