@@ -162,14 +162,93 @@ function credentialHealth(row: { lastErrorClass: string | null } | undefined): '
 }
 
 export async function assembleNetWorth(userId: string, now: Date = new Date()): Promise<NetWorthAssembly> {
-  const classCache = await getClassCache(userId);
+  // Every read this function needs, issued together (audit 4.7.2).
+  //
+  // These used to be 28 sequential `await`s spread down the body, not one of
+  // them inside a Promise.all, so an authenticated GET /api/net-worth paid 28
+  // Postgres round trips end to end before any of them could overlap. At a 2 ms
+  // Neon round trip that is ~56 ms of pure waiting, and it is worse than that
+  // when the compute has scaled to zero and the first query also pays
+  // reactivation (4.5.5).
+  //
+  // Every one is an independent `WHERE user_id = $1` against a different table:
+  // no query's arguments come from another's result, which is what makes this
+  // safe to batch rather than merely faster. The postgres.js pool is `max: 5`
+  // (db/client.ts), so this does not open 28 connections; it fills the pool and
+  // drains in about six waves instead of twenty-eight.
+  //
+  // Promise.all rather than starting the promises early and awaiting each in
+  // place: an unawaited rejection would reach the process-level
+  // `unhandledRejection` handler (util/log.ts) and be logged as an error before
+  // the code that actually handles it ran. Promise.all attaches handlers to all
+  // of them synchronously.
+  //
+  // Anything added here must stay independent of the others. A query that needs
+  // a previous result belongs below, not in this list.
+  const [
+    classCache,
+    items,
+    balanceRows,
+    liabilityRows,
+    coinbaseRows,
+    zerionRows,
+    spinwheelRows,
+    chainRows,
+    hlRows,
+    pmRows,
+    reRows,
+    vehRows,
+    metalRows,
+    sneakerRows,
+    nftRows,
+    manualRows,
+    declaredLines,
+    pokemonRows,
+    ynabRows,
+    krakenRows,
+    alpacaRows,
+    discogsRows,
+    kalshiRows,
+    energyRows,
+    farmRows,
+    tcRows,
+    coinRows,
+    tlRows,
+  ] = await Promise.all([
+    getClassCache(userId),
+    db().select().from(plaidItems).where(eq(plaidItems.userId, userId)),
+    getPlaidAccountBalances(userId),
+    getCachedLiabilities(userId),
+    db().select().from(coinbaseConnections).where(eq(coinbaseConnections.userId, userId)),
+    db().select().from(zerionWallets).where(eq(zerionWallets.userId, userId)),
+    db().select().from(spinwheelConnections).where(eq(spinwheelConnections.userId, userId)),
+    db().select().from(chainWallets).where(eq(chainWallets.userId, userId)),
+    db().select().from(hyperliquidAccounts).where(eq(hyperliquidAccounts.userId, userId)),
+    db().select().from(polymarketAccounts).where(eq(polymarketAccounts.userId, userId)),
+    db().select().from(realEstateAssets).where(eq(realEstateAssets.userId, userId)),
+    db().select().from(vehicleAssets).where(eq(vehicleAssets.userId, userId)),
+    db().select().from(metalHoldings).where(eq(metalHoldings.userId, userId)),
+    db().select().from(sneakerHoldings).where(eq(sneakerHoldings.userId, userId)),
+    db().select().from(nftWallets).where(eq(nftWallets.userId, userId)),
+    db().select().from(manualAssets).where(eq(manualAssets.userId, userId)),
+    listDeclaredAssets(userId),
+    db().select().from(pokemonCardHoldings).where(eq(pokemonCardHoldings.userId, userId)),
+    db().select().from(ynabConnections).where(eq(ynabConnections.userId, userId)),
+    db().select().from(krakenConnections).where(eq(krakenConnections.userId, userId)),
+    db().select().from(alpacaConnections).where(eq(alpacaConnections.userId, userId)),
+    db().select().from(discogsConnections).where(eq(discogsConnections.userId, userId)),
+    db().select().from(kalshiConnections).where(eq(kalshiConnections.userId, userId)),
+    db().select().from(energyPositions).where(eq(energyPositions.userId, userId)),
+    db().select().from(farmlandParcels).where(eq(farmlandParcels.userId, userId)),
+    db().select().from(tradingCardHoldings).where(eq(tradingCardHoldings.userId, userId)),
+    db().select().from(coinHoldings).where(eq(coinHoldings.userId, userId)),
+    db().select().from(truelayerConnections).where(eq(truelayerConnections.userId, userId)),
+  ]);
+
   const classes = {} as Record<NetWorthClassName, ClassReading>;
 
   // --- Bank (Plaid) from the per-account balance cache -----------------------
-  const items = await db().select().from(plaidItems).where(eq(plaidItems.userId, userId));
   const activeItemIds = new Set(items.filter((i) => !i.disabled).map((i) => i.itemId));
-  const balanceRows = await getPlaidAccountBalances(userId);
-  const liabilityRows = await getCachedLiabilities(userId);
 
   const liabilityMeta = new Map(
     liabilityRows.map((row) => [
@@ -291,7 +370,7 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
   classes.investments = reading(num(invRow?.valueUsd ?? null), invRow?.asOf ?? null, invStatus);
 
   // --- Crypto (Coinbase, cached) ---------------------------------------------
-  const [coinbaseRow] = await db().select().from(coinbaseConnections).where(eq(coinbaseConnections.userId, userId));
+  const [coinbaseRow] = coinbaseRows;
   // A 'dev_key' connection signs with the operator's shared key; serving that in
   // production would count the operator's balances as this user's.
   const coinbaseUsable = !!coinbaseRow && (coinbaseRow.mode !== 'dev_key' || isSharedCoinbaseKeyAllowed());
@@ -310,7 +389,6 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
   classes.crypto = reading(num(cryptoRow?.valueUsd ?? null), cryptoRow?.asOf ?? null, cryptoStatus);
 
   // --- DeFi (Zerion, cached) -------------------------------------------------
-  const zerionRows = await db().select().from(zerionWallets).where(eq(zerionWallets.userId, userId));
   const defiRow = classCache.get('defi');
   const defiStatus = deriveStatus({
     connected: zerionRows.length > 0,
@@ -324,7 +402,7 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
   classes.defi = reading(num(defiRow?.valueUsd ?? null), defiRow?.asOf ?? null, defiStatus);
 
   // --- Debts (Spinwheel, cached) ---------------------------------------------
-  const [spinwheelRow] = await db().select().from(spinwheelConnections).where(eq(spinwheelConnections.userId, userId));
+  const [spinwheelRow] = spinwheelRows;
   const debtsRow = classCache.get('debts');
   const debtsPayload = debtsRow?.payload as { items?: DebtItem[]; debts?: SpinwheelDebt[] } | null;
   const debtItems = (debtsPayload?.items ?? []) as DebtItem[];
@@ -367,49 +445,42 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
   classes.bank = reading(bankClassValue, bankOldestAsOf, bankStatus);
 
   // --- Simple per-row synced classes -----------------------------------------
-  const chainRows = await db().select().from(chainWallets).where(eq(chainWallets.userId, userId));
   classes.chainWallets = rollupRows(
     chainRows.map((r): SimpleRow => ({ valueUsd: num(r.lastBalanceUsd), syncedAt: r.lastSyncedAt })),
     FRESHNESS.chainWallets,
     now,
   );
 
-  const hlRows = await db().select().from(hyperliquidAccounts).where(eq(hyperliquidAccounts.userId, userId));
   classes.hyperliquid = rollupRows(
     hlRows.map((r): SimpleRow => ({ valueUsd: num(r.lastAccountValueUsd), syncedAt: r.lastSyncedAt })),
     FRESHNESS.hyperliquid,
     now,
   );
 
-  const pmRows = await db().select().from(polymarketAccounts).where(eq(polymarketAccounts.userId, userId));
   classes.polymarket = rollupRows(
     pmRows.map((r): SimpleRow => ({ valueUsd: num(r.lastValueUsd), syncedAt: r.lastSyncedAt })),
     FRESHNESS.polymarket,
     now,
   );
 
-  const reRows = await db().select().from(realEstateAssets).where(eq(realEstateAssets.userId, userId));
   classes.realEstate = rollupRows(
     reRows.map((r): SimpleRow => ({ valueUsd: num(r.lastValueUsd), syncedAt: r.lastSyncedAt })),
     FRESHNESS.realEstate,
     now,
   );
 
-  const vehRows = await db().select().from(vehicleAssets).where(eq(vehicleAssets.userId, userId));
   classes.vehicles = rollupRows(
     vehRows.map((r): SimpleRow => ({ valueUsd: num(r.lastValueUsd), syncedAt: r.lastSyncedAt })),
     FRESHNESS.vehicles,
     now,
   );
 
-  const metalRows = await db().select().from(metalHoldings).where(eq(metalHoldings.userId, userId));
   classes.metals = rollupRows(
     metalRows.map((r): SimpleRow => ({ valueUsd: num(r.lastValueUsd), syncedAt: r.lastSyncedAt })),
     FRESHNESS.metals,
     now,
   );
 
-  const sneakerRows = await db().select().from(sneakerHoldings).where(eq(sneakerHoldings.userId, userId));
   classes.sneakers = rollupRows(
     sneakerRows.map(
       (r): SimpleRow => ({
@@ -421,7 +492,6 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
     now,
   );
 
-  const nftRows = await db().select().from(nftWallets).where(eq(nftWallets.userId, userId));
   classes.nft = rollupRows(
     nftRows.map((r): SimpleRow => ({ valueUsd: num(r.lastValueUsd), syncedAt: r.lastSyncedAt })),
     FRESHNESS.nft,
@@ -430,7 +500,6 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
 
   // Manual assets are self-reported: always labelled, never stale, never
   // excluded (prd.md R-8.2). asOf is the OLDEST declaration so age is honest.
-  const manualRows = await db().select().from(manualAssets).where(eq(manualAssets.userId, userId));
   if (manualRows.length === 0) {
     classes.manual = reading(null, null, 'not_connected');
   } else {
@@ -451,14 +520,12 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
   // asOf is the OLDEST refreshedAt so the label never understates age. A sheet
   // whose every line skipped the amount reads value null (a number we cannot
   // compute is never rendered as zero), which contributes nothing to `total`.
-  const declaredLines = await listDeclaredAssets(userId);
   if (declaredLines.length === 0) {
     classes.declared = reading(null, null, 'not_connected');
   } else {
     classes.declared = reading(declaredNetUsd(declaredLines), oldestRefreshedAt(declaredLines), 'ok');
   }
 
-  const pokemonRows = await db().select().from(pokemonCardHoldings).where(eq(pokemonCardHoldings.userId, userId));
   classes.pokemonCards = rollupRows(
     pokemonRows.map(
       (r): SimpleRow => ({
@@ -470,7 +537,7 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
     now,
   );
 
-  const [ynabRow] = await db().select().from(ynabConnections).where(eq(ynabConnections.userId, userId));
+  const [ynabRow] = ynabRows;
   classes.ynab = ynabRow
     ? reading(
         num(ynabRow.lastNetWorthUsd),
@@ -486,7 +553,7 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
       )
     : reading(null, null, 'not_connected');
 
-  const [krakenRow] = await db().select().from(krakenConnections).where(eq(krakenConnections.userId, userId));
+  const [krakenRow] = krakenRows;
   classes.kraken = krakenRow
     ? reading(
         num(krakenRow.lastTotalUsd),
@@ -502,7 +569,7 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
       )
     : reading(null, null, 'not_connected');
 
-  const [alpacaRow] = await db().select().from(alpacaConnections).where(eq(alpacaConnections.userId, userId));
+  const [alpacaRow] = alpacaRows;
   classes.alpaca = alpacaRow
     ? reading(
         num(alpacaRow.lastEquityUsd),
@@ -521,10 +588,10 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
   // Vinyl (Discogs): register row DR-10 pins the served value to 0 until
   // written permission plus attribution plus the six-hour display rule exist.
   // The connection is reported so the UI can explain why no value appears.
-  const [discogsRow] = await db().select().from(discogsConnections).where(eq(discogsConnections.userId, userId));
+  const [discogsRow] = discogsRows;
   classes.vinyl = discogsRow ? reading(0, null, 'ok') : reading(null, null, 'not_connected');
 
-  const [kalshiRow] = await db().select().from(kalshiConnections).where(eq(kalshiConnections.userId, userId));
+  const [kalshiRow] = kalshiRows;
   classes.kalshi = kalshiRow
     ? reading(
         num(kalshiRow.lastPortfolioUsd),
@@ -540,7 +607,6 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
       )
     : reading(null, null, 'not_connected');
 
-  const energyRows = await db().select().from(energyPositions).where(eq(energyPositions.userId, userId));
   classes.energy = rollupRows(
     energyRows.map(
       (r): SimpleRow => ({
@@ -552,7 +618,6 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
     now,
   );
 
-  const farmRows = await db().select().from(farmlandParcels).where(eq(farmlandParcels.userId, userId));
   classes.farmland = rollupRows(
     farmRows.map(
       (r): SimpleRow => ({
@@ -564,7 +629,6 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
     now,
   );
 
-  const tcRows = await db().select().from(tradingCardHoldings).where(eq(tradingCardHoldings.userId, userId));
   classes.tradingCards = rollupRows(
     tcRows.map(
       (r): SimpleRow => ({
@@ -576,7 +640,6 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
     now,
   );
 
-  const coinRows = await db().select().from(coinHoldings).where(eq(coinHoldings.userId, userId));
   classes.coins = rollupRows(
     coinRows.map(
       (r): SimpleRow => ({
@@ -588,7 +651,7 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
     now,
   );
 
-  const [tlRow] = await db().select().from(truelayerConnections).where(eq(truelayerConnections.userId, userId));
+  const [tlRow] = tlRows;
   // lastBalanceGbp stores USD post-conversion (column name kept for compat).
   classes.truelayer = tlRow
     ? reading(
@@ -620,6 +683,11 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
   // --- Emergency fund coverage (C4) ------------------------------------------
   let liquidCashMonths: number | null = null;
   try {
+    // Deliberately not in the batch above, though it depends on nothing there.
+    // It is the one read whose failure is caught and tolerated: coverage goes
+    // null and the rest of the response still renders. Inside a Promise.all its
+    // rejection would take every other query's result with it, trading a
+    // degraded field for a failed request to save one round trip.
     const outflows90 = await getRecentOutflows(userId, 90);
     const totalOutflows90 = outflows90.reduce((sum, tx) => sum + Math.abs(parseFloat(tx.amount)), 0);
     const avgMonthlyBurn = totalOutflows90 / 3;
