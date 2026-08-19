@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { fetchWithRetry } from '../util/fetch.js';
+import { cachedByKey, PRICE_TTL } from '../util/price-cache.js';
 
 // EIA Open Data API v2 — https://www.eia.gov/opendata/
 // Free key: https://www.eia.gov/opendata/register.php
@@ -47,7 +48,7 @@ const EiaDataResponseSchema = z.object({
  * Fetches the latest spot price (USD per unit) for the given commodity.
  * Returns null if the key is absent, the API errors, or no data is returned.
  */
-export async function getEiaSpotPrice(commodity: EiaCommodity, apiKey: string): Promise<number | null> {
+async function fetchEiaSpotPrice(commodity: EiaCommodity, apiKey: string): Promise<number | null> {
   if (!apiKey) return null;
 
   const meta = EIA_COMMODITIES[commodity];
@@ -85,3 +86,32 @@ export async function getAllEiaSpotPrices(apiKey: string): Promise<Map<EiaCommod
 
   return new Map(entries.filter((e): e is [EiaCommodity, number] => e[1] !== null));
 }
+
+/**
+ * Shared across users: this figure is identical for everyone who holds it, so
+ * it is fetched once per TTL rather than once per user per refresh.
+ *
+ * Keyed WITHOUT the API key. A secret has no business in a cache key, and it
+ * is the same on every call so it would add nothing anyway.
+ */
+const cachedEiaSpotPrice = cachedByKey(
+  PRICE_TTL.STATISTICAL,
+  (commodity: EiaCommodity, _apiKey: string) => commodity,
+  fetchEiaSpotPrice,
+  // Never cache a null. This client returns null for "could not price this"
+  // rather than throwing, and storing that would serve "no price" for a week
+  // after one bad request.
+  (v) => v !== null,
+);
+
+export async function getEiaSpotPrice(commodity: EiaCommodity, apiKey: string): Promise<number | null> {
+  // Outside the cache deliberately. A missing API key is a CONFIG state, not a
+  // price, and the cache key does not include the key (a secret has no
+  // business in one) so caching this would poison the real lookup.
+  if (!apiKey) return null;
+  return cachedEiaSpotPrice(commodity, apiKey);
+}
+
+/** Test seam: prices are module-level state, so a suite that asserts on fetch
+ *  counts has to reset between cases. */
+export const _clearEiaCache = cachedEiaSpotPrice.clear;

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getTradingCardPrice } from '../src/tcgapi/client.js';
+import { _clearTcgCache, getTradingCardPrice } from '../src/tcgapi/client.js';
 
 function makeFetch(body: unknown, status = 200) {
   return vi.fn().mockResolvedValue({
@@ -8,6 +8,10 @@ function makeFetch(body: unknown, status = 200) {
     json: async () => body,
   } as unknown as Response);
 }
+
+// The price cache is module-level state, so a suite asserting on fetch
+// counts has to reset it between cases.
+beforeEach(() => _clearTcgCache());
 
 describe('getTradingCardPrice', () => {
   beforeEach(() => vi.stubGlobal('fetch', vi.fn()));

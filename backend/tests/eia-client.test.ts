@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getAllEiaSpotPrices, getEiaSpotPrice } from '../src/eia/client.js';
+import { _clearEiaCache, getAllEiaSpotPrices, getEiaSpotPrice } from '../src/eia/client.js';
 
 function makeFetch(body: unknown, status = 200) {
   return vi.fn().mockResolvedValue({
@@ -12,6 +12,10 @@ function makeFetch(body: unknown, status = 200) {
 const okBody = {
   response: { data: [{ period: '2024-01-01', value: 75.5 }] },
 };
+
+// The price cache is module-level state, so a suite asserting on fetch
+// counts has to reset it between cases.
+beforeEach(() => _clearEiaCache());
 
 describe('getEiaSpotPrice', () => {
   beforeEach(() => vi.stubGlobal('fetch', vi.fn()));
