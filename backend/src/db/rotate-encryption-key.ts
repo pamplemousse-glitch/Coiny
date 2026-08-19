@@ -67,7 +67,13 @@ function target<T extends PgTable>(
 // category_overrides, which is handled separately below because rotating it
 // changes its primary key.
 const TARGETS: RotationTarget[] = [
-  target(users, 'id', ['email']),
+  // Was ['email'] until 0054 dropped that column. `appleRefreshToken` is the
+  // other encryptString column on this table and was never listed here, so a
+  // rotation would have left it unreadable: account deletion could no longer
+  // call Apple's /auth/revoke (TN3194) and the grant would outlive the account,
+  // silently, since nothing reads the token until a deletion happens. Rows
+  // where it is null are skipped by the loop below.
+  target(users, 'id', ['appleRefreshToken']),
   target(reactionHistory, 'id', ['reaction']),
   target(plaidItems, 'itemId', ['accessToken']),
   // Usually empty, and it is the row you can least afford to lose to a

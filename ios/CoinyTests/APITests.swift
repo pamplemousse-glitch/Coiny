@@ -72,7 +72,7 @@ final class APITests: XCTestCase {
         let signedInBefore = await api.isSignedIn
         XCTAssertFalse(signedInBefore)
 
-        try await api.signInWithApple(identityToken: "apple-id-token", userId: "apple-sub", email: nil, displayName: nil)
+        try await api.signInWithApple(identityToken: "apple-id-token", userId: "apple-sub")
 
         let signedInAfter = await api.isSignedIn
         XCTAssertTrue(signedInAfter)
@@ -256,12 +256,27 @@ final class APITests: XCTestCase {
 
     // MARK: - Sign-in edge cases
 
-    func testSignInWithNilEmailSucceeds() async throws {
+    /// The sign-in body carries the identity token, the Apple `sub` and
+    /// nothing that identifies the person. Asserted on the encoded request
+    /// rather than on the call signature, because the signature can be
+    /// widened again without anyone noticing and the wire is what actually
+    /// reaches the server. Guards audit 2.2.1: Coiny stored an email and a
+    /// legal name it never once read.
+    func testSignInSendsNoIdentityFields() async throws {
         let api = makeAPI()
         http.enqueue(status: 200, json: """
-            {"token": "tok-nil-email", "user_id": "user-456"}
+            {"token": "tok-no-identity", "user_id": "user-456"}
             """)
-        try await api.signInWithApple(identityToken: "id-tok", userId: "sub-456", email: nil, displayName: nil)
+
+        try await api.signInWithApple(identityToken: "id-tok", userId: "sub-456")
+
+        let request = try XCTUnwrap(http.requests.last)
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertNil(json["email"])
+        XCTAssertNil(json["display_name"])
+        XCTAssertEqual(json["user_id"] as? String, "sub-456")
+
         let isSignedIn = await api.isSignedIn
         XCTAssertTrue(isSignedIn)
     }
@@ -271,7 +286,7 @@ final class APITests: XCTestCase {
         http.enqueue(.ok(status: 401, body: Data("{\"error\":\"invalid token\"}".utf8)))
 
         do {
-            try await api.signInWithApple(identityToken: "bad-tok", userId: "sub", email: nil, displayName: nil)
+            try await api.signInWithApple(identityToken: "bad-tok", userId: "sub")
             XCTFail("Expected sign-in to throw on 401")
         } catch {
             // expected

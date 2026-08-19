@@ -126,15 +126,11 @@ actor API {
     func signInWithApple(
         identityToken: String,
         userId: String,
-        email: String?,
-        displayName: String?,
         authorizationCode: String? = nil
     ) async throws {
         struct Body: Encodable {
             let identity_token: String
             let user_id: String
-            let email: String?
-            let display_name: String?
             let authorization_code: String?
         }
         struct Response: Decodable {
@@ -147,25 +143,12 @@ actor API {
             body: Body(
                 identity_token: identityToken,
                 user_id: userId,
-                email: email,
-                display_name: displayName,
                 authorization_code: authorizationCode
             ),
             requiresAuth: false
         )
         try sessionStore.save(res.token)
         sessionToken = res.token
-    }
-
-    func updateDisplayName(_ name: String) async throws {
-        struct Body: Encodable { let display_name: String }
-        struct Response: Decodable { let ok: Bool }
-        let _: Response = try await request(
-            method: "PATCH",
-            path: "/api/account",
-            body: Body(display_name: name),
-            requiresAuth: true
-        )
     }
 
     func signOut() {

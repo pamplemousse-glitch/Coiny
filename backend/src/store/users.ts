@@ -9,9 +9,10 @@ import { clearUserEvents } from './events.js';
 
 export type UserRow = typeof users.$inferSelect;
 
-export type FindOrCreateUserArgs =
-  | { appleSub: string; googleSub?: never; email?: string | null; displayName?: string | null }
-  | { appleSub?: never; googleSub: string; email?: string | null; displayName?: string | null };
+// Deliberately carries the subject identifier and nothing else. The provider
+// also offers an email and a name; Coiny does not ask for them and does not
+// accept them if offered (audit 2.2.1). See the note in schema.ts.
+export type FindOrCreateUserArgs = { appleSub: string; googleSub?: never } | { appleSub?: never; googleSub: string };
 
 export async function findOrCreateUser(args: FindOrCreateUserArgs): Promise<string> {
   const lookupColumn = args.appleSub ? users.appleSub : users.googleSub;
@@ -22,13 +23,10 @@ export async function findOrCreateUser(args: FindOrCreateUserArgs): Promise<stri
 
   const id = randomUUID();
   await db().transaction(async (tx) => {
-    const encryptedEmail = args.email ? encryptString(args.email) : null;
     await tx.insert(users).values({
       id,
       appleSub: args.appleSub ?? null,
       googleSub: args.googleSub ?? null,
-      email: encryptedEmail,
-      displayName: args.displayName ?? null,
     });
     // Every user gets exactly one pet row, initialized with defaults.
     await tx.insert(petState).values({ userId: id });
@@ -40,10 +38,6 @@ export async function findOrCreateUser(args: FindOrCreateUserArgs): Promise<stri
   await trackServerEvent(id, 'signup_completed', { method: args.appleSub ? 'apple' : 'google' });
 
   return id;
-}
-
-export async function updateDisplayName(userId: string, displayName: string): Promise<void> {
-  await db().update(users).set({ displayName }).where(eq(users.id, userId));
 }
 
 // The Sign in with Apple refresh token, stored encrypted so that account
@@ -82,7 +76,7 @@ export async function getUserById(id: string): Promise<UserRow | null> {
   // is a credential, it has exactly one reader (revoke/upstream.ts, via
   // getAppleGrant), and this is the generic accessor whose result is the one
   // most likely to end up in a response body one day.
-  return { ...row, appleRefreshToken: null, email: row.email ? decryptString(row.email) : null };
+  return { ...row, appleRefreshToken: null };
 }
 
 export type ConsentState = {

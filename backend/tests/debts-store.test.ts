@@ -364,7 +364,7 @@ describe('user scoping', () => {
   it('one user debt set is invisible to another user', async () => {
     await ingestPlaidLiabilities(testUserId, plaidCardResponse());
     const { findOrCreateUser } = await import('../src/store/users.js');
-    const otherId = await findOrCreateUser({ appleSub: 'other_apple_sub', email: 'other@coiny.test' });
+    const otherId = await findOrCreateUser({ appleSub: 'other_apple_sub' });
     expect(await getDebtAccounts(otherId)).toHaveLength(0);
     expect(await getHighAprDebtBalances(otherId)).toBeNull();
   });

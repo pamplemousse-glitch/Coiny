@@ -29,8 +29,14 @@ export const users = pgTable(
     // best-effort at sign-in when the client sends an authorization code, read
     // once at deletion, and destroyed with the row.
     appleRefreshToken: text('apple_refresh_token'),
-    email: text('email'),
-    displayName: text('display_name'),
+    // No `email` and no `display_name`. Both columns existed, both were
+    // written at sign-in, and in the whole history of the codebase neither was
+    // ever read by anything in `src/` (audit 2.2.1). An identity field nobody
+    // reads is not a feature with a control attached, it is breach-notification
+    // surface with no offsetting benefit: it is exactly the "customer
+    // information" that starts the FTC clock (1.11.3) and California's
+    // (1.11.4). Dropped in 0054 rather than encrypted, disclosed, disposed of
+    // and notified about. Do not reintroduce either without a named reader.
     // Reg P 1016.9(b)(1)(iii) delivers the privacy notice by requiring the
     // consumer to acknowledge it as a necessary step to obtaining the service.
     // The sign-in screen is that step; these two columns are the record of it.

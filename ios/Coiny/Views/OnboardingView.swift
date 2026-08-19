@@ -13,9 +13,6 @@ import SwiftUI
 /// composition and the Plaid Link presentation.
 struct OnboardingView: View {
     @Binding var onboardingComplete: Bool
-    /// Retained for call-site compatibility with `CoinyApp`. Unused: the name
-    /// entry screen no longer exists (R-5.2).
-    var appleDisplayName: String = ""
 
     @State private var viewModel = OnboardingViewModel()
     @State private var showLink = false

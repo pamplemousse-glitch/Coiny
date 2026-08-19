@@ -161,7 +161,7 @@ describe('GET /api/goals/:id', () => {
   it('returns 404 for another user’s goal', async () => {
     const { findOrCreateUser } = await import('../src/store/users.js');
     const { createGoal } = await import('../src/store/target-goals.js');
-    const otherId = await findOrCreateUser({ appleSub: 'other_user_sub', email: 'other@coiny.test' });
+    const otherId = await findOrCreateUser({ appleSub: 'other_user_sub' });
     const theirs = await createGoal(
       otherId,
       {
@@ -323,7 +323,7 @@ describe('DELETE /api/goals/:id', () => {
   it('does not touch another user’s goal', async () => {
     const { findOrCreateUser } = await import('../src/store/users.js');
     const { createGoal, getGoal } = await import('../src/store/target-goals.js');
-    const otherId = await findOrCreateUser({ appleSub: 'other_user_sub', email: 'other@coiny.test' });
+    const otherId = await findOrCreateUser({ appleSub: 'other_user_sub' });
     const theirs = await createGoal(
       otherId,
       {

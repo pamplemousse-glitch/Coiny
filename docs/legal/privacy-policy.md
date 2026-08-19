@@ -32,9 +32,10 @@ The short version:
 ## 1. What we collect
 
 **Account identity.** When you sign in with Apple (or Google on Android), we
-receive a stable account identifier, your email address, and, on first sign-in
-only, your name. Your email is stored encrypted. We never see your Apple ID or
-Google password.
+receive a stable account identifier and nothing else. We do not ask for your
+name or your email address, and we do not store them. Coiny has no reason to
+hold either: it never sends you mail and never displays your name. We never see
+your Apple ID or Google password.
 
 **Financial account data you connect.** When you link a bank, card, loan, or
 brokerage through Plaid, we receive and store: account balances, transactions
@@ -110,7 +111,7 @@ each one needs. They are contractually limited to providing their service.
 
 | Provider | What they do | What they hold |
 |---|---|---|
-| Neon | Database hosting (United States) | All stored data described above, with tokens, keys, email, and reaction history encrypted at the field level before they are written |
+| Neon | Database hosting (United States) | All stored data described above, with tokens, keys, and reaction history encrypted at the field level before they are written |
 | Fly.io | Application hosting (Ashburn, Virginia, United States) | Data in transit through our servers; configuration secrets |
 | Apple | Sign in with Apple, push notification delivery, and payment processing if you subscribe | Your Apple identity; push tokens; purchase records (we never see payment card details) |
 | Google | Sign-in verification on Android | Your Google identity |
@@ -203,12 +204,13 @@ app itself; that is the product. For anything else, email us.
 
 ## 6. How we protect it
 
-Access tokens, API keys, your email, and reaction history are encrypted with
-AES-256-GCM before they touch the database, and the encryption key is stored
-separately from the data, with a different vendor. All traffic uses TLS. Your
-session token is stored only as a hash on our side and in the iOS Keychain on
-your device. We log event types and pseudonymous identifiers, never merchant
-names, amounts, or email addresses. Coiny is operated under a written
+Access tokens, API keys and reaction history are encrypted with AES-256-GCM
+before they touch the database, and the encryption key is stored separately from
+the data, with a different vendor. All traffic uses TLS. Your session token is
+stored only as a hash on our side and in the iOS Keychain on your device. We log
+event types and pseudonymous identifiers, never merchant names, amounts, or
+email addresses. The strongest protection we apply to your name and email
+address is that we never collect them. Coiny is operated under a written
 information security program as required by the FTC Safeguards Rule.
 
 No system is perfectly secure, and we cannot guarantee absolute security. If a

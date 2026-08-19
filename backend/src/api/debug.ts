@@ -134,7 +134,7 @@ export function registerDebugApi(app: FastifyInstance): void {
 // Only registered when PLAID_ENV=sandbox. Never callable in production.
 export function registerDebugSessionApi(app: FastifyInstance): void {
   app.post('/api/debug/session', async (_req: FastifyRequest, _reply: FastifyReply) => {
-    const userId = await findOrCreateUser({ appleSub: 'debug-simulator-user', email: 'simulator@coiny.dev' });
+    const userId = await findOrCreateUser({ appleSub: 'debug-simulator-user' });
     const { rawToken } = await createSession(userId);
     return { token: rawToken };
   });

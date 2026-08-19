@@ -72,7 +72,7 @@ describe('canSendPush', () => {
   it('scopes the budget per user', async () => {
     const { canSendPush, recordNotification } = await import('../src/store/notifications.js');
     const { findOrCreateUser } = await import('../src/store/users.js');
-    const otherUserId = await findOrCreateUser({ appleSub: 'other_apple_sub', email: 'other@coiny.test' });
+    const otherUserId = await findOrCreateUser({ appleSub: 'other_apple_sub' });
     await recordNotification(otherUserId, 'goal_achieved');
     expect(await canSendPush(testUserId, 'goal_achieved')).toBe(true);
   });

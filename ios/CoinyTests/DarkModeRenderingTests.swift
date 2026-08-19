@@ -274,7 +274,7 @@ final class DarkModeRenderingTests: XCTestCase {
     /// control that has to be perceived as a control.
     func testAppleButtonIsVisibleAgainstTheScreenInBothSchemes() {
         for scheme in [ColorScheme.light, .dark] {
-            let raster = render(SignInView(onSignedIn: { _ in }), scheme, named: "signin")
+            let raster = render(SignInView(onSignedIn: {}), scheme, named: "signin")
             let screen = rgb(CoinyTheme.screen, scheme)
             // Start below the creature window rather than at a guessed
             // fraction of the height: the window is a large block of `field`

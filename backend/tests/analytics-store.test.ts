@@ -35,7 +35,7 @@ describe('insertAnalyticsEvents / listAnalyticsEvents', () => {
     const { insertAnalyticsEvents, listAnalyticsEvents } = await import('../src/store/analytics.js');
     const { findOrCreateUser } = await import('../src/store/users.js');
 
-    const otherUserId = await findOrCreateUser({ appleSub: 'analytics_other_user', email: null });
+    const otherUserId = await findOrCreateUser({ appleSub: 'analytics_other_user' });
     await insertAnalyticsEvents(otherUserId, [
       { event: 'app_open', properties: { source: 'icon', days_since_signup: 0 }, clientTs: null },
     ]);
@@ -85,7 +85,7 @@ describe('signup_completed emission (store/users.ts)', () => {
     const { findOrCreateUser } = await import('../src/store/users.js');
     const { listAnalyticsEvents } = await import('../src/store/analytics.js');
 
-    const userId = await findOrCreateUser({ googleSub: 'signup_google_sub', email: 'pii@example.com' });
+    const userId = await findOrCreateUser({ googleSub: 'signup_google_sub' });
 
     const rows = await listAnalyticsEvents(userId, 'signup_completed');
     expect(rows.length).toBe(1);
@@ -96,8 +96,8 @@ describe('signup_completed emission (store/users.ts)', () => {
     const { findOrCreateUser } = await import('../src/store/users.js');
     const { listAnalyticsEvents } = await import('../src/store/analytics.js');
 
-    const userId = await findOrCreateUser({ appleSub: 'returning_apple_sub', email: null });
-    const again = await findOrCreateUser({ appleSub: 'returning_apple_sub', email: null });
+    const userId = await findOrCreateUser({ appleSub: 'returning_apple_sub' });
+    const again = await findOrCreateUser({ appleSub: 'returning_apple_sub' });
     expect(again).toBe(userId);
 
     const rows = await listAnalyticsEvents(userId, 'signup_completed');

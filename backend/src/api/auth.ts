@@ -15,10 +15,10 @@ const AppleSignInSchema = z.object({
   identity_token: z.string().min(1),
   // Apple's stable user identifier — cross-check against JWT `sub`.
   user_id: z.string().min(1),
-  // Optional: only provided on first sign-in; null on subsequent logins.
-  email: z.string().email().nullish(),
-  // Optional: Apple provides fullName only on first sign-in.
-  display_name: z.string().max(100).nullish(),
+  // `email` and `display_name` are deliberately absent. Shipped iOS builds
+  // still send both; this schema is not `.strict()`, so Zod strips them and an
+  // old client keeps signing in while the values never reach a column. See
+  // schema.ts for why the columns are gone (audit 2.2.1).
   // Optional: ASAuthorizationAppleIDCredential.authorizationCode, exchanged
   // here for the refresh token that account deletion needs in order to revoke
   // the grant (TN3194). Single-use and expires in five minutes, which is why it
@@ -52,7 +52,7 @@ export function registerAuthApi(app: FastifyInstance): void {
     const parsed = AppleSignInSchema.safeParse(req.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
-    const { identity_token, user_id, email, display_name, authorization_code } = parsed.data;
+    const { identity_token, user_id, authorization_code } = parsed.data;
 
     let sub: string;
     try {
@@ -71,7 +71,7 @@ export function registerAuthApi(app: FastifyInstance): void {
       return reply.status(401).send({ error: 'Invalid identity token' });
     }
 
-    const userId = await findOrCreateUser({ appleSub: sub, email: email ?? null, displayName: display_name ?? null });
+    const userId = await findOrCreateUser({ appleSub: sub });
 
     // Best-effort, and deliberately after the user exists but before the
     // session is returned, so a stored token is never attributed to the wrong
@@ -95,8 +95,6 @@ export function registerAuthApi(app: FastifyInstance): void {
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
     let sub: string;
-    let email: string | null = null;
-    let displayName: string | null = null;
     try {
       const { payload } = await jwtVerify(parsed.data.id_token, googleJwks, {
         // Google's ID tokens use either issuer form; accept both.
@@ -104,14 +102,15 @@ export function registerAuthApi(app: FastifyInstance): void {
         audience: config.GOOGLE_AUTH_CLIENT_ID,
       });
       sub = payload.sub as string;
-      if (typeof payload.email === 'string') email = payload.email;
-      if (typeof payload.name === 'string') displayName = payload.name.slice(0, 100);
+      // `payload.email` and `payload.name` are present here and deliberately
+      // not read. Google hands them over whether or not we want them; taking
+      // only `sub` is what keeps them out of the database (audit 2.2.1).
     } catch (err) {
       req.log.warn({ err }, 'google id token verification failed');
       return reply.status(401).send({ error: 'Invalid identity token' });
     }
 
-    const userId = await findOrCreateUser({ googleSub: sub, email, displayName });
+    const userId = await findOrCreateUser({ googleSub: sub });
     const { rawToken } = await createSession(userId);
 
     req.log.info({ userId }, 'google sign-in success');

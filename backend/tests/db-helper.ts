@@ -48,7 +48,7 @@ export async function resetDatabase(): Promise<void> {
   // analytics-store.test.ts do. Do not "fix" it by truncating after this call:
   // the retention test in analytics-store.test.ts backdates that exact row and
   // depends on it existing.
-  testUserId = await findOrCreateUser({ appleSub: 'test_apple_sub_fixed', email: 'test@coiny.test' });
+  testUserId = await findOrCreateUser({ appleSub: 'test_apple_sub_fixed' });
   const { rawToken } = await createSession(testUserId);
   testToken = rawToken;
 }
@@ -73,7 +73,7 @@ export async function createOtherUser(): Promise<{
   const { findOrCreateUser } = await import('../src/store/users.js');
   const { createSession } = await import('../src/store/sessions.js');
 
-  const userId = await findOrCreateUser({ appleSub: 'test_apple_sub_other', email: 'other@coiny.test' });
+  const userId = await findOrCreateUser({ appleSub: 'test_apple_sub_other' });
   const { rawToken } = await createSession(userId);
   return { userId, token: rawToken, authHeader: { authorization: `Bearer ${rawToken}` } };
 }

@@ -178,7 +178,7 @@ describe('apple grant revocation', () => {
   it('reports no_connection for a Google-only account', async () => {
     const { findOrCreateUser } = await import('../src/store/users.js');
     const { revokeApple } = await import('../src/revoke/upstream.js');
-    const googleUserId = await findOrCreateUser({ googleSub: 'google-only-sub', email: null });
+    const googleUserId = await findOrCreateUser({ googleSub: 'google-only-sub' });
     const log = { warn: () => {}, info: () => {} } as never;
 
     expect(await revokeApple(googleUserId, log)).toEqual({ provider: 'apple', result: 'no_connection' });

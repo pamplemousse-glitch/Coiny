@@ -1,0 +1,24 @@
+-- Drop users.email and users.display_name.
+--
+-- Both were written at sign-in and neither was ever read. `email` came from the
+-- Apple `.email` scope and the Google id token; `display_name` came from the
+-- Apple `.fullName` scope and from PATCH /api/account. The only accessor that
+-- returned either was getUserById, whose call sites are test files and nothing
+-- in src/ (audit 2.2.1). There is no mail sender anywhere in the product, no
+-- GET /api/account, and API.updateDisplayName had no call site in any view
+-- (audit 2.2.2).
+--
+-- An identity field nothing reads is not a feature with a control attached. It
+-- is the "customer information" whose unauthorised acquisition starts the FTC
+-- Safeguards notification clock (audit 1.11.3) and California's (1.11.4), held
+-- against no benefit. Encryption mitigates the exposure and does not remove it,
+-- so this deletes rather than protects (audit 2.2.3).
+--
+-- This is destructive and intentionally so. Both columns hold sandbox data for
+-- synthetic users; there are no real users. Restoring them would mean restoring
+-- the scopes and the collection, which is the thing being undone.
+--
+-- Idempotent, per the convention 0033 established.
+ALTER TABLE "users" DROP COLUMN IF EXISTS "email";
+--> statement-breakpoint
+ALTER TABLE "users" DROP COLUMN IF EXISTS "display_name";

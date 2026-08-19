@@ -67,7 +67,7 @@ describe('user scoping', () => {
   it('never returns another user’s goal', async () => {
     const { findOrCreateUser } = await import('../src/store/users.js');
     const { createGoal, getGoal, listGoals } = await import('../src/store/target-goals.js');
-    const otherId = await findOrCreateUser({ appleSub: 'other_user_sub', email: 'other@coiny.test' });
+    const otherId = await findOrCreateUser({ appleSub: 'other_user_sub' });
     const theirs = await createGoal(otherId, goalInput({ name: 'Not yours' }), NOW);
 
     expect(await getGoal(testUserId, (theirs as { id: number }).id)).toBeNull();
@@ -77,7 +77,7 @@ describe('user scoping', () => {
   it('never archives another user’s goal', async () => {
     const { findOrCreateUser } = await import('../src/store/users.js');
     const { archiveGoal, createGoal, getGoal } = await import('../src/store/target-goals.js');
-    const otherId = await findOrCreateUser({ appleSub: 'other_user_sub', email: 'other@coiny.test' });
+    const otherId = await findOrCreateUser({ appleSub: 'other_user_sub' });
     const theirs = await createGoal(otherId, goalInput({ name: 'Not yours' }), NOW);
 
     await archiveGoal(testUserId, (theirs as { id: number }).id, NOW);
@@ -132,7 +132,7 @@ describe('getFundingActivity', () => {
 
   it('reads empty for an account id belonging to another user', async () => {
     const { findOrCreateUser } = await import('../src/store/users.js');
-    const otherId = await findOrCreateUser({ appleSub: 'other_user_sub', email: 'other@coiny.test' });
+    const otherId = await findOrCreateUser({ appleSub: 'other_user_sub' });
     const { db } = await import('../src/db/client.js');
     const { transactions } = await import('../src/db/schema.js');
     await db()
