@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { db } from '../db/client.js';
 import { sneakerHoldings } from '../db/schema.js';
-import { getSneakerPrice } from '../kicksdb/client.js';
+import { getSneakerFacts } from '../kicksdb/client.js';
 import { SYNC_LIMIT } from './rate-limits.js';
 
 const AddSneakerBodySchema = z.object({
@@ -24,6 +24,7 @@ export function registerSneakersApi(app: FastifyInstance): void {
       size: r.size ?? null,
       quantity: r.quantity,
       lastPriceUsd: r.lastPriceUsd !== null ? parseFloat(r.lastPriceUsd) : null,
+      imageUrl: r.imageUrl ?? null,
       lastSyncedAt: r.lastSyncedAt?.toISOString() ?? null,
       createdAt: r.createdAt.toISOString(),
     }));
@@ -72,14 +73,22 @@ export function registerSneakersApi(app: FastifyInstance): void {
 
     for (const row of rows) {
       try {
-        const price = await getSneakerPrice(row.sku, row.size ?? undefined);
+        const facts = await getSneakerFacts(row.sku, row.size ?? undefined);
+        const price = facts?.priceUsd ?? null;
         if (price === null) {
           errors++;
           continue;
         }
         await db()
           .update(sneakerHoldings)
-          .set({ lastPriceUsd: price.toString(), lastSyncedAt: now })
+          // The image comes from the same response as the price, so it costs
+          // nothing extra. Only overwritten when the vendor sent one: a
+          // response without an image is not a product that lost its picture.
+          .set({
+            lastPriceUsd: price.toString(),
+            lastSyncedAt: now,
+            ...(facts?.imageUrl ? { imageUrl: facts.imageUrl } : {}),
+          })
           .where(and(eq(sneakerHoldings.userId, userId), eq(sneakerHoldings.id, row.id)));
         synced++;
       } catch (err) {

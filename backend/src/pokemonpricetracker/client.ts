@@ -7,6 +7,13 @@ const BASE_URL = 'https://www.pokemonpricetracker.com';
 const CardSchema = z.object({
   name: z.string(),
   setName: z.string().nullable().optional(),
+  // Sized CDN variants. 400px is the list-thumbnail size: 200 is soft on a
+  // 3x retina tile and 800 is four times the bytes for pixels nobody sees.
+  // `imageUrl` also exists and is marked deprecated by the vendor, so it is
+  // read only as a fallback for records the CDN has not backfilled.
+  imageCdnUrl400: z.string().nullable().optional(),
+  imageCdnUrl: z.string().nullable().optional(),
+  imageUrl: z.string().nullable().optional(),
   prices: z
     .object({
       market: z.number().nullable().optional(),
@@ -21,12 +28,19 @@ const SearchResponseSchema = z.object({
   data: z.array(CardSchema),
 });
 
-async function fetchPokemonCardPrice(
+/** A card's price and its picture, from the one search response. */
+export type PokemonCardFacts = {
+  priceUsd: number | null;
+  /** Absolute CDN URL, or null when the vendor has no image for this card. */
+  imageUrl: string | null;
+};
+
+async function fetchPokemonCard(
   cardName: string,
   setName: string | null,
   variant: string | null,
   apiKey: string,
-): Promise<number | null> {
+): Promise<PokemonCardFacts | null> {
   const params = new URLSearchParams({ search: cardName, limit: '20' });
   const res = await fetchWithRetry(`${BASE_URL}/api/v2/cards?${params}`, {
     headers: { Authorization: `Bearer ${apiKey}` },
@@ -48,17 +62,19 @@ async function fetchPokemonCardPrice(
   const card = candidates[0];
   if (!card?.prices) return null;
 
+  const imageUrl = card.imageCdnUrl400 ?? card.imageCdnUrl ?? card.imageUrl ?? null;
+
   if (variant && card.prices.variants) {
     const variantKey = Object.keys(card.prices.variants).find((k) => k.toLowerCase() === variant.toLowerCase());
     if (variantKey) {
       const conditions = card.prices.variants[variantKey]!;
       const firstCondition = Object.values(conditions)[0];
       const price = firstCondition?.price;
-      if (price != null) return price;
+      if (price != null) return { priceUsd: price, imageUrl };
     }
   }
 
-  return card.prices.market ?? null;
+  return { priceUsd: card.prices.market ?? null, imageUrl };
 }
 
 /**
@@ -75,7 +91,7 @@ const cachedPokemon = cachedByKey(
   PRICE_TTL.COLLECTIBLE,
   (cardName: string, setName: string | null, variant: string | null, _apiKey: string) =>
     `${cardName}|${setName ?? ''}|${variant ?? ''}`.toLowerCase(),
-  fetchPokemonCardPrice,
+  fetchPokemonCard,
   // Never cache a null: this client returns null for "could not price this"
   // rather than throwing, and storing it would serve "no price" for a day
   // after one bad request.
@@ -91,6 +107,19 @@ export async function getPokemonCardPrice(
   // Outside the cache deliberately. A missing API key is a config state, not a
   // price, and the cache key excludes the key (a secret has no business in
   // one), so caching this would poison the real lookup.
+  if (!apiKey) return null;
+  const facts = await cachedPokemon(cardName, setName, variant, apiKey);
+  return facts?.priceUsd ?? null;
+}
+
+/** Price and picture together. The image ships in the same response as the
+ *  price, so it costs no extra request. */
+export async function getPokemonCard(
+  cardName: string,
+  setName: string | null,
+  variant: string | null,
+  apiKey: string,
+): Promise<PokemonCardFacts | null> {
   if (!apiKey) return null;
   return cachedPokemon(cardName, setName, variant, apiKey);
 }

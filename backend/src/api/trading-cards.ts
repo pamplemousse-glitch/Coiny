@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { tradingCardHoldings } from '../db/schema.js';
-import { getTradingCardPrice } from '../tcgapi/client.js';
+import { getTradingCard } from '../tcgapi/client.js';
 import { SYNC_LIMIT } from './rate-limits.js';
 
 const AddCardBodySchema = z.object({
@@ -34,6 +34,7 @@ export function registerTradingCardsApi(app: FastifyInstance): void {
       quantity: r.quantity,
       label: r.label ?? null,
       lastPriceUsd: r.lastPriceUsd !== null ? parseFloat(r.lastPriceUsd) : null,
+      imageUrl: r.imageUrl ?? null,
       valueUsd: r.lastPriceUsd !== null ? parseFloat(r.lastPriceUsd) * r.quantity : null,
       lastSyncedAt: r.lastSyncedAt?.toISOString() ?? null,
       createdAt: r.createdAt.toISOString(),
@@ -113,7 +114,7 @@ export function registerTradingCardsApi(app: FastifyInstance): void {
     const now = new Date();
 
     for (const row of rows) {
-      const price = await getTradingCardPrice(
+      const facts = await getTradingCard(
         row.cardName,
         row.game,
         row.setName ?? null,
@@ -121,6 +122,7 @@ export function registerTradingCardsApi(app: FastifyInstance): void {
         config.TCGAPI_KEY,
       ).catch(() => null);
 
+      const price = facts?.priceUsd ?? null;
       if (price === null) {
         errors++;
         continue;
@@ -128,7 +130,12 @@ export function registerTradingCardsApi(app: FastifyInstance): void {
 
       await db()
         .update(tradingCardHoldings)
-        .set({ lastPriceUsd: price.toString(), lastSyncedAt: now })
+        // Image rides along in the same response; only written when present.
+        .set({
+          lastPriceUsd: price.toString(),
+          lastSyncedAt: now,
+          ...(facts?.imageUrl ? { imageUrl: facts.imageUrl } : {}),
+        })
         .where(and(eq(tradingCardHoldings.userId, userId), eq(tradingCardHoldings.id, row.id)));
 
       updated++;

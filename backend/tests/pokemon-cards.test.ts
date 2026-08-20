@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authHeader, resetDatabase, testUserId } from './db-helper.js';
 
 vi.mock('../src/pokemonpricetracker/client.js', () => ({
-  getPokemonCardPrice: vi.fn(),
+  getPokemonCard: vi.fn(),
 }));
 
-import { getPokemonCardPrice } from '../src/pokemonpricetracker/client.js';
+import { getPokemonCard } from '../src/pokemonpricetracker/client.js';
 
-const mockedGetPrice = vi.mocked(getPokemonCardPrice);
+const mockedGetPrice = vi.mocked(getPokemonCard);
 
 describe('GET /api/pokemon-cards', () => {
   beforeEach(async () => {
@@ -238,7 +238,9 @@ describe('POST /api/pokemon-cards/sync', () => {
         { userId: testUserId, cardName: 'Pikachu', quantity: 1 },
       ]);
 
-    mockedGetPrice.mockResolvedValueOnce(450).mockResolvedValueOnce(25);
+    mockedGetPrice
+      .mockResolvedValueOnce({ priceUsd: 450, imageUrl: null })
+      .mockResolvedValueOnce({ priceUsd: 25, imageUrl: null });
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
@@ -266,7 +268,7 @@ describe('POST /api/pokemon-cards/sync', () => {
         { userId: testUserId, cardName: 'Common Card', quantity: 5 },
       ]);
 
-    mockedGetPrice.mockResolvedValueOnce(null).mockResolvedValueOnce(1.5);
+    mockedGetPrice.mockResolvedValueOnce(null).mockResolvedValueOnce({ priceUsd: 1.5, imageUrl: null });
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();

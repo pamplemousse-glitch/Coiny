@@ -33,6 +33,7 @@ export function registerCoinsApi(app: FastifyInstance): void {
       coinName: r.coinName ?? null,
       label: r.label ?? null,
       lastPriceGuideUsd: r.lastPriceGuideUsd !== null ? parseFloat(r.lastPriceGuideUsd) : null,
+      imageUrl: r.imageUrl ?? null,
       valueUsd: r.lastPriceGuideUsd !== null ? parseFloat(r.lastPriceGuideUsd) * r.quantity : null,
       lastSyncedAt: r.lastSyncedAt?.toISOString() ?? null,
       createdAt: r.createdAt.toISOString(),

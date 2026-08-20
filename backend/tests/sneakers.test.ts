@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authHeader, resetDatabase, testUserId } from './db-helper.js';
 
 vi.mock('../src/kicksdb/client.js', () => ({
-  getSneakerPrice: vi.fn(),
+  getSneakerFacts: vi.fn(),
 }));
 
-import { getSneakerPrice } from '../src/kicksdb/client.js';
+import { getSneakerFacts } from '../src/kicksdb/client.js';
 
-const mockedGetSneakerPrice = vi.mocked(getSneakerPrice);
+const mockedGetSneakerFacts = vi.mocked(getSneakerFacts);
 
 describe('GET /api/sneakers', () => {
   beforeEach(async () => {
@@ -193,7 +193,7 @@ describe('POST /api/sneakers/sync', () => {
     const { sneakerHoldings } = await import('../src/db/schema.js');
     await db().insert(sneakerHoldings).values({ userId: testUserId, sku: 'DZ5485-612', size: '10', quantity: 2 });
 
-    mockedGetSneakerPrice.mockResolvedValue(450);
+    mockedGetSneakerFacts.mockResolvedValue({ priceUsd: 450, imageUrl: null });
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
@@ -206,7 +206,7 @@ describe('POST /api/sneakers/sync', () => {
     const holding = list.json<{ lastPriceUsd: number }[]>()[0];
     expect(holding?.lastPriceUsd).toBeCloseTo(450, 0);
 
-    expect(mockedGetSneakerPrice).toHaveBeenCalledWith('DZ5485-612', '10');
+    expect(mockedGetSneakerFacts).toHaveBeenCalledWith('DZ5485-612', '10');
 
     await app.close();
   });
@@ -216,13 +216,13 @@ describe('POST /api/sneakers/sync', () => {
     const { sneakerHoldings } = await import('../src/db/schema.js');
     await db().insert(sneakerHoldings).values({ userId: testUserId, sku: 'FD4449-105', quantity: 1 });
 
-    mockedGetSneakerPrice.mockResolvedValue(200);
+    mockedGetSneakerFacts.mockResolvedValue({ priceUsd: 200, imageUrl: null });
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
 
     await app.inject({ method: 'POST', url: '/api/sneakers/sync', headers: authHeader() });
-    expect(mockedGetSneakerPrice).toHaveBeenCalledWith('FD4449-105', undefined);
+    expect(mockedGetSneakerFacts).toHaveBeenCalledWith('FD4449-105', undefined);
 
     await app.close();
   });
@@ -232,7 +232,7 @@ describe('POST /api/sneakers/sync', () => {
     const { sneakerHoldings } = await import('../src/db/schema.js');
     await db().insert(sneakerHoldings).values({ userId: testUserId, sku: 'UNKNOWN-SKU', quantity: 1 });
 
-    mockedGetSneakerPrice.mockResolvedValue(null);
+    mockedGetSneakerFacts.mockResolvedValue(null);
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
@@ -279,6 +279,75 @@ describe('GET /api/net-worth — sneakers field', () => {
     const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
     expect(res.statusCode).toBe(200);
     expect(res.json<{ sneakers: number }>().sneakers).toBeCloseTo(1080, 0); // 450*2 + 180*1
+    await app.close();
+  });
+});
+
+describe('product images', () => {
+  beforeEach(async () => {
+    vi.resetAllMocks();
+    await resetDatabase();
+  });
+
+  it('stores the image from the same response as the price', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { sneakerHoldings } = await import('../src/db/schema.js');
+    await db().insert(sneakerHoldings).values({ userId: testUserId, sku: 'FD4449-105' });
+
+    mockedGetSneakerFacts.mockResolvedValue({
+      priceUsd: 220,
+      imageUrl: 'https://images.stockx.com/fd4449-105.jpg',
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    await app.inject({ method: 'POST', url: '/api/sneakers/sync', headers: authHeader() });
+
+    const list = await app.inject({ method: 'GET', url: '/api/sneakers', headers: authHeader() });
+    const row = list.json<{ imageUrl: string }[]>()[0];
+    expect(row?.imageUrl).toBe('https://images.stockx.com/fd4449-105.jpg');
+
+    await app.close();
+  });
+
+  // A response without an image is not a product that lost its picture.
+  it('keeps a stored image when a later sync returns none', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { sneakerHoldings } = await import('../src/db/schema.js');
+    await db().insert(sneakerHoldings).values({
+      userId: testUserId,
+      sku: 'FD4449-105',
+      imageUrl: 'https://images.stockx.com/known.jpg',
+    });
+
+    mockedGetSneakerFacts.mockResolvedValue({ priceUsd: 230, imageUrl: null });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    await app.inject({ method: 'POST', url: '/api/sneakers/sync', headers: authHeader() });
+
+    const list = await app.inject({ method: 'GET', url: '/api/sneakers', headers: authHeader() });
+    const row = list.json<{ imageUrl: string; lastPriceUsd: number }[]>()[0];
+    expect(row?.imageUrl).toBe('https://images.stockx.com/known.jpg');
+    // The price still updated; only the image was left alone.
+    expect(row?.lastPriceUsd).toBeCloseTo(230, 0);
+
+    await app.close();
+  });
+
+  it('reports imageUrl as null before any sync', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { sneakerHoldings } = await import('../src/db/schema.js');
+    await db().insert(sneakerHoldings).values({ userId: testUserId, sku: 'FD4449-105' });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    const list = await app.inject({ method: 'GET', url: '/api/sneakers', headers: authHeader() });
+    expect(list.json<{ imageUrl: string | null }[]>()[0]?.imageUrl).toBeNull();
+
     await app.close();
   });
 });
