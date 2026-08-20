@@ -421,6 +421,13 @@
       "when": 1787256973949,
       "tag": "0059_chain_staked_balance",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1787257791694,
+      "tag": "0060_property_confidence_band",
+      "breakpoints": true
     }
   ]
 }

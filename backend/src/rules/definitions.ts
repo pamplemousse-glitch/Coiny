@@ -40,6 +40,20 @@ export type Rule = {
 };
 
 const WEEKLY_BUDGET_CATEGORIES = new Set(['groceries', 'food_and_drink', 'restaurants']);
+
+/** Confidence grades too weak to justify a reaction.
+ *
+ *  Only LOW, and the narrowness is deliberate. Plaid grading its own guess LOW
+ *  is a positive statement that the answer is probably wrong, which is exactly
+ *  what should not drive a reaction.
+ *
+ *  UNKNOWN and a MISSING field are both left permissive. They are dominated by
+ *  transactions categorised from Plaid's legacy taxonomy and by rows written
+ *  before this field existed, so blocking them would not sharpen the signal —
+ *  it would silently switch the rule off for a large slice of real history,
+ *  which is a worse failure than the one being fixed. Absence of evidence
+ *  about quality is not evidence of poor quality. */
+const LOW_CONFIDENCE_CATEGORIES = new Set(['LOW']);
 const CONTRIBUTION_MILESTONES = [0.25, 0.5, 1.0] as const;
 const BILL_CATEGORIES = new Set(['utilities', 'loan_payment', 'rent', 'insurance', 'mortgage']);
 
@@ -121,6 +135,18 @@ export const rules: Rule[] = [
     name: 'overspend_vs_plan',
     match(tx, goals, context) {
       if (!isDebit(tx)) return false;
+      // Do not make the creature react to a category Plaid is unsure about.
+      //
+      // Plaid grades every categorisation VERY_HIGH down to LOW, plus UNKNOWN,
+      // and that grade was typed and read nowhere: a LOW-confidence guess
+      // breached a weekly budget with exactly the authority of a certain one.
+      // The visible cost is a pet that looks worried about a transaction the
+      // user never miscategorised, which teaches them to distrust the whole
+      // signal.
+      //
+      // A user's own override is 'USER' and always passes: their category is
+      // not a guess, and second-guessing it would be the same defect inverted.
+      if (LOW_CONFIDENCE_CATEGORIES.has(tx.details?.categoryConfidence ?? '')) return false;
       const category = tx.details?.category?.toLowerCase() ?? '';
       const limit = goals.weeklyBudgetByCategory[category] ?? null;
       if (limit === null || !WEEKLY_BUDGET_CATEGORIES.has(category)) return false;

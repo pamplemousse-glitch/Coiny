@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { realEstateAssets } from '../db/schema.js';
 import { deriveValueFromPurchase } from '../fred/client.js';
-import { getPropertyValue } from '../realestate/client.js';
+import { getPropertyValuation } from '../realestate/client.js';
 import { SYNC_LIMIT } from './rate-limits.js';
 
 const AddAssetBodySchema = z.object({
@@ -33,6 +33,11 @@ export function registerRealEstateApi(app: FastifyInstance): void {
       // an index-tracked estimate of what a typical home bought at that price
       // would be worth, not an appraisal of this one.
       valuationSource: r.valuationSource ?? null,
+      // The vendor's confidence interval. A $250k estimate with a
+      // $195k-$304k band is not the same claim as one with a $245k-$255k band,
+      // and the client needs both numbers to say so.
+      priceRangeLowUsd: r.priceRangeLowUsd !== null ? parseFloat(r.priceRangeLowUsd) : null,
+      priceRangeHighUsd: r.priceRangeHighUsd !== null ? parseFloat(r.priceRangeHighUsd) : null,
       purchasePriceUsd: r.purchasePriceUsd !== null ? parseFloat(r.purchasePriceUsd) : null,
       purchaseDate: r.purchaseDate ?? null,
       lastSyncedAt: r.lastSyncedAt?.toISOString() ?? null,
@@ -112,10 +117,28 @@ export function registerRealEstateApi(app: FastifyInstance): void {
 
     for (const row of rows) {
       try {
-        const value = await getPropertyValue(row.address);
+        const valuation = await getPropertyValuation(row.address);
         await db()
           .update(realEstateAssets)
-          .set({ lastValueUsd: value.toString(), lastSyncedAt: now, valuationSource: 'avm' })
+          .set({
+            lastValueUsd: valuation.valueUsd.toString(),
+            lastSyncedAt: now,
+            valuationSource: 'avm',
+            // The vendor's own uncertainty, stored rather than replaced with
+            // ours. Null stays null: a missing band is not a narrow one.
+            priceRangeLowUsd: valuation.priceRangeLowUsd?.toString() ?? null,
+            priceRangeHighUsd: valuation.priceRangeHighUsd?.toString() ?? null,
+            // Backfills DR-21's derived-valuation input without asking the
+            // user, but never overwrites a purchase price they entered.
+            ...(valuation.lastSalePriceUsd !== null && row.purchasePriceUsd === null
+              ? {
+                  lastSalePriceUsd: valuation.lastSalePriceUsd.toString(),
+                  lastSaleDate: valuation.lastSaleDate,
+                  purchasePriceUsd: valuation.lastSalePriceUsd.toString(),
+                  purchaseDate: valuation.lastSaleDate,
+                }
+              : {}),
+          })
           .where(and(eq(realEstateAssets.userId, userId), eq(realEstateAssets.id, row.id)));
         synced++;
       } catch (err) {

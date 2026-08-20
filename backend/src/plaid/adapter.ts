@@ -137,6 +137,14 @@ export async function plaidTxToInternal(
   const category =
     override ?? mapCategory(plaidTx.personal_finance_category?.detailed) ?? mapLegacyCategory(plaidTx.category);
 
+  // Where the category came from decides how much to trust it. A user override
+  // is not a guess. Plaid's own confidence applies only when Plaid supplied
+  // the answer; falling back to the legacy taxonomy carries no confidence
+  // signal at all, which is UNKNOWN rather than a quiet assumption of quality.
+  const categoryConfidence = override
+    ? ('USER' as const)
+    : (plaidTx.personal_finance_category?.confidence_level ?? ('UNKNOWN' as const));
+
   const logoUrl = plaidTx.logo_url ?? plaidTx.counterparties?.find((c) => c.logo_url)?.logo_url ?? null;
 
   return {
@@ -150,6 +158,7 @@ export async function plaidTxToInternal(
     running_balance: accountBalance == null ? null : accountBalance.toFixed(2),
     details: {
       category,
+      categoryConfidence,
       ...(counterparty ? { counterparty: { name: counterparty, type: 'organization' } } : {}),
       ...(logoUrl ? { logo_url: logoUrl } : {}),
     },
