@@ -523,7 +523,11 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
   );
 
   classes.metals = rollupRows(
-    metalRows.map((r): SimpleRow => ({ valueUsd: num(r.lastValueUsd), syncedAt: r.lastSyncedAt })),
+    // The vendor's quote time in preference to our fetch time. Metals markets
+    // close at weekends, so a Sunday sync holds Friday's close; reporting that
+    // as seconds old is a freshness claim we cannot support. Falls back to
+    // lastSyncedAt for pre-0058 rows and for vendors that send no timestamp.
+    metalRows.map((r): SimpleRow => ({ valueUsd: num(r.lastValueUsd), syncedAt: r.priceAsOf ?? r.lastSyncedAt })),
     FRESHNESS.metals,
     now,
   );

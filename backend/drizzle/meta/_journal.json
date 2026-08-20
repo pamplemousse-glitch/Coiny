@@ -407,6 +407,13 @@
       "when": 1787182515780,
       "tag": "0057_collectible_images",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1787256064479,
+      "tag": "0058_vendor_price_as_of",
+      "breakpoints": true
     }
   ]
 }

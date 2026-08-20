@@ -1,0 +1,16 @@
+-- When the QUOTE was struck, as distinct from when we fetched it.
+--
+-- `last_synced_at` has always been our own fetch time, and the freshness
+-- system in networth/classes.ts measures age against it. That is the wrong
+-- input wherever the vendor tells us how old the number actually is.
+--
+-- Metals are the clearest case: the market closes at weekends, so a Sunday
+-- refresh returns Friday's close and we stamped it "seconds old". GoldAPI
+-- sends `timestamp` in the same response and we discarded it.
+--
+-- Nullable, and the reader falls back to `last_synced_at` when it is null:
+-- rows written before this column existed, and vendors that send no
+-- timestamp, keep exactly the behaviour they had.
+--
+-- Idempotent, per the convention 0033 established.
+ALTER TABLE "metal_holdings" ADD COLUMN IF NOT EXISTS "price_as_of" timestamp with time zone;

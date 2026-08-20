@@ -114,6 +114,7 @@ export async function refreshInvestments(userId: string): Promise<RefreshOutcome
   let total = 0;
   let cashEquivalent = 0;
   let unvested = 0;
+  let oldestPricedAt: Date | null = null;
   // Assembly now lives in goals/snapshot.ts and is shared. The type was
   // already shared to stop the two paths drifting; the LOGIC was not, so a
   // rule added in one was silently missing from the other. Vesting is exactly
@@ -125,12 +126,20 @@ export async function refreshInvestments(userId: string): Promise<RefreshOutcome
     total += summarised.total;
     cashEquivalent += summarised.cashEquivalentTotal;
     unvested += summarised.unvestedTotal;
+    if (summarised.oldestPricedAt !== null && (oldestPricedAt === null || summarised.oldestPricedAt < oldestPricedAt)) {
+      oldestPricedAt = summarised.oldestPricedAt;
+    }
     holdings.push(...summarised.holdings);
   }
 
   await recordClassSuccess(userId, 'investments', {
     valueUsd: total,
     payload: { holdings, cashEquivalent, unvested },
+    // The institution's own pricing time, not ours. A brokerage that last
+    // priced a holding on Friday does not become fresh because we asked on
+    // Sunday. Omitted when no holding carried one, which leaves the previous
+    // fetch-time behaviour intact.
+    ...(oldestPricedAt !== null ? { asOf: oldestPricedAt } : {}),
   });
   return 'refreshed';
 }
