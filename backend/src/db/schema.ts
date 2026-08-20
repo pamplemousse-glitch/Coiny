@@ -398,6 +398,14 @@ export const realEstateAssets = pgTable(
     // a typical US home bought at that price on that date would be worth now,
     // and R-8.1 requires that a number never be presented as something it is not.
     valuationSource: text('valuation_source').$type<'avm' | 'derived'>(),
+    // RentCast's own confidence interval (0060). Null means the vendor sent
+    // none; it is never inferred from the estimate.
+    priceRangeLowUsd: numeric('price_range_low_usd'),
+    priceRangeHighUsd: numeric('price_range_high_usd'),
+    // The last recorded sale, which RentCast returns alongside the estimate.
+    // This is DR-21's derived-valuation input arriving for free.
+    lastSalePriceUsd: numeric('last_sale_price_usd'),
+    lastSaleDate: date('last_sale_date'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('real_estate_assets_user_address_idx').on(t.userId, t.address)],

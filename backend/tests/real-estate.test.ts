@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authHeader, resetDatabase, testUserId } from './db-helper.js';
 
 vi.mock('../src/realestate/client.js', () => ({
-  getPropertyValue: vi.fn(),
+  getPropertyValuation: vi.fn(),
 }));
 
 vi.mock('../src/fred/client.js', () => ({
@@ -10,9 +10,9 @@ vi.mock('../src/fred/client.js', () => ({
 }));
 
 import { deriveValueFromPurchase } from '../src/fred/client.js';
-import { getPropertyValue } from '../src/realestate/client.js';
+import { getPropertyValuation } from '../src/realestate/client.js';
 
-const mockedGetPropertyValue = vi.mocked(getPropertyValue);
+const mockedGetPropertyValue = vi.mocked(getPropertyValuation);
 const mockedDerive = vi.mocked(deriveValueFromPurchase);
 
 describe('GET /api/real-estate', () => {
@@ -191,7 +191,13 @@ describe('POST /api/real-estate/sync', () => {
     const { realEstateAssets } = await import('../src/db/schema.js');
     await db().insert(realEstateAssets).values({ userId: testUserId, address: '123 Main St' });
 
-    mockedGetPropertyValue.mockResolvedValue(450000);
+    mockedGetPropertyValue.mockResolvedValue({
+      valueUsd: 450000,
+      priceRangeLowUsd: null,
+      priceRangeHighUsd: null,
+      lastSalePriceUsd: null,
+      lastSaleDate: null,
+    });
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
@@ -234,7 +240,13 @@ describe('POST /api/real-estate/sync', () => {
         { userId: testUserId, address: '222 Ok Ave' },
       ]);
 
-    mockedGetPropertyValue.mockRejectedValueOnce(new Error('API timeout')).mockResolvedValueOnce(300000);
+    mockedGetPropertyValue.mockRejectedValueOnce(new Error('API timeout')).mockResolvedValueOnce({
+      valueUsd: 300000,
+      priceRangeLowUsd: null,
+      priceRangeHighUsd: null,
+      lastSalePriceUsd: null,
+      lastSaleDate: null,
+    });
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
@@ -394,7 +406,13 @@ describe('derived valuation (DR-21)', () => {
       purchaseDate: '2010-06-01',
     });
 
-    mockedGetPropertyValue.mockResolvedValue(700000);
+    mockedGetPropertyValue.mockResolvedValue({
+      valueUsd: 700000,
+      priceRangeLowUsd: null,
+      priceRangeHighUsd: null,
+      lastSalePriceUsd: null,
+      lastSaleDate: null,
+    });
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
@@ -405,6 +423,124 @@ describe('derived valuation (DR-21)', () => {
 
     const list = await app.inject({ method: 'GET', url: '/api/real-estate', headers: authHeader() });
     expect(list.json<{ valuationSource: string }[]>()[0]?.valuationSource).toBe('avm');
+
+    await app.close();
+  });
+});
+
+describe('RentCast confidence band and last sale', () => {
+  beforeEach(async () => {
+    vi.resetAllMocks();
+    mockedDerive.mockResolvedValue(null);
+    await resetDatabase();
+  });
+
+  // A $250k estimate with a $195k-$304k band is roughly plus or minus 22% on
+  // the largest asset most Americans own. We stored the midpoint as a hard
+  // number and dropped the interval the vendor sent with it.
+  it('stores and returns the vendor confidence interval', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { realEstateAssets } = await import('../src/db/schema.js');
+    await db().insert(realEstateAssets).values({ userId: testUserId, address: '1 Test St' });
+
+    mockedGetPropertyValue.mockResolvedValue({
+      valueUsd: 250_000,
+      priceRangeLowUsd: 195_000,
+      priceRangeHighUsd: 304_000,
+      lastSalePriceUsd: null,
+      lastSaleDate: null,
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    await app.inject({ method: 'POST', url: '/api/real-estate/sync', headers: authHeader() });
+
+    const list = await app.inject({ method: 'GET', url: '/api/real-estate', headers: authHeader() });
+    const a = list.json<{ priceRangeLowUsd: number; priceRangeHighUsd: number }[]>()[0];
+    expect(a?.priceRangeLowUsd).toBeCloseTo(195_000, 0);
+    expect(a?.priceRangeHighUsd).toBeCloseTo(304_000, 0);
+
+    await app.close();
+  });
+
+  // A missing band is not a narrow one.
+  it('leaves the band null when the vendor sends none', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { realEstateAssets } = await import('../src/db/schema.js');
+    await db().insert(realEstateAssets).values({ userId: testUserId, address: '2 Test St' });
+
+    mockedGetPropertyValue.mockResolvedValue({
+      valueUsd: 250_000,
+      priceRangeLowUsd: null,
+      priceRangeHighUsd: null,
+      lastSalePriceUsd: null,
+      lastSaleDate: null,
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    await app.inject({ method: 'POST', url: '/api/real-estate/sync', headers: authHeader() });
+
+    const list = await app.inject({ method: 'GET', url: '/api/real-estate', headers: authHeader() });
+    expect(list.json<{ priceRangeLowUsd: number | null }[]>()[0]?.priceRangeLowUsd).toBeNull();
+
+    await app.close();
+  });
+
+  // DR-21's derived valuation was recorded as blocked for want of a purchase
+  // price. RentCast returns one in the response we already pay for.
+  it('backfills the purchase price from the last recorded sale', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { realEstateAssets } = await import('../src/db/schema.js');
+    await db().insert(realEstateAssets).values({ userId: testUserId, address: '3 Test St' });
+
+    mockedGetPropertyValue.mockResolvedValue({
+      valueUsd: 400_000,
+      priceRangeLowUsd: null,
+      priceRangeHighUsd: null,
+      lastSalePriceUsd: 250_000,
+      lastSaleDate: '2015-06-01',
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    await app.inject({ method: 'POST', url: '/api/real-estate/sync', headers: authHeader() });
+
+    const list = await app.inject({ method: 'GET', url: '/api/real-estate', headers: authHeader() });
+    const a = list.json<{ purchasePriceUsd: number; purchaseDate: string }[]>()[0];
+    expect(a?.purchasePriceUsd).toBeCloseTo(250_000, 0);
+    expect(a?.purchaseDate).toBe('2015-06-01');
+
+    await app.close();
+  });
+
+  // The user is the better source about their own house.
+  it('never overwrites a purchase price the user entered', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { realEstateAssets } = await import('../src/db/schema.js');
+    await db().insert(realEstateAssets).values({
+      userId: testUserId,
+      address: '4 Test St',
+      purchasePriceUsd: '310000',
+      purchaseDate: '2016-01-01',
+    });
+
+    mockedGetPropertyValue.mockResolvedValue({
+      valueUsd: 400_000,
+      priceRangeLowUsd: null,
+      priceRangeHighUsd: null,
+      lastSalePriceUsd: 250_000,
+      lastSaleDate: '2015-06-01',
+    });
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    await app.inject({ method: 'POST', url: '/api/real-estate/sync', headers: authHeader() });
+
+    const list = await app.inject({ method: 'GET', url: '/api/real-estate', headers: authHeader() });
+    const a = list.json<{ purchasePriceUsd: number; purchaseDate: string }[]>()[0];
+    expect(a?.purchasePriceUsd).toBeCloseTo(310_000, 0);
+    expect(a?.purchaseDate).toBe('2016-01-01');
 
     await app.close();
   });
