@@ -12,6 +12,7 @@ import { db } from '../db/client.js';
 import { spinwheelConnections } from '../db/schema.js';
 import { countsAsLiquidCash } from '../networth/account-taxonomy.js';
 import { accountsBalanceGet, investmentsHoldingsGet, liabilitiesGet } from '../plaid/client.js';
+import type { PlaidHolding, PlaidSecurity } from '../plaid/types.js';
 import { getDebtProfile, type SpinwheelDebt } from '../spinwheel/client.js';
 import { getItemsByUser } from '../store/items.js';
 import { getCachedLiabilities } from '../store/plaid-liabilities.js';
@@ -47,6 +48,25 @@ export type HoldingSummary = {
    * be a type that lies about what is actually in the database.
    */
   securityType?: string | null;
+  /**
+   * Plaid's `subtype`, finer than `securityType`: 'money market', 'option',
+   * 'etf'. Optional for the same cached-payload reason as `securityType`.
+   */
+  securitySubtype?: string | null;
+  /** True when Plaid classes this security as cash rather than an investment.
+   *  See PlaidSecurity.is_cash_equivalent for why it is not the same question
+   *  as the account subtype #274 handled. */
+  isCashEquivalent?: boolean | null;
+  /**
+   * The unvested portion of an equity grant, in dollars, excluded from
+   * `value`. Zero or absent on ordinary holdings.
+   *
+   * Kept alongside rather than silently dropped: "you have $180,000 of stock"
+   * and "you have $60,000 of stock and $120,000 you do not own yet" are
+   * different facts, and only one of them is money. The client can show the
+   * unvested figure as context without it ever reaching the total.
+   */
+  unvestedValue?: number | null;
   /**
    * Which account holds it. Plaid returns this on every holding and we dropped
    * it, so there was no way to say "this ETF is inside your Roth IRA" even
@@ -113,6 +133,61 @@ type LiabilityMeta = {
   isOverdue: boolean | null;
   primaryApr: number | null;
 };
+
+/**
+ * Turns one `/investments/holdings/get` response into summaries plus a total.
+ *
+ * Extracted because this ran in TWO places — here and networth/refresh.ts —
+ * assembling the same cached payload from the same inputs. The comment above
+ * HoldingSummary says the type was extracted to stop those two drifting; the
+ * LOGIC had not been, so a rule added in one was silently absent from the
+ * other. Vesting is exactly the kind of rule that must not be half-applied.
+ *
+ * THE COUNTED VALUE is `vested_value` when Plaid supplies one, and
+ * `institution_value` otherwise. Plaid returns `vested_value` only for
+ * equity-compensation holdings, so ordinary shares are unaffected: their
+ * `institution_value` already is entirely the user's.
+ */
+export function summariseHoldings(
+  holdings: PlaidHolding[],
+  securities: PlaidSecurity[],
+): { holdings: HoldingSummary[]; total: number; cashEquivalentTotal: number; unvestedTotal: number } {
+  const secMap = new Map(securities.map((s) => [s.security_id, s]));
+  const summaries: HoldingSummary[] = [];
+  let total = 0;
+  let cashEquivalentTotal = 0;
+  let unvestedTotal = 0;
+
+  for (const h of holdings) {
+    const marketValue = h.institution_value ?? 0;
+    // `?? null` rather than a falsy check: a genuinely fully-unvested grant has
+    // vested_value 0, and 0 is a real answer meaning "none of this is yours".
+    // Treating it as absent would count the whole grant.
+    const vested = h.vested_value ?? null;
+    const value = vested ?? marketValue;
+    const unvested = vested === null ? 0 : Math.max(0, marketValue - vested);
+
+    total += value;
+    unvestedTotal += unvested;
+
+    const sec = secMap.get(h.security_id);
+    if (sec?.is_cash_equivalent) cashEquivalentTotal += value;
+
+    summaries.push({
+      securityId: h.security_id,
+      name: sec?.name ?? null,
+      ticker: sec?.ticker_symbol ?? null,
+      value,
+      securityType: sec?.type ?? null,
+      securitySubtype: sec?.subtype ?? null,
+      isCashEquivalent: sec?.is_cash_equivalent ?? null,
+      unvestedValue: unvested,
+      accountId: h.account_id ?? null,
+    });
+  }
+
+  return { holdings: summaries, total, cashEquivalentTotal, unvestedTotal };
+}
 
 export async function fetchPlaidSnapshot(userId: string): Promise<PlaidSnapshot> {
   try {
@@ -226,7 +301,7 @@ export async function fetchPlaidSnapshot(userId: string): Promise<PlaidSnapshot>
       }
     }
 
-    // Investment holdings: sum institution_value across all securities.
+    // Investment holdings, counting only what the user actually owns.
     let investmentsTotal = 0;
     let holdingsFailure: unknown = null;
     const investmentHoldings: HoldingSummary[] = [];
@@ -235,20 +310,9 @@ export async function fetchPlaidSnapshot(userId: string): Promise<PlaidSnapshot>
         if (holdingsFailure === null) holdingsFailure = result.reason;
         continue;
       }
-      const secMap = new Map(result.value.securities.map((s) => [s.security_id, s]));
-      for (const h of result.value.holdings) {
-        const value = h.institution_value ?? 0;
-        investmentsTotal += value;
-        const sec = secMap.get(h.security_id);
-        investmentHoldings.push({
-          securityId: h.security_id,
-          name: sec?.name ?? null,
-          ticker: sec?.ticker_symbol ?? null,
-          value,
-          securityType: sec?.type ?? null,
-          accountId: h.account_id ?? null,
-        });
-      }
+      const summarised = summariseHoldings(result.value.holdings, result.value.securities);
+      investmentsTotal += summarised.total;
+      investmentHoldings.push(...summarised.holdings);
     }
 
     return {

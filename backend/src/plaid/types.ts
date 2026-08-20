@@ -145,6 +145,28 @@ export type PlaidHolding = {
   institution_value: number | null; // market value = quantity × price
   quantity: number;
   cost_basis: number | null;
+  /**
+   * The vested portion of an equity-compensation holding (RSUs, ESPP, options
+   * in a `stock plan` account). Null on ordinary holdings, which is not an
+   * error: a share you bought is entirely yours.
+   *
+   * WHY THIS MATTERS: `institution_value` is the WHOLE grant, vested and
+   * unvested together. Unvested equity is not the user's money yet — leave the
+   * employer before the cliff and it never becomes theirs — so counting it
+   * inflates net worth in the flattering direction. Same defect class as the
+   * five-year CD that #274 stopped counting as emergency cash.
+   *
+   * DR-22 concluded vesting was not modellable because "no integration exposes
+   * it". DR-32 corrects that on the evidence of these two fields, and DR-22's
+   * own closing line makes the revisit conditional on exactly this: "Revisit
+   * only if an integration ever exposes the vested split."
+   *
+   * DR-22's other holding stands untouched: ladder rung 2 is about CAPTURE,
+   * not ownership, so it must not be gated on vesting. This changes the
+   * net-worth figure only.
+   */
+  vested_quantity?: number | null;
+  vested_value?: number | null;
 };
 
 export type PlaidSecurity = {
@@ -152,6 +174,21 @@ export type PlaidSecurity = {
   name: string | null;
   ticker_symbol: string | null;
   type: string | null; // 'equity' | 'mutual_fund' | 'etf' | 'fixed_income' | etc.
+  /** Finer than `type`: 'etf', 'option', 'money market', and so on. */
+  subtype?: string | null;
+  /**
+   * Plaid's own answer to "is this security really cash".
+   *
+   * The MIRROR of #274. That PR stopped a five-year CD counting as emergency
+   * cash, using Plaid's depository account SUBTYPES
+   * (networth/account-taxonomy.ts). But a money market fund held as a SECURITY
+   * inside a brokerage never reaches that code: it arrives as a holding, not
+   * as an account, so it lands in the investments class and counts as invested
+   * when it is in fact spendable cash.
+   *
+   * #274 fixed the overstating direction. This is the understating one.
+   */
+  is_cash_equivalent?: boolean | null;
 };
 
 export type InvestmentsHoldingsGetResponse = {
