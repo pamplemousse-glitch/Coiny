@@ -5,11 +5,11 @@ import { getAptosBalance } from '../chains/aptos.js';
 import { getBitcoinBalance } from '../chains/bitcoin.js';
 import { getBlockcypherBalance } from '../chains/blockcypher.js';
 import { getCardanoBalance } from '../chains/cardano.js';
-import { getCosmosBalance } from '../chains/cosmos.js';
+import { getCosmosBalance, getCosmosStakedBalance } from '../chains/cosmos.js';
 import { getHederaBalance } from '../chains/hedera.js';
 import { getNearBalance } from '../chains/near.js';
 import { getPolkadotBalance } from '../chains/polkadot.js';
-import { getSolanaTotalBalance } from '../chains/solana.js';
+import { getSolanaBalance, getSolanaStakedBalance } from '../chains/solana.js';
 import { getStellarBalance } from '../chains/stellar.js';
 import { getSuiBalance } from '../chains/sui.js';
 import { getTonBalance } from '../chains/ton.js';
@@ -41,6 +41,21 @@ export const CHAIN_SYMBOLS: Record<string, string> = {
 };
 
 // Returns native-unit balance for the given chain and address.
+/**
+ * A chain balance, with staking kept SEPARATE rather than folded in.
+ *
+ * The audit found the same shape three times — Solana computed liquid and
+ * staked then returned their sum, Kraken stripped its staking suffixes and
+ * merged the balances, Zerion's five-way split was parsed and discarded. In
+ * every case a real distinction was collapsed into one number. "You have
+ * 1,000 ATOM" and "you have 300 ATOM and 700 you cannot touch for 21 days"
+ * are different facts, and only one of them is spendable.
+ *
+ * `staked: null` means unknown, NOT zero: either the chain client has no
+ * staking support or the call failed. Only a number is a claim.
+ */
+export type ChainBalance = { total: number; staked: number | null };
+
 // Returns null when no client is available for the chain yet — each chain PR
 // adds a case — AND when the chain's client could not determine the balance.
 // Both mean "unknown", and the caller must treat them the same way: leave the
@@ -75,10 +90,41 @@ export async function fetchNativeBalance(chain: string, address: string): Promis
     case 'ton':
       return getTonBalance(address);
     case 'solana':
-      return getSolanaTotalBalance(address, config.HELIUS_API_KEY);
+      // LIQUID only. getSolanaTotalBalance folds staked in, and
+      // fetchChainBalance adds staked itself — using it here would count the
+      // delegated balance twice.
+      return getSolanaBalance(address, config.HELIUS_API_KEY);
     default:
       return null;
   }
+}
+
+/**
+ * Liquid balance plus staked balance, for the chains whose clients can read
+ * one. Everything else reports `staked: null`, which the caller stores as
+ * unknown rather than as zero.
+ *
+ * Cosmos and Osmosis read delegations and unclaimed rewards; Solana reads its
+ * delegated stake accounts. The other nine chains read liquid balance only —
+ * NEAR, Aptos, Sui, TON and Polkadot all have real staking ecosystems and are
+ * still understated. Polkadot in particular is one Subscan field (`bonded`)
+ * away, and is left out here only because Subscan refuses unauthenticated
+ * requests, so the response shape could not be verified rather than guessed.
+ */
+export async function fetchChainBalance(chain: string, address: string): Promise<ChainBalance | null> {
+  const liquid = await fetchNativeBalance(chain, address);
+  if (liquid === null) return null;
+
+  let staked: number | null = null;
+  if (chain === 'cosmos' || chain === 'osmosis') {
+    // A staking failure must not discard a good liquid balance: unknown
+    // staking is recorded as unknown, and the liquid figure still stands.
+    staked = await getCosmosStakedBalance(chain, address).catch(() => null);
+  } else if (chain === 'solana') {
+    staked = await getSolanaStakedBalance(address, config.HELIUS_API_KEY).catch(() => null);
+  }
+
+  return { total: liquid + (staked ?? 0), staked };
 }
 
 const AddWalletBodySchema = z.object({
@@ -114,6 +160,8 @@ export function registerChainWalletsApi(app: FastifyInstance): void {
       address: r.address,
       label: r.label ?? null,
       lastBalanceUsd: r.lastBalanceUsd !== null ? parseFloat(r.lastBalanceUsd) : null,
+      // Included IN lastBalanceUsd, not additional to it. Null means unknown.
+      lastStakedUsd: r.lastStakedUsd !== null ? parseFloat(r.lastStakedUsd) : null,
       lastSyncedAt: r.lastSyncedAt?.toISOString() ?? null,
       createdAt: r.createdAt.toISOString(),
     }));
@@ -169,7 +217,8 @@ export function registerChainWalletsApi(app: FastifyInstance): void {
     const now = new Date();
 
     for (const row of rows) {
-      const nativeBalance = await fetchNativeBalance(row.chain, row.address);
+      const chainBalance = await fetchChainBalance(row.chain, row.address);
+      const nativeBalance = chainBalance?.total ?? null;
 
       // The balance half of the same rule the price half enforces below: a
       // balance we could not read is NOT a balance of zero. Every chain client
@@ -208,10 +257,17 @@ export function registerChainWalletsApi(app: FastifyInstance): void {
       }
 
       const balanceUsd = nativeBalance * price;
+      const stakedUsd = chainBalance?.staked ?? null;
 
       await db()
         .update(chainWallets)
-        .set({ lastBalanceUsd: balanceUsd.toString(), lastSyncedAt: now })
+        .set({
+          lastBalanceUsd: balanceUsd.toString(),
+          lastSyncedAt: now,
+          // Null stays null: unknown staking is recorded as unknown rather
+          // than written as zero, the same rule as the balance itself.
+          lastStakedUsd: stakedUsd !== null ? (stakedUsd * price).toString() : null,
+        })
         .where(and(eq(chainWallets.userId, userId), eq(chainWallets.id, row.id)));
 
       updated++;

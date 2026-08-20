@@ -414,6 +414,13 @@
       "when": 1787256064479,
       "tag": "0058_vendor_price_as_of",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1787256973949,
+      "tag": "0059_chain_staked_balance",
+      "breakpoints": true
     }
   ]
 }

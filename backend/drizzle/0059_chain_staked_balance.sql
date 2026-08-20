@@ -1,0 +1,15 @@
+-- The staked half of a chain wallet, kept rather than folded into the total.
+--
+-- Three separate places computed a liquid/staked split and then returned their
+-- sum: Solana added them, Kraken stripped its .S/.M/.B/.F/.T suffixes and
+-- merged the balances, Zerion's five-way distribution was parsed and thrown
+-- away. In each case a real distinction became one number. "You have 1,000
+-- ATOM" and "you have 300 ATOM and 700 you cannot touch for 21 days" are
+-- different facts, and only one of them is spendable.
+--
+-- NULL means UNKNOWN, not zero: nine of the eleven chains have no staking
+-- support in their client, and a failed staking call must not read as "stakes
+-- nothing". Only a number is a claim.
+--
+-- Idempotent, per the convention 0033 established.
+ALTER TABLE "chain_wallets" ADD COLUMN IF NOT EXISTS "last_staked_usd" numeric;

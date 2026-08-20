@@ -20,6 +20,7 @@ vi.mock('../src/chains/blockcypher.js', () => ({
 }));
 vi.mock('../src/chains/cosmos.js', () => ({
   getCosmosBalance: vi.fn(),
+  getCosmosStakedBalance: vi.fn(),
 }));
 vi.mock('../src/chains/near.js', () => ({
   getNearBalance: vi.fn(),
@@ -36,7 +37,7 @@ vi.mock('../src/chains/hedera.js', () => ({
 
 import { getBitcoinBalance } from '../src/chains/bitcoin.js';
 import { getBlockcypherBalance } from '../src/chains/blockcypher.js';
-import { getCosmosBalance } from '../src/chains/cosmos.js';
+import { getCosmosBalance, getCosmosStakedBalance } from '../src/chains/cosmos.js';
 import { getStellarBalance } from '../src/chains/stellar.js';
 import { getXrpBalance } from '../src/chains/xrp.js';
 import { getSpotPrices } from '../src/coinbase/client.js';
@@ -47,10 +48,13 @@ const mockedGetXrpBalance = vi.mocked(getXrpBalance);
 const mockedGetStellarBalance = vi.mocked(getStellarBalance);
 const mockedGetBlockcypherBalance = vi.mocked(getBlockcypherBalance);
 const mockedGetCosmosBalance = vi.mocked(getCosmosBalance);
+const mockedGetCosmosStaked = vi.mocked(getCosmosStakedBalance);
 
 describe('GET /api/chain-wallets', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    // Staking unknown by default, which is what every pre-0059 test assumed.
+    mockedGetCosmosStaked.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -98,6 +102,8 @@ describe('GET /api/chain-wallets', () => {
 describe('POST /api/chain-wallets', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    // Staking unknown by default, which is what every pre-0059 test assumed.
+    mockedGetCosmosStaked.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -220,6 +226,8 @@ describe('POST /api/chain-wallets', () => {
 describe('DELETE /api/chain-wallets/:chain/:address', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    // Staking unknown by default, which is what every pre-0059 test assumed.
+    mockedGetCosmosStaked.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -262,6 +270,8 @@ describe('DELETE /api/chain-wallets/:chain/:address', () => {
 describe('POST /api/chain-wallets/sync', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    // Staking unknown by default, which is what every pre-0059 test assumed.
+    mockedGetCosmosStaked.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -431,6 +441,8 @@ describe('POST /api/chain-wallets/sync', () => {
 describe('GET /api/net-worth — chainWallets field', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    // Staking unknown by default, which is what every pre-0059 test assumed.
+    mockedGetCosmosStaked.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -464,6 +476,86 @@ describe('GET /api/net-worth — chainWallets field', () => {
     expect(res.statusCode).toBe(200);
     const body = res.json<{ chainWallets: number; total: number }>();
     expect(body.chainWallets).toBeCloseTo(46200.5, 1);
+
+    await app.close();
+  });
+});
+
+describe('staked balances are counted and kept separate', () => {
+  beforeEach(async () => {
+    vi.resetAllMocks();
+    mockedGetCosmosStaked.mockResolvedValue(null);
+    await resetDatabase();
+  });
+
+  // The understatement: ATOM staking runs around two thirds of supply, so the
+  // bank balance alone was a fraction of a typical holder's position.
+  it('adds staked ATOM to the total and records the split', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { chainWallets } = await import('../src/db/schema.js');
+    await db().insert(chainWallets).values({ userId: testUserId, chain: 'cosmos', address: 'cosmos1s' });
+
+    mockedGetCosmosBalance.mockResolvedValue(100); // liquid
+    mockedGetCosmosStaked.mockResolvedValue(300); // delegated + rewards
+    mockedGetSpotPrices.mockResolvedValue(new Map([['ATOM', 5]]));
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    await app.inject({ method: 'POST', url: '/api/chain-wallets/sync', headers: authHeader() });
+
+    const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
+    const w = list.json<{ lastBalanceUsd: number; lastStakedUsd: number }[]>()[0];
+
+    // 400 ATOM at $5. Before this, only the 100 liquid were counted.
+    expect(w?.lastBalanceUsd).toBeCloseTo(2000, 0);
+    // The split survives rather than being merged away.
+    expect(w?.lastStakedUsd).toBeCloseTo(1500, 0);
+
+    await app.close();
+  });
+
+  // Unknown is not zero, the same rule as the balance itself.
+  it('records staking as null when the staking call cannot answer', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { chainWallets } = await import('../src/db/schema.js');
+    await db().insert(chainWallets).values({ userId: testUserId, chain: 'cosmos', address: 'cosmos1u' });
+
+    mockedGetCosmosBalance.mockResolvedValue(100);
+    mockedGetCosmosStaked.mockResolvedValue(null);
+    mockedGetSpotPrices.mockResolvedValue(new Map([['ATOM', 5]]));
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    await app.inject({ method: 'POST', url: '/api/chain-wallets/sync', headers: authHeader() });
+
+    const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
+    const w = list.json<{ lastBalanceUsd: number; lastStakedUsd: number | null }[]>()[0];
+
+    // The liquid balance still stands; staking is recorded as unknown.
+    expect(w?.lastBalanceUsd).toBeCloseTo(500, 0);
+    expect(w?.lastStakedUsd).toBeNull();
+
+    await app.close();
+  });
+
+  // A chain whose client cannot read staking must not report zero staked.
+  it('reports staking as unknown for a chain with no staking support', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { chainWallets } = await import('../src/db/schema.js');
+    await db().insert(chainWallets).values({ userId: testUserId, chain: 'bitcoin', address: 'bc1q' });
+
+    mockedGetBitcoinBalance.mockResolvedValue(1);
+    mockedGetSpotPrices.mockResolvedValue(new Map([['BTC', 60000]]));
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+
+    await app.inject({ method: 'POST', url: '/api/chain-wallets/sync', headers: authHeader() });
+
+    const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
+    expect(list.json<{ lastStakedUsd: number | null }[]>()[0]?.lastStakedUsd).toBeNull();
 
     await app.close();
   });
