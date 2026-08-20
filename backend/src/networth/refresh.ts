@@ -11,7 +11,7 @@ import { isSharedCoinbaseKeyAllowed } from '../config.js';
 import { db } from '../db/client.js';
 import { coinbaseConnections, petState, zerionWallets } from '../db/schema.js';
 import { refreshGoalSystem } from '../goals/refresh.js';
-import { fetchDebtSnapshot, fetchPlaidSnapshot, type HoldingSummary } from '../goals/snapshot.js';
+import { fetchDebtSnapshot, fetchPlaidSnapshot, type HoldingSummary, summariseHoldings } from '../goals/snapshot.js';
 import { investmentsHoldingsGet, liabilitiesGet } from '../plaid/client.js';
 import { dispatchReaction } from '../reactions/dispatch.js';
 import { evaluateExternalEvent } from '../reactions/external.js';
@@ -112,32 +112,26 @@ export async function refreshInvestments(userId: string): Promise<RefreshOutcome
   }
 
   let total = 0;
-  // Typed as HoldingSummary rather than restating the shape inline. This
-  // function and goals/snapshot.ts both assemble holdings into the SAME cache
-  // payload, and the inline structural type here meant the two could drift
-  // without the compiler noticing: adding a field in one left the scheduler
-  // quietly writing the older, thinner shape. That drift is the thing
-  // snapshot.ts's header comment says the extraction existed to prevent.
+  let cashEquivalent = 0;
+  let unvested = 0;
+  // Assembly now lives in goals/snapshot.ts and is shared. The type was
+  // already shared to stop the two paths drifting; the LOGIC was not, so a
+  // rule added in one was silently missing from the other. Vesting is exactly
+  // the kind of rule that must not be applied on only one of two code paths.
   const holdings: HoldingSummary[] = [];
   for (const result of results) {
     if (result.status !== 'fulfilled') continue;
-    const secMap = new Map(result.value.securities.map((s) => [s.security_id, s]));
-    for (const h of result.value.holdings) {
-      const value = h.institution_value ?? 0;
-      total += value;
-      const sec = secMap.get(h.security_id);
-      holdings.push({
-        securityId: h.security_id,
-        name: sec?.name ?? null,
-        ticker: sec?.ticker_symbol ?? null,
-        value,
-        securityType: sec?.type ?? null,
-        accountId: h.account_id ?? null,
-      });
-    }
+    const summarised = summariseHoldings(result.value.holdings, result.value.securities);
+    total += summarised.total;
+    cashEquivalent += summarised.cashEquivalentTotal;
+    unvested += summarised.unvestedTotal;
+    holdings.push(...summarised.holdings);
   }
 
-  await recordClassSuccess(userId, 'investments', { valueUsd: total, payload: { holdings } });
+  await recordClassSuccess(userId, 'investments', {
+    valueUsd: total,
+    payload: { holdings, cashEquivalent, unvested },
+  });
   return 'refreshed';
 }
 

@@ -132,3 +132,54 @@ describe('the scheduler refresh writes the same shape', () => {
     expect(cached.every((h) => h.accountId === 'acct-roth')).toBe(true);
   });
 });
+
+// Both paths must apply vesting. The type was already shared to stop them
+// drifting; the assembly logic was not, so a rule added to one would have been
+// silently missing from the other. It is now one function used by both.
+describe('vesting reaches the net-worth number on both paths', () => {
+  function rsuGrant(): InvestmentsHoldingsGetResponse {
+    return {
+      accounts: [],
+      holdings: [
+        {
+          account_id: 'acct-stockplan',
+          security_id: 'sec-rsu',
+          institution_price: 300,
+          institution_value: 180_000,
+          quantity: 600,
+          cost_basis: null,
+          vested_quantity: 200,
+          vested_value: 60_000,
+        },
+      ],
+      securities: [{ security_id: 'sec-rsu', name: 'Acme Inc', ticker_symbol: 'ACME', type: 'equity' }],
+      request_id: 'req-rsu',
+    };
+  }
+
+  it('the scheduled refresh caches only the vested value', async () => {
+    mockedHoldings.mockResolvedValue(rsuGrant());
+
+    const { refreshScheduledClass } = await import('../src/networth/refresh.js');
+    await refreshScheduledClass(testUserId, 'investments');
+
+    const { getClassCacheRow } = await import('../src/store/asset-cache.js');
+    const row = await getClassCacheRow(testUserId, 'investments');
+
+    // $180,000 granted, $60,000 vested. Only the vested part is the user's.
+    expect(Number(row?.valueUsd)).toBeCloseTo(60_000, 0);
+    const payload = row?.payload as { unvested?: number } | null;
+    expect(payload?.unvested).toBeCloseTo(120_000, 0);
+  });
+
+  it('the manual snapshot path agrees with it', async () => {
+    mockedBalances.mockResolvedValue({ accounts: [], request_id: 'r' });
+    mockedLiabilities.mockRejectedValue(new Error('no liabilities'));
+    mockedHoldings.mockResolvedValue(rsuGrant());
+
+    const { fetchPlaidSnapshot } = await import('../src/goals/snapshot.js');
+    const snap = await fetchPlaidSnapshot(testUserId);
+
+    expect(snap.investmentsTotal).toBeCloseTo(60_000, 0);
+  });
+});

@@ -113,6 +113,13 @@ export type NetWorthResponse = {
   accounts: {
     bank: BankAccountReading[];
     investments: HoldingSummary[];
+    investmentsSummary: {
+      /** Unvested equity, EXCLUDED from every total. Null when unknown. */
+      unvestedUSD: number | null;
+      /** Cash-equivalent securities, currently INCLUDED in the investments
+       *  total. Surfaced so the ladder question can be decided explicitly. */
+      cashEquivalentUSD: number | null;
+    };
     crypto: CryptoPosition[];
     defi: {
       totalUSD: number;
@@ -382,7 +389,12 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
 
   // --- Investments (Plaid holdings, cached) ----------------------------------
   const invRow = classCache.get('investments');
-  const invHoldings = ((invRow?.payload as { holdings?: HoldingSummary[] } | null)?.holdings ?? []) as HoldingSummary[];
+  const invPayload = invRow?.payload as {
+    holdings?: HoldingSummary[];
+    cashEquivalent?: number;
+    unvested?: number;
+  } | null;
+  const invHoldings = (invPayload?.holdings ?? []) as HoldingSummary[];
   // A bank item does not imply investment accounts, so the class counts as
   // connected only once a holdings refresh has produced a cache row (a
   // successful fetch of zero holdings writes value 0, status ok). Before that
@@ -799,6 +811,20 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
     accounts: {
       bank: bankAccounts,
       investments: invHoldings,
+      // Aggregates so the client need not re-sum the holdings array. A
+      // sibling key rather than a reshape of `investments`, which the shipped
+      // iOS build reads as an array.
+      investmentsSummary: {
+        // Excluded from every total above. Equity the user does not own yet.
+        unvestedUSD: invPayload?.unvested ?? null,
+        // INCLUDED in the investments total today. Surfaced because a money
+        // market fund inside a brokerage is spendable cash that the ladder's
+        // emergency-fund rungs currently do not see: `liquidCash` is built
+        // from depository accounts only. Whether to move it is a change to
+        // what completes a rung, so it is Antoine's call, not a side effect
+        // of capturing the field. See PlaidSecurity.is_cash_equivalent.
+        cashEquivalentUSD: invPayload?.cashEquivalent ?? null,
+      },
       crypto: cryptoPositions,
       // The five-way split #276 parsed and nothing consumed, plus what the
       // spam filter removed. `breakdown` is null when Zerion omitted the
