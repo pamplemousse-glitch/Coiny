@@ -20,7 +20,7 @@ import { getItemsByUser } from '../store/items.js';
 import { recordReaction } from '../store/pet.js';
 import { cacheLiabilities, getCachedLiabilities } from '../store/plaid-liabilities.js';
 import { log } from '../util/log.js';
-import { getPortfolio } from '../zerion/client.js';
+import { getPortfolio, getPositionsPage, type ZerionPositionBreakdown } from '../zerion/client.js';
 import type { CryptoPosition } from './read.js';
 import { assembleNetWorth } from './read.js';
 
@@ -201,11 +201,82 @@ export async function refreshDefi(userId: string): Promise<RefreshOutcome> {
     // Sequential on purpose: Zerion rate limits per org, and a failing wallet
     // must fail the whole refresh (a partial sum would undercount silently).
     let total = 0;
+    let spamFiltered = 0;
+    let unpriced = 0;
+    const breakdown: ZerionPositionBreakdown = { wallet: 0, deposited: 0, borrowed: 0, locked: 0, staked: 0 };
+    let breakdownKnown = false;
+
     for (const wallet of wallets) {
-      const portfolio = await getPortfolio(wallet.address);
-      total += portfolio.total_usd;
+      // The positions call is an ENRICHMENT of the portfolio call, not a
+      // replacement for it: it buys a spam-free total, and if it fails we
+      // still have the vendor's own complete figure. Failing the whole class
+      // because the better number was unavailable would make the DeFi total
+      // strictly less reliable than before spam filtering existed.
+      //
+      // Treated exactly like a truncated page below, because it is the same
+      // situation: no trustworthy filtered sum, so use the unfiltered total.
+      const [portfolio, page] = await Promise.all([
+        getPortfolio(wallet.address),
+        getPositionsPage(wallet.address).catch(() => ({ positions: [], truncated: true }) as const),
+      ]);
+
+      // THE FIX. `portfolio.total_usd` counts spam.
+      //
+      // Zerion's portfolio endpoint accepts no trash filter — its only query
+      // parameters are `filter[positions]` and `currency` — so the total it
+      // returns includes airdropped junk. Anyone can mint a token, name it
+      // USDC, seed a tiny pool to fix its price at $1, and send a user
+      // 500,000 of them. The wallet then reports half a million dollars it
+      // does not have, the creature reacts to it, and a ladder rung completes
+      // on a fiction. Inflated totals from spam tokens are the single most
+      // cited reason people abandon a crypto tracker.
+      //
+      // The positions endpoint DOES filter spam, so the honest total is built
+      // from `only_non_trash` positions instead.
+      if (page.truncated) {
+        // A partial page cannot be summed: it would undercount, which is the
+        // same defect as counting spam pointed the other way. Fall back to the
+        // vendor's own total, which is complete even though it includes junk.
+        total += portfolio.total_usd;
+      } else {
+        // Per wallet, not the running total: `spamFiltered` below is the
+        // difference for THIS wallet, and comparing a cross-wallet running sum
+        // against one wallet's total would be meaningless.
+        let walletTotal = 0;
+        for (const position of page.positions) {
+          // Null value means Zerion declined to price it. Not zero — R-8.1,
+          // and the same rule #279 applied to Coinbase and the chain wallets.
+          if (position.value_usd === null) {
+            unpriced++;
+            continue;
+          }
+          walletTotal += position.value_usd;
+        }
+        total += walletTotal;
+        // What the filter removed, for the response's `excluded` block. The
+        // portfolio total is a superset of the filtered one, so this should
+        // never be negative; clamped rather than shown as one if it ever is.
+        spamFiltered += Math.max(0, portfolio.total_usd - walletTotal);
+      }
+
+      if (portfolio.breakdown) {
+        breakdownKnown = true;
+        breakdown.wallet += portfolio.breakdown.wallet;
+        breakdown.deposited += portfolio.breakdown.deposited;
+        breakdown.borrowed += portfolio.breakdown.borrowed;
+        breakdown.locked += portfolio.breakdown.locked;
+        breakdown.staked += portfolio.breakdown.staked;
+      }
     }
-    await recordClassSuccess(userId, 'defi', { valueUsd: total, payload: null });
+
+    await recordClassSuccess(userId, 'defi', {
+      valueUsd: total,
+      // #276 parsed this five-way split and nothing consumed it: the payload
+      // was written as null. Its own comment argues that "$40,000" and
+      // "$2,000, and $38,000 you cannot touch until the unbonding period ends"
+      // are different facts. Now the client can tell them apart.
+      payload: { breakdown: breakdownKnown ? breakdown : null, spamFiltered, unpriced },
+    });
     return 'refreshed';
   } catch (err) {
     await recordClassFailure(userId, 'defi', classifyError(err));

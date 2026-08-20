@@ -114,7 +114,18 @@ export type NetWorthResponse = {
     bank: BankAccountReading[];
     investments: HoldingSummary[];
     crypto: CryptoPosition[];
-    defi: { totalUSD: number };
+    defi: {
+      totalUSD: number;
+      /** Zerion's wallet/deposited/borrowed/locked/staked split. Null means
+       *  Zerion omitted it, NOT that every bucket is zero. */
+      breakdown: { wallet: number; deposited: number; borrowed: number; locked: number; staked: number } | null;
+      /** Value the spam filter removed from the vendor's own total. Null when
+       *  the positions list was truncated and the filtered sum was not used. */
+      spamFilteredUSD: number | null;
+      /** Positions Zerion declined to price, excluded rather than counted as
+       *  zero (R-8.1). */
+      unpricedCount: number | null;
+    };
     debts: DebtItem[];
   };
   connections: {
@@ -409,6 +420,11 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
 
   // --- DeFi (Zerion, cached) -------------------------------------------------
   const defiRow = classCache.get('defi');
+  const defiPayload = defiRow?.payload as {
+    breakdown?: { wallet: number; deposited: number; borrowed: number; locked: number; staked: number } | null;
+    spamFiltered?: number;
+    unpriced?: number;
+  } | null;
   const defiStatus = deriveStatus({
     connected: zerionRows.length > 0,
     health: credentialHealth(defiRow),
@@ -784,7 +800,16 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
       bank: bankAccounts,
       investments: invHoldings,
       crypto: cryptoPositions,
-      defi: { totalUSD: scalar('defi') },
+      // The five-way split #276 parsed and nothing consumed, plus what the
+      // spam filter removed. `breakdown` is null when Zerion omitted the
+      // distribution, which reads as "unknown" rather than as five zeroes: a
+      // breakdown of all-zero is a claim that the wallet holds nothing.
+      defi: {
+        totalUSD: scalar('defi'),
+        breakdown: defiPayload?.breakdown ?? null,
+        spamFilteredUSD: defiPayload?.spamFiltered ?? null,
+        unpricedCount: defiPayload?.unpriced ?? null,
+      },
       debts: debtsUsable ? debtItems : [],
     },
     connections: {
