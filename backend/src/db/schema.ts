@@ -346,6 +346,10 @@ export const chainWallets = pgTable(
     address: text('address').notNull(),
     label: text('label'),
     lastBalanceUsd: numeric('last_balance_usd'),
+    // The staked portion OF lastBalanceUsd, not additional to it (0059). NULL
+    // means unknown: nine of the eleven chain clients cannot read staking, and
+    // a failed staking call must not read as "stakes nothing".
+    lastStakedUsd: numeric('last_staked_usd'),
     lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

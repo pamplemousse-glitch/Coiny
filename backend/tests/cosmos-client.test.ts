@@ -96,3 +96,72 @@ describe('getCosmosBalance', () => {
     await expect(getCosmosBalance('bitcoin', 'bc1q')).rejects.toBeInstanceOf(CosmosLcdError);
   });
 });
+
+describe('getCosmosStakedBalance', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  function reply(delegations: unknown, rewards: unknown) {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => delegations } as Response)
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => rewards } as Response);
+  }
+
+  // ATOM staking participation runs around two thirds of supply, so reading
+  // the bank balance alone reported a fraction of a holder's position.
+  it('sums delegations and unclaimed rewards', async () => {
+    reply(
+      {
+        delegation_responses: [
+          { balance: { denom: 'uatom', amount: '500000000' } },
+          { balance: { denom: 'uatom', amount: '250000000' } },
+        ],
+      },
+      // DecCoin: a DECIMAL string. Parsing this as an integer would truncate.
+      { total: [{ denom: 'uatom', amount: '12500000.123456789' }] },
+    );
+
+    const { getCosmosStakedBalance } = await import('../src/chains/cosmos.js');
+    // 500 + 250 delegated, 12.5 in rewards.
+    expect(await getCosmosStakedBalance('cosmos', 'cosmos1x')).toBeCloseTo(762.5, 4);
+  });
+
+  it('ignores denominations that are not the chain native token', async () => {
+    reply(
+      { delegation_responses: [{ balance: { denom: 'uosmo', amount: '999000000' } }] },
+      { total: [{ denom: 'uosmo', amount: '1000000' }] },
+    );
+
+    const { getCosmosStakedBalance } = await import('../src/chains/cosmos.js');
+    expect(await getCosmosStakedBalance('cosmos', 'cosmos1x')).toBe(0);
+  });
+
+  it('returns 0 when both endpoints report the address has never delegated', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({ ok: false, status: 404 } as Response)
+      .mockResolvedValueOnce({ ok: false, status: 404 } as Response);
+
+    const { getCosmosStakedBalance } = await import('../src/chains/cosmos.js');
+    expect(await getCosmosStakedBalance('cosmos', 'cosmos1x')).toBe(0);
+  });
+
+  // Unknown, not zero — the rule #289 established for every chain balance.
+  // 400 rather than 503: fetchWithRetry retries 5xx, which would consume the
+  // queued mocks and fail for a reason unrelated to what is being asserted.
+  it('returns null when the node errors', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({ ok: false, status: 400 } as Response)
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ total: [] }) } as Response);
+
+    const { getCosmosStakedBalance } = await import('../src/chains/cosmos.js');
+    expect(await getCosmosStakedBalance('cosmos', 'cosmos1x')).toBeNull();
+  });
+
+  it('returns null for an unrecognised response shape', async () => {
+    reply({ nope: true }, { total: [] });
+
+    const { getCosmosStakedBalance } = await import('../src/chains/cosmos.js');
+    expect(await getCosmosStakedBalance('cosmos', 'cosmos1x')).toBeNull();
+  });
+});
