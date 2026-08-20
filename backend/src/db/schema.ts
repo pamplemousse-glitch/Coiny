@@ -441,6 +441,10 @@ export const metalHoldings = pgTable('metal_holdings', {
   label: text('label'),
   lastValueUsd: numeric('last_value_usd'),
   lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  // When the vendor says the quote was struck (0058). The freshness system
+  // reads this in preference to lastSyncedAt, which is only our fetch time.
+  // Null falls back to lastSyncedAt: pre-0058 rows behave exactly as before.
+  priceAsOf: timestamp('price_as_of', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

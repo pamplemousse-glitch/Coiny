@@ -5,9 +5,28 @@ import { cachedByKey, PRICE_TTL } from '../util/price-cache.js';
 
 const GoldApiResponseSchema = z.object({
   price: z.number(),
+  // WHEN the quote was struck, which is not when we fetched it.
+  //
+  // Metals markets close at weekends. A Sunday refresh returns Friday's close,
+  // and stamping it with our own fetch time claims a two-day-old number is
+  // seconds old. `networth/classes.ts` gives metals a seven-day freshness
+  // window and was being fed the wrong input to measure against it.
+  //
+  // Unix seconds. `datetime` carries the same instant as a string and is read
+  // only when `timestamp` is absent.
+  timestamp: z.number().optional(),
+  datetime: z.string().optional(),
 });
 
-async function fetchMetalSpotPrice(metal: string): Promise<number> {
+/** A spot price and the moment the vendor says it was struck. */
+export type MetalSpot = {
+  priceUsd: number;
+  /** Null when GoldAPI sent no timestamp; the caller then falls back to its
+   *  own fetch time, which is the old behaviour and no worse than it was. */
+  asOf: Date | null;
+};
+
+async function fetchMetalSpotPrice(metal: string): Promise<MetalSpot> {
   if (!config.GOLDAPI_API_KEY) throw new Error('GOLDAPI_API_KEY not configured');
 
   const url = `https://www.goldapi.io/api/${encodeURIComponent(metal)}/USD`;
@@ -18,7 +37,17 @@ async function fetchMetalSpotPrice(metal: string): Promise<number> {
   if (!res.ok) throw new Error(`GoldAPI error: ${res.status}`);
 
   const parsed = GoldApiResponseSchema.parse(await res.json());
-  return parsed.price;
+
+  let asOf: Date | null = null;
+  if (parsed.timestamp !== undefined) {
+    const d = new Date(parsed.timestamp * 1000);
+    if (!Number.isNaN(d.getTime())) asOf = d;
+  } else if (parsed.datetime !== undefined) {
+    const d = new Date(parsed.datetime);
+    if (!Number.isNaN(d.getTime())) asOf = d;
+  }
+
+  return { priceUsd: parsed.price, asOf };
 }
 
 /**

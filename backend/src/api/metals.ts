@@ -65,12 +65,12 @@ export function registerMetalsApi(app: FastifyInstance): void {
 
     // Fetch spot price once per unique metal symbol.
     const uniqueMetals = [...new Set(rows.map((r) => r.metal))];
-    const spotPrices = new Map<string, number>();
+    const spotPrices = new Map<string, { priceUsd: number; asOf: Date | null }>();
 
     for (const metal of uniqueMetals) {
       try {
-        const price = await getMetalSpotPrice(metal);
-        spotPrices.set(metal, price);
+        const spot = await getMetalSpotPrice(metal);
+        spotPrices.set(metal, spot);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg === 'GOLDAPI_API_KEY not configured') {
@@ -85,15 +85,21 @@ export function registerMetalsApi(app: FastifyInstance): void {
     const now = new Date();
 
     for (const row of rows) {
-      const price = spotPrices.get(row.metal);
-      if (price === undefined) {
+      const spot = spotPrices.get(row.metal);
+      if (spot === undefined) {
         errors++;
         continue;
       }
-      const valueUsd = price * parseFloat(row.weightOz);
+      const valueUsd = spot.priceUsd * parseFloat(row.weightOz);
       await db()
         .update(metalHoldings)
-        .set({ lastValueUsd: valueUsd.toString(), lastSyncedAt: now })
+        .set({
+          lastValueUsd: valueUsd.toString(),
+          lastSyncedAt: now,
+          // The vendor's own quote time when it sent one. Null leaves the
+          // freshness reader on lastSyncedAt, which is the old behaviour.
+          priceAsOf: spot.asOf ?? null,
+        })
         .where(and(eq(metalHoldings.userId, userId), eq(metalHoldings.id, row.id)));
       synced++;
     }

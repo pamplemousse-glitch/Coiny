@@ -167,6 +167,17 @@ export type PlaidHolding = {
    */
   vested_quantity?: number | null;
   vested_value?: number | null;
+  /**
+   * When the institution last priced this holding. `institution_price_as_of`
+   * is a date (YYYY-MM-DD); `institution_price_datetime` is the same instant
+   * with a time, and is preferred when present.
+   *
+   * The freshness system measured age from OUR fetch time, so a holding an
+   * institution last priced three days ago was reported as freshly valued.
+   * Markets close; brokerages lag; the vendor tells us this and we dropped it.
+   */
+  institution_price_as_of?: string | null;
+  institution_price_datetime?: string | null;
 };
 
 export type PlaidSecurity = {

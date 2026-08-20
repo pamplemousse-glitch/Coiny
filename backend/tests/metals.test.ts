@@ -211,7 +211,7 @@ describe('POST /api/metals/sync', () => {
     const { metalHoldings } = await import('../src/db/schema.js');
     await db().insert(metalHoldings).values({ userId: testUserId, metal: 'XAU', weightOz: '2.5' });
 
-    mockedGetMetalSpotPrice.mockResolvedValue(2000);
+    mockedGetMetalSpotPrice.mockResolvedValue({ priceUsd: 2000, asOf: null });
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
@@ -237,7 +237,7 @@ describe('POST /api/metals/sync', () => {
         { userId: testUserId, metal: 'XAG', weightOz: '25' },
       ]);
 
-    mockedGetMetalSpotPrice.mockResolvedValue(30);
+    mockedGetMetalSpotPrice.mockResolvedValue({ priceUsd: 30, asOf: null });
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
@@ -277,7 +277,9 @@ describe('POST /api/metals/sync', () => {
         { userId: testUserId, metal: 'XPT', weightOz: '2' },
       ]);
 
-    mockedGetMetalSpotPrice.mockRejectedValueOnce(new Error('API timeout')).mockResolvedValueOnce(1000);
+    mockedGetMetalSpotPrice
+      .mockRejectedValueOnce(new Error('API timeout'))
+      .mockResolvedValueOnce({ priceUsd: 1000, asOf: null });
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();

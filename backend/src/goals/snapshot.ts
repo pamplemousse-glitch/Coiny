@@ -151,12 +151,22 @@ type LiabilityMeta = {
 export function summariseHoldings(
   holdings: PlaidHolding[],
   securities: PlaidSecurity[],
-): { holdings: HoldingSummary[]; total: number; cashEquivalentTotal: number; unvestedTotal: number } {
+): {
+  holdings: HoldingSummary[];
+  total: number;
+  cashEquivalentTotal: number;
+  unvestedTotal: number;
+  /** OLDEST institution pricing time across the holdings, or null when none
+   *  carried one. Oldest rather than newest because a class is only as fresh
+   *  as its stalest contributor, which is the rule rollupRows already uses. */
+  oldestPricedAt: Date | null;
+} {
   const secMap = new Map(securities.map((s) => [s.security_id, s]));
   const summaries: HoldingSummary[] = [];
   let total = 0;
   let cashEquivalentTotal = 0;
   let unvestedTotal = 0;
+  let oldestPricedAt: Date | null = null;
 
   for (const h of holdings) {
     const marketValue = h.institution_value ?? 0;
@@ -169,6 +179,16 @@ export function summariseHoldings(
 
     total += value;
     unvestedTotal += unvested;
+
+    // Datetime first: it is the same instant with more precision than the
+    // date-only field. An unparseable value is ignored rather than guessed at.
+    const pricedRaw = h.institution_price_datetime ?? h.institution_price_as_of ?? null;
+    if (pricedRaw !== null) {
+      const priced = new Date(pricedRaw);
+      if (!Number.isNaN(priced.getTime()) && (oldestPricedAt === null || priced < oldestPricedAt)) {
+        oldestPricedAt = priced;
+      }
+    }
 
     const sec = secMap.get(h.security_id);
     if (sec?.is_cash_equivalent) cashEquivalentTotal += value;
@@ -186,7 +206,7 @@ export function summariseHoldings(
     });
   }
 
-  return { holdings: summaries, total, cashEquivalentTotal, unvestedTotal };
+  return { holdings: summaries, total, cashEquivalentTotal, unvestedTotal, oldestPricedAt };
 }
 
 export async function fetchPlaidSnapshot(userId: string): Promise<PlaidSnapshot> {
