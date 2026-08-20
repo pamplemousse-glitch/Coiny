@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authHeader, resetDatabase, testUserId } from './db-helper.js';
 
 vi.mock('../src/tcgapi/client.js', () => ({
-  getTradingCardPrice: vi.fn(),
+  getTradingCard: vi.fn(),
 }));
 
-import { getTradingCardPrice } from '../src/tcgapi/client.js';
+import { getTradingCard } from '../src/tcgapi/client.js';
 
-const mockedGetTradingCardPrice = vi.mocked(getTradingCardPrice);
+const mockedGetTradingCard = vi.mocked(getTradingCard);
 
 describe('GET /api/trading-cards', () => {
   beforeEach(async () => {
@@ -252,7 +252,9 @@ describe('POST /api/trading-cards/sync', () => {
         { userId: testUserId, game: 'magic', cardName: 'Black Lotus', quantity: 1 },
       ]);
 
-    mockedGetTradingCardPrice.mockResolvedValueOnce(450).mockResolvedValueOnce(10000);
+    mockedGetTradingCard
+      .mockResolvedValueOnce({ priceUsd: 450, imageUrl: null })
+      .mockResolvedValueOnce({ priceUsd: 10000, imageUrl: null });
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();
@@ -280,7 +282,7 @@ describe('POST /api/trading-cards/sync', () => {
         { userId: testUserId, game: 'pokemon', cardName: 'Common Card', quantity: 5 },
       ]);
 
-    mockedGetTradingCardPrice.mockResolvedValueOnce(null).mockResolvedValueOnce(1.5);
+    mockedGetTradingCard.mockResolvedValueOnce(null).mockResolvedValueOnce({ priceUsd: 1.5, imageUrl: null });
 
     const { buildApp } = await import('../src/server.js');
     const app = await buildApp();

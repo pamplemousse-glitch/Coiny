@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { _clearTcgCache, getTradingCardPrice } from '../src/tcgapi/client.js';
+import { _clearTcgCache, getTradingCard, getTradingCardPrice } from '../src/tcgapi/client.js';
 
 function makeFetch(body: unknown, status = 200) {
   return vi.fn().mockResolvedValue({
@@ -76,5 +76,40 @@ describe('getTradingCardPrice', () => {
   it('returns null when price is null', async () => {
     vi.stubGlobal('fetch', makeFetch({ data: [{ name: 'Charizard', market_price: null }] }));
     expect(await getTradingCardPrice('Charizard', 'pokemon', null, false, 'key')).toBeNull();
+  });
+});
+
+describe('image capture', () => {
+  beforeEach(() => vi.stubGlobal('fetch', vi.fn()));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('returns the card image alongside the price', async () => {
+    vi.stubGlobal(
+      'fetch',
+      makeFetch({
+        data: [{ name: 'Black Lotus', set: 'Alpha', market_price: 50000, image_url: 'https://cdn.tcg/bl.jpg' }],
+      }),
+    );
+
+    const facts = await getTradingCard('Black Lotus', 'magic', 'Alpha', false, 'k');
+    expect(facts).toEqual({ priceUsd: 50000, imageUrl: 'https://cdn.tcg/bl.jpg' });
+  });
+
+  // An absent image must not cost us the price that came with it.
+  it('returns a null image when the vendor omits one, without losing the price', async () => {
+    vi.stubGlobal('fetch', makeFetch({ data: [{ name: 'Some Card', market_price: 3 }] }));
+
+    const facts = await getTradingCard('Some Card', 'magic', null, false, 'k');
+    expect(facts).toEqual({ priceUsd: 3, imageUrl: null });
+  });
+
+  // The back-compat wrapper: existing callers still get a bare number.
+  it('getTradingCardPrice still returns just the price', async () => {
+    vi.stubGlobal(
+      'fetch',
+      makeFetch({ data: [{ name: 'Black Lotus', market_price: 50000, image_url: 'https://cdn.tcg/bl.jpg' }] }),
+    );
+
+    expect(await getTradingCardPrice('Black Lotus', 'magic', null, false, 'k')).toBe(50000);
   });
 });

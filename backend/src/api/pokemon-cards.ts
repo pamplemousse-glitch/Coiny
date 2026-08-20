@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { pokemonCardHoldings } from '../db/schema.js';
-import { getPokemonCardPrice } from '../pokemonpricetracker/client.js';
+import { getPokemonCard } from '../pokemonpricetracker/client.js';
 import { SYNC_LIMIT } from './rate-limits.js';
 
 const CreateSchema = z.object({
@@ -35,6 +35,7 @@ export function registerPokemonCardsApi(app: FastifyInstance): void {
       quantity: r.quantity,
       label: r.label,
       lastPriceUsd: r.lastPriceUsd !== null ? parseFloat(r.lastPriceUsd) : null,
+      imageUrl: r.imageUrl ?? null,
       valueUsd: r.lastPriceUsd !== null ? parseFloat(r.lastPriceUsd) * r.quantity : null,
       lastSyncedAt: r.lastSyncedAt,
     }));
@@ -99,14 +100,20 @@ export function registerPokemonCardsApi(app: FastifyInstance): void {
 
     await Promise.all(
       rows.map(async (row) => {
-        const price = await getPokemonCardPrice(row.cardName, row.setName, row.variant, apiKey);
+        const facts = await getPokemonCard(row.cardName, row.setName, row.variant, apiKey);
+        const price = facts?.priceUsd ?? null;
         if (price === null) {
           errors++;
           return;
         }
         await db()
           .update(pokemonCardHoldings)
-          .set({ lastPriceUsd: price.toString(), lastSyncedAt: new Date() })
+          // Image rides along in the same response; only written when present.
+          .set({
+            lastPriceUsd: price.toString(),
+            lastSyncedAt: new Date(),
+            ...(facts?.imageUrl ? { imageUrl: facts.imageUrl } : {}),
+          })
           .where(eq(pokemonCardHoldings.id, row.id));
         updated++;
       }),

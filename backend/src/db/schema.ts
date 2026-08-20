@@ -680,6 +680,10 @@ export const tradingCardHoldings = pgTable('trading_card_holdings', {
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   game: text('game').notNull(), // e.g. 'pokemon', 'magic', 'yugioh'
+  // Product image URL from the pricing vendor (0057). Belongs to the product,
+  // not the holding, so it is written on sync and never refetched.
+  imageUrl: text('image_url'),
+
   cardName: text('card_name').notNull(),
   setName: text('set_name'),
   isFoil: boolean('is_foil').notNull().default(false),
@@ -696,6 +700,10 @@ export const coinHoldings = pgTable('coin_holdings', {
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   pcgsNo: integer('pcgs_no').notNull(),
+  // Product image URL from the pricing vendor (0057). Belongs to the product,
+  // not the holding, so it is written on sync and never refetched.
+  imageUrl: text('image_url'),
+
   gradeNo: integer('grade_no').notNull(),
   plusGrade: boolean('plus_grade').notNull().default(false),
   quantity: integer('quantity').notNull().default(1),
@@ -712,6 +720,10 @@ export const sneakerHoldings = pgTable('sneaker_holdings', {
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   sku: text('sku').notNull(),
+  // Product image URL from the pricing vendor (0057). Belongs to the product,
+  // not the holding, so it is written on sync and never refetched.
+  imageUrl: text('image_url'),
+
   description: text('description'),
   size: text('size'),
   quantity: integer('quantity').notNull().default(1),
@@ -731,6 +743,10 @@ export const pokemonCardHoldings = pgTable('pokemon_card_holdings', {
   cardName: text('card_name').notNull(),
   setName: text('set_name'),
   variant: text('variant'),
+  // Product image URL from the pricing vendor (0057). Belongs to the product,
+  // not the holding, so it is written on sync and never refetched.
+  imageUrl: text('image_url'),
+
   quantity: integer('quantity').notNull().default(1),
   label: text('label'),
   lastPriceUsd: numeric('last_price_usd'),
