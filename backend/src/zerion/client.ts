@@ -268,6 +268,9 @@ const ZerionPositionSchema = z.object({
 
 const ZerionPositionsResponseSchema = z.object({
   data: z.array(ZerionPositionSchema),
+  // Zerion paginates positions. Cursors are opaque: pass `links.next` back
+  // verbatim, never reconstruct one, exactly as getTransactions does.
+  links: z.object({ next: z.string().nullable().optional() }).optional(),
 });
 
 export type ZerionPosition = {
@@ -341,22 +344,66 @@ function toPosition(item: z.infer<typeof ZerionPositionSchema>): ZerionPosition 
   };
 }
 
-export async function getPositions(walletAddress: string): Promise<ZerionPosition[]> {
+/** Positions plus whether the list is COMPLETE.
+ *
+ *  `truncated` exists because a caller that sums these into a net-worth figure
+ *  must know it is summing all of them. A partial page silently undercounts,
+ *  which is the same class of wrong number as counting spam, just in the other
+ *  direction. */
+export type ZerionPositionsPage = {
+  positions: ZerionPosition[];
+  truncated: boolean;
+};
+
+/** Hard ceiling on pages, so one enormous wallet cannot spend the whole
+ *  per-org rate limit. 10 x 100 covers any realistic holder; beyond it the
+ *  caller is told the list is truncated rather than handed a short one. */
+const MAX_POSITION_PAGES = 10;
+
+/**
+ * Every non-spam position for a wallet, following Zerion's pagination.
+ *
+ * `filter[trash]=only_non_trash` is the whole point: the portfolio endpoint
+ * accepts no trash filter at all (its only query parameters are
+ * `filter[positions]` and `currency`), so a spam-free total can only be built
+ * from positions.
+ */
+export async function getPositionsPage(walletAddress: string): Promise<ZerionPositionsPage> {
   if (!config.ZERION_API_KEY) throw new ZerionError(0, 'ZERION_API_KEY is not configured');
 
   const params = new URLSearchParams({
     'filter[positions]': 'no_filter',
     'filter[trash]': 'only_non_trash',
     currency: 'usd',
+    'page[size]': '100',
   });
 
-  const raw = await zerionGet(`/v1/wallets/${encodeURIComponent(walletAddress)}/positions/?${params}`);
-  if (!raw) return [];
+  let urlOrPath = `/v1/wallets/${encodeURIComponent(walletAddress)}/positions/?${params}`;
+  const positions: ZerionPosition[] = [];
 
-  const parsed = ZerionPositionsResponseSchema.safeParse(raw);
-  if (!parsed.success) return [];
+  for (let page = 0; page < MAX_POSITION_PAGES; page++) {
+    const raw = await zerionGet(urlOrPath);
+    if (!raw) return { positions, truncated: false };
 
-  return parsed.data.data.map(toPosition);
+    const parsed = ZerionPositionsResponseSchema.safeParse(raw);
+    // An unrecognised shape mid-walk means we cannot claim the list is
+    // complete, so say so rather than return a short one as if it were whole.
+    if (!parsed.success) return { positions, truncated: true };
+
+    positions.push(...parsed.data.data.map(toPosition));
+
+    const next = parsed.data.links?.next;
+    if (!next) return { positions, truncated: false };
+    urlOrPath = next;
+  }
+
+  return { positions, truncated: true };
+}
+
+/** First page only. Kept for callers that want a sample rather than a total. */
+export async function getPositions(walletAddress: string): Promise<ZerionPosition[]> {
+  const { positions } = await getPositionsPage(walletAddress);
+  return positions;
 }
 
 export async function getDeFiPositions(walletAddress: string): Promise<ZerionPosition[]> {

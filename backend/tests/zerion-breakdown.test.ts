@@ -133,3 +133,107 @@ describe('Zerion position breakdown', () => {
     expect(gross - parts.borrowed).toBe(39_000);
   });
 });
+
+// Positions pagination. This mattered the moment the DeFi total started being
+// built from positions rather than from the portfolio endpoint: a truncated
+// list summed as if complete undercounts, which is the same class of wrong
+// number as counting spam, pointed the other way.
+function mockPositionsPages(pages: Array<{ items: object[]; next: string | null }>) {
+  const pool = mockAgent.get('https://api.zerion.io');
+  for (const page of pages) {
+    pool
+      .intercept({ path: (p) => p.includes('/positions/'), method: 'GET' })
+      .reply(200, { data: page.items, links: page.next ? { next: page.next } : {} });
+  }
+}
+
+function position(id: string, value: number | null) {
+  return {
+    id,
+    attributes: {
+      value,
+      quantity: { float: 1 },
+      fungible_info: { symbol: id.toUpperCase(), name: id, implementations: [{ chain_id: 'ethereum', address: null }] },
+    },
+  };
+}
+
+describe('getPositionsPage', () => {
+  it('follows links.next and reports the list as complete', async () => {
+    mockPositionsPages([
+      { items: [position('a', 10)], next: 'https://api.zerion.io/v1/wallets/x/positions/?page=2' },
+      { items: [position('b', 5)], next: null },
+    ]);
+
+    const { getPositionsPage } = await import('../src/zerion/client.js');
+    const page = await getPositionsPage(ADDRESS);
+
+    expect(page.truncated).toBe(false);
+    expect(page.positions.map((p) => p.id)).toEqual(['a', 'b']);
+  });
+
+  it('requests only non-trash positions', async () => {
+    let seenPath = '';
+    mockAgent
+      .get('https://api.zerion.io')
+      .intercept({
+        path: (p) => {
+          if (p.includes('/positions/')) seenPath = p;
+          return p.includes('/positions/');
+        },
+        method: 'GET',
+      })
+      .reply(200, { data: [], links: {} });
+
+    const { getPositionsPage } = await import('../src/zerion/client.js');
+    await getPositionsPage(ADDRESS);
+
+    // The whole basis of the spam fix: the portfolio endpoint accepts no trash
+    // filter, so this request is the only place spam can be excluded.
+    expect(decodeURIComponent(seenPath)).toContain('filter[trash]=only_non_trash');
+  });
+
+  it('reports truncation rather than silently returning a short list', async () => {
+    // Every page advertises another, so the page cap is what stops the walk.
+    const pages = Array.from({ length: 12 }, (_, i) => ({
+      items: [position(`t${i}`, 1)],
+      next: 'https://api.zerion.io/v1/wallets/x/positions/?page=next',
+    }));
+    mockPositionsPages(pages);
+
+    const { getPositionsPage } = await import('../src/zerion/client.js');
+    const page = await getPositionsPage(ADDRESS);
+
+    expect(page.truncated).toBe(true);
+  });
+
+  it('carries the contract address, which is the only safe pricing key', async () => {
+    mockAgent
+      .get('https://api.zerion.io')
+      .intercept({ path: (p) => p.includes('/positions/'), method: 'GET' })
+      .reply(200, {
+        data: [
+          {
+            id: 'usdc',
+            attributes: {
+              value: 100,
+              quantity: { float: 100 },
+              flags: { is_trash: false },
+              fungible_info: {
+                symbol: 'USDC',
+                name: 'USD Coin',
+                flags: { verified: true },
+                implementations: [{ chain_id: 'ethereum', address: '0xa0b8' }],
+              },
+            },
+          },
+        ],
+        links: {},
+      });
+
+    const { getPositionsPage } = await import('../src/zerion/client.js');
+    const { positions } = await getPositionsPage(ADDRESS);
+
+    expect(positions[0]).toMatchObject({ tokenAddress: '0xa0b8', verified: true, isTrash: false });
+  });
+});

@@ -8,6 +8,7 @@ vi.mock('../src/coinbase/client.js', () => ({
 }));
 vi.mock('../src/zerion/client.js', () => ({
   getPortfolio: vi.fn(),
+  getPositionsPage: vi.fn(),
   getTransactions: vi.fn(),
 }));
 vi.mock('../src/spinwheel/client.js', () => ({
@@ -31,12 +32,13 @@ vi.mock('../src/plaid/client.js', async (importOriginal) => {
 import { getAccounts, getSpotPrices } from '../src/coinbase/client.js';
 import { itemRemove } from '../src/plaid/client.js';
 import { getDebtProfile } from '../src/spinwheel/client.js';
-import { getPortfolio } from '../src/zerion/client.js';
+import { getPortfolio, getPositionsPage } from '../src/zerion/client.js';
 
 const mockedItemRemove = vi.mocked(itemRemove);
 const mockedGetAccounts = vi.mocked(getAccounts);
 const mockedGetSpotPrices = vi.mocked(getSpotPrices);
 const mockedGetPortfolio = vi.mocked(getPortfolio);
+const mockedGetPositionsPage = vi.mocked(getPositionsPage);
 const mockedGetDebtProfile = vi.mocked(getDebtProfile);
 
 const HOUR = 60 * 60 * 1000;
@@ -52,6 +54,9 @@ const NOW = (() => {
 describe('runSchedulerTick', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    // Default to a truncated page so refreshDefi falls back to the portfolio
+    // total, which is what these tests were written against.
+    mockedGetPositionsPage.mockResolvedValue({ positions: [], truncated: true });
     await resetDatabase();
   });
 
@@ -196,6 +201,9 @@ describe('runSchedulerTick', () => {
 describe('scheduler lifecycle', () => {
   it('reports enabled only between start and stop', async () => {
     vi.resetAllMocks();
+    // Default to a truncated page so refreshDefi falls back to the portfolio
+    // total, which is what these tests were written against.
+    mockedGetPositionsPage.mockResolvedValue({ positions: [], truncated: true });
     await resetDatabase();
     const { getSchedulerStatus, isSchedulerStale, startScheduler, stopScheduler } = await import(
       '../src/scheduler/index.js'
