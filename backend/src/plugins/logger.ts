@@ -123,12 +123,63 @@ export function pathOnly(url: string): string {
   return q === -1 ? url : url.slice(0, q);
 }
 
+/** How deep `scrubDeep` walks before replacing a subtree wholesale.
+ *
+ *  A bound rather than a visited set: log payloads are plain data, so the
+ *  realistic risk is depth, and a wrong answer at depth 12 is a dropped subtree
+ *  rather than a leak. Twelve is far past anything logged here and cheap. */
+const MAX_SCRUB_DEPTH = 12;
+
+export const REDACTED = '[redacted]';
+
+/**
+ * Censor every forbidden key at ANY depth.
+ *
+ * This exists because `redact` alone does not do what this file used to claim.
+ * The comment here read "deeper nesting is covered by the wildcard at the end
+ * of each family", and there was no such wildcard: the deepest path generated
+ * was `*.*.key`, so a value at `a.b.c.email` was written in full. Measured, not
+ * reasoned about, and pinned by `tests/logger.test.ts`.
+ *
+ * Path lists are structurally the wrong tool for an open set of shapes. Every
+ * finite list is a guess about how deeply someone will nest an object, and the
+ * cost of guessing low is a credential in the log stream.
+ *
+ * Parameterised by the key set because there are two callers with legitimately
+ * different sets: pino may write `user_id`, and `observability/sentry.ts` may
+ * not, because the log stays in Fly and the Sentry event does not. One
+ * mechanism, two policies, rather than two mechanisms.
+ */
+export function scrubDeep(value: unknown, forbidden: ReadonlySet<string>, depth = 0): unknown {
+  if (depth > MAX_SCRUB_DEPTH) return REDACTED;
+  if (Array.isArray(value)) return value.map((v) => scrubDeep(v, forbidden, depth + 1));
+  if (value === null || typeof value !== 'object') return value;
+  // Anything with its own semantics (Date, Buffer, Error) would be flattened to
+  // `{}` by the walk below, which corrupts the line rather than protecting it.
+  // Left alone: pino's serializers already handle the ones that appear here.
+  if (!isPlainObject(value)) return value;
+
+  const out: Record<string, unknown> = {};
+  for (const [key, v] of Object.entries(value)) {
+    out[key] = forbidden.has(key) ? REDACTED : scrubDeep(v, forbidden, depth + 1);
+  }
+  return out;
+}
+
+function isPlainObject(value: object): value is Record<string, unknown> {
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+const FORBIDDEN_SET: ReadonlySet<string> = new Set(FORBIDDEN_KEYS);
+
 /** Every place a forbidden key realistically appears.
  *
- *  `*.key` covers one level of nesting, which is where pino's own serializers
- *  put things (`req.headers.*`) and where most log payloads sit. The bare form
- *  covers the top level. Deeper nesting is covered by the wildcard at the end
- *  of each family rather than by guessing at paths. */
+ *  Retained alongside `scrubDeep` rather than replaced by it. `redact` runs
+ *  inside pino on the serialised output and covers the shallow cases with less
+ *  work; `scrubDeep` covers the arbitrary depth `redact` cannot express. Two
+ *  controls on the same path, which is the right number for the one that has
+ *  already been wrong once. */
 function redactPaths(): string[] {
   const paths: string[] = [];
   for (const key of FORBIDDEN_KEYS) {
@@ -152,8 +203,17 @@ export const loggerOptions = {
     // "[redacted]" rather than removal, so a log line proves a field was
     // present and censored. A missing key is indistinguishable from a key that
     // was never set, which is the wrong answer during an incident.
-    censor: '[redacted]',
+    censor: REDACTED,
     remove: false,
+  },
+  formatters: {
+    /** The depth-unbounded half of the policy. Runs on the merged object of
+     *  every log call, after the serializers below have shaped `req`, `res` and
+     *  `err`, so it censors what a path list structurally cannot reach without
+     *  undoing their work. */
+    log(object: Record<string, unknown>): Record<string, unknown> {
+      return scrubDeep(object, FORBIDDEN_SET) as Record<string, unknown>;
+    },
   },
   serializers: {
     // Typed as Fastify's own request rather than a narrow structural shape.

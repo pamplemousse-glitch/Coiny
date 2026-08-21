@@ -33,6 +33,7 @@ import { isNotNull } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { coinbaseConnections, plaidItems, spinwheelConnections, zerionWallets } from '../db/schema.js';
 import { refreshScheduledClass, runGoalRefreshFromCache, type ScheduledClass } from '../networth/refresh.js';
+import { captureError } from '../observability/sentry.js';
 import { getClassCacheForUsers } from '../store/asset-cache.js';
 import { usersMissingDailyPoint } from '../store/goals.js';
 import { type HealthSweepSummary, isHealthSweepDue, runConnectionHealthSweep } from './plaid-health.js';
@@ -166,6 +167,7 @@ export async function runSchedulerTick(
       summary.removals = await drainPlaidRemovalQueue(now, log);
     } catch (err) {
       log.warn({ err }, 'plaid removal queue drain failed');
+      captureError(err, { task: 'plaid_removal_drain' });
     }
 
     const work = await findDueClassRefreshes(now);
@@ -201,6 +203,7 @@ export async function runSchedulerTick(
         log.info({ ...summary.health }, 'connection_health_sweep_completed');
       } catch (err) {
         log.warn({ err }, 'connection health sweep failed');
+        captureError(err, { task: 'connection_health_sweep' });
       }
     }
 
@@ -213,6 +216,7 @@ export async function runSchedulerTick(
         log.info({ ...summary.purge }, 'retention_purge_completed');
       } catch (err) {
         log.warn({ err }, 'retention purge failed');
+        captureError(err, { task: 'retention_purge' });
       }
     }
 

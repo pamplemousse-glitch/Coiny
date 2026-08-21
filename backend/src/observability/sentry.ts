@@ -53,7 +53,7 @@
 
 import * as Sentry from '@sentry/node';
 import { config } from '../config.js';
-import { FORBIDDEN_KEYS, pathOnly, vendorErrorCode } from '../plugins/logger.js';
+import { FORBIDDEN_KEYS, pathOnly, REDACTED, scrubDeep, vendorErrorCode } from '../plugins/logger.js';
 
 /** Keys pino is allowed to write that Sentry is not.
  *
@@ -72,23 +72,51 @@ import { FORBIDDEN_KEYS, pathOnly, vendorErrorCode } from '../plugins/logger.js'
 const SENTRY_ONLY_FORBIDDEN = ['user_id', 'userId', 'item_id', 'itemId', 'device_token', 'deviceToken'];
 
 /** Set membership, not the array scan `FORBIDDEN_KEYS` is written for. */
-const FORBIDDEN = new Set([...FORBIDDEN_KEYS, ...SENTRY_ONLY_FORBIDDEN]);
+const FORBIDDEN: ReadonlySet<string> = new Set([...FORBIDDEN_KEYS, ...SENTRY_ONLY_FORBIDDEN]);
 
 /** Integrations that attach data pino has never applied its policy to.
  *
  *  Removed by name rather than by `defaultIntegrations: false`, so the ones
  *  that make Sentry work at all (dedupe, context, the error handlers) stay on
- *  and a future SDK version's additions are not silently opted into. */
-const DISABLED_INTEGRATIONS = new Set(['RequestData', 'Http', 'Console', 'LocalVariables', 'Fastify']);
-
-/** How deep `deepScrub` walks before giving up.
+ *  and a future SDK version's additions are not silently opted into.
  *
- *  A bound rather than a cycle-tracking visited set: Sentry events are plain
- *  JSON by the time `beforeSend` sees them, so the realistic risk is depth, and
- *  a wrong answer at depth 8 is a dropped subtree rather than a leak. */
-const MAX_SCRUB_DEPTH = 8;
+ *  MATCHING BY NAME IS A SILENT FAILURE MODE, and it already bit this file: the
+ *  first version listed `LocalVariables` and `Fastify`, neither of which is a
+ *  real integration name in v10, so those two filter entries did nothing at
+ *  all. It also disabled `Http` while every vendor client in this codebase
+ *  calls out through `fetch`, which is `NodeFetch`. A control that is present
+ *  in source and absent in effect is exactly what
+ *  `docs/connection-resilience-survey.md` is about, so
+ *  `tests/sentry.test.ts` now asserts every name here exists among the SDK's
+ *  own defaults. A rename in a future SDK breaks a test instead of quietly
+ *  re-enabling collection. */
+const DISABLED_INTEGRATIONS: ReadonlySet<string> = new Set([
+  // Puts headers, query string and body on the event.
+  'RequestData',
+  // Breadcrumbs and spans for outbound calls. Both are needed: `Http` covers
+  // node:http, `NodeFetch` covers global fetch, and OUR clients use fetch.
+  'Http',
+  'NodeFetch',
+  // Console output as breadcrumbs. util/log.ts exists precisely because
+  // console bypasses the redaction policy.
+  'Console',
+  // Reads the SOURCE FILE around each frame and attaches the lines. Our source
+  // is not secret, but it is not ours to hand to a third party either, and it
+  // is the one default that reads from disk at error time.
+  'ContextLines',
+  // Local variables at each frame, which is where a decrypted value or an
+  // access token would sit at the moment of a throw.
+  'LocalVariablesAsync',
+  // The installed dependency list and versions. Not user data; still an
+  // inventory of our supply chain that nothing needs.
+  'Modules',
+]);
 
-const REDACTED = '[redacted]';
+/** Names every `DISABLED_INTEGRATIONS` entry must match. Exported so the test
+ *  can compare this file's intent against the SDK's actual defaults. */
+export function disabledIntegrationNames(): readonly string[] {
+  return [...DISABLED_INTEGRATIONS];
+}
 
 let initialised = false;
 
@@ -130,22 +158,14 @@ export function allowEvent(key: string, now: number = Date.now()): boolean {
 }
 
 /**
- * Replace the value of any forbidden key, at any depth, in place-safe fashion.
+ * Replace the value of any forbidden key, at any depth.
  *
- * Mirrors pino's `redact` with `remove: false`: the key survives with a censor
- * marker, because a missing key is indistinguishable from one that was never
- * set, which is the wrong answer during an incident.
+ * The walk itself lives in plugins/logger.ts and is shared with pino, so the
+ * two paths cannot diverge in behaviour. What differs is only the key set, and
+ * that difference is deliberate: see `SENTRY_ONLY_FORBIDDEN`.
  */
-export function deepScrub(value: unknown, depth = 0): unknown {
-  if (depth > MAX_SCRUB_DEPTH) return REDACTED;
-  if (Array.isArray(value)) return value.map((v) => deepScrub(v, depth + 1));
-  if (value === null || typeof value !== 'object') return value;
-
-  const out: Record<string, unknown> = {};
-  for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
-    out[key] = FORBIDDEN.has(key) ? REDACTED : deepScrub(v, depth + 1);
-  }
-  return out;
+export function deepScrub(value: unknown): unknown {
+  return scrubDeep(value, FORBIDDEN);
 }
 
 /**
@@ -197,6 +217,9 @@ export function scrubEvent(event: Sentry.ErrorEvent, hint?: Sentry.EventHint): S
   delete event.breadcrumbs;
   delete event.user;
   delete event.server_name;
+  // The installed dependency inventory. `Modules` is disabled; this is its
+  // second control, for the same reason every other one has two.
+  delete event.modules;
 
   // A transaction name is a route, and a route can arrive with a query string
   // attached. Same reasoning as the pino `req` serializer: the identity is the
@@ -210,7 +233,16 @@ export function scrubEvent(event: Sentry.ErrorEvent, hint?: Sentry.EventHint): S
     // per-frame local variables, which the LocalVariables integration attaches.
     // It is disabled, and this drops the field regardless.
     for (const frame of value.stacktrace?.frames ?? []) {
+      // Local variables: where a decrypted value or an access token sits at the
+      // moment of a throw.
       delete frame.vars;
+      // Source lines around the frame, attached by ContextLines, which reads
+      // the file from disk at error time. The integration is disabled; this is
+      // the second control, and it is the one that was missing when the
+      // integration name in the disable list turned out to be wrong.
+      delete frame.pre_context;
+      delete frame.context_line;
+      delete frame.post_context;
     }
   }
 

@@ -54,7 +54,7 @@ identifiers Tier 2 vendors get.
 
 | Provider | Service | Customer information they touch | Safeguard basis | Annual check |
 |---|---|---|---|---|
-| Sentry | Backend error monitoring (US) | **None by design.** Error type, programmatic error code, stack frames within our own code, and the route path. No user id, no item id, no request, no headers, no query string, no body, no breadcrumbs, no vendor response text | Standard DPA; SOC 2. Enforced in code by `backend/src/observability/sentry.ts` `beforeSend`, not by configuration | Re-read `tests/sentry.test.ts` still passes; confirm no new SDK integration re-attached request data; confirm DPA current |
+| Sentry | Backend error monitoring (US) | **None by design.** Error type, programmatic error code, stack frame filenames and line numbers within our own code, and the route path. No user id, no item id, no request, no headers, no query string, no body, no breadcrumbs, no vendor response text, no local variables, no source lines, no dependency inventory | Standard DPA; SOC 2. Enforced in code by `backend/src/observability/sentry.ts` `beforeSend`, not by configuration | Re-read `tests/sentry.test.ts` still passes; confirm no new SDK integration re-attached request data; confirm DPA current |
 
 **Why the claim is auditable rather than asserted.** The scrubber is a hard
 gate every event passes through before transmission, chosen over Sentry's
@@ -67,9 +67,31 @@ access token each fail to appear anywhere in a serialised event.
 
 **Known limit, stated rather than glossed.** A stack trace is generated code we
 do not fully control, and a future frame could in principle carry a value its
-author did not anticipate. Local variables are dropped and the message is
-rebuilt from programmatic parts, which closes the two known routes. This is a
-residual risk, not a closed one.
+author did not anticipate. Local variables, source lines and the message are
+each dropped or rebuilt, which closes the known routes. This is a residual
+risk, not a closed one.
+
+**Correction, 2026-08-21, same day.** The first version of this row overstated
+the controls. Sentry integrations are disabled by matching their NAME, and two
+of the five names were wrong (`LocalVariables` is really `LocalVariablesAsync`;
+`Fastify` is not a default integration), so those filters did nothing. It also
+disabled `Http` while every vendor client here calls out through `fetch`, which
+is a different integration (`NodeFetch`), and it left `ContextLines` enabled,
+which reads the source file around each frame, and `Modules`, which sends the
+dependency inventory.
+
+No customer data was exposed: the second control caught all of it, since
+breadcrumbs were dropped wholesale, spans were never sent, and local variables
+were deleted in `beforeSend`. Source lines and the module list were reaching
+the event and are now dropped by both controls.
+
+The durable fix is not the corrected names. It is that `tests/sentry.test.ts`
+now asserts every name in the disable list exists among the SDK's own
+defaults, so a rename in a future SDK version fails a test instead of silently
+re-enabling collection. A control that is present in source and absent in
+effect is the exact failure shape `docs/connection-resilience-survey.md`
+exists to describe, and it was reproduced here while writing the thing that
+describes it.
 
 **Scope.** Backend only. The iOS app sends nothing to Sentry. Crash reporting
 on device is runbook G3.10 (MetricKit), which is an Apple system framework and
