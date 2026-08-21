@@ -18,7 +18,12 @@
 
 import { pino } from 'pino';
 import { config } from '../config.js';
+import { captureError, flushSentry } from '../observability/sentry.js';
 import { loggerOptions } from '../plugins/logger.js';
+
+/** Long enough for one HTTP round trip to Sentry, short enough that a crashing
+ *  process still restarts promptly. Fly restarts it either way. */
+const FATAL_FLUSH_MS = 2_000;
 
 export const log = pino({
   level: config.LOG_LEVEL,
@@ -45,11 +50,24 @@ export const log = pino({
 export function installProcessLogging(): void {
   process.on('uncaughtException', (err) => {
     log.fatal({ err }, 'uncaught exception, exiting');
-    // Give pino a tick to flush before the process goes.
-    setTimeout(() => process.exit(1), 100).unref();
+    captureError(err, { fatal: true });
+    // Flush before exiting. An unflushed transport loses precisely the event
+    // worth having: the SDK batches, and `process.exit` does not drain it. The
+    // exit is not conditional on the flush succeeding, because a Sentry
+    // timeout must not turn a crash into a hang. `flushSentry` resolves false
+    // on timeout rather than rejecting, and is a no-op with no DSN, so the
+    // 100 ms pino tick below is preserved unchanged in that case.
+    void flushSentry(FATAL_FLUSH_MS).finally(() => {
+      setTimeout(() => process.exit(1), 100).unref();
+    });
   });
 
   process.on('unhandledRejection', (reason) => {
-    log.error({ err: reason instanceof Error ? reason : new Error(String(reason)) }, 'unhandled rejection');
+    const err = reason instanceof Error ? reason : new Error(String(reason));
+    log.error({ err }, 'unhandled rejection');
+    // Reported, but the process keeps serving, for the reason above: one
+    // unawaited vendor promise must not take down a machine that is otherwise
+    // fine. No flush, because nothing is about to exit.
+    captureError(err);
   });
 }

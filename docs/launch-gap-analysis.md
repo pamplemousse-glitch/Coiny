@@ -208,6 +208,18 @@ at every upload. One hour, total.
 
 ### 9. Backend error triage has a decision that contradicts the compliance docs
 
+> **RESOLVED 2026-08-21: Sentry adopted, on this section's own terms.** The
+> second branch below was taken, completely and in one PR: DPA (founder),
+> `service-providers.md` row (new Tier 3, because Sentry receives no customer
+> information), privacy-policy paragraph, and the scrubbing config, which is
+> `backend/src/observability/sentry.ts` and is a `beforeSend` hard gate rather
+> than Sentry's server-side scrubbing, because server-side scrubbing runs after
+> the data has arrived. Backend only; iOS crash reporting remains G3.10
+> (MetricKit), which adds no vendor. The recommendation below to stay
+> first-party until 1,000 users was considered and declined: at the free tier
+> the cost is zero and the difference is a day of paperwork against a day of
+> code, which is the founder's call and was made explicitly.
+
 `docs/environments-research.md` §10 says: at first external tester, add
 Sentry to the backend only. But `docs/legal/service-providers.md`, the
 privacy policy, and the Safeguards 314.4(f) service-provider oversight row

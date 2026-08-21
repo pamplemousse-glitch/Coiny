@@ -1,3 +1,7 @@
+// Side-effect import, and it is first on purpose: it calls Sentry.init before
+// any other module in this file is evaluated. Biome treats a side-effect import
+// as an ordering barrier and will not sort it away from here.
+import './observability/instrument.js';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import rateLimit from '@fastify/rate-limit';

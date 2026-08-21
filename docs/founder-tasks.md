@@ -61,6 +61,34 @@ urgent. Everything below section 1 can be done in any order once unblocked.
 - Required by FTC Safeguards 314.4(c)(5) before a real bank connects, and
   attested to directly in Plaid's trial-access form.
 
+### 2.2a Create the Sentry account and accept its DPA
+
+- Free "Developer" plan: $0, one user, 5,000 errors a month, 30-day history,
+  email alerts. Nothing here needs a paid tier, and nothing should be upgraded
+  to one without revisiting the compliance note below.
+- Accept the standard DPA in the Sentry dashboard. **This is the only reason
+  this is a founder task**: `docs/legal/service-providers.md` requires a
+  safeguard basis per provider, and 314.4(f) requires it by contract.
+- Then hand over the DSN. Set it as a Fly secret, not in a `.env` file, and
+  not in the Keychain loader: it belongs only to the deployed apps.
+
+  ```
+  fly secrets set -a coiny-api SENTRY_DSN='<dsn>'
+  ```
+
+- Leave it unset locally and in CI. With no DSN the SDK is never initialised,
+  which is deliberate: a local run and a CI run send nothing to a third party
+  and cannot be made to by a stray import.
+- The code side is already done and merged: the scrubber, the rate cap, the
+  `service-providers.md` Tier 3 row, the privacy-policy paragraph and the
+  `obligations.md` 314.4(f) entry all landed together, which was the condition
+  `launch-gap-analysis.md` section 9 attached to adopting Sentry at all.
+- Two things for the attorney pass (section 1.4) rather than for you: whether
+  the "receives no personal data" claim is sufficient as written given it rests
+  on a code control, and confirmation that a backend-only error reporter leaves
+  the Apple privacy nutrition labels unchanged. Both are flagged in the
+  documents themselves.
+
 ### 2.2 Confirm the support email works
 - `contact@athanorworks.com` must receive mail.
 - Used by both legal documents and the App Store listing.

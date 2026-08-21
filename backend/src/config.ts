@@ -125,6 +125,39 @@ const configSchema = z
     // not the Android client ID. When empty, /api/auth/google returns 503.
     GOOGLE_AUTH_CLIENT_ID: z.string().default(''),
 
+    // Sentry error tracking (docs/launch-gap-analysis.md section 9, resolved
+    // 2026-08-21 in favour of adopting it with the full compliance set rather
+    // than staying first-party).
+    //
+    // Empty by default and empty everywhere except the deployed apps, which is
+    // load-bearing rather than convenient: with no DSN the SDK is never
+    // initialised, so tests, CI and a local run send nothing to a third party
+    // and cannot be made to by a stray import. `observability/sentry.ts` is
+    // written so every one of its entry points is a no-op in that state.
+    SENTRY_DSN: z.string().default(''),
+
+    // Errors only. Tracing spans carry route parameters, database statements
+    // and outbound URLs, none of which have been through the redaction policy
+    // in plugins/logger.ts, and none of which we need to answer "what broke".
+    // Raise this only alongside a scrubbing story for spans.
+    SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0),
+
+    // Events per rolling window, and per distinct error key inside it.
+    //
+    // The free plan allows 5,000 errors a month, which is about 166 a day, and
+    // `util/fetch.ts` currently retries up to 3 times per logical call with no
+    // budget. One vendor outage across a sweep can therefore emit thousands of
+    // identical events and exhaust a month of quota in an afternoon, at which
+    // point the NEXT incident is invisible. Capping is what keeps error
+    // tracking working during the failure it exists for.
+    SENTRY_MAX_EVENTS_PER_WINDOW: z.coerce.number().int().positive().default(20),
+    SENTRY_MAX_EVENTS_PER_KEY: z.coerce.number().int().positive().default(3),
+    SENTRY_RATE_WINDOW_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(10 * 60 * 1000),
+
     // Rate-limit knobs. Per-key budget for the global limiter (keyed on
     // bearer-token hash, falling back to req.ip for unauthenticated traffic).
     RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
