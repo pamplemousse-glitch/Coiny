@@ -8,7 +8,7 @@ import { getCardanoBalance } from '../chains/cardano.js';
 import { getCosmosBalance, getCosmosStakedBalance } from '../chains/cosmos.js';
 import { getHederaBalance } from '../chains/hedera.js';
 import { getNearBalance } from '../chains/near.js';
-import { getPolkadotBalance } from '../chains/polkadot.js';
+import { getPolkadotBalance, getPolkadotStakedBalance } from '../chains/polkadot.js';
 import { getSolanaBalance, getSolanaStakedBalance } from '../chains/solana.js';
 import { getStellarBalance } from '../chains/stellar.js';
 import { getSuiBalance } from '../chains/sui.js';
@@ -105,11 +105,10 @@ export async function fetchNativeBalance(chain: string, address: string): Promis
  * unknown rather than as zero.
  *
  * Cosmos and Osmosis read delegations and unclaimed rewards; Solana reads its
- * delegated stake accounts. The other nine chains read liquid balance only —
- * NEAR, Aptos, Sui, TON and Polkadot all have real staking ecosystems and are
- * still understated. Polkadot in particular is one Subscan field (`bonded`)
- * away, and is left out here only because Subscan refuses unauthenticated
- * requests, so the response shape could not be verified rather than guessed.
+ * delegated stake accounts. Polkadot reports its staked figure for the SPLIT
+ * only: Subscan's `balance` is already free + reserved and staking is a hold
+ * inside reserved, so adding it would double count. NEAR, Aptos, Sui and TON
+ * read liquid balance only and remain understated.
  */
 export async function fetchChainBalance(chain: string, address: string): Promise<ChainBalance | null> {
   const liquid = await fetchNativeBalance(chain, address);
@@ -122,9 +121,18 @@ export async function fetchChainBalance(chain: string, address: string): Promise
     staked = await getCosmosStakedBalance(chain, address).catch(() => null);
   } else if (chain === 'solana') {
     staked = await getSolanaStakedBalance(address, config.HELIUS_API_KEY).catch(() => null);
+  } else if (chain === 'polkadot') {
+    // Reported for the split only. Subscan's `balance` is free + reserved and
+    // staking is a hold inside reserved, so this is already counted in
+    // `liquid` above and must NEVER be added to the total.
+    staked = await getPolkadotStakedBalance(address).catch(() => null);
   }
 
-  return { total: liquid + (staked ?? 0), staked };
+  // Polkadot is the exception: its `balance` is already the total, staking
+  // included, so adding the staked figure would count it twice. Cosmos and
+  // Solana report a liquid balance that genuinely excludes their stake.
+  const stakeIsAlreadyInTotal = chain === 'polkadot';
+  return { total: liquid + (stakeIsAlreadyInTotal ? 0 : (staked ?? 0)), staked };
 }
 
 const AddWalletBodySchema = z.object({

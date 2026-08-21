@@ -31,6 +31,10 @@ vi.mock('../src/chains/aptos.js', () => ({
 vi.mock('../src/chains/sui.js', () => ({
   getSuiBalance: vi.fn(),
 }));
+vi.mock('../src/chains/polkadot.js', () => ({
+  getPolkadotBalance: vi.fn(),
+  getPolkadotStakedBalance: vi.fn(),
+}));
 vi.mock('../src/chains/hedera.js', () => ({
   getHederaBalance: vi.fn(),
 }));
@@ -38,6 +42,7 @@ vi.mock('../src/chains/hedera.js', () => ({
 import { getBitcoinBalance } from '../src/chains/bitcoin.js';
 import { getBlockcypherBalance } from '../src/chains/blockcypher.js';
 import { getCosmosBalance, getCosmosStakedBalance } from '../src/chains/cosmos.js';
+import { getPolkadotBalance, getPolkadotStakedBalance } from '../src/chains/polkadot.js';
 import { getStellarBalance } from '../src/chains/stellar.js';
 import { getXrpBalance } from '../src/chains/xrp.js';
 import { getSpotPrices } from '../src/coinbase/client.js';
@@ -49,6 +54,8 @@ const mockedGetStellarBalance = vi.mocked(getStellarBalance);
 const mockedGetBlockcypherBalance = vi.mocked(getBlockcypherBalance);
 const mockedGetCosmosBalance = vi.mocked(getCosmosBalance);
 const mockedGetCosmosStaked = vi.mocked(getCosmosStakedBalance);
+const mockedGetPolkadotBalance = vi.mocked(getPolkadotBalance);
+const mockedGetPolkadotStaked = vi.mocked(getPolkadotStakedBalance);
 
 describe('GET /api/chain-wallets', () => {
   beforeEach(async () => {
@@ -556,6 +563,45 @@ describe('staked balances are counted and kept separate', () => {
 
     const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
     expect(list.json<{ lastStakedUsd: number | null }[]>()[0]?.lastStakedUsd).toBeNull();
+
+    await app.close();
+  });
+});
+
+// Polkadot is the exception to the staking rule. Subscan's `balance` is
+// free + reserved, and staking is a hold inside reserved, so the stake is
+// ALREADY in the total. Adding it — as Cosmos and Solana correctly do — would
+// count it twice.
+describe('Polkadot staking is a split of the total, not an addition to it', () => {
+  beforeEach(async () => {
+    vi.resetAllMocks();
+    mockedGetCosmosStaked.mockResolvedValue(null);
+    mockedGetPolkadotStaked.mockResolvedValue(null);
+    await resetDatabase();
+  });
+
+  it('does not add bonded DOT on top of the reported balance', async () => {
+    const { db } = await import('../src/db/client.js');
+    const { chainWallets } = await import('../src/db/schema.js');
+    await db().insert(chainWallets).values({ userId: testUserId, chain: 'polkadot', address: '1dot' });
+
+    // 33.69 total, of which 5.69 is bonded — the real figures from a live
+    // Asset Hub staker.
+    mockedGetPolkadotBalance.mockResolvedValue(33.69);
+    mockedGetPolkadotStaked.mockResolvedValue(5.69);
+    mockedGetSpotPrices.mockResolvedValue(new Map([['DOT', 10]]));
+
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    await app.inject({ method: 'POST', url: '/api/chain-wallets/sync', headers: authHeader() });
+
+    const list = await app.inject({ method: 'GET', url: '/api/chain-wallets', headers: authHeader() });
+    const w = list.json<{ lastBalanceUsd: number; lastStakedUsd: number }[]>()[0];
+
+    // 33.69 x $10 = $336.90. NOT $393.80, which is what adding would give.
+    expect(w?.lastBalanceUsd).toBeCloseTo(336.9, 1);
+    // The staked figure is still reported, as a subset.
+    expect(w?.lastStakedUsd).toBeCloseTo(56.9, 1);
 
     await app.close();
   });
