@@ -12,11 +12,42 @@ enum NetWorthFixtures {
         ClassReading(value: value, asOf: asOf, status: status)
     }
 
+    /// The server's rule for what counts toward `total`, transcribed from
+    /// `backend/src/networth/classes.ts` `includedInTotal`.
+    ///
+    /// This is the only copy of that rule on the client, and it deliberately
+    /// lives in test code: production reads the server's `excluded` list
+    /// instead, so a transcription that falls behind can break a test but can
+    /// never reach a screen.
+    static func serverIncludesInTotal(_ status: ClassStatus) -> Bool {
+        status == .ok || status == .stale || status == .expiring || status == .reauthRequired
+    }
+
+    /// `excluded` exactly as the server builds it: every class that is neither
+    /// included in the total nor `not_connected`.
+    static func serverExcluded(_ classes: [String: ClassReading]) -> ExcludedSummary {
+        let names = classes
+            .filter { !serverIncludesInTotal($0.value.status) && $0.value.status != .notConnected }
+            .keys
+            .sorted()
+        return ExcludedSummary(count: names.count, classes: Array(names))
+    }
+
+    /// `total` exactly as the server builds it: included classes summed, with
+    /// debts subtracted rather than added.
+    static func serverTotal(_ classes: [String: ClassReading]) -> Double {
+        classes.reduce(0.0) { sum, entry in
+            guard serverIncludesInTotal(entry.value.status) else { return sum }
+            let value = entry.value.value ?? 0
+            return entry.key == "debts" ? sum - value : sum + value
+        }
+    }
+
     // swiftlint:disable:next function_body_length
     static func response(
         total: Double = 0,
         classes: [String: ClassReading] = [:],
-        excluded: ExcludedSummary = ExcludedSummary(count: 0, classes: []),
+        excluded: ExcludedSummary? = nil,
         generatedAt: Date = Date(timeIntervalSince1970: 1_700_000_000),
         bankRefresh: String? = nil,
         liquidCashMonths: Double? = nil,
@@ -69,7 +100,7 @@ enum NetWorthFixtures {
                 truelayer: nil
             ),
             classes: classes,
-            excluded: excluded,
+            excluded: excluded ?? serverExcluded(classes),
             generatedAt: generatedAt,
             bankRefresh: bankRefresh
         )

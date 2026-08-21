@@ -70,6 +70,54 @@ final class WealthGroupsTests: XCTestCase {
         XCTAssertEqual(cryptoGroup.includedTotal, 1300, "a failed class contributes nothing, never a zero-that-hides")
     }
 
+    func testReauthRequiredCountsTowardItsGroupSubtotal() {
+        // The server counts `reauth_required` in `total`: a lapsed login does
+        // not make the last balance wrong, it makes it un-refreshable. The
+        // client used to omit it from the subtotal, so a user whose bank login
+        // had lapsed saw a Liquid header that did not agree with their net
+        // worth, and nothing in `excluded` to explain the gap.
+        let classes = [
+            "bank": NetWorthFixtures.reading(value: 4000, status: .reauthRequired),
+            "ynab": NetWorthFixtures.reading(value: 1000, status: .ok),
+        ]
+        let response = NetWorthFixtures.response(classes: classes)
+
+        XCTAssertTrue(response.excluded.classes.isEmpty, "reauth_required is not an excluded class")
+
+        let liquid = WealthPresenter.sections(from: response).first { $0.group == .liquid }
+        XCTAssertEqual(liquid?.includedTotal, 5000)
+    }
+
+    func testGroupSubtotalsReconcileToTheServerTotal() {
+        // The structural pin. Whatever either side later decides about a given
+        // status, the assets minus the debts must equal the headline number the
+        // server sent, because the client takes the included set from the
+        // server's own `excluded` list rather than re-deriving it.
+        let classes: [String: ClassReading] = [
+            "bank": NetWorthFixtures.reading(value: 4000, status: .reauthRequired),
+            "ynab": NetWorthFixtures.reading(value: 1000, status: .ok),
+            "truelayer": NetWorthFixtures.reading(value: 250, status: .stale),
+            "investments": NetWorthFixtures.reading(value: 20_000, status: .expiring),
+            "alpaca": NetWorthFixtures.reading(value: nil, status: .pending),
+            "crypto": NetWorthFixtures.reading(value: 800, status: .error),
+            "defi": NetWorthFixtures.reading(value: 150, status: .staleExcluded),
+            "kraken": NetWorthFixtures.reading(value: 90, status: .disconnected),
+            "chainWallets": NetWorthFixtures.reading(value: nil, status: .notConnected),
+            "realEstate": NetWorthFixtures.reading(value: 300_000, status: .ok),
+            "debts": NetWorthFixtures.reading(value: 12_000, status: .ok),
+        ]
+        let response = NetWorthFixtures.response(
+            total: NetWorthFixtures.serverTotal(classes),
+            classes: classes
+        )
+        let sections = WealthPresenter.sections(from: response)
+
+        let assets = sections.filter { $0.group != .owed }.reduce(0.0) { $0 + $1.includedTotal }
+        let owed = sections.filter { $0.group == .owed }.reduce(0.0) { $0 + $1.includedTotal }
+
+        XCTAssertEqual(assets - owed, response.total, accuracy: 0.001)
+    }
+
     func testGroupsRenderInFixedOrder() {
         let response = NetWorthFixtures.response(classes: [
             "debts": NetWorthFixtures.reading(value: 900, status: .ok),
