@@ -106,10 +106,21 @@ export async function getPolkadotBalance(address: string): Promise<number | null
  * `free + reserved`, so it is already the total. Second, Polkadot migrated
  * staking from LOCKS to HOLDS: the wiki now says "Reserved Balance (also
  * called holds) is the balance removed from free and does not overlay... used
- * for native staking on the Polkadot Hub". A live Asset Hub query on a real
- * staker shows `reserved` exactly equal to `staking.ledger.total`, `locks`
- * empty and `frozen` zero. So bonded is inside reserved, which is inside
- * balance.
+ * for native staking on the Polkadot Hub".
+ *
+ * Verified directly against Polkadot Asset Hub, not taken on trust. Account
+ * 15aBy7hAzkVCbX4rkB8mdn2NCZNL6m456QQgM2pVcimfNBQ8 returns:
+ *
+ *     free                 28.0021686817
+ *     reserved              5.6891446119
+ *     frozen                0
+ *     free + reserved      33.6913132936   <- what Subscan reports as `balance`
+ *     staking.ledger.total  5.6891446119   <- EQUALS reserved
+ *     balances.locks        []             <- empty: staking is not a lock
+ *     balances.holds        [{ Staking: 56891446119 }]  <- equals reserved
+ *
+ * So bonded is inside reserved, which is inside balance. Re-run that query
+ * against any staker to check this rather than believing the comment.
  *
  * The pre-migration answer was the same for a different reason: staking was
  * then a lock inside `free`, and `free + reserved` contained it anyway.
