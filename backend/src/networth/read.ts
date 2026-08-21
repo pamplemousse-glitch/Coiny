@@ -132,6 +132,12 @@ export type NetWorthResponse = {
       /** Positions Zerion declined to price, excluded rather than counted as
        *  zero (R-8.1). */
       unpricedCount: number | null;
+      /** Positions excluded for thin liquidity, and their quoted value. NOT
+       *  spam (#295 handles that): real holdings in tokens that cannot be sold
+       *  at the quoted price. Excluded from `totalUSD` and from the reactive
+       *  signal, so the creature never celebrates a gain nobody could take. */
+      illiquidCount: number | null;
+      illiquidUSD: number | null;
     };
     debts: DebtItem[];
   };
@@ -436,6 +442,8 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
     breakdown?: { wallet: number; deposited: number; borrowed: number; locked: number; staked: number } | null;
     spamFiltered?: number;
     unpriced?: number;
+    illiquidCount?: number;
+    illiquidValue?: number;
   } | null;
   const defiStatus = deriveStatus({
     connected: zerionRows.length > 0,
@@ -839,6 +847,11 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
         breakdown: defiPayload?.breakdown ?? null,
         spamFilteredUSD: defiPayload?.spamFiltered ?? null,
         unpricedCount: defiPayload?.unpriced ?? null,
+        // Genuine holdings in tokens almost nobody trades. Excluded from the
+        // total on purpose: a position quoting $50,000 against a $500 pool is
+        // not $50,000 the user can realise. Shown honestly, not counted.
+        illiquidCount: defiPayload?.illiquidCount ?? null,
+        illiquidUSD: defiPayload?.illiquidValue ?? null,
       },
       debts: debtsUsable ? debtItems : [],
     },

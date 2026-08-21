@@ -1,21 +1,33 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authHeader, resetDatabase, testUserId } from './db-helper.js';
 
+vi.mock('../src/dexscreener/client.js', async (importOriginal) => ({
+  // isThinlyTraded is pure, so the real one is kept: mocking it would test the
+  // mock's threshold instead of the client's.
+  ...(await importOriginal<typeof import('../src/dexscreener/client.js')>()),
+  getTokenMarket: vi.fn(),
+}));
+
 vi.mock('../src/zerion/client.js', () => ({
   getPortfolio: vi.fn(),
   getPositionsPage: vi.fn(),
   getTransactions: vi.fn(),
 }));
 
+import { getTokenMarket } from '../src/dexscreener/client.js';
 import { getPortfolio, getPositionsPage, getTransactions } from '../src/zerion/client.js';
 
 const mockedGetPortfolio = vi.mocked(getPortfolio);
+const mockedGetTokenMarket = vi.mocked(getTokenMarket);
 const mockedGetPositionsPage = vi.mocked(getPositionsPage);
 const mockedGetTransactions = vi.mocked(getTransactions);
 
 describe('GET /api/zerion/wallets', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    // No market data by default, which counts the position: unknown liquidity
+    // is not thin liquidity.
+    mockedGetTokenMarket.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -44,6 +56,9 @@ describe('GET /api/zerion/wallets', () => {
 describe('POST /api/zerion/wallets', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    // No market data by default, which counts the position: unknown liquidity
+    // is not thin liquidity.
+    mockedGetTokenMarket.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -102,6 +117,9 @@ describe('POST /api/zerion/wallets', () => {
 describe('DELETE /api/zerion/wallets/:address', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    // No market data by default, which counts the position: unknown liquidity
+    // is not thin liquidity.
+    mockedGetTokenMarket.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -130,6 +148,9 @@ describe('DELETE /api/zerion/wallets/:address', () => {
 describe('GET /api/zerion/portfolio', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    // No market data by default, which counts the position: unknown liquidity
+    // is not thin liquidity.
+    mockedGetTokenMarket.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -193,6 +214,9 @@ describe('GET /api/zerion/portfolio', () => {
 describe('POST /api/zerion/sync', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    // No market data by default, which counts the position: unknown liquidity
+    // is not thin liquidity.
+    mockedGetTokenMarket.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -327,6 +351,9 @@ describe('POST /api/zerion/sync', () => {
 describe('spam tokens do not inflate the DeFi total', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
+    // No market data by default, which counts the position: unknown liquidity
+    // is not thin liquidity.
+    mockedGetTokenMarket.mockResolvedValue(null);
     await resetDatabase();
   });
 
@@ -488,5 +515,121 @@ describe('spam tokens do not inflate the DeFi total', () => {
     expect(bd).toMatchObject({ wallet: 2000, staked: 38_000 });
 
     await app.close();
+  });
+});
+
+// Thin liquidity is NOT spam. #295 removed impostor tokens; this is a genuine
+// holding in something almost nobody trades. Handoff 2026-08-19 §3 lists four
+// options and recommends excluding, using the machinery that already exists.
+describe('illiquid tokens are excluded from the total, not counted', () => {
+  beforeEach(async () => {
+    vi.resetAllMocks();
+    mockedGetTokenMarket.mockResolvedValue(null);
+    await resetDatabase();
+  });
+
+  function pos(id: string, value: number | null, address: string | null = '0xabc') {
+    return {
+      id,
+      symbol: id.toUpperCase(),
+      name: id,
+      quantity: 1,
+      value_usd: value,
+      verified: null,
+      isTrash: false,
+      chainId: 'ethereum',
+      tokenAddress: address,
+    };
+  }
+
+  function market(liquidityUsd: number | null) {
+    return { priceUsd: 1, liquidityUsd, fdv: null, marketCap: null, pairCreatedAtMs: null, pairCount: 1 };
+  }
+
+  async function totals() {
+    const { refreshDefi } = await import('../src/networth/refresh.js');
+    await refreshDefi(testUserId);
+    const { buildApp } = await import('../src/server.js');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    await app.close();
+    return res.json<{
+      defi: number;
+      accounts: { defi: { illiquidCount: number | null; illiquidUSD: number | null } };
+    }>();
+  }
+
+  async function wallet(address: string) {
+    const { db } = await import('../src/db/client.js');
+    const { zerionWallets } = await import('../src/db/schema.js');
+    await db().insert(zerionWallets).values({ userId: testUserId, address, label: null });
+    mockedGetPortfolio.mockResolvedValue({
+      total_usd: 0,
+      change_1d_abs: null,
+      change_1d_pct: null,
+      breakdown: null,
+    });
+  }
+
+  // A $50,000 quote against a $500 pool is not $50,000 anyone can realise.
+  it('excludes a position whose pool is below the thin-liquidity threshold', async () => {
+    await wallet('0xill');
+    mockedGetPositionsPage.mockResolvedValue({
+      positions: [pos('real', 1000, null), pos('thin', 50_000)],
+      truncated: false,
+    });
+    mockedGetTokenMarket.mockResolvedValue(market(500));
+
+    const body = await totals();
+
+    expect(body.defi).toBeCloseTo(1000, 0);
+    expect(body.accounts.defi.illiquidCount).toBe(1);
+    expect(body.accounts.defi.illiquidUSD).toBeCloseTo(50_000, 0);
+  });
+
+  it('counts a position backed by a deep pool', async () => {
+    await wallet('0xdeep');
+    mockedGetPositionsPage.mockResolvedValue({ positions: [pos('weth', 5000)], truncated: false });
+    mockedGetTokenMarket.mockResolvedValue(market(5_000_000));
+
+    const body = await totals();
+
+    expect(body.defi).toBeCloseTo(5000, 0);
+    expect(body.accounts.defi.illiquidCount).toBe(0);
+  });
+
+  // Unknown liquidity is not thin liquidity. A vendor outage must never
+  // quietly delete real holdings from someone's net worth.
+  it('counts the position when liquidity is unknown', async () => {
+    await wallet('0xunk');
+    mockedGetPositionsPage.mockResolvedValue({ positions: [pos('mystery', 8000)], truncated: false });
+    mockedGetTokenMarket.mockResolvedValue(market(null));
+
+    const body = await totals();
+
+    expect(body.defi).toBeCloseTo(8000, 0);
+    expect(body.accounts.defi.illiquidCount).toBe(0);
+  });
+
+  it('counts the position when DexScreener itself fails', async () => {
+    await wallet('0xdown');
+    mockedGetPositionsPage.mockResolvedValue({ positions: [pos('token', 3000)], truncated: false });
+    mockedGetTokenMarket.mockRejectedValue(new Error('dexscreener 503'));
+
+    const body = await totals();
+
+    expect(body.defi).toBeCloseTo(3000, 0);
+  });
+
+  // A chain's native asset has no contract address and is never illiquid, so
+  // it must not cost a lookup.
+  it('never queries liquidity for a native asset', async () => {
+    await wallet('0xnative');
+    mockedGetPositionsPage.mockResolvedValue({ positions: [pos('eth', 9000, null)], truncated: false });
+
+    const body = await totals();
+
+    expect(body.defi).toBeCloseTo(9000, 0);
+    expect(mockedGetTokenMarket).not.toHaveBeenCalled();
   });
 });

@@ -10,6 +10,7 @@ import { getAccounts, getSpotPrices } from '../coinbase/client.js';
 import { isSharedCoinbaseKeyAllowed } from '../config.js';
 import { db } from '../db/client.js';
 import { coinbaseConnections, petState, zerionWallets } from '../db/schema.js';
+import { getTokenMarket, isThinlyTraded } from '../dexscreener/client.js';
 import { refreshGoalSystem } from '../goals/refresh.js';
 import { fetchDebtSnapshot, fetchPlaidSnapshot, type HoldingSummary, summariseHoldings } from '../goals/snapshot.js';
 import { investmentsHoldingsGet, liabilitiesGet } from '../plaid/client.js';
@@ -20,7 +21,7 @@ import { getItemsByUser } from '../store/items.js';
 import { recordReaction } from '../store/pet.js';
 import { cacheLiabilities, getCachedLiabilities } from '../store/plaid-liabilities.js';
 import { log } from '../util/log.js';
-import { getPortfolio, getPositionsPage, type ZerionPositionBreakdown } from '../zerion/client.js';
+import { getPortfolio, getPositionsPage, type ZerionPosition, type ZerionPositionBreakdown } from '../zerion/client.js';
 import type { CryptoPosition } from './read.js';
 import { assembleNetWorth } from './read.js';
 
@@ -196,6 +197,30 @@ export async function refreshCrypto(userId: string): Promise<RefreshOutcome> {
   }
 }
 
+/**
+ * Whether a position's quoted value is one the user could actually realise.
+ *
+ * Only asked of tokens with a contract address, which is the ONLY safe key:
+ * symbols are neither unique nor owned, so resolving by ticker lets an
+ * impostor choose the number. A chain's native asset (ETH, SOL) has no
+ * address and is never illiquid, so it short-circuits.
+ *
+ * Fails OPEN in every uncertain case. Unknown liquidity is not thin
+ * liquidity, and a DexScreener outage must not quietly delete real holdings
+ * from someone's net worth — that would be a far worse error than the
+ * overstatement it is trying to prevent.
+ */
+async function isPositionIlliquid(position: ZerionPosition): Promise<boolean> {
+  if (position.tokenAddress === null || position.chainId === null) return false;
+
+  const market = await getTokenMarket(position.chainId, position.tokenAddress).catch(() => null);
+  // No market data at all: unknown, so counted. See above.
+  if (market === null) return false;
+
+  // isThinlyTraded returns null for "liquidity unknown", which is also counted.
+  return isThinlyTraded(market) === true;
+}
+
 export async function refreshDefi(userId: string): Promise<RefreshOutcome> {
   const wallets = await db().select().from(zerionWallets).where(eq(zerionWallets.userId, userId));
   if (wallets.length === 0) return 'not_connected';
@@ -206,6 +231,8 @@ export async function refreshDefi(userId: string): Promise<RefreshOutcome> {
     let total = 0;
     let spamFiltered = 0;
     let unpriced = 0;
+    let illiquidCount = 0;
+    let illiquidValue = 0;
     const breakdown: ZerionPositionBreakdown = { wallet: 0, deposited: 0, borrowed: 0, locked: 0, staked: 0 };
     let breakdownKnown = false;
 
@@ -253,6 +280,23 @@ export async function refreshDefi(userId: string): Promise<RefreshOutcome> {
             unpriced++;
             continue;
           }
+
+          // Thin liquidity is NOT spam. #295 removed impostor tokens; this is
+          // a genuine holding in something almost nobody trades. A position
+          // quoting $50,000 against a $500 pool cannot be sold for $50,000, so
+          // counting it at face value states a number the user cannot realise.
+          //
+          // Excluded from the total and reported separately, using the
+          // vocabulary the response already has for exactly this ("shown
+          // honestly, not counted"). Keeping it out of the total also keeps it
+          // out of the reactive signal, so the creature never celebrates a
+          // gain that cannot be sold.
+          if (await isPositionIlliquid(position)) {
+            illiquidCount++;
+            illiquidValue += position.value_usd;
+            continue;
+          }
+
           walletTotal += position.value_usd;
         }
         total += walletTotal;
@@ -278,7 +322,7 @@ export async function refreshDefi(userId: string): Promise<RefreshOutcome> {
       // was written as null. Its own comment argues that "$40,000" and
       // "$2,000, and $38,000 you cannot touch until the unbonding period ends"
       // are different facts. Now the client can tell them apart.
-      payload: { breakdown: breakdownKnown ? breakdown : null, spamFiltered, unpriced },
+      payload: { breakdown: breakdownKnown ? breakdown : null, spamFiltered, unpriced, illiquidCount, illiquidValue },
     });
     return 'refreshed';
   } catch (err) {
