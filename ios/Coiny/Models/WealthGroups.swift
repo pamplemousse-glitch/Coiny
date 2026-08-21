@@ -163,17 +163,34 @@ struct WealthGroupSection: Identifiable, Equatable, Sendable {
 }
 
 enum WealthPresenter {
-    /// Statuses the server includes in `total`. Client-side this drives group
-    /// subtotals and the composition bar only; the total itself is always the
-    /// server's number (R-14.2).
-    static func includedInTotal(_ status: ClassStatus) -> Bool {
-        status == .ok || status == .stale || status == .expiring
+    /// Statuses that carry a value the user can rely on, used only for row
+    /// *treatment* (is this a number or a failure). It is NOT the rule for what
+    /// counts toward a subtotal: `sections(from:)` takes that from the server's
+    /// own `excluded` list, for the reason below.
+    ///
+    /// This function used to decide subtotals as well, and it disagreed with
+    /// the server. `networth/classes.ts` counts `reauth_required` in `total`
+    /// (a lapsed login does not make the last balance wrong, it makes it
+    /// un-refreshable), and this list omitted it. The headline number is always
+    /// the server's (R-14.2), so a user whose bank login lapsed saw group
+    /// subtotals that did not add up to their net worth, with nothing in
+    /// `excluded` to explain the difference. Two copies of one rule in two
+    /// languages will drift again, so there is now only one copy: the server's.
+    static func hasReliableValue(_ status: ClassStatus) -> Bool {
+        status == .ok || status == .stale || status == .expiring || status == .reauthRequired
     }
 
     /// The six fixed groups from a response. A class whose status is
     /// `not_connected` is never rendered (it belongs in Add an account), and a
     /// group with no renderable rows is not rendered at all (R-7.27).
+    ///
+    /// Subtotals sum exactly the classes the server put in `total`: its
+    /// `excluded.classes` is the complement of that set apart from
+    /// `not_connected`, which is never rendered here anyway. So the group
+    /// subtotals reconcile to the headline by construction, whatever either
+    /// side later decides about a given status.
     static func sections(from response: NetWorthResponse) -> [WealthGroupSection] {
+        let excluded = Set(response.excluded.classes)
         var byGroup: [WealthGroup: [WealthRow]] = [:]
         for cls in WealthClass.allCases {
             guard let reading = response.classes[cls.rawValue], reading.status != .notConnected else { continue }
@@ -182,7 +199,7 @@ enum WealthPresenter {
         return WealthGroup.allCases.compactMap { group in
             guard let rows = byGroup[group], !rows.isEmpty else { return nil }
             let total = rows.reduce(0.0) { sum, row in
-                includedInTotal(row.reading.status) ? sum + (row.reading.value ?? 0) : sum
+                excluded.contains(row.cls.rawValue) ? sum : sum + (row.reading.value ?? 0)
             }
             return WealthGroupSection(group: group, rows: rows, includedTotal: total)
         }
@@ -210,7 +227,7 @@ enum WealthPresenter {
         // Declared values are always labelled "Self-reported <date>" even when
         // fresh (R-8.2); the server reports them as `ok` and never excludes
         // them.
-        if row.cls == .manual || row.cls == .declared, includedInTotal(row.reading.status) {
+        if row.cls == .manual || row.cls == .declared, hasReliableValue(row.reading.status) {
             return .selfReported(label: selfReportedLabel(row.reading.asOf))
         }
         let asOfText = row.reading.asOf.map { asOfLabel($0, now: now) }
