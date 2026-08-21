@@ -1,4 +1,6 @@
 import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { captureError } from '../observability/sentry.js';
+import { pathOnly } from './logger.js';
 
 /**
  * The last thing between a thrown error and the client (PRD R-31.6).
@@ -35,7 +37,7 @@ const SAFE_MESSAGE_CODES = new Set([
 ]);
 
 export function registerErrorHandler(app: FastifyInstance): void {
-  app.setErrorHandler((error: FastifyError, _req: FastifyRequest, reply: FastifyReply) => {
+  app.setErrorHandler((error: FastifyError, req: FastifyRequest, reply: FastifyReply) => {
     const status = error.statusCode ?? 500;
 
     // Pass the error itself, not a hand-picked `message`. The `err` serializer
@@ -44,6 +46,15 @@ export function registerErrorHandler(app: FastifyInstance): void {
     app.log.error({ err: error }, 'request error');
 
     if (status >= 500) {
+      // 5xx ONLY. A 4xx is the client getting it wrong, and reporting those
+      // would spend the plan's monthly error budget on validation failures,
+      // which is how error tracking ends up switched off for being noisy.
+      //
+      // Route and method, never the user. Sentry answers "what broke and
+      // where"; the correlated Fly log line, which carries `user_id`, answers
+      // "for whom". `pathOnly` for the same reason the request serializer uses
+      // it: OAuth codes arrive as query parameters.
+      captureError(error, { route: pathOnly(req.url), method: req.method, status });
       return reply.status(status).send({ error: 'Internal Server Error' });
     }
 

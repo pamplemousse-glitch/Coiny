@@ -136,16 +136,33 @@ receive product identifiers (a shoe SKU, a coin number, a card name) that are
 not tied to you; Frankfurter provides currency rates and receives nothing about
 you.
 
+**Error monitoring (receives nothing about you):** Sentry receives a report
+when our own server code fails. Those reports are limited by design to the type
+of error, the programmatic error code, the stack trace inside our code, and the
+route that was being served. They deliberately do not include your account
+identifier, your request, your data, or anything a bank or other provider sent
+us. We enforce that in code before a report is sent rather than relying on a
+setting, and the enforcement is tested.
+
 Attorney note: wallet addresses, property addresses, and VINs are pseudonymous
 but potentially re-identifiable; we have treated them as personal data
 throughout. Confirm this framing is sufficient for the pricing-vendor section.
+
+Attorney note, Sentry: we assert that these reports contain no personal data,
+which is why Sentry sits outside the two categories above. That assertion rests
+on a code control (`backend/src/observability/sentry.ts`) rather than on a
+contract term. Confirm whether the assertion is sufficient as written, or
+whether the policy should describe Sentry as a processor of personal data
+regardless, on the basis that a stack trace could in principle carry a value
+its author did not anticipate.
 
 We may also disclose data if the law requires it (for example a valid subpoena),
 or as part of a merger or acquisition, in which case this policy would continue
 to apply to data collected under it.
 
 That is the complete list. There are no data brokers, ad networks, or analytics
-vendors.
+vendors. Sentry is an error-monitoring vendor and is not used for analytics: it
+receives nothing about you, and it never receives usage data of any kind.
 
 ## 4. How long we keep it
 

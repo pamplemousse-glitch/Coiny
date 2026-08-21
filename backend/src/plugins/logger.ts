@@ -20,6 +20,18 @@
 // Adding paths here without keeping that second mechanism is the failure mode
 // this comment exists to prevent: the redact list looks thorough, and the leak
 // walks straight past it.
+//
+// THIRD CONSUMER, added with Sentry (observability/sentry.ts). Sentry ships an
+// error payload to a third party, so both mechanisms above apply to it, and a
+// third one does too: Sentry's own default integrations attach request data,
+// outbound-HTTP breadcrumbs and console output that pino never sees. The four
+// primitives below are exported for exactly one reason, which is the line at
+// the bottom of this comment block. `FORBIDDEN_KEYS`, `pathOnly`,
+// `stackFramesOnly` and `vendorErrorCode` are the policy; the Sentry scrubber
+// is a second APPLICATION of that policy, never a second copy of it.
+//
+// If you find yourself wanting a second configuration, the answer is almost
+// always that the first one is wrong.
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { ResSerializerReply } from 'fastify/types/logger.js';
@@ -33,7 +45,7 @@ import type { RawServerDefault } from 'fastify/types/utils.js';
  *
  *  Ordered by what they protect: credentials first, then the identifying half
  *  of the behavioural profile, then amounts. */
-const FORBIDDEN_KEYS = [
+export const FORBIDDEN_KEYS = [
   // Credentials. A leaked access token is a live bank connection.
   'access_token',
   'accessToken',
@@ -106,7 +118,7 @@ const FORBIDDEN_KEYS = [
  *  names: the set of parameters is open (every new route can add one) and the
  *  cost of missing one is a credential in the log stream. A route's identity
  *  is its path, and that is what per-route latency and error rates group by. */
-function pathOnly(url: string): string {
+export function pathOnly(url: string): string {
   const q = url.indexOf('?');
   return q === -1 ? url : url.slice(0, q);
 }
@@ -255,7 +267,7 @@ export const loggerOptions = {
  * front. Written to survive a multi-line message: it seeks the first real
  * frame rather than dropping a fixed number of lines.
  */
-function stackFramesOnly(stack: string | undefined): string {
+export function stackFramesOnly(stack: string | undefined): string {
   if (!stack) return '';
   const lines = stack.split('\n');
   const firstFrame = lines.findIndex((line) => /^\s+at\s/.test(line));
@@ -268,7 +280,7 @@ function stackFramesOnly(stack: string | undefined): string {
  * module stays free of a dependency on the Plaid layer and so the same
  * treatment covers any other client that adopts the shape.
  */
-function vendorErrorCode(err: Error): Record<string, string> {
+export function vendorErrorCode(err: Error): Record<string, string> {
   const body = (err as { body?: unknown }).body;
   if (body === null || typeof body !== 'object') return {};
   const code = (body as { error_code?: unknown }).error_code;

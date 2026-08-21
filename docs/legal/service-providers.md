@@ -46,6 +46,36 @@ being the caller.
 Annual check for Tier 2: the one-hour ToS pass owed before paid launch
 (PRD section 17), prioritizing vendors whose data renders as a dollar value.
 
+## Tier 3: receive no customer information at all
+
+One entry, and the tier exists because it genuinely fits neither of the two
+above: Sentry receives nothing about a customer, not even the pseudonymous
+identifiers Tier 2 vendors get.
+
+| Provider | Service | Customer information they touch | Safeguard basis | Annual check |
+|---|---|---|---|---|
+| Sentry | Backend error monitoring (US) | **None by design.** Error type, programmatic error code, stack frames within our own code, and the route path. No user id, no item id, no request, no headers, no query string, no body, no breadcrumbs, no vendor response text | Standard DPA; SOC 2. Enforced in code by `backend/src/observability/sentry.ts` `beforeSend`, not by configuration | Re-read `tests/sentry.test.ts` still passes; confirm no new SDK integration re-attached request data; confirm DPA current |
+
+**Why the claim is auditable rather than asserted.** The scrubber is a hard
+gate every event passes through before transmission, chosen over Sentry's
+server-side scrubbing because server-side scrubbing runs after the data has
+arrived. It imports the same `FORBIDDEN_KEYS` list pino redacts on, so the two
+controls cannot diverge, and it adds user and item identifiers on top, which
+pino is permitted to write and Sentry is not. `tests/sentry.test.ts` asserts
+that an institution name, an OAuth authorization code, a wallet address and an
+access token each fail to appear anywhere in a serialised event.
+
+**Known limit, stated rather than glossed.** A stack trace is generated code we
+do not fully control, and a future frame could in principle carry a value its
+author did not anticipate. Local variables are dropped and the message is
+rebuilt from programmatic parts, which closes the two known routes. This is a
+residual risk, not a closed one.
+
+**Scope.** Backend only. The iOS app sends nothing to Sentry. Crash reporting
+on device is runbook G3.10 (MetricKit), which is an Apple system framework and
+adds no vendor. The Apple privacy nutrition labels are therefore unaffected by
+this entry; confirm that reading before the first submission.
+
 ## Removed providers (do not re-add without re-reading their terms)
 
 Steam, SnapTrade: removed from the codebase 2026-08-12 (register DR-8). Any
@@ -55,3 +85,7 @@ production users ever existed.
 ## Change log
 
 - 2026-08-13: initial list, enumerated from code.
+- 2026-08-21: added Sentry under a new Tier 3. Resolves the unreconciled
+  decision recorded in `launch-gap-analysis.md` section 9, which required that
+  Sentry be either declined or adopted completely, with the DPA, this row, a
+  privacy-policy sentence and the scrubbing config in one change.
