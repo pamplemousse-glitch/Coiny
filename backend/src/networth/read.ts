@@ -116,9 +116,12 @@ export type NetWorthResponse = {
     investmentsSummary: {
       /** Unvested equity, EXCLUDED from every total. Null when unknown. */
       unvestedUSD: number | null;
-      /** Cash-equivalent securities, currently INCLUDED in the investments
-       *  total. Surfaced so the ladder question can be decided explicitly. */
+      /** Cash-equivalent securities, INCLUDED in the investments total. */
       cashEquivalentUSD: number | null;
+      /** The subset of the above held in TAXABLE accounts, which also counts
+       *  toward the ladder's emergency-fund rungs. Money market funds inside a
+       *  401(k) or IRA are excluded: reaching them costs tax and a penalty. */
+      liquidCashEquivalentUSD: number;
     };
     crypto: CryptoPosition[];
     defi: {
@@ -307,8 +310,17 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
   let bankOldestAsOf: Date | null = null;
   let anyIncludedAccount = false;
   const bankAccounts: BankAccountReading[] = [];
+  /** Every account's tax treatment, INCLUDING investment ones, which the loop
+   *  below skips for balance purposes. Needed to decide whether a
+   *  cash-equivalent holding inside a brokerage is reachable in an emergency:
+   *  a money market fund in a taxable account is, the same fund inside a
+   *  401(k) is not. */
+  const accountIsTaxAdvantaged = new Map<string, boolean>();
+  const accountIsExpired = new Map<string, boolean>();
 
   for (const acct of activeAccounts) {
+    accountIsTaxAdvantaged.set(acct.accountId, classifyAccount(acct.type, acct.subtype).taxAdvantaged);
+    accountIsExpired.set(acct.accountId, isExpired(acct.asOf));
     if (acct.type === 'investment' || acct.type === 'brokerage') continue;
     const balance = num(acct.balance) ?? 0;
     const meta = liabilityMeta.get(acct.accountId);
@@ -401,6 +413,44 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
     unvested?: number;
   } | null;
   const invHoldings = (invPayload?.holdings ?? []) as HoldingSummary[];
+
+  // Cash-equivalent holdings in TAXABLE accounts are emergency money.
+  //
+  // `liquidDeposits` above counts depository accounts only, so someone whose
+  // emergency fund sits in a money market fund (Fidelity SPAXX, Vanguard
+  // VMFXX, Schwab SWVXX) was told they had NO emergency fund at all, and the
+  // creature worried about a person doing exactly the right thing.
+  //
+  // Every authority treats these as emergency funds and none draws a
+  // bank-account-only line: FINRA lists money market funds beside bank
+  // accounts on safety/liquidity/accessibility rather than account type,
+  // Vanguard calls them "ideal for emergency funds", Fidelity markets SPAXX
+  // for precisely this, and the Bogleheads wiki names "a money market fund or
+  // a bank savings account" in the same breath. The line the field actually
+  // draws is the accounting one — cash and cash equivalents: stable principal,
+  // same-day to T+2 access, no penalty on the amount counted.
+  //
+  // The TAX WRAPPER is what disqualifies, not the institution. The same fund
+  // inside a 401(k) or Traditional IRA costs tax plus a 10% penalty to reach,
+  // so it is not emergency money. `taxAdvantaged` already encodes that.
+  //
+  // A Roth IRA is deliberately excluded even though contributions can be
+  // withdrawn penalty-free: counting it correctly needs contribution-basis
+  // tracking we do not have, and guessing at the basis would overstate. The
+  // consensus is that it is a second-tier reserve at best.
+  //
+  // Conservative on every unknown: a holding whose account we cannot classify
+  // does NOT count, because we cannot show it is reachable.
+  let liquidCashEquivalents = 0;
+  for (const h of invHoldings) {
+    if (h.isCashEquivalent !== true) continue;
+    if (h.accountId == null) continue;
+    const taxAdvantaged = accountIsTaxAdvantaged.get(h.accountId);
+    if (taxAdvantaged !== false) continue;
+    if (accountIsExpired.get(h.accountId) === true) continue;
+    liquidCashEquivalents += Math.max(0, h.value);
+  }
+  liquidDeposits += liquidCashEquivalents;
   // A bank item does not imply investment accounts, so the class counts as
   // connected only once a holdings refresh has produced a cache row (a
   // successful fetch of zero holdings writes value 0, status ok). Before that
@@ -836,6 +886,10 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
         // what completes a rung, so it is Antoine's call, not a side effect
         // of capturing the field. See PlaidSecurity.is_cash_equivalent.
         cashEquivalentUSD: invPayload?.cashEquivalent ?? null,
+        // The part of cashEquivalentUSD that is reachable in an emergency, so
+        // the client can say WHY the ladder's cash figure is larger than the
+        // sum of the bank accounts on screen.
+        liquidCashEquivalentUSD: liquidCashEquivalents,
       },
       crypto: cryptoPositions,
       // The five-way split #276 parsed and nothing consumed, plus what the
