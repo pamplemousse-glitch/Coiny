@@ -182,6 +182,31 @@ describe('redaction', () => {
     expect(all).not.toContain('user@example.com');
   });
 
+  it('censors a forbidden key at every depth, not just the two the paths cover', async () => {
+    // The test above stops at two levels, which is exactly as deep as `redact`
+    // reached, so it could never have found the gap. `redact` generated
+    // `key`, `*.key` and `*.*.key` and nothing further, while the comment above
+    // it claimed deeper nesting was "covered by the wildcard at the end of each
+    // family". There was no such wildcard. Measured: `a.b.c.email` was written
+    // in full.
+    //
+    // A path list is structurally the wrong tool for an open set of shapes:
+    // every finite list is a guess about how deeply someone will nest an
+    // object, and guessing low costs a credential. `scrubDeep` is the
+    // unbounded half of the policy and this drives it past any plausible depth.
+    const app = await buildAppWithCapturedLogs();
+    let payload: Record<string, unknown> = { email: 'user@example.com' };
+    for (let depth = 0; depth < 10; depth++) {
+      app.log.info({ payload }, `depth ${depth}`);
+      payload = { nested: payload };
+    }
+    await app.close();
+
+    const all = capture.raw.join('\n');
+    expect(all).not.toContain('user@example.com');
+    expect(all).toContain('[redacted]');
+  });
+
   it('censors credentials, amounts and provider subs', async () => {
     const app = await buildAppWithCapturedLogs();
     app.log.info(

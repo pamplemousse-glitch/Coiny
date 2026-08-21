@@ -8,12 +8,14 @@
 // never invoked: with no DSN the SDK is not initialised, which is the state in
 // CI, and nothing in this file may be able to send an event anywhere.
 
+import { getDefaultIntegrations } from '@sentry/node';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { config } from '../src/config.js';
 import {
   allowEvent,
   captureError,
   deepScrub,
+  disabledIntegrationNames,
   eventKey,
   flushSentry,
   isSentryEnabled,
@@ -166,6 +168,29 @@ describe('scrubEvent', () => {
     expect(JSON.stringify(scrubbed)).not.toContain('access-abc');
   });
 
+  test('drops the source lines ContextLines attaches around each frame', () => {
+    const withSource = errorEvent();
+    const frame = withSource.exception?.values?.[0]?.stacktrace?.frames?.[0];
+    if (!frame) throw new Error('fixture lost its frame');
+    frame.pre_context = ['const key = process.env.PLAID_SECRET;'];
+    frame.context_line = '  const res = await fetch(url, { headers: { Authorization: key } });';
+    frame.post_context = ['  return res.json();'];
+
+    const scrubbed = scrubEvent(withSource, { originalException: new FakePlaidError() });
+    const cleaned = scrubbed?.exception?.values?.[0]?.stacktrace?.frames?.[0];
+    expect(cleaned?.pre_context).toBeUndefined();
+    expect(cleaned?.context_line).toBeUndefined();
+    expect(cleaned?.post_context).toBeUndefined();
+    expect(JSON.stringify(scrubbed)).not.toContain('PLAID_SECRET');
+  });
+
+  test('drops the installed dependency inventory', () => {
+    const scrubbed = scrubEvent(errorEvent({ modules: { '@sentry/node': '10.70.0', pino: '9.5.0' } }), {
+      originalException: new FakePlaidError(),
+    });
+    expect(scrubbed?.modules).toBeUndefined();
+  });
+
   test('keeps the stack frames, which are the useful part and are all ours', () => {
     const scrubbed = scrubEvent(errorEvent(), { originalException: new FakePlaidError() });
     expect(scrubbed?.exception?.values?.[0]?.stacktrace?.frames?.[0]?.filename).toBe('src/plaid/client.ts');
@@ -226,6 +251,41 @@ describe('the rate cap', () => {
       expect(scrubEvent(errorEvent(), { originalException: err })).not.toBeNull();
     }
     expect(scrubEvent(errorEvent(), { originalException: err })).toBeNull();
+  });
+});
+
+describe('the disabled-integration list', () => {
+  // This suite exists because the first version of the list was wrong and
+  // nothing said so. It named `LocalVariables` (the real name is
+  // `LocalVariablesAsync`) and `Fastify` (not a default integration at all),
+  // so two of five entries filtered nothing, and it disabled `Http` while
+  // every vendor client here calls out through `fetch`, which is `NodeFetch`.
+  //
+  // Matching by string against another package's internals is a silent failure
+  // mode: the filter still runs, still returns a list, and collects the data
+  // anyway. That is the exact shape docs/connection-resilience-survey.md is
+  // about, so it gets a test rather than a comment.
+  const defaults = new Set(getDefaultIntegrations({}).map((i) => i.name));
+
+  test.each(disabledIntegrationNames())('%s is a real integration name in this SDK version', (name) => {
+    expect(defaults.has(name)).toBe(true);
+  });
+
+  test('every default that attaches request, source or dependency data is disabled', () => {
+    // Named explicitly rather than derived, so adding an integration to the
+    // SDK cannot quietly satisfy this test. A new default that carries data
+    // has to be considered by a person and added here.
+    for (const name of [
+      'RequestData',
+      'Http',
+      'NodeFetch',
+      'Console',
+      'ContextLines',
+      'LocalVariablesAsync',
+      'Modules',
+    ]) {
+      expect(disabledIntegrationNames()).toContain(name);
+    }
   });
 });
 
