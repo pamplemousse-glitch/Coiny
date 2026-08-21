@@ -214,6 +214,97 @@ livestock and machinery, CoinGecko/CoinMarketCap free tiers.
 
 ---
 
+## Where the money actually is
+
+*Added 2026-08-21. The map above answers "what could we add". This answers
+"what is worth adding", which is a different question and has a less
+comfortable answer.*
+
+**Source:** Federal Reserve Survey of Consumer Finances 2022, the authoritative
+US dataset, plus the Fed's Distributional Financial Accounts. **Caveat that
+applies to every number here:** SCF 2022 was released Oct 2023 and the 2025
+wave does not publish until late 2026, so this predates the crypto ETF boom and
+the 2024-26 run-up.
+
+| Asset | % of households owning | Median value when owned |
+|---|---|---|
+| Checking / savings | **98.6%** | $8,000 |
+| Vehicles | **86.6%** | $27,700 |
+| Primary residence | **66.1%** | $323,200 |
+| Retirement accounts (401k/IRA) | **54.3%** | $86,900 |
+| Direct stocks | 21.0% | $15,000 |
+| Cash-value life insurance | 16.1% | $9,700 |
+| DB pension | 15.6% (was 40% in 1992) | n/a |
+| Private business equity | 14.6% | $90,000 (mean $1.62M) |
+| Other real estate | 12.9% | $225,000 |
+| Mutual funds / ETFs | 11.5% | $150,000 |
+| CDs | 6.5% | $26,000 |
+| Savings bonds | 6.4% | $2,000 |
+| **Crypto** | **4.3%** | not reported |
+
+**The single strongest signal in the dataset:** households with a retirement
+account have a median net worth of **$442,900** against **$47,450** for those
+without. It is the largest predictor of net worth there is.
+
+**It changes by wealth decile.** For the bottom 50%, roughly half of assets are
+real estate and the balance sheet is essentially home equity plus retirement.
+For the top 1% and the 90th-99th, real estate drops below 20% and **equities
+are about half of assets**. A mass-market app lives on home equity and
+retirement; an affluent-skewing app lives on brokerage.
+
+### What this says about our priorities
+
+**Ranks 1 through 5 — cash, retirement, home equity, brokerage, vehicles — are
+the whole game, and we already cover four of them.** The gap is workplace
+retirement at recordkeepers Plaid cannot reach, which is exactly what Akoya and
+Empower unlock, and which is the highest-value application on the list above.
+
+**Employer equity (RSU/ESPP) is the strongest differentiator.** No competitor
+handles it natively, and it is disproportionately relevant to the tech
+professional most likely to pay $99-169/yr. We shipped vested-value handling on
+2026-08-20. Note honestly that its ranking rests on inference from buyer
+demographics, not on a measured prevalence statistic — no source isolates
+personal-finance-app users.
+
+**Crypto is a loud minority, not a driver.** SCF says 4.3%; 2026 panel surveys
+claim 22-42% but are not SCF-grade and mix "ever owned" with "currently hold".
+What is consistent everywhere is that holdings are **small**: most holders sit
+between $100 and $5,000. It generates support demand out of all proportion to
+its balance-sheet weight. Our crypto depth is already well beyond what this
+justifies, which is fine as a differentiator but should not absorb more effort.
+
+**Collectibles are unproven, and we have a lot of them.** There is NO SCF or
+DFA breakout for cards, coins, sneakers, wine, art, domains or loyalty points;
+they fall into a residual bucket that is historically small. The
+$320-535B "collectibles market" figures measure trading volume, not household
+ownership, and are not a demand proxy. **Treat as vanity features until our own
+users prove otherwise.** This is a pointed finding given how much of the app is
+collectibles, and it is recorded rather than softened.
+
+### The tension worth naming
+
+`market-research-2026-08.md` §3.1 finds the top reason people quit this
+category is **broken connections, "by a distance"** — not missing asset
+classes. §1.3 finds the core FIRE audience is spreadsheet-first and actively
+distrusts integrations.
+
+Competitor evidence agrees: Monarch's most-cited complaint is investment
+connection reliability, not breadth.
+
+**So every integration added expands the surface area of the number-one churn
+cause.** Breadth is a real position — Kubera charges $249/yr and markets it
+explicitly — but it is not free, and it trades against the thing that retains
+people.
+
+The resolution is a third axis beyond prevalence and value: **how likely is
+this to break, and what happens to trust when it does.** A class DR-21's
+derived tier can serve — property from purchase price plus an index, vehicles
+from a VIN — beats a class needing a fragile credentialed connection, even
+when the fragile one holds more dollars. That is an argument for finishing the
+derived tier before adding vendors.
+
+---
+
 ## Honesty notes
 
 - Prices marked unpublished are genuinely sales-gated. Nothing here is guessed.
