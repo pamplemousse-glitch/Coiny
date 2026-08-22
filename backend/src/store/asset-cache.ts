@@ -10,6 +10,7 @@
 import { and, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { assetClassCache, plaidAccountBalances } from '../db/schema.js';
+import { recordOpsEvent } from './ops.js';
 
 export type PlaidAccountBalanceRow = typeof plaidAccountBalances.$inferSelect;
 export type AssetClassCacheRow = typeof assetClassCache.$inferSelect;
@@ -111,13 +112,26 @@ export async function recordClassSuccess(
 
 /** Records a failed class refresh WITHOUT touching the last good value/asOf:
  *  the read path keeps serving the cached value with its real age, and a class
- *  that has never succeeded reads `error`, never zero (prd.md R-8.1). */
+ *  that has never succeeded reads `error`, never zero (prd.md R-8.1).
+ *
+ *  Also emits an ops event. This is the single chokepoint every vendor failure
+ *  path funnels through (seven call sites in networth/refresh.ts), which is why
+ *  the emission lives here rather than at each of them: one place to change,
+ *  and none of the seven can be forgotten. The ops event carries the asset
+ *  class and the error class and NOT the user, per store/ops.ts. */
 export async function recordClassFailure(
   userId: string,
   assetClass: CachedAssetClass,
   errorClass: string,
   at: Date = new Date(),
 ): Promise<void> {
+  await recordOpsEvent({
+    severity: 'warn',
+    kind: 'class_refresh_failed',
+    errorClass,
+    detail: { asset_class: assetClass },
+  });
+
   const [existing] = await db()
     .select()
     .from(assetClassCache)

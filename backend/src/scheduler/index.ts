@@ -37,6 +37,7 @@ import { captureError } from '../observability/sentry.js';
 import { retryBudgetStats } from '../resilience/retry-budget.js';
 import { getClassCacheForUsers } from '../store/asset-cache.js';
 import { usersMissingDailyPoint } from '../store/goals.js';
+import { recordOpsEvent } from '../store/ops.js';
 import { type HealthSweepSummary, isHealthSweepDue, runConnectionHealthSweep } from './plaid-health.js';
 import { drainPlaidRemovalQueue, type RemovalDrainSummary } from './plaid-removals.js';
 import { isPurgeDue, type PurgeSummary, runRetentionPurge } from './purge.js';
@@ -169,6 +170,7 @@ export async function runSchedulerTick(
     } catch (err) {
       log.warn({ err }, 'plaid removal queue drain failed');
       captureError(err, { task: 'plaid_removal_drain' });
+      await recordOpsEvent({ severity: 'error', kind: 'task_failed', detail: { task: 'plaid_removal_drain' } });
     }
 
     const work = await findDueClassRefreshes(now);
@@ -205,6 +207,7 @@ export async function runSchedulerTick(
       } catch (err) {
         log.warn({ err }, 'connection health sweep failed');
         captureError(err, { task: 'connection_health_sweep' });
+        await recordOpsEvent({ severity: 'error', kind: 'task_failed', detail: { task: 'connection_health_sweep' } });
       }
     }
 
@@ -218,6 +221,7 @@ export async function runSchedulerTick(
       } catch (err) {
         log.warn({ err }, 'retention purge failed');
         captureError(err, { task: 'retention_purge' });
+        await recordOpsEvent({ severity: 'error', kind: 'task_failed', detail: { task: 'retention_purge' } });
       }
     }
 
@@ -251,6 +255,22 @@ export async function runSchedulerTick(
         },
         'vendor_retry_budget_throttled',
       );
+      // Durable now, not just a log line. The retry budget lives in memory and
+      // dies with the process; a vendor that was throttled across a deploy
+      // leaves no trace otherwise, which is precisely the "quietly stopped
+      // moving" failure this table exists for.
+      for (const s of throttled) {
+        await recordOpsEvent({
+          severity: 'warn',
+          kind: 'vendor_throttled',
+          vendor: s.vendor,
+          detail: {
+            retries_denied: s.retriesDenied,
+            local_failures: s.localFailures,
+            upstream_failures: s.upstreamFailures,
+          },
+        });
+      }
     }
   } finally {
     inFlight = false;

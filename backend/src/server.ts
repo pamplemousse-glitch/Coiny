@@ -22,6 +22,7 @@ import { registerEnergyApi } from './api/energy.js';
 import { registerEntitlementsApi } from './api/entitlements.js';
 import { registerFarmlandApi } from './api/farmland.js';
 import { registerGoalsApi } from './api/goals.js';
+import { registerIntegrationsHealth } from './api/health-integrations.js';
 import { registerHyperliquidApi } from './api/hyperliquid.js';
 import { registerKalshiConnectApi } from './api/kalshi-connect.js';
 import { registerKrakenApi } from './api/kraken.js';
@@ -210,6 +211,10 @@ async function buildApp(options: BuildAppOptions = {}) {
     }
     return { ok: true, scheduler_enabled: true, last_tick_at: lastTickAt };
   });
+  // Vendor health for the same external pinger, and unauthenticated for the
+  // same reason: a free uptime monitor polls a URL. See api/health-integrations.ts.
+  registerIntegrationsHealth(app);
+
   // RFC 9116 disclosure channel. Public by requirement, see api/well-known.ts.
   registerWellKnownApi(app);
   registerPlaidWebhook(app);

@@ -31,6 +31,7 @@ import {
   analyticsEvents,
   discogsPending,
   notificationLog,
+  opsEvents,
   reactionHistory,
   sessions,
   spinwheelPending,
@@ -50,6 +51,13 @@ export const RETENTION = {
   reactionHistoryMs: 365 * DAY_MS,
   /** Cohort analysis at this scale never needs more. */
   analyticsEventsMs: 365 * DAY_MS,
+  /** Operational events (store/ops.ts). Ninety days is long enough to answer
+   *  "has this vendor been flaky all quarter", which is the longest question
+   *  anyone asks of it, and short enough that an unbounded failure loop cannot
+   *  grow the table without limit. Shorter than analytics deliberately: these
+   *  rows are about vendors, not people, so nothing about them gets more
+   *  valuable with age. */
+  opsEventsMs: 90 * DAY_MS,
 } as const;
 
 export const PURGE_INTERVAL_MS = DAY_MS;
@@ -60,6 +68,7 @@ export type PurgeSummary = {
   notifications: number;
   reactions: number;
   analytics: number;
+  opsEvents: number;
 };
 
 let lastPurgeAt: Date | null = null;
@@ -116,6 +125,11 @@ export async function runRetentionPurge(now: Date = new Date()): Promise<PurgeSu
     .where(lt(analyticsEvents.serverTs, before(RETENTION.analyticsEventsMs)))
     .returning({ id: analyticsEvents.id });
 
+  const ops = await db()
+    .delete(opsEvents)
+    .where(lt(opsEvents.at, before(RETENTION.opsEventsMs)))
+    .returning({ id: opsEvents.id });
+
   lastPurgeAt = now;
 
   return {
@@ -124,5 +138,6 @@ export async function runRetentionPurge(now: Date = new Date()): Promise<PurgeSu
     notifications: notifications.length,
     reactions: reactions.length,
     analytics: analytics.length,
+    opsEvents: ops.length,
   };
 }

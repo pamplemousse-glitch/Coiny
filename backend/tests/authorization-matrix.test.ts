@@ -27,6 +27,13 @@ import { authHeader, createOtherUser, resetDatabase } from './db-helper.js';
 const PUBLIC_ROUTES: Record<string, string> = {
   'GET /health': 'liveness probe for Fly; must answer before anything else works',
   'GET /health/scheduler': 'readiness of the background tick, for an external monitor',
+  'GET /health/integrations':
+    'vendor health for the same external monitor as /health/scheduler, and public for the same reason: ' +
+    'a free uptime monitor polls a URL, and requiring auth is friction for no gain. The body is summary-level ' +
+    'by construction and carries only vendor hostnames (each already named in the privacy policy section 3), ' +
+    'failure counts, and programmatic error classes. No user, no balance, no institution. The guarantee is ' +
+    'structural rather than filtered at the edge: ops_events has no user column at all (store/ops.ts), so ' +
+    'there is nothing personal in the source rows for this route to leak.',
   'GET /.well-known/security.txt': 'RFC 9116 requires this to be publicly fetchable',
   'POST /webhooks/plaid': 'Plaid cannot hold a session; authenticated by JWS + request_body_sha256',
   'POST /webhooks/appstore': 'Apple cannot hold a session; authenticated by JWS against the pinned root',

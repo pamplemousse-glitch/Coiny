@@ -573,6 +573,32 @@ do not have: the path that tells *us* rather than the user. Unchanged from the
 handoff's ordering and the survey only strengthens it, since every technique in
 Part B terminates in "and then it alerts someone".
 
+> **DONE 2026-08-22, and it took two halves rather than one.** Sentry (#311,
+> #312) catches an **exception**. `ops_events` plus `/health/integrations`
+> (#314) catches an **absence**, which is the failure mode that actually hurts
+> here: a vendor returning failures for six hours while every request completes,
+> every handler returns 200, and the only symptom is a total that stopped
+> moving. There is no exception to catch, so a reporter cannot see it and a
+> reader must.
+>
+> Gaps 4 and 5 close together, and the reason is one design choice.
+> `consecutiveFailures` could only ever answer "fifty"; a table of rows answers
+> "since when", "how often", and "which vendor", which is what an alert needs.
+> The emission sits inside `recordClassFailure`, the one chokepoint all seven
+> vendor failure paths funnel through, so none of them can be forgotten.
+>
+> The table has **no user column at all**, and that is load-bearing in both
+> directions rather than an omission. `analytics_events` is consent-gated, so
+> one user opting out of usage sharing would blind us to an outage affecting
+> everybody; and a table that cannot be consent-gated must carry nothing
+> personal, which is what makes the exemption defensible. The same argument
+> that lets the Sentry row in `service-providers.md` read "no customer
+> information".
+>
+> No new vendor: `/health/scheduler` had already established the
+> external-pinger pattern, and runbook T3 had already called for the free
+> monitor. This is one more URL for a monitor that was going to exist anyway.
+
 **2. Per-connection health, generalised.** Give `zerion_wallets`,
 `coinbase_connections`, `alpaca_connections`, `kraken_connections` and the rest
 the columns `plaid_items` already has. This is gaps 1 and 2 together, and it is

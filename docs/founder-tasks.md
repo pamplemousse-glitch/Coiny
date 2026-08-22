@@ -89,6 +89,25 @@ urgent. Everything below section 1 can be done in any order once unblocked.
   the Apple privacy nutrition labels unchanged. Both are flagged in the
   documents themselves.
 
+### 2.2b Point the uptime monitor at the two health URLs
+
+- Runbook T3 already asks for a free UptimeRobot monitor on `/health`. There
+  are now three URLs worth watching, and they answer different questions:
+
+  | URL | Goes 503 when | Means |
+  |---|---|---|
+  | `/health` | never (liveness only) | the process is up |
+  | `/health/scheduler` | the 15-minute tick has stopped | background work is dead; nothing refreshes |
+  | `/health/integrations` | a vendor has failed 10+ times in 24h, or the retry budget is throttling it | the numbers on screen are going stale for real users |
+
+- Five minutes each, free, no account beyond the one T3 already needs. Email
+  alerting is enough; there is nothing here that needs a phone call.
+- **The third one is the point of the whole connection-resilience programme.**
+  `docs/incident-response.md` currently says discovery would realistically come
+  from a user or a security researcher. These monitors are what change that
+  sentence.
+- No body parsing or scripting required: the status code alone is the alert.
+
 ### 2.2 Confirm the support email works
 - `contact@athanorworks.com` must receive mail.
 - Used by both legal documents and the App Store listing.
