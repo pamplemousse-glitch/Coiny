@@ -338,9 +338,15 @@ describe('fetchWithRetry', () => {
       const { fetchWithRetry } = await import('../src/util/fetch.js');
       const { retryBudgetStats } = await import('../src/resilience/retry-budget.js');
 
-      const p = fetchWithRetry('https://unreachable.example');
+      // Attach the rejection handler BEFORE advancing timers, the same way
+      // 'throws immediately after 3 network errors' above does. Without it the
+      // promise rejects while nothing is listening, which surfaces as an
+      // unhandled rejection that fails the run even though every test passed.
+      // It is timing-dependent, so it survived a local run at reduced
+      // parallelism and only failed on CI.
+      const assertion = expect(fetchWithRetry('https://unreachable.example')).rejects.toBeInstanceOf(TypeError);
       await vi.runAllTimersAsync();
-      await expect(p).rejects.toThrow();
+      await assertion;
 
       const stats = retryBudgetStats().find((s) => s.vendor === 'unreachable.example');
       expect(stats?.localFailures).toBeGreaterThan(0);
