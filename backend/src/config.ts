@@ -150,6 +150,13 @@ const configSchema = z
     // identical events and exhaust a month of quota in an afternoon, at which
     // point the NEXT incident is invisible. Capping is what keeps error
     // tracking working during the failure it exists for.
+    // Fraction of a class value that must be lost in ONE refresh before it
+    // counts as a collapse (src/resilience/invariants.ts). 0.9 is far above
+    // any normal market movement on purpose: a threshold that fires on a bad
+    // day in the market gets muted, and a muted alert is worse than no alert
+    // because it reads as coverage. The Polkadot incident was a ~99% drop.
+    INVARIANT_COLLAPSE_RATIO: z.coerce.number().positive().max(1).default(0.9),
+
     // Retry throttling, gRFC A6's token bucket (src/resilience/retry-budget.ts).
     //
     // 20 tokens with a threshold at half means a vendor gets ten retryable

@@ -58,6 +58,10 @@ export const OPS_EVENT_KINDS = [
    *  The earliest durable signal that a vendor is down for everybody rather
    *  than for one user. */
   'vendor_throttled',
+  /** A fetched value failed a plausibility check against the value it replaced
+   *  (resilience/invariants.ts). The write still happened: this is an alert to
+   *  us, never an error to the user. */
+  'invariant_violated',
 ] as const;
 
 export type OpsEventKind = (typeof OPS_EVENT_KINDS)[number];

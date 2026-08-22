@@ -8,8 +8,10 @@
 // log sinks (#2).
 
 import { and, eq, inArray, notInArray, sql } from 'drizzle-orm';
+import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { assetClassCache, plaidAccountBalances } from '../db/schema.js';
+import { checkValueTransition } from '../resilience/invariants.js';
 import { recordOpsEvent } from './ops.js';
 
 export type PlaidAccountBalanceRow = typeof plaidAccountBalances.$inferSelect;
@@ -96,6 +98,35 @@ export async function recordClassSuccess(
   args: { valueUsd: number | null; payload: Record<string, unknown> | null; asOf?: Date },
 ): Promise<void> {
   const asOf = args.asOf ?? new Date();
+
+  // Plausibility, checked against what we had. NON-BLOCKING BY CONSTRUCTION:
+  // the violation is recorded and the write proceeds unchanged below. A user
+  // who genuinely sold everything must still see the truth, and from inside a
+  // single account that is indistinguishable from the Polkadot bug. This raises
+  // an alert to US, never an error to THEM.
+  //
+  // Costs one read per successful refresh, against a write that was already a
+  // round trip. That is the entire price of catching the class of bug that has
+  // now bitten twice.
+  const [previous] = await db()
+    .select({ valueUsd: assetClassCache.valueUsd })
+    .from(assetClassCache)
+    .where(and(eq(assetClassCache.userId, userId), eq(assetClassCache.assetClass, assetClass)));
+
+  const violation = checkValueTransition(
+    previous?.valueUsd != null ? Number(previous.valueUsd) : null,
+    args.valueUsd,
+    config.INVARIANT_COLLAPSE_RATIO,
+  );
+  if (violation !== null) {
+    await recordOpsEvent({
+      severity: 'warn',
+      kind: 'invariant_violated',
+      errorClass: violation.violation,
+      detail: { asset_class: assetClass, drop_percent: violation.dropPercent },
+    });
+  }
+
   const set = {
     valueUsd: args.valueUsd !== null ? args.valueUsd.toString() : null,
     asOf,
