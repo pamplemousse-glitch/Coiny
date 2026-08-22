@@ -150,6 +150,22 @@ const configSchema = z
     // identical events and exhaust a month of quota in an afternoon, at which
     // point the NEXT incident is invisible. Capping is what keeps error
     // tracking working during the failure it exists for.
+    // Retry throttling, gRFC A6's token bucket (src/resilience/retry-budget.ts).
+    //
+    // 20 tokens with a threshold at half means a vendor gets ten retryable
+    // failures before retries stop, which is roughly three or four logical
+    // calls at the current three-attempt ladder. The ratio is Google SRE's
+    // recommended 10% retry budget: ten good responses buy back one bad one.
+    RETRY_BUDGET_MAX_TOKENS: z.coerce.number().int().positive().default(20),
+    RETRY_BUDGET_TOKEN_RATIO: z.coerce.number().positive().max(1).default(0.1),
+
+    // Full-jitter backoff (AWS, "Exponential Backoff And Jitter"):
+    // `random(0, min(cap, base * 2^attempt))`. Base and cap only; the ladder is
+    // computed rather than listed, because a fixed list is what produced
+    // synchronised retries in the first place.
+    RETRY_BASE_DELAY_MS: z.coerce.number().int().positive().default(200),
+    RETRY_MAX_DELAY_MS: z.coerce.number().int().positive().default(2_000),
+
     SENTRY_MAX_EVENTS_PER_WINDOW: z.coerce.number().int().positive().default(20),
     SENTRY_MAX_EVENTS_PER_KEY: z.coerce.number().int().positive().default(3),
     SENTRY_RATE_WINDOW_MS: z.coerce
