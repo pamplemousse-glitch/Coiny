@@ -305,6 +305,14 @@ export const coinbaseConnections = pgTable('coinbase_connections', {
   refreshToken: text('refresh_token'),
   tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true }),
   mode: text('mode').notNull().default('dev_key'),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  // Per-connection health (0062). See store/connection-health.ts: status is
+  // DERIVED from these, never stored, because no vendor here sends a webhook
+  // that would make a stored lifecycle a fact rather than a cache.
+  lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+  lastErrorClass: text('last_error_class'),
+  consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+  disabled: boolean('disabled').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -318,6 +326,14 @@ export const zerionWallets = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     address: text('address').notNull(),
     label: text('label'),
+    lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    // Per-connection health (0062). See store/connection-health.ts: status is
+    // DERIVED from these, never stored, because no vendor here sends a webhook
+    // that would make a stored lifecycle a fact rather than a cache.
+    lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+    lastErrorClass: text('last_error_class'),
+    consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+    disabled: boolean('disabled').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('zerion_wallets_user_address_idx').on(t.userId, t.address)],
@@ -330,6 +346,13 @@ export const spinwheelConnections = pgTable('spinwheel_connections', {
     .references(() => users.id, { onDelete: 'cascade' }),
   spinwheelUserId: text('spinwheel_user_id').notNull(),
   lastCreditScore: integer('last_credit_score'),
+  // Per-connection health (0062). See store/connection-health.ts: status is
+  // DERIVED from these, never stored, because no vendor here sends a webhook
+  // that would make a stored lifecycle a fact rather than a cache.
+  lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+  lastErrorClass: text('last_error_class'),
+  consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+  disabled: boolean('disabled').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -351,6 +374,13 @@ export const chainWallets = pgTable(
     // a failed staking call must not read as "stakes nothing".
     lastStakedUsd: numeric('last_staked_usd'),
     lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    // Per-connection health (0062). See store/connection-health.ts: status is
+    // DERIVED from these, never stored, because no vendor here sends a webhook
+    // that would make a stored lifecycle a fact rather than a cache.
+    lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+    lastErrorClass: text('last_error_class'),
+    consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+    disabled: boolean('disabled').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('chain_wallets_user_chain_address_idx').on(t.userId, t.chain, t.address)],
@@ -369,6 +399,13 @@ export const hyperliquidAccounts = pgTable(
     label: text('label'),
     lastAccountValueUsd: numeric('last_account_value_usd'),
     lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    // Per-connection health (0062). See store/connection-health.ts: status is
+    // DERIVED from these, never stored, because no vendor here sends a webhook
+    // that would make a stored lifecycle a fact rather than a cache.
+    lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+    lastErrorClass: text('last_error_class'),
+    consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+    disabled: boolean('disabled').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('hyperliquid_accounts_user_address_idx').on(t.userId, t.address)],
@@ -472,6 +509,13 @@ export const ynabConnections = pgTable('ynab_connections', {
   tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true }),
   lastNetWorthUsd: numeric('last_net_worth_usd'),
   lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  // Per-connection health (0062). See store/connection-health.ts: status is
+  // DERIVED from these, never stored, because no vendor here sends a webhook
+  // that would make a stored lifecycle a fact rather than a cache.
+  lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+  lastErrorClass: text('last_error_class'),
+  consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+  disabled: boolean('disabled').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -484,6 +528,13 @@ export const krakenConnections = pgTable('kraken_connections', {
   privateKey: text('private_key').notNull(), // encrypted
   lastTotalUsd: numeric('last_total_usd'),
   lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  // Per-connection health (0062). See store/connection-health.ts: status is
+  // DERIVED from these, never stored, because no vendor here sends a webhook
+  // that would make a stored lifecycle a fact rather than a cache.
+  lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+  lastErrorClass: text('last_error_class'),
+  consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+  disabled: boolean('disabled').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -497,6 +548,13 @@ export const discogsConnections = pgTable('discogs_connections', {
   accessTokenSecret: text('access_token_secret').notNull(), // encrypted
   lastCollectionUsd: numeric('last_collection_usd'),
   lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  // Per-connection health (0062). See store/connection-health.ts: status is
+  // DERIVED from these, never stored, because no vendor here sends a webhook
+  // that would make a stored lifecycle a fact rather than a cache.
+  lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+  lastErrorClass: text('last_error_class'),
+  consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+  disabled: boolean('disabled').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -509,6 +567,13 @@ export const kalshiConnections = pgTable('kalshi_connections', {
   privateKeyBase64: text('private_key_base64').notNull(), // encrypted
   lastPortfolioUsd: numeric('last_portfolio_usd'),
   lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  // Per-connection health (0062). See store/connection-health.ts: status is
+  // DERIVED from these, never stored, because no vendor here sends a webhook
+  // that would make a stored lifecycle a fact rather than a cache.
+  lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+  lastErrorClass: text('last_error_class'),
+  consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+  disabled: boolean('disabled').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -585,6 +650,13 @@ export const alpacaConnections = pgTable('alpaca_connections', {
   env: text('env').notNull().default('paper'), // 'paper' | 'live'
   lastEquityUsd: numeric('last_equity_usd'),
   lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  // Per-connection health (0062). See store/connection-health.ts: status is
+  // DERIVED from these, never stored, because no vendor here sends a webhook
+  // that would make a stored lifecycle a fact rather than a cache.
+  lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+  lastErrorClass: text('last_error_class'),
+  consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+  disabled: boolean('disabled').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -601,6 +673,13 @@ export const nftWallets = pgTable(
     label: text('label'),
     lastValueUsd: numeric('last_value_usd'),
     lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    // Per-connection health (0062). See store/connection-health.ts: status is
+    // DERIVED from these, never stored, because no vendor here sends a webhook
+    // that would make a stored lifecycle a fact rather than a cache.
+    lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+    lastErrorClass: text('last_error_class'),
+    consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+    disabled: boolean('disabled').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('nft_wallets_user_address_idx').on(t.userId, t.address)],
@@ -666,6 +745,13 @@ export const truelayerConnections = pgTable('truelayer_connections', {
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   lastBalanceGbp: numeric('last_balance_gbp'), // value is USD post-conversion
   lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  // Per-connection health (0062). See store/connection-health.ts: status is
+  // DERIVED from these, never stored, because no vendor here sends a webhook
+  // that would make a stored lifecycle a fact rather than a cache.
+  lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+  lastErrorClass: text('last_error_class'),
+  consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+  disabled: boolean('disabled').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -682,6 +768,13 @@ export const polymarketAccounts = pgTable(
     label: text('label'),
     lastValueUsd: numeric('last_value_usd'),
     lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+    // Per-connection health (0062). See store/connection-health.ts: status is
+    // DERIVED from these, never stored, because no vendor here sends a webhook
+    // that would make a stored lifecycle a fact rather than a cache.
+    lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true }),
+    lastErrorClass: text('last_error_class'),
+    consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+    disabled: boolean('disabled').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('polymarket_accounts_user_address_idx').on(t.userId, t.walletAddress)],
