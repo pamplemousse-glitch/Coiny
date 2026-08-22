@@ -17,6 +17,7 @@ import { investmentsHoldingsGet, liabilitiesGet } from '../plaid/client.js';
 import { dispatchReaction } from '../reactions/dispatch.js';
 import { evaluateExternalEvent } from '../reactions/external.js';
 import { recordClassFailure, recordClassSuccess, upsertPlaidAccountBalances } from '../store/asset-cache.js';
+import { failurePatch, successPatch } from '../store/connection-health.js';
 import { getItemsByUser } from '../store/items.js';
 import { recordReaction } from '../store/pet.js';
 import { cacheLiabilities, getCachedLiabilities } from '../store/plaid-liabilities.js';
@@ -225,6 +226,15 @@ export async function refreshDefi(userId: string): Promise<RefreshOutcome> {
   const wallets = await db().select().from(zerionWallets).where(eq(zerionWallets.userId, userId));
   if (wallets.length === 0) return 'not_connected';
 
+  // Which wallet is currently in flight, so the catch below can attribute the
+  // failure to ONE wallet instead of to the whole class. Declared out here
+  // rather than inside the try because the catch is the only place that reads
+  // it. Safe precisely because the loop is sequential, which it is on purpose:
+  // only one wallet is ever in flight, so the attribution is never ambiguous.
+  // If that loop ever becomes concurrent, this has to become a per-iteration
+  // try/catch.
+  let inFlight: (typeof wallets)[number] | null = null;
+
   try {
     // Sequential on purpose: Zerion rate limits per org, and a failing wallet
     // must fail the whole refresh (a partial sum would undercount silently).
@@ -237,6 +247,7 @@ export async function refreshDefi(userId: string): Promise<RefreshOutcome> {
     let breakdownKnown = false;
 
     for (const wallet of wallets) {
+      inFlight = wallet;
       // The positions call is an ENRICHMENT of the portfolio call, not a
       // replacement for it: it buys a spam-free total, and if it fails we
       // still have the vendor's own complete figure. Failing the whole class
@@ -314,6 +325,13 @@ export async function refreshDefi(userId: string): Promise<RefreshOutcome> {
         breakdown.locked += portfolio.breakdown.locked;
         breakdown.staked += portfolio.breakdown.staked;
       }
+
+      // This wallet worked. Recorded per WALLET, not per class, which is the
+      // whole of survey gap 2: a user with three wallets, one of them dead,
+      // previously got a `defi` class reading degraded with no way to say which
+      // wallet needed attention, so "prompt them to fix it" had nothing
+      // specific to prompt about.
+      await db().update(zerionWallets).set(successPatch()).where(eq(zerionWallets.id, wallet.id));
     }
 
     await recordClassSuccess(userId, 'defi', {
@@ -326,7 +344,22 @@ export async function refreshDefi(userId: string): Promise<RefreshOutcome> {
     });
     return 'refreshed';
   } catch (err) {
-    await recordClassFailure(userId, 'defi', classifyError(err));
+    const errorClass = classifyError(err);
+    // Both grains, because they answer different questions. The class failure
+    // is what the net-worth read path consults to decide the class reads
+    // `error` rather than a smaller number. The wallet failure is what makes a
+    // specific prompt possible.
+    //
+    // `lastSyncedAt` is deliberately untouched by failurePatch, exactly as
+    // recordClassFailure leaves the cached value alone: a failed refresh does
+    // not make the last good value wrong, it makes it un-refreshable.
+    if (inFlight !== null) {
+      await db()
+        .update(zerionWallets)
+        .set(failurePatch(inFlight.consecutiveFailures, errorClass))
+        .where(eq(zerionWallets.id, inFlight.id));
+    }
+    await recordClassFailure(userId, 'defi', errorClass);
     return 'failed';
   }
 }
