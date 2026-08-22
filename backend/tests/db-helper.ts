@@ -34,7 +34,14 @@ export async function resetDatabase(): Promise<void> {
     // purpose (it has to survive the account-deletion cascade), so nothing
     // truncates it by association and a leftover row would leak into the next
     // test's drain.
-    sql`TRUNCATE sessions, reaction_history, processed_events, plaid_items, plaid_removal_queue, category_overrides, device_tokens, transactions, pet_state, app_store_notifications, users RESTART IDENTITY CASCADE`,
+    //
+    // ops_events is the second instance, and it is here for a related reason
+    // rather than the same one. It has no user column BY DESIGN (store/ops.ts:
+    // a vendor outage is not a fact about a person, which is what lets the
+    // table skip the analytics consent gate), so it has no FK path to users
+    // and the cascade cannot reach it. The design property and the truncation
+    // requirement are the same property seen from two sides.
+    sql`TRUNCATE sessions, reaction_history, processed_events, plaid_items, plaid_removal_queue, ops_events, category_overrides, device_tokens, transactions, pet_state, app_store_notifications, users RESTART IDENTITY CASCADE`,
   );
   _resetOverrideCache();
 

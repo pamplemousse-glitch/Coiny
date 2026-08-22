@@ -1102,6 +1102,56 @@ export const petProgression = pgTable('pet_progression', {
 // a row. Properties hold ONLY the whitelisted categorical/bucketed values from
 // src/analytics/events.ts: no amounts, no merchant names, no PII (R-22.6).
 // Rows cascade on user deletion so account deletion wipes the trail.
+// Operational events: what broke, when, and how often. Not analytics.
+//
+// The distinction is the reason this table exists rather than reusing
+// `analytics_events`, and it is worth stating precisely because the two look
+// similar from a distance.
+//
+//   `analytics_events` is data ABOUT A PERSON. It is scoped by `user_id`, it is
+//   consent-gated (`trackServerEvent` writes zero rows for a user who turned
+//   usage sharing off), and it answers product questions.
+//
+//   This is data about a VENDOR OR A TASK. It has no `user_id` at all, it is
+//   not consent-gated, and it answers "is the number on someone's screen
+//   currently trustworthy".
+//
+// Those properties are load-bearing in both directions. A vendor being down is
+// not a fact about any individual, so gating it on an individual's analytics
+// preference would be incoherent: one user opting out would blind us to an
+// outage affecting everyone. And precisely because it must not be gated, it
+// must carry nothing personal, which is why there is no user column to be
+// tempted by. `docs/connection-resilience-survey.md` section A2 makes the
+// related point that a counter cannot be alerted on and a history can.
+//
+// `detail` is counts, codes and identifiers of NON-PERSONAL things (an asset
+// class, a task name, a vendor hostname). Never a balance, never an address,
+// never an institution. The redaction policy in plugins/logger.ts is the
+// standard; this table has the stricter one, because rows here outlive a log
+// line.
+export const opsEvents = pgTable(
+  'ops_events',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+    /** 'warn' is degraded but serving; 'error' is a failure someone should look
+     *  at. Deliberately two values: a level nobody acts on differently is a
+     *  level nobody reads. */
+    severity: text('severity').$type<'warn' | 'error'>().notNull(),
+    /** What kind of thing happened, from a closed set in store/ops.ts, so the
+     *  health rollup can group without parsing prose. */
+    kind: text('kind').notNull(),
+    /** Vendor hostname where known (the retry budget's key), else null. Public
+     *  information: every one of these is named in the privacy policy. */
+    vendor: text('vendor'),
+    /** Programmatic error class only, never a vendor's message. Same rule as
+     *  the `err` serializer in plugins/logger.ts. */
+    errorClass: text('error_class'),
+    detail: jsonb('detail').$type<Record<string, unknown>>().notNull().default({}),
+  },
+  (t) => [index('ops_events_at_idx').on(t.at), index('ops_events_vendor_at_idx').on(t.vendor, t.at)],
+);
+
 export const analyticsEvents = pgTable(
   'analytics_events',
   {
