@@ -461,6 +461,23 @@ success.
 vendor-level breaker for us needs the equivalent guard: a bug in the breaker
 must not be able to stop refreshing everything.
 
+> **Finding 6 is CLOSED as of 2026-08-22.** `util/fetch.ts` now uses AWS full
+> jitter and consults a per-vendor retry budget in
+> `src/resilience/retry-budget.ts`, which is gRFC A6's token bucket verbatim:
+> `token_count` from `maxTokens`, minus one per retryable failure, plus
+> `tokenRatio` per success, retries off at `<= maxTokens / 2`. The local versus
+> upstream split is recorded and falls out of the control flow for free, since
+> every throw from `fetch` is local-origin and every upstream failure arrives
+> as a status. Findings 1 to 5 remain open and are the vendor-level breaker.
+>
+> One thing that only became clear while implementing it, and that sharpens
+> section 3: a bucket was the right structure precisely BECAUSE our per-vendor
+> volume is a handful of requests per interval. A ratio over a window, which is
+> how the SRE book states the 10% budget, would have hit the same wall the
+> existing breaker hits, where there are too few samples for a rate to mean
+> anything. The bucket carries state instead of sampling, so it works at low
+> volume. The breaker in finding 3 needs the same treatment.
+
 **6. Retries amplify underneath all of it.** `util/fetch.ts` gives every logical
 call up to 3 attempts (200 ms, 400 ms, no jitter). Against a dead vendor with N
 users that is `3N` requests per sweep, and the breaker only engages after five
@@ -570,9 +587,15 @@ worked around, and it is what alerting in step 1 will want to read.
 
 **4. Re-key the circuit breaker to the vendor.** Section 3. Add the vendor-level
 breaker above the existing per-user backoff, with a volume floor, a rolling
-window, a half-open probe and an ejection ceiling. Add jitter to
-`util/fetch.ts`'s retry delays and consider a retry budget. Depends on step 3
-for the observation history and step 1 for anyone to notice it tripping.
+window, a half-open probe and an ejection ceiling. Depends on step 3 for the
+observation history and step 1 for anyone to notice it tripping.
+
+*The jitter and retry-budget half of this step shipped early, on 2026-08-22,
+because it is one file, needs nothing else, and was doing real harm every day
+it waited. See the note on finding 6. The breaker itself is still open, and it
+now has a working precedent to copy: `resilience/retry-budget.ts` is already
+keyed on the vendor, already has the stats surface, and already records the
+local versus upstream split the breaker wants.*
 
 **5. Drift detection: canaries plus invariant assertions.** Section B2 Tier 1.
 The cheapest thing that would have caught both #302 and #295. Depends on step 1

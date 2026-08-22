@@ -34,6 +34,7 @@ import { db } from '../db/client.js';
 import { coinbaseConnections, plaidItems, spinwheelConnections, zerionWallets } from '../db/schema.js';
 import { refreshScheduledClass, runGoalRefreshFromCache, type ScheduledClass } from '../networth/refresh.js';
 import { captureError } from '../observability/sentry.js';
+import { retryBudgetStats } from '../resilience/retry-budget.js';
 import { getClassCacheForUsers } from '../store/asset-cache.js';
 import { usersMissingDailyPoint } from '../store/goals.js';
 import { type HealthSweepSummary, isHealthSweepDue, runConnectionHealthSweep } from './plaid-health.js';
@@ -232,6 +233,25 @@ export async function runSchedulerTick(
       },
       'scheduler_tick_completed',
     );
+
+    // A throttled vendor is the retry budget doing its job, and it is also the
+    // clearest early signal that a vendor is down for everyone rather than for
+    // one user. Logged per tick rather than per occurrence so a sustained
+    // outage produces one line every 15 minutes instead of thousands.
+    //
+    // This is a stopgap surface. `/health/integrations` is where it belongs,
+    // and an unread statistic is how a control goes unnoticed for a month, so
+    // it gets a reader now rather than waiting for its proper one.
+    const throttled = retryBudgetStats().filter((s) => s.throttled);
+    if (throttled.length > 0) {
+      log.warn(
+        {
+          vendors: throttled.map((s) => s.vendor),
+          retries_denied: throttled.reduce((n, s) => n + s.retriesDenied, 0),
+        },
+        'vendor_retry_budget_throttled',
+      );
+    }
   } finally {
     inFlight = false;
   }
