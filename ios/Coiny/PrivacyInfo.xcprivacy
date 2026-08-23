@@ -31,32 +31,27 @@
 				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
 			</array>
 		</dict>
-		<!-- Name: Sign in with Apple fullName, sent to backend at first sign-in -->
-		<dict>
-			<key>NSPrivacyCollectedDataType</key>
-			<string>NSPrivacyCollectedDataTypeName</string>
-			<key>NSPrivacyCollectedDataTypeLinked</key>
-			<true/>
-			<key>NSPrivacyCollectedDataTypeTracking</key>
-			<false/>
-			<key>NSPrivacyCollectedDataTypePurposes</key>
-			<array>
-				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
-			</array>
-		</dict>
-		<!-- Email: Sign in with Apple email, stored encrypted server-side -->
-		<dict>
-			<key>NSPrivacyCollectedDataType</key>
-			<string>NSPrivacyCollectedDataTypeEmailAddress</string>
-			<key>NSPrivacyCollectedDataTypeLinked</key>
-			<true/>
-			<key>NSPrivacyCollectedDataTypeTracking</key>
-			<false/>
-			<key>NSPrivacyCollectedDataTypePurposes</key>
-			<array>
-				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
-			</array>
-		</dict>
+		<!-- Name and Email Address are deliberately NOT declared.
+		     Coiny does not collect either, at any layer:
+		       - SignInView requests no Apple scopes at all
+		         (`request.requestedScopes = []`), so the user is never shown a
+		         consent sheet for them and the values never leave the device.
+		       - AppleSignInSchema/GoogleSignIn in api/auth.ts omit both. The
+		         schema is non-strict on purpose, so an older shipped client
+		         that still sends them has them stripped by Zod rather than
+		         rejected, and they never reach a column.
+		       - Google's id token carries `email` and `name`; auth.ts reads
+		         only `sub` and says so.
+		       - The columns are gone: drizzle migration
+		         0054_drop_user_identity_columns dropped users.email and
+		         users.display_name (audit 2.2.1), because nothing in src/ ever
+		         read either one.
+		     Both entries were declared here until 2026-08-23 and were stale:
+		     they outlived the collection they described. An over-declared
+		     label is not a rejection risk, but it contradicted
+		     privacy-policy.md section 1, which correctly states that neither is
+		     asked for or stored, and the trio is required to agree.
+		     Re-declare only alongside a named reader. -->
 		<!-- Phone number: entered for Spinwheel SMS identity verification; passed through, not stored -->
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
