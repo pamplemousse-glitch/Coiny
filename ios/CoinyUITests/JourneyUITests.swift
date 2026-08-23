@@ -4,15 +4,26 @@ import XCTest
 /// (R-7.4, R-7.7 to R-7.12). Under `--ui-testing` the app serves deterministic
 /// fixtures: two goals (one paced, one dateless with a null pace) and all
 /// seven guardrails, with skip state shared between the journey and pet APIs.
+/// See `ActivityTabUITests` for why this is `@MainActor` and why the lifecycle
+/// hooks opt in with `MainActor.assumeIsolated` rather than inheriting it.
+///
+/// Both hooks are kept as they were, in the same relative order. Converting
+/// `setUpWithError()` into `setUp() async throws`, which is the usual Swift 6
+/// migration, would put two setup methods in this class with a different
+/// ordering than they have now, and the second one exists precisely to stop
+/// state leaking between tests.
+@MainActor
 final class JourneyUITests: XCTestCase {
     private static var app: XCUIApplication!
 
     override class func setUp() {
         super.setUp()
-        app = XCUIApplication()
-        app.launchArguments = ["--ui-testing"]
-        app.launch()
-        Self.app.tabBars.firstMatch.buttons["Home"].tap()
+        MainActor.assumeIsolated {
+            app = XCUIApplication()
+            app.launchArguments = ["--ui-testing"]
+            app.launch()
+            Self.app.tabBars.firstMatch.buttons["Home"].tap()
+        }
     }
 
     override func setUpWithError() throws {
@@ -22,9 +33,11 @@ final class JourneyUITests: XCTestCase {
     /// Collapse before each test so ordering never leaks between tests.
     override func setUp() {
         super.setUp()
-        let tabBar = Self.app.tabBars.firstMatch
-        tabBar.buttons["Wealth"].tap()
-        tabBar.buttons["Home"].tap()
+        MainActor.assumeIsolated {
+            let tabBar = Self.app.tabBars.firstMatch
+            tabBar.buttons["Wealth"].tap()
+            tabBar.buttons["Home"].tap()
+        }
     }
 
     private var window: XCUIElement {

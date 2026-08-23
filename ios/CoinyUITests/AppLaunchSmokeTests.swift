@@ -10,6 +10,11 @@ import XCTest
 /// OnboardingView, RootView, PetView, SettingsView, SpendingView) is exercised
 /// by unit tests. Without this smoke, CI is silent when a view crashes on
 /// construction.
+/// See `ActivityTabUITests` for why this is `@MainActor`. This class needs no
+/// `assumeIsolated`: its only hook sets `continueAfterFailure`, which is not
+/// main-actor isolated, and every `XCUIApplication` here is a local inside a
+/// test method that inherits the class's isolation.
+@MainActor
 final class AppLaunchSmokeTests: XCTestCase {
     override func setUpWithError() throws {
         // Stop the test on the first failure so the trace points at root cause

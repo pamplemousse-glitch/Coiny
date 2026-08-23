@@ -3,15 +3,21 @@ import XCTest
 /// Tests for the Home tab: the creature-and-journey surface (DR-27, R-4.1a).
 /// Under `--ui-testing` the app serves a deterministic pet fixture (rung 4
 /// active, rungs 0 to 3 done), so these assertions do not depend on a backend.
+/// See `ActivityTabUITests` for why this is `@MainActor` and why the lifecycle
+/// hooks opt in with `MainActor.assumeIsolated` rather than inheriting it. As in
+/// `JourneyUITests`, both hooks keep their existing shape and relative order.
+@MainActor
 final class HomeTabUITests: XCTestCase {
     private static var app: XCUIApplication!
 
     override class func setUp() {
         super.setUp()
-        app = XCUIApplication()
-        app.launchArguments = ["--ui-testing"]
-        app.launch()
-        Self.app.tabBars.firstMatch.buttons["Home"].tap()
+        MainActor.assumeIsolated {
+            app = XCUIApplication()
+            app.launchArguments = ["--ui-testing"]
+            app.launch()
+            Self.app.tabBars.firstMatch.buttons["Home"].tap()
+        }
     }
 
     override func setUpWithError() throws {
@@ -21,9 +27,11 @@ final class HomeTabUITests: XCTestCase {
     /// Collapse before each test so ordering never leaks between tests.
     override func setUp() {
         super.setUp()
-        let tabBar = Self.app.tabBars.firstMatch
-        tabBar.buttons["Wealth"].tap()
-        tabBar.buttons["Home"].tap()
+        MainActor.assumeIsolated {
+            let tabBar = Self.app.tabBars.firstMatch
+            tabBar.buttons["Wealth"].tap()
+            tabBar.buttons["Home"].tap()
+        }
     }
 
     private var window: XCUIElement {

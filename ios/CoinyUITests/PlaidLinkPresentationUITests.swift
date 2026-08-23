@@ -17,13 +17,21 @@ import XCTest
 /// if one is absent, because a green run against no server would assert
 /// nothing, which is the failure mode the whole session has been guarding
 /// against.
+/// See `ActivityTabUITests` for why this is `@MainActor` and why the lifecycle
+/// hook opts in with `MainActor.assumeIsolated` rather than inheriting it.
+@MainActor
 final class PlaidLinkPresentationUITests: XCTestCase {
 
     private var app: XCUIApplication!
 
-    override func setUpWithError() throws {
+    // `setUp() async throws` rather than `setUpWithError()`, for the same
+    // reason as PaywallUITests: the async variant inherits the class's
+    // `@MainActor` isolation. One setup hook, so nothing reorders.
+    override func setUp() async throws {
+        try await super.setUp()
         continueAfterFailure = false
-        try XCTSkipUnless(backendIsUp(), "no local backend on 127.0.0.1:3000; start it before running this")
+        let isUp = await Self.backendIsUp()
+        try XCTSkipUnless(isUp, "no local backend on 127.0.0.1:3000; start it before running this")
 
         app = XCUIApplication()
         // Deliberately NOT --ui-testing: that would stub the API and never
@@ -32,16 +40,25 @@ final class PlaidLinkPresentationUITests: XCTestCase {
         app.launch()
     }
 
-    private func backendIsUp() -> Bool {
+    /// Async rather than a semaphore around a completion handler.
+    ///
+    /// The previous version mutated a captured `var ok` from inside the
+    /// `URLSession` callback, which is a genuine data race the compiler now
+    /// reports: the callback runs on a URLSession delegate queue while the
+    /// caller blocks on a semaphore, so the write and the read are on different
+    /// threads with nothing ordering them. `URLSession.data(for:)` removes the
+    /// shared variable rather than guarding it.
+    ///
+    /// `static` so the call carries no `self`. As an instance method it would
+    /// send a `@MainActor` instance into a nonisolated context, which is a
+    /// data-race warning in its own right; the check needs nothing from the
+    /// instance anyway.
+    nonisolated private static func backendIsUp() async -> Bool {
         let url = URL(string: "http://127.0.0.1:3000/health")!
-        let sem = DispatchSemaphore(value: 0)
-        var ok = false
-        URLSession.shared.dataTask(with: url) { _, response, _ in
-            ok = (response as? HTTPURLResponse)?.statusCode == 200
-            sem.signal()
-        }.resume()
-        _ = sem.wait(timeout: .now() + 10)
-        return ok
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10
+        guard let (_, response) = try? await URLSession.shared.data(for: request) else { return false }
+        return (response as? HTTPURLResponse)?.statusCode == 200
     }
 
     /// Plaid's Link UI is a web view hosted by the SDK. Rather than assert on

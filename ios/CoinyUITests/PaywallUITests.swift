@@ -9,10 +9,20 @@ import XCTest
 ///
 /// This is the screen that asks for money and carries the Terms and privacy
 /// links App Review 3.1.2 requires. It gets its own test.
+/// See `ActivityTabUITests` for why this is `@MainActor` and why the lifecycle
+/// hook opts in with `MainActor.assumeIsolated` rather than inheriting it.
+@MainActor
 final class PaywallUITests: XCTestCase {
     private var app: XCUIApplication!
 
-    override func setUpWithError() throws {
+    // `setUp() async throws` rather than `setUpWithError()`: the async variant
+    // inherits the class's `@MainActor` isolation, where a `setUpWithError()`
+    // override stays nonisolated and would have to send `self` into an
+    // `assumeIsolated` block to touch `app`. Safe to convert here because this
+    // class has exactly one setup hook, so there is no second hook whose
+    // relative order could change (unlike JourneyUITests and HomeTabUITests).
+    override func setUp() async throws {
+        try await super.setUp()
         continueAfterFailure = false
         app = XCUIApplication()
         app.launchArguments = ["--ui-testing"]
