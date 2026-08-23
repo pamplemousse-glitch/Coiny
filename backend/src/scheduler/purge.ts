@@ -29,9 +29,9 @@ import { lt } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import {
   analyticsEvents,
+  crashDiagnostics,
   discogsPending,
   notificationLog,
-  crashDiagnostics,
   opsEvents,
   reactionHistory,
   sessions,

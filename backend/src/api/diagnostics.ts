@@ -55,9 +55,7 @@ const MAX_CALL_STACK_BYTES = 256 * 1024;
 /** Lowercase hex, computed on device from the stack's binary UUIDs and offsets.
  *  Constrained by SHAPE rather than trusted: a client that put something else
  *  here would otherwise have a free-form string column. */
-const signature = z
-  .string()
-  .regex(/^[a-f0-9]{16,64}$/, 'signature must be lowercase hex');
+const signature = z.string().regex(/^[a-f0-9]{16,64}$/, 'signature must be lowercase hex');
 
 /** Integers only, from sys/exception_types.h and sys/signal.h. Nothing
  *  free-form rides along on these. */
