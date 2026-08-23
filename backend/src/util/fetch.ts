@@ -6,6 +6,12 @@
 // fails as though the provider were down. That is the runner's speed being
 // asserted, not the code's behaviour. Production never sets this.
 import { config } from '../config.js';
+import {
+  allowRequest,
+  CircuitOpenError,
+  recordBreakerFailure,
+  recordBreakerSuccess,
+} from '../resilience/circuit-breaker.js';
 import { canRetry, recordFailure, recordRequest, recordSuccess, vendorKeyFor } from '../resilience/retry-budget.js';
 
 const TIMEOUT_MS = Number(process.env.FETCH_TIMEOUT_MS) || 5_000;
@@ -98,20 +104,43 @@ function rateLimitDelayMs(res: Response, attempt: number): number | null {
 /**
  * Wraps fetch with a 5 s per-attempt timeout and up to 2 retries.
  *
- * Three controls, in the order they engage:
+ * Four controls, in the order they engage:
  *
+ *   0. A per-vendor circuit breaker (`resilience/circuit-breaker.ts`), checked
+ *      before the first attempt. An open breaker throws `CircuitOpenError`
+ *      without calling the vendor at all.
  *   1. Full-jitter backoff, so concurrent callers do not retry in lockstep.
  *   2. A per-vendor retry budget (`resilience/retry-budget.ts`), so a dead
  *      vendor stops receiving retries after about ten retryable failures
  *      rather than after every caller has spent its own three attempts.
  *   3. Retry-After on a 429, honoured as an instruction.
  *
- * The budget is consulted per retry, not per call: a first attempt is always
- * made, because refusing to try at all would turn a vendor's bad minute into
+ * The budget is consulted per retry, not per call: it always permits a first
+ * attempt, because refusing to try at all would turn a vendor's bad minute into
  * our outage. Only the AMPLIFICATION is throttled.
+ *
+ * The BREAKER is the deliberate exception to that sentence, and the difference
+ * is the point of having both. The budget answers "should we try harder"; the
+ * breaker answers "should we try at all". It only refuses after the vendor has
+ * failed five times in a row, it lets exactly one probe through to test
+ * recovery, and an ejection ceiling bounds how much of the fleet it can take
+ * out, so the case where refusing is wrong stays small and self-correcting.
+ *
+ * Callers MUST distinguish `CircuitOpenError` from a vendor failure. Recording
+ * it as one feeds the breaker fabricated evidence about a vendor it never
+ * called, which keeps it open: a self-sustaining outage caused by the thing
+ * meant to prevent one. `isCircuitOpenError` is the guard.
  */
 export async function fetchWithRetry(url: string, init?: RequestInit): Promise<Response> {
   const vendor = vendorKeyFor(url);
+
+  // The breaker is consulted BEFORE recordRequest, and before the first
+  // attempt. This is the one place it differs from the retry budget above: the
+  // budget always permits a first attempt and throttles only amplification,
+  // while an open breaker refuses the call outright. A refused call is not a
+  // request to the vendor and must not appear in the budget's denominator.
+  if (!allowRequest(vendor)) throw new CircuitOpenError(vendor);
+
   recordRequest(vendor);
 
   const lastAttempt = MAX_ATTEMPTS - 1;
@@ -132,6 +161,7 @@ export async function fetchWithRetry(url: string, init?: RequestInit): Promise<R
       // That is Envoy's `split_external_local_origin_errors` distinction, and
       // in a fetch-based client it falls out of the control flow for free.
       recordFailure(vendor, 'local');
+      recordBreakerFailure(vendor, 'local');
       if (attempt >= lastAttempt || !canRetry(vendor)) throw err;
       await sleep(backoffMs(attempt));
       continue;
@@ -143,6 +173,7 @@ export async function fetchWithRetry(url: string, init?: RequestInit): Promise<R
       const delay = rateLimitDelayMs(res, attempt);
       if (delay === null || rateLimitRetries >= MAX_RATE_LIMIT_RETRIES || attempt >= lastAttempt) {
         recordSuccess(vendor);
+        recordBreakerSuccess(vendor);
         return res;
       }
       rateLimitRetries++;
@@ -152,6 +183,7 @@ export async function fetchWithRetry(url: string, init?: RequestInit): Promise<R
 
     if (RETRYABLE_STATUSES.has(res.status)) {
       recordFailure(vendor, 'upstream');
+      recordBreakerFailure(vendor, 'upstream');
       if (attempt < lastAttempt && canRetry(vendor)) {
         lastError = new Error(`HTTP ${res.status}`);
         await sleep(backoffMs(attempt));
@@ -165,6 +197,7 @@ export async function fetchWithRetry(url: string, init?: RequestInit): Promise<R
     // Any other status is the vendor answering. A 404 is a correct answer to a
     // wrong question and must not throttle a healthy dependency.
     recordSuccess(vendor);
+    recordBreakerSuccess(vendor);
     return res;
   }
 

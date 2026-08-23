@@ -212,7 +212,7 @@ describe('scheduler lifecycle', () => {
     expect(getSchedulerStatus().enabled).toBe(false);
     expect(isSchedulerStale()).toBe(false);
 
-    const silent = { info: () => {}, warn: () => {} };
+    const silent = { info: () => {}, warn: () => {}, error: () => {} };
     startScheduler(silent);
     expect(getSchedulerStatus().enabled).toBe(true);
     expect(isSchedulerStale()).toBe(false);

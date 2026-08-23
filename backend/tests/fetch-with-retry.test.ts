@@ -21,6 +21,13 @@ describe('fetchWithRetry', () => {
     // better order to find it in.
     const { resetRetryBudgets } = await import('../src/resilience/retry-budget.js');
     resetRetryBudgets();
+    // Same reasoning, one control further along: these tests provoke real
+    // failures against one host, and five in a row now EJECT that host. Without
+    // this reset a later test's first call throws CircuitOpenError before fetch
+    // is ever reached, and the failure reads as a broken retry ladder rather
+    // than as leftover state.
+    const { resetCircuitBreakers } = await import('../src/resilience/circuit-breaker.js');
+    resetCircuitBreakers();
   });
 
   afterEach(() => {
@@ -264,13 +271,23 @@ describe('fetchWithRetry', () => {
     it('stops retrying a persistently failing vendor, and still makes first attempts', async () => {
       vi.mocked(fetch).mockResolvedValue(makeResponse(500));
       const { fetchWithRetry } = await import('../src/util/fetch.js');
+      const { resetCircuitBreakers } = await import('../src/resilience/circuit-breaker.js');
 
       // Drive the bucket down. Each call is 3 attempts, so 3 failures.
+      //
+      // The breaker is reset between calls ON PURPOSE. It ejects this vendor
+      // after five consecutive failures, which would refuse the sixth call
+      // before fetch is reached and make this assertion about the BREAKER
+      // rather than about the budget. The two controls answer different
+      // questions and this test names the budget; their composed behaviour is
+      // asserted in tests/circuit-breaker.test.ts.
       for (let i = 0; i < 4; i++) {
+        resetCircuitBreakers();
         const p = fetchWithRetry('https://dead.example');
         await vi.runAllTimersAsync();
         await p;
       }
+      resetCircuitBreakers();
 
       vi.mocked(fetch).mockClear();
       const p = fetchWithRetry('https://dead.example');
@@ -287,8 +304,11 @@ describe('fetchWithRetry', () => {
     it('does not let one dead vendor throttle a healthy one', async () => {
       const { fetchWithRetry } = await import('../src/util/fetch.js');
 
+      const { resetCircuitBreakers } = await import('../src/resilience/circuit-breaker.js');
       vi.mocked(fetch).mockResolvedValue(makeResponse(500));
+      // Same reason as the test above: isolate the budget from the breaker.
       for (let i = 0; i < 4; i++) {
+        resetCircuitBreakers();
         const p = fetchWithRetry('https://dead.example');
         await vi.runAllTimersAsync();
         await p;
