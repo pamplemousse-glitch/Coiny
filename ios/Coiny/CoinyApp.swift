@@ -123,6 +123,14 @@ struct CoinyApp: App {
     }
 }
 
+/// `UIApplicationDelegate` is `@MainActor`-isolated and
+/// `UNUserNotificationCenterDelegate` is not, so one class conforming to both
+/// straddles two isolation domains. The explicit `@MainActor` here states the
+/// isolation the `UIApplicationDelegate` half already implies, and the two
+/// `UNUserNotificationCenterDelegate` callbacks below are marked `nonisolated`
+/// to match the protocol they actually satisfy. Each hops to the main actor
+/// itself for the work that needs it.
+@MainActor
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(
         _ application: UIApplication,
@@ -166,7 +174,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         }
     }
 
-    func userNotificationCenter(
+    nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
@@ -179,7 +187,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     /// `didReceiveRemoteNotification` above fires for silent background
     /// delivery too, so treating that as an open would count pushes the user
     /// never saw. The flag is consumed by the next emit.
-    func userNotificationCenter(
+    nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
