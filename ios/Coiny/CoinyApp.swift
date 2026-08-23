@@ -25,6 +25,21 @@ struct CoinyApp: App {
     /// DEBUG-only, so it is compiled out of every Release build entirely.
     private static let isDebugSessionRun = CommandLine.arguments.contains("--uitest-debug-session")
 
+    /// UI tests cannot satisfy a biometric prompt, so every one of them would
+    /// stop on the lock screen.
+    ///
+    /// The suite is seeded with the lock explicitly OFF. Handing it an EMPTY
+    /// suite is not enough and was the bug CI caught: `AppLock.isEnabled` treats
+    /// an ABSENT value as ON, which is right for real users (a lock nobody finds
+    /// protects nobody) and exactly wrong here. A fresh suite has no value, so
+    /// "bypass the lock" silently meant "enable the lock".
+    private static func makeAppLock() -> AppLock {
+        guard isUITesting || isDebugSessionRun else { return AppLock() }
+        let suite = UserDefaults(suiteName: "uitest.nolock")!
+        suite.set(false, forKey: AppLock.enabledKey)
+        return AppLock(defaults: suite)
+    }
+
     /// UI tests bypass sign-in, so live API calls would 401; serve a fixture
     /// instead so the Home journey surface is deterministic under test.
     private static func makePetStore() -> PetStore {
@@ -44,9 +59,7 @@ struct CoinyApp: App {
     /// On-device protection (Services/AppLock.swift). UI tests bypass it: they
     /// cannot satisfy a biometric prompt, and every one of them would otherwise
     /// stop on the lock screen.
-    @State private var appLock = AppLock(
-        defaults: CoinyApp.isUITesting || CoinyApp.isDebugSessionRun ? UserDefaults(suiteName: "uitest.nolock")! : .standard
-    )
+    @State private var appLock = CoinyApp.makeAppLock()
 
     var body: some Scene {
         WindowGroup {
