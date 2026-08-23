@@ -17,6 +17,7 @@ import { registerDebtsApi } from './api/debts.js';
 import { registerDebugApi, registerDebugSessionApi } from './api/debug.js';
 import { registerDeclaredAssetsApi } from './api/declared-assets.js';
 import { registerDevicesApi } from './api/devices.js';
+import { registerDiagnosticsApi } from './api/diagnostics.js';
 import { registerDiscogsApi } from './api/discogs.js';
 import { registerEnergyApi } from './api/energy.js';
 import { registerEntitlementsApi } from './api/entitlements.js';
@@ -278,6 +279,9 @@ async function buildApp(options: BuildAppOptions = {}) {
     registerDebtsApi(scope);
     registerNetWorthApi(scope);
     registerTelemetryApi(scope);
+    // Protected scope: a crash is filed against the session's account, never
+    // against an id in the payload.
+    registerDiagnosticsApi(scope);
   });
 
   return app;

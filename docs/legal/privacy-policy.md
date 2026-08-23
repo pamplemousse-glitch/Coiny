@@ -96,8 +96,14 @@ servers so we can find and fix problems you would otherwise just experience.
 Two things worth being specific about. The crash trace is a list of memory
 addresses and identifiers for our own app's code; it is not readable as text and
 contains none of your information, none of your financial data, and nothing you
-typed. And this comes from Apple's own built-in reporting, not from a
-crash-reporting company: no third party receives any of it.
+typed. The few fields in Apple's report that can contain free text are removed
+on your phone and never sent. And this comes from Apple's own built-in
+reporting, not from a crash-reporting company: no third party receives any of
+it.
+
+We keep crash reports for 90 days and then delete them. They describe a version
+of the app rather than a person, and a crash in a build from three months ago
+tells us nothing we can act on.
 
 We do not collect your location, contacts, photos, browsing history, or health
 data, and the app does not track you across other companies' apps or websites.

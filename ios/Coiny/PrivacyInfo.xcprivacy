@@ -157,8 +157,11 @@
 		<!-- Crash data: MetricKit MXDiagnosticPayload (G3.10). Declared now, in
 		     the same change as the performance half, so the three privacy
 		     documents move together exactly once. The subscriber that uploads it
-		     lands in the follow-up PR; an over-declared label is not a rejection
-		     risk, whereas a label that lags the collection is.
+		     LANDED on 2026-08-23 (Services/CrashDiagnostics.swift), so this is
+		     now live collection rather than an early declaration. It posts to
+		     POST /api/diagnostics, which is a separate endpoint from
+		     /api/telemetry because the analytics catalog rejects free-form data
+		     by construction and a call stack tree cannot pass it.
 		     What this is, precisely: MXCallStackTree.JSONRepresentation carries
 		     binary image name, binary UUID, text-segment offset, address and
 		     sample count. It is UNSYMBOLICATED, so it holds no function names

@@ -1249,6 +1249,69 @@ export const opsEvents = pgTable(
   (t) => [index('ops_events_at_idx').on(t.at), index('ops_events_vendor_at_idx').on(t.vendor, t.at)],
 );
 
+/**
+ * MetricKit crash and hang diagnostics (G3.10, the diagnostic half).
+ *
+ * A SEPARATE table, and separate from `analytics_events` on purpose. That
+ * catalog (`analytics/events.ts`) accepts only flat objects whose strings match
+ * a lowercase token regex, which is the control keeping merchant names and
+ * emails out of analytics by construction. A call stack tree is a nested tree of
+ * binary UUIDs and hex offsets and cannot pass it, and loosening the catalog to
+ * fit would dismantle the control for every other event. So the diagnostics get
+ * their own home with their own rules rather than widening that door.
+ *
+ * WHAT IS IN HERE, precisely, because "crash report" sounds worse than it is:
+ * `MXCallStackTree.JSONRepresentation` carries binary image name, binary UUID,
+ * text-segment offset, address and sample count. It is UNSYMBOLICATED, so no
+ * function names and no file paths; symbolication happens off device against
+ * our own dSYM.
+ *
+ * WHAT IS DELIBERATELY NOT IN HERE: `terminationReason`,
+ * `virtualMemoryRegionInfo` and `exceptionReason.composedMessage` are the only
+ * free-form strings MetricKit hands over, and Apple's own header says the last
+ * "may have some pieces redacted", which is not a guarantee anyone should build
+ * on. All three are dropped on the device and never sent.
+ *
+ * Retention is 90 days (scheduler/purge.ts), matching `ops_events` rather than
+ * analytics: these rows describe a BUILD, not a person, and nothing about them
+ * gets more valuable with age.
+ */
+export const crashDiagnostics = pgTable(
+  'crash_diagnostics',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Which MXDiagnostic subclass this came from. Closed set, validated at the
+     *  route, so the read path can group without parsing prose. */
+    kind: text('kind').$type<'crash' | 'hang' | 'disk_write' | 'cpu_exception' | 'app_launch'>().notNull(),
+    /** The build these numbers belong to. Without it a regression cannot be
+     *  attributed and the series is only noise. */
+    appBuild: integer('app_build').notNull(),
+    osMajor: integer('os_major').notNull(),
+    /** Stable grouping key, computed on device from the call stack's binary
+     *  UUIDs and offsets. This is what turns "47 crashes" into "one crash, 47
+     *  times", which is the difference between a number and a lead. */
+    signature: text('signature').notNull(),
+    /** Mach exception type / code / signal, from sys/exception_types.h and
+     *  sys/signal.h. Integers, so nothing free-form rides along. */
+    exceptionType: integer('exception_type'),
+    exceptionCode: integer('exception_code'),
+    signal: integer('signal'),
+    /** MXCallStackTree.JSONRepresentation, verbatim. Size-capped at the route. */
+    callStack: jsonb('call_stack').$type<Record<string, unknown>>().notNull(),
+    receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('crash_diagnostics_user_idx').on(t.userId),
+    // The query that matters: "which crash is hitting this build most", which
+    // is the only question worth asking of this table.
+    index('crash_diagnostics_signature_idx').on(t.signature, t.appBuild),
+    index('crash_diagnostics_received_at_idx').on(t.receivedAt),
+  ],
+);
+
 export const analyticsEvents = pgTable(
   'analytics_events',
   {

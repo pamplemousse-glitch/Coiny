@@ -211,6 +211,8 @@ extension DeviceMetricsSnapshot {
 /// `@MainActor` type.
 final class MetricKitReporter: NSObject, MXMetricManagerSubscriber, @unchecked Sendable {
     private static let logger = Logger(subsystem: "app.coiny.ios", category: "metrickit")
+    /// Separate category so a crash is greppable apart from the daily metrics.
+    static let diagnosticsLogger = Logger(subsystem: "app.coiny.ios", category: "metrickit.diagnostics")
 
     private let client: TelemetryClient
 
