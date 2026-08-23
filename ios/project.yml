@@ -4,6 +4,19 @@ options:
   deploymentTarget:
     iOS: "17.0"
   developmentLanguage: en
+  # en-GB because market-research-2026-08.md 6.2 names the UK as the beachhead.
+  #
+  # Without the region here the String Catalog's en-GB values compile but are
+  # never selected: knownRegions is what tells Xcode the variant exists, and a
+  # UK device silently falls back to the en values. That failure is invisible
+  # in review and on a US simulator, which is the whole reason it is spelled out.
+  #
+  # `Base` stays: it is Xcode's own entry for non-localizable resources and
+  # dropping it from a regenerated project detaches them.
+  knownRegions:
+    - Base
+    - en
+    - en-GB
   createIntermediateGroups: true
   generateEmptyDirectories: false
   groupSortPosition: top

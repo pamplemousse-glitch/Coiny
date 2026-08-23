@@ -1,0 +1,210 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "assetClass.brokerage": {
+      "comment": "Investment account",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brokerage"
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Investments"
+          }
+        }
+      }
+    },
+    "assetClass.business": {
+      "comment": "A business the user owns",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Business"
+          }
+        }
+      }
+    },
+    "assetClass.car": {
+      "comment": "A vehicle the user owns",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Car"
+          }
+        }
+      }
+    },
+    "assetClass.checking": {
+      "comment": "Everyday transaction account. en-GB says 'Current account'.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking"
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current account"
+          }
+        }
+      }
+    },
+    "assetClass.collectibles": {
+      "comment": "Collectible assets",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collectibles"
+          }
+        }
+      }
+    },
+    "assetClass.creditCards": {
+      "comment": "Credit cards",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Credit cards"
+          }
+        }
+      }
+    },
+    "assetClass.crypto": {
+      "comment": "Cryptocurrency",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crypto"
+          }
+        }
+      }
+    },
+    "assetClass.home": {
+      "comment": "Residential property",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Home"
+          }
+        }
+      }
+    },
+    "assetClass.other": {
+      "comment": "Anything not covered above",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other"
+          }
+        }
+      }
+    },
+    "assetClass.retirement": {
+      "comment": "Retirement savings. The default hedges US and UK; en-GB says 'Pension'.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "401k or pension"
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pension"
+          }
+        }
+      }
+    },
+    "assetClass.savings": {
+      "comment": "Savings account",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Savings"
+          }
+        }
+      }
+    },
+    "assetClass.studentLoans": {
+      "comment": "Student debt. en-GB says 'Student loan' (singular; there is normally one).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Student loans"
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Student loan"
+          }
+        }
+      }
+    },
+    "wealthClass.realEstate": {
+      "comment": "Residential or commercial property. en-GB says 'Property'.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Real estate"
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Property"
+          }
+        }
+      }
+    },
+    "wealthClass.sneakers": {
+      "comment": "Collectible footwear. en-GB says 'Trainers'.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sneakers"
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trainers"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

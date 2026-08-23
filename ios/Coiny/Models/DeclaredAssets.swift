@@ -28,20 +28,64 @@ enum DeclaredAssetClass: String, CaseIterable, Codable, Sendable {
     case collectibles
     case other
 
+    /// `String(localized:)` rather than a bare literal, because these are the
+    /// strings that actually differ between markets and a String Catalog cannot
+    /// reach them otherwise.
+    ///
+    /// SwiftUI localizes `Text("literal")` for free, since it takes a
+    /// `LocalizedStringKey`. It does NOT localize a `String` returned from a
+    /// property like this one, so every asset-class name in onboarding has been
+    /// hard-wired to US English no matter what the device locale says. That is
+    /// the opposite of where the localization gap was assumed to be: the 166
+    /// literal `Text(...)` call sites were already localizable and are almost
+    /// all identical in en-GB.
+    ///
+    /// The tell was already in this switch. "401k or pension" is a hand-written
+    /// compromise between two markets, which means somebody hit this exact
+    /// problem and solved it locally instead of systemically.
+    ///
+    /// Keys are explicit and stable so renaming display copy never orphans a
+    /// translation. The type stays `String` deliberately: three of the five
+    /// call sites interpolate this into an `accessibilityLabel`, where a
+    /// `LocalizedStringResource` would need unwrapping at each one.
     var label: String {
         switch self {
-        case .checking: return "Checking"
-        case .savings: return "Savings"
-        case .creditCards: return "Credit cards"
-        case .retirement: return "401k or pension"
-        case .brokerage: return "Brokerage"
-        case .crypto: return "Crypto"
-        case .car: return "Car"
-        case .home: return "Home"
-        case .studentLoans: return "Student loans"
-        case .business: return "Business"
-        case .collectibles: return "Collectibles"
-        case .other: return "Other"
+        case .checking:
+            return String(
+                localized: "assetClass.checking",
+                defaultValue: "Checking",
+                comment: "Everyday transaction account. en-GB says 'Current account'."
+            )
+        case .savings:
+            return String(localized: "assetClass.savings", defaultValue: "Savings", comment: "Savings account")
+        case .creditCards:
+            return String(localized: "assetClass.creditCards", defaultValue: "Credit cards", comment: "Credit cards")
+        case .retirement:
+            return String(
+                localized: "assetClass.retirement",
+                defaultValue: "401k or pension",
+                comment: "Retirement savings. The default hedges US and UK; en-GB says 'Pension'."
+            )
+        case .brokerage:
+            return String(localized: "assetClass.brokerage", defaultValue: "Brokerage", comment: "Investment account")
+        case .crypto:
+            return String(localized: "assetClass.crypto", defaultValue: "Crypto", comment: "Cryptocurrency")
+        case .car:
+            return String(localized: "assetClass.car", defaultValue: "Car", comment: "A vehicle the user owns")
+        case .home:
+            return String(localized: "assetClass.home", defaultValue: "Home", comment: "Residential property")
+        case .studentLoans:
+            return String(
+                localized: "assetClass.studentLoans",
+                defaultValue: "Student loans",
+                comment: "Student debt. en-GB says 'Student loan' (singular; there is normally one)."
+            )
+        case .business:
+            return String(localized: "assetClass.business", defaultValue: "Business", comment: "A business the user owns")
+        case .collectibles:
+            return String(localized: "assetClass.collectibles", defaultValue: "Collectibles", comment: "Collectible assets")
+        case .other:
+            return String(localized: "assetClass.other", defaultValue: "Other", comment: "Anything not covered above")
         }
     }
 
