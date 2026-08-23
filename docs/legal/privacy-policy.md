@@ -86,6 +86,19 @@ works. These events never contain dollar amounts or merchant names; monetary
 values are recorded only as broad buckets. We do all of this ourselves; there is
 no third-party analytics company involved.
 
+**Device performance and crash data.** With the same consent as usage data, your
+phone's operating system gives the app a daily report on how the app behaved:
+how long it took to launch, how often it froze, how much memory it used, and
+whether it exited normally or crashed. If it crashed, the report also contains a
+technical trace of where in the code it happened. We send this to our own
+servers so we can find and fix problems you would otherwise just experience.
+
+Two things worth being specific about. The crash trace is a list of memory
+addresses and identifiers for our own app's code; it is not readable as text and
+contains none of your information, none of your financial data, and nothing you
+typed. And this comes from Apple's own built-in reporting, not from a
+crash-reporting company: no third party receives any of it.
+
 We do not collect your location, contacts, photos, browsing history, or health
 data, and the app does not track you across other companies' apps or websites.
 

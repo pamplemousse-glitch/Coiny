@@ -324,7 +324,7 @@ this section on its own; nothing else in the runbook needs you.
 | G3.1 | Create the App Store Connect record: description naming the financial-data integration, keywords, age rating, support URL, privacy policy URL. **Waits on G1.1 and G1.2** | Submission | Half a day |
 | G3.3 | Accept or amend the demo-account plan (open decision B9), then supply the credentials in the review notes and the Fly secret | Guideline 2.1, the largest rejection category | 30 min to decide, 15 min to supply |
 | G3.2 | Transcribe the nutrition labels field by field. **Waits on G3.4** | App Privacy in App Store Connect | 1 hour |
-| G3.10 | Approve MetricKit's Performance Data label line (gap analysis §8 Q3), and decide whether to take the diagnostic half now or later | Every field performance number Part 4 cannot produce today | 15 min |
+| G3.10 | ~~Approve MetricKit's Performance Data label line, and decide whether to take the diagnostic half now or later~~ **DONE 2026-08-23: both halves approved.** Performance Data and Crash Data are declared together; the metric subscriber ships first and the diagnostic one follows. (The citation here read "gap analysis §8 Q3", which resolves nowhere: `launch-gap-analysis.md` has no Q3 and its §8 is export compliance, while `obligations.md` §8 Q3 is the Reg P notice question. The MetricKit reasoning is `launch-gap-analysis.md` **§7**.) | Every field performance number Part 4 cannot produce today | Done |
 
 ### Before the first paying user
 
