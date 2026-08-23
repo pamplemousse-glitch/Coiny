@@ -872,6 +872,8 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
   if (discogsRow) pushIfUnhealthy('discogs', 'me', 'Discogs', discogsRow);
   if (kalshiRow) pushIfUnhealthy('kalshi', 'me', 'Kalshi', kalshiRow);
   if (tlRow) pushIfUnhealthy('truelayer', 'me', 'TrueLayer', tlRow);
+  if (coinbaseRow) pushIfUnhealthy('coinbase', 'me', 'Coinbase', coinbaseRow);
+  if (spinwheelRow) pushIfUnhealthy('spinwheel', 'me', 'Credit report', spinwheelRow);
 
   // --- Emergency fund coverage (C4) ------------------------------------------
   let liquidCashMonths: number | null = null;

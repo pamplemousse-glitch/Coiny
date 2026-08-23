@@ -9,7 +9,7 @@ import { eq } from 'drizzle-orm';
 import { getAccounts, getSpotPrices } from '../coinbase/client.js';
 import { isSharedCoinbaseKeyAllowed } from '../config.js';
 import { db } from '../db/client.js';
-import { coinbaseConnections, petState, zerionWallets } from '../db/schema.js';
+import { coinbaseConnections, petState, spinwheelConnections, zerionWallets } from '../db/schema.js';
 import { getTokenMarket, isThinlyTraded } from '../dexscreener/client.js';
 import { refreshGoalSystem } from '../goals/refresh.js';
 import { fetchDebtSnapshot, fetchPlaidSnapshot, type HoldingSummary, summariseHoldings } from '../goals/snapshot.js';
@@ -191,9 +191,18 @@ export async function refreshCrypto(userId: string): Promise<RefreshOutcome> {
     }
 
     await recordClassSuccess(userId, 'crypto', { valueUsd: total, payload: { positions } });
+    // Both grains, as in refreshDefi. The class failure is what the read path
+    // consults; the connection health is what lets the response NAME Coinbase
+    // rather than say the crypto class is degraded.
+    await db().update(coinbaseConnections).set(successPatch()).where(eq(coinbaseConnections.userId, userId));
     return 'refreshed';
   } catch (err) {
-    await recordClassFailure(userId, 'crypto', classifyError(err));
+    const errorClass = classifyError(err);
+    await db()
+      .update(coinbaseConnections)
+      .set(failurePatch(connection.consecutiveFailures, errorClass))
+      .where(eq(coinbaseConnections.userId, userId));
+    await recordClassFailure(userId, 'crypto', errorClass);
     return 'failed';
   }
 }
@@ -368,8 +377,19 @@ export async function refreshDebts(userId: string): Promise<RefreshOutcome> {
   const snapshot = await fetchDebtSnapshot(userId);
   if (!snapshot.spinwheelConnected) return 'not_connected';
 
+  // Read for its failure count, which failurePatch needs to increment without a
+  // read-modify-write race. One row per user, so this is a primary-key lookup.
+  const [connection] = await db().select().from(spinwheelConnections).where(eq(spinwheelConnections.userId, userId));
+
   if (!snapshot.spinwheelDebtsLoaded) {
-    await recordClassFailure(userId, 'debts', classifyError(snapshot.fetchError));
+    const errorClass = classifyError(snapshot.fetchError);
+    if (connection) {
+      await db()
+        .update(spinwheelConnections)
+        .set(failurePatch(connection.consecutiveFailures, errorClass))
+        .where(eq(spinwheelConnections.userId, userId));
+    }
+    await recordClassFailure(userId, 'debts', errorClass);
     return 'failed';
   }
 
@@ -377,6 +397,9 @@ export async function refreshDebts(userId: string): Promise<RefreshOutcome> {
     valueUsd: snapshot.debtsTotal,
     payload: { items: snapshot.debtItems, debts: snapshot.debts },
   });
+  if (connection) {
+    await db().update(spinwheelConnections).set(successPatch()).where(eq(spinwheelConnections.userId, userId));
+  }
   return 'refreshed';
 }
 
