@@ -2,6 +2,22 @@ import { type Dispatcher, getGlobalDispatcher, MockAgent, setGlobalDispatcher } 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { authHeader, resetDatabase, testUserId } from './db-helper.js';
 
+// The vendor circuit breaker keeps per-vendor state in a module-level Map, on
+// purpose: keying on the vendor is what makes one user's failures protect every
+// other user, so the state cannot be per-request. The consequence here is that
+// this file's simulated vendor failures accumulate across tests and, past five
+// in a row, eject the vendor so the NEXT test's fixture is never reached.
+//
+// Imported dynamically inside the hook rather than at the top of the file:
+// circuit-breaker.js pulls in config.js, which snapshots process.env at import
+// time (config.ts:407), and several test files set their env at module scope.
+// Forcing that import early is how a global version of this reset broke
+// zerion-breakdown.test.ts with "ZERION_API_KEY is not configured".
+beforeEach(async () => {
+  const { resetCircuitBreakers } = await import('../src/resilience/circuit-breaker.js');
+  resetCircuitBreakers();
+});
+
 describe('DELETE /api/account', () => {
   let originalDispatcher: Dispatcher;
   let mockAgent: MockAgent;

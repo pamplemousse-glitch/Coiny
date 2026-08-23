@@ -166,6 +166,46 @@ const configSchema = z
     RETRY_BUDGET_MAX_TOKENS: z.coerce.number().int().positive().default(20),
     RETRY_BUDGET_TOKEN_RATIO: z.coerce.number().positive().max(1).default(0.1),
 
+    // Vendor-level circuit breaking (src/resilience/circuit-breaker.ts).
+    //
+    // Two detectors, because one of them cannot work at our volume. The
+    // consecutive threshold is Envoy's `consecutive_5xx` default, and it is the
+    // one that will actually fire today: at roughly one sample per refresh
+    // interval a RATE cannot be computed at all, which is the whole finding in
+    // connection-resilience-survey.md section 3.
+    BREAKER_CONSECUTIVE_THRESHOLD: z.coerce.number().int().positive().default(5),
+
+    // The rate path, gated behind a volume floor the way Envoy gates its
+    // success-rate detector. Silent at today's volume BY CONSTRUCTION: 20
+    // requests inside a five-minute window is far more than one vendor sees.
+    // It is here so the breaker does not need reopening when volume arrives,
+    // and it catches the failure a streak counter cannot: a vendor failing half
+    // its requests forever while never failing two in a row.
+    BREAKER_WINDOW_MS: z.coerce.number().int().positive().default(300_000),
+    BREAKER_WINDOW_BUCKETS: z.coerce.number().int().positive().default(10),
+    BREAKER_VOLUME_FLOOR: z.coerce.number().int().positive().default(20),
+    BREAKER_FAILURE_RATE: z.coerce.number().positive().max(1).default(0.5),
+
+    // Ejection duration: base x 2^(ejections - 1), capped. Envoy's shape.
+    // Thirty seconds is short enough that a brief blip costs one refresh cycle,
+    // and the ten-minute cap is short enough that a recovered vendor is not
+    // locked out for the rest of the day.
+    BREAKER_BASE_EJECTION_MS: z.coerce.number().int().positive().default(30_000),
+    BREAKER_MAX_EJECTION_MS: z.coerce.number().int().positive().default(600_000),
+
+    // How long a half-open probe may stay outstanding before it is abandoned.
+    // Without this the breaker has a permanent-refusal bug: a probe whose
+    // caller crashes or never reports leaves the vendor refused forever with
+    // nothing able to clear it. Comfortably longer than fetch.ts's own request
+    // timeout, so a probe that is merely slow is not abandoned while in flight.
+    BREAKER_PROBE_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+
+    // Envoy's `max_ejection_percent`. This is a blast-radius bound on THIS
+    // MODULE, not on the vendors: without it, one bug here stops every refresh
+    // for every vendor and the product silently stops updating. A breaker that
+    // can brick the product is a worse risk than the amplification it prevents.
+    BREAKER_MAX_EJECTION_PERCENT: z.coerce.number().int().positive().max(100).default(50),
+
     // Full-jitter backoff (AWS, "Exponential Backoff And Jitter"):
     // `random(0, min(cap, base * 2^attempt))`. Base and cap only; the ladder is
     // computed rather than listed, because a fixed list is what produced

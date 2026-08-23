@@ -16,6 +16,7 @@ import { fetchDebtSnapshot, fetchPlaidSnapshot, type HoldingSummary, summariseHo
 import { investmentsHoldingsGet, liabilitiesGet } from '../plaid/client.js';
 import { dispatchReaction } from '../reactions/dispatch.js';
 import { evaluateExternalEvent } from '../reactions/external.js';
+import { isCircuitOpenError } from '../resilience/circuit-breaker.js';
 import { recordClassFailure, recordClassSuccess, upsertPlaidAccountBalances } from '../store/asset-cache.js';
 import { failurePatch, successPatch } from '../store/connection-health.js';
 import { getItemsByUser } from '../store/items.js';
@@ -31,6 +32,18 @@ import { assembleNetWorth } from './read.js';
  *  so vendor error bodies (which can echo request detail) stay out of the DB
  *  and the logs. */
 export function classifyError(err: unknown): string {
+  // A refused call is not a vendor failure, and must not be filed as one.
+  //
+  // The circuit breaker throws before contacting the vendor, so recording this
+  // as 'unknown' would write a class_refresh_failed row for a request that was
+  // never made. Those rows feed vendorFailureRollup, which feeds
+  // /health/integrations, so an ejected vendor would inflate its own failure
+  // count and look progressively worse the longer the breaker protected it.
+  //
+  // The breaker's OWN window is already safe from this (fetch.ts counts only
+  // real attempts, asserted in circuit-breaker.test.ts). This is about the
+  // durable record telling the truth about what happened.
+  if (isCircuitOpenError(err)) return 'circuit_open';
   if (err instanceof DOMException && err.name === 'TimeoutError') return 'timeout';
   if (err && typeof err === 'object') {
     const status =

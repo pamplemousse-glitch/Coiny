@@ -62,6 +62,13 @@ export const OPS_EVENT_KINDS = [
    *  (resilience/invariants.ts). The write still happened: this is an alert to
    *  us, never an error to the user. */
   'invariant_violated',
+  /** The vendor-level circuit breaker ejected a vendor
+   *  (resilience/circuit-breaker.ts). Stronger than `vendor_throttled`: the
+   *  budget only stops RETRYING, this stops calling the vendor at all, so it is
+   *  the first signal that refreshes are being skipped rather than merely
+   *  slowed. The breaker's state is in-process and dies with the machine, which
+   *  is exactly why the ejection is written down here. */
+  'vendor_circuit_opened',
 ] as const;
 
 export type OpsEventKind = (typeof OPS_EVENT_KINDS)[number];

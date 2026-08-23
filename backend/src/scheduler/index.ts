@@ -34,6 +34,7 @@ import { db } from '../db/client.js';
 import { coinbaseConnections, plaidItems, spinwheelConnections, zerionWallets } from '../db/schema.js';
 import { refreshScheduledClass, runGoalRefreshFromCache, type ScheduledClass } from '../networth/refresh.js';
 import { captureError } from '../observability/sentry.js';
+import { openBreakers } from '../resilience/circuit-breaker.js';
 import { retryBudgetStats } from '../resilience/retry-budget.js';
 import { getClassCacheForUsers } from '../store/asset-cache.js';
 import { usersMissingDailyPoint } from '../store/goals.js';
@@ -69,9 +70,15 @@ const DAILY_JITTER_WINDOW_MS = 3 * HOUR;
 type SchedulerLogger = {
   info: (obj: Record<string, unknown>, msg: string) => void;
   warn: (obj: Record<string, unknown>, msg: string) => void;
+  /** Added for the circuit breaker. A throttled vendor is a control working as
+   *  designed and warns; an EJECTED vendor means refreshes are being skipped
+   *  and users are not getting fresh numbers, which is a different thing and
+   *  should not share a level with it. pino provides this; the silent logger
+   *  below and any test double must too. */
+  error: (obj: Record<string, unknown>, msg: string) => void;
 };
 
-const silentLogger: SchedulerLogger = { info: () => {}, warn: () => {} };
+const silentLogger: SchedulerLogger = { info: () => {}, warn: () => {}, error: () => {} };
 
 let timer: NodeJS.Timeout | null = null;
 let startedAt: Date | null = null;
@@ -266,6 +273,41 @@ export async function runSchedulerTick(
           vendor: s.vendor,
           detail: {
             retries_denied: s.retriesDenied,
+            local_failures: s.localFailures,
+            upstream_failures: s.upstreamFailures,
+          },
+        });
+      }
+    }
+
+    // An ejected vendor is strictly worse news than a throttled one: the budget
+    // only stops RETRYING, the breaker stops calling the vendor at all, so this
+    // is the first point at which refreshes are being skipped rather than
+    // merely slowed. Same durability argument as above and more so, because the
+    // breaker's state is in-process and dies with the machine.
+    //
+    // `error`, not `warn`: a throttled vendor is a control working as designed,
+    // while an ejected one means users are not getting fresh numbers.
+    const ejected = openBreakers();
+    if (ejected.length > 0) {
+      log.error(
+        {
+          vendors: ejected.map((s) => s.vendor),
+          reasons: ejected.map((s) => s.lastTrip),
+        },
+        'vendor_circuit_opened',
+      );
+      for (const s of ejected) {
+        await recordOpsEvent({
+          severity: 'error',
+          kind: 'vendor_circuit_opened',
+          vendor: s.vendor,
+          detail: {
+            trip_reason: s.lastTrip,
+            consecutive_failures: s.consecutiveFailures,
+            window_requests: s.windowRequests,
+            window_failures: s.windowFailures,
+            ejections: s.ejections,
             local_failures: s.localFailures,
             upstream_failures: s.upstreamFailures,
           },

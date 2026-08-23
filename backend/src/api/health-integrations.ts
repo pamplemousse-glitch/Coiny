@@ -45,6 +45,7 @@
 // does not re-derive that guarantee, it inherits it.
 
 import type { FastifyInstance, FastifyReply } from 'fastify';
+import { openBreakers } from '../resilience/circuit-breaker.js';
 import { retryBudgetStats } from '../resilience/retry-budget.js';
 import { vendorFailureRollup } from '../store/ops.js';
 
@@ -70,6 +71,11 @@ export type IntegrationHealth = {
   lastErrorClass: string | null;
   /** From the in-memory retry budget: retries are currently being refused. */
   throttled: boolean;
+  /** From the in-memory circuit breaker: the vendor is EJECTED, so calls are
+   *  not being made at all. Strictly worse than `throttled`, which only stops
+   *  the retries, and the distinction is the point: throttled means slower,
+   *  ejected means skipped. */
+  ejected: boolean;
 };
 
 export type IntegrationsHealthBody = {
@@ -98,6 +104,7 @@ export async function buildIntegrationsHealth(now: Date = new Date()): Promise<I
       lastAt: row.lastAt,
       lastErrorClass: row.lastErrorClass,
       throttled: throttled.get(row.key)?.throttled ?? false,
+      ejected: false,
     });
   }
 
@@ -120,6 +127,30 @@ export async function buildIntegrationsHealth(now: Date = new Date()): Promise<I
       lastAt: null,
       lastErrorClass: null,
       throttled: true,
+      ejected: false,
+    });
+  }
+
+  // An EJECTED vendor is `down` unconditionally, and for a stronger reason than
+  // throttling: the breaker is refusing the calls, so the absence of fresh
+  // failures in `ops_events` is caused by the control rather than by recovery.
+  // Reading that silence as health is exactly the muted-alarm failure this
+  // whole surface exists to prevent.
+  for (const s of openBreakers()) {
+    const existing = byKey.get(s.vendor);
+    if (existing) {
+      existing.status = 'down';
+      existing.ejected = true;
+      continue;
+    }
+    byKey.set(s.vendor, {
+      key: s.vendor,
+      status: 'down',
+      failures: s.localFailures + s.upstreamFailures,
+      lastAt: null,
+      lastErrorClass: s.lastTrip,
+      throttled: throttled.get(s.vendor)?.throttled ?? false,
+      ejected: true,
     });
   }
 
