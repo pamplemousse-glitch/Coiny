@@ -36,7 +36,23 @@
 // of one rule, in two places, drifting. `deriveConnectionStatus` is the single
 // copy.
 
+import type { SQL } from 'drizzle-orm';
+import { db } from '../db/client.js';
+import type {
+  alpacaConnections,
+  chainWallets,
+  discogsConnections,
+  hyperliquidAccounts,
+  kalshiConnections,
+  krakenConnections,
+  nftWallets,
+  polymarketAccounts,
+  truelayerConnections,
+  ynabConnections,
+} from '../db/schema.js';
 import type { ClassStatus } from '../networth/classes.js';
+import { classifyError } from '../networth/refresh.js';
+import { log } from '../util/log.js';
 
 /** The health columns every connection table gained in migration 0062, plus
  *  the `lastSyncedAt` eleven of them already had. Structural rather than
@@ -139,4 +155,51 @@ export function failurePatch(
   at: Date = new Date(),
 ): { lastAttemptAt: Date; lastErrorClass: string; consecutiveFailures: number } {
   return { lastAttemptAt: at, lastErrorClass: errorClass, consecutiveFailures: previousFailures + 1 };
+}
+
+/** The connection tables that carry the 0062 health columns and are synced by a
+ *  user-triggered route. A union rather than a generic `PgTable`, so `.set()`
+ *  below stays type-checked against the real columns instead of being cast. */
+type SyncedConnectionTable =
+  | typeof alpacaConnections
+  | typeof chainWallets
+  | typeof discogsConnections
+  | typeof hyperliquidAccounts
+  | typeof kalshiConnections
+  | typeof krakenConnections
+  | typeof nftWallets
+  | typeof polymarketAccounts
+  | typeof truelayerConnections
+  | typeof ynabConnections;
+
+/**
+ * Record a failed user-triggered sync against one connection row.
+ *
+ * Called from a route's catch, which then RETHROWS: the client must still see
+ * its 500, and `plugins/error-handler.ts` must still report it to Sentry. This
+ * only adds the durable per-connection fact that was missing, so the next
+ * `GET /api/net-worth` can name which connection is unhealthy.
+ *
+ * Never throws. A failure to record a failure must not replace the vendor's
+ * error with ours, which would lose the more informative of the two.
+ *
+ * `where` accepts undefined because Drizzle's `and()` is typed
+ * `SQL | undefined`, and every caller here composes one to keep the update
+ * scoped by `user_id` (.claude/rules/security.md #6) rather than by primary key
+ * alone.
+ */
+export async function recordSyncFailure(
+  table: SyncedConnectionTable,
+  where: SQL | undefined,
+  previousFailures: number,
+  err: unknown,
+): Promise<void> {
+  try {
+    await db()
+      .update(table)
+      .set(failurePatch(previousFailures, classifyError(err)))
+      .where(where);
+  } catch {
+    log.warn('connection-health: failed to record a sync failure');
+  }
 }

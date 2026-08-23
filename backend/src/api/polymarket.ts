@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { polymarketAccounts } from '../db/schema.js';
 import { getPortfolioValue } from '../polymarket/client.js';
+import { recordSyncFailure, successPatch } from '../store/connection-health.js';
 import { SYNC_LIMIT } from './rate-limits.js';
 
 const AddAccountBodySchema = z.object({
@@ -70,12 +71,23 @@ export function registerPolymarketApi(app: FastifyInstance): void {
     const now = new Date();
 
     for (const row of rows) {
-      const valueUsd = await getPortfolioValue(row.walletAddress);
-      await db()
-        .update(polymarketAccounts)
-        .set({ lastValueUsd: valueUsd.toString(), lastSyncedAt: now })
-        .where(and(eq(polymarketAccounts.userId, userId), eq(polymarketAccounts.id, row.id)));
-      updated++;
+      try {
+        const valueUsd = await getPortfolioValue(row.walletAddress);
+        await db()
+          .update(polymarketAccounts)
+          .set({ lastValueUsd: valueUsd.toString(), ...successPatch(now) })
+          .where(and(eq(polymarketAccounts.userId, userId), eq(polymarketAccounts.id, row.id)));
+        updated++;
+      } catch (err) {
+        // Per-row, so the broken address is nameable rather than the whole class.
+        await recordSyncFailure(
+          polymarketAccounts,
+          and(eq(polymarketAccounts.userId, userId), eq(polymarketAccounts.id, row.id)),
+          row.consecutiveFailures,
+          err,
+        );
+        throw err;
+      }
     }
 
     req.log.info({ userId, updated }, 'polymarket sync complete');
