@@ -24,8 +24,6 @@ same and are given in Step 2.
 
 | ASC category | ASC data type | What it actually is in Coiny |
 |---|---|---|
-| Contact Info | Name | Sign in with Apple full name, first sign-in only |
-| Contact Info | Email Address | Sign-in email, stored encrypted |
 | Contact Info | Phone Number | Entered for Spinwheel SMS identity verification; sent, not stored |
 | Financial Info | Credit Info | Credit score from Spinwheel |
 | Financial Info | Other Financial Info | Balances, transactions, liabilities, asset values and identifiers (wallet addresses, property addresses, VINs), goals, net worth history |
@@ -38,6 +36,16 @@ same and are given in Step 2.
 Do **not** declare: Location, Contacts, User Content, Browsing History, Search
 History, Health & Fitness, Diagnostics (no crash SDK is integrated), Sensitive Info, Payment Info (Apple
 is merchant of record; we never see payment details).
+
+Also do **not** declare **Name** or **Email Address**. Both were listed here
+until 2026-08-23 and were stale by four layers: `SignInView` requests no Apple
+scopes (`request.requestedScopes = []`), `api/auth.ts` omits both from its
+schemas and reads only `sub` from Google's id token, and drizzle migration
+`0054_drop_user_identity_columns` dropped `users.email` and
+`users.display_name` because nothing in `src/` ever read them (audit 2.2.1).
+`privacy-policy.md` section 1 has said so correctly the whole time; this file
+and the manifest were the two that drifted. Re-declare only alongside a named
+reader.
 
 ## Step 2: per-type follow-up answers
 
@@ -56,8 +64,14 @@ keyed by user id.
 
 - Every type above appears in `PrivacyInfo.xcprivacy` under
   `NSPrivacyCollectedDataTypes` with `Linked = true`, `Tracking = false`, and
-  matching purposes. Verified: the manifest has exactly 9 entries matching the
-  9 rows in Step 1.
+  matching purposes. Verified by counting on 2026-08-23: the manifest has
+  exactly **8** entries matching the **8** rows in Step 1.
+
+  This line previously read "exactly 9 entries matching the 9 rows" and that
+  was wrong when it was written: there were 10 of each. So the invariant most
+  likely to catch a drift was itself drifted, and stated a specific number
+  confidently enough that nobody recounted. Recount both sides when either
+  changes; do not carry this number forward on trust.
 - Every type above is described in plain language in the privacy policy
   sections 1 and 3. Verified.
 - `NSPrivacyTracking` is `false` and `NSPrivacyTrackingDomains` is empty:
