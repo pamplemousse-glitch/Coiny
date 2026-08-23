@@ -195,3 +195,87 @@ describe('usdValueBand', () => {
     expect(usdValueBand(1_000_000)).toBe('1m+');
   });
 });
+
+// G3.10. device_metrics is the one client event whose payload originates in a
+// system framework rather than in app code, so the schema is the only thing
+// standing between an MXMetricPayload and the analytics table.
+describe('device_metrics (MetricKit)', () => {
+  const minimal = { app_build: 321, os_major: 26 };
+
+  it('accepts the two required fields alone, because MetricKit omits absent sections', () => {
+    const result = validateClientEvent('device_metrics', minimal);
+    expect(result).toEqual({ ok: true, properties: minimal });
+  });
+
+  it('accepts a full payload', () => {
+    const result = validateClientEvent('device_metrics', {
+      ...minimal,
+      launch_ms_avg: 842,
+      hang_ms_avg: 12,
+      peak_memory_mb: 214,
+      cpu_ms: 90_000,
+      scroll_hitch_ppm: 4_200,
+      exit_normal: 40,
+      exit_abnormal: 2,
+      exit_memory_limit: 1,
+      exit_watchdog: 0,
+      exit_bad_access: 1,
+      exit_illegal_instruction: 0,
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects a missing app_build, since a metric with no build cannot be attributed', () => {
+    const result = validateClientEvent('device_metrics', { os_major: 26 });
+    expect(result).toEqual({ ok: false, reason: 'invalid_properties' });
+  });
+
+  it('rejects the raw MXMetricPayload shape the runbook implies posting', () => {
+    // The runbook, 04-performance-reliability 4.13.3 and launch-gap-analysis
+    // section 7 all describe posting MXMetricPayload to /api/telemetry
+    // directly. This asserts that it cannot work, so nobody re-reads those
+    // lines and tries: the payload is a nested tree, and the catalog takes
+    // flat scalars only. The client reduces it before it ever gets here.
+    const result = validateClientEvent('device_metrics', {
+      ...minimal,
+      applicationLaunchMetrics: { histogrammedTimeToFirstDraw: { bucketCount: 3 } },
+    });
+    expect(result).toEqual({ ok: false, reason: 'invalid_properties' });
+  });
+
+  it('rejects a stack frame string, which is the crash half and does not belong on this event', () => {
+    const result = validateClientEvent('device_metrics', {
+      ...minimal,
+      // Uppercase and dashes: a binary UUID cannot pass the token rule even if
+      // a key were added for it.
+      binary_uuid: 'A1B2C3D4-5E6F-7890-ABCD-EF1234567890',
+    });
+    expect(result).toEqual({ ok: false, reason: 'invalid_properties' });
+  });
+
+  it('rejects an out-of-range value rather than clamping it server-side', () => {
+    // The client clamps (DeviceMetricsSnapshot.telemetryProperties) precisely
+    // because the server does not: one bad number costs the whole event, and
+    // with it the exit counts that were fine.
+    const result = validateClientEvent('device_metrics', { ...minimal, peak_memory_mb: 999_999 });
+    expect(result).toEqual({ ok: false, reason: 'invalid_properties' });
+  });
+
+  it('rejects a non-integer duration', () => {
+    const result = validateClientEvent('device_metrics', { ...minimal, launch_ms_avg: 842.5 });
+    expect(result).toEqual({ ok: false, reason: 'invalid_properties' });
+  });
+
+  it('is client-reported, not server-emitted', () => {
+    expect(isClientEvent('device_metrics')).toBe(true);
+    expect(isServerEvent('device_metrics')).toBe(false);
+  });
+
+  it('carries no string property at all, so there is no free-form field to scrub', () => {
+    const shape = CLIENT_EVENT_SCHEMAS.device_metrics.shape;
+    for (const [key, schema] of Object.entries(shape)) {
+      const probe = schema.safeParse('a');
+      expect(probe.success, `${key} accepted a string`).toBe(false);
+    }
+  });
+});

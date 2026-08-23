@@ -30,12 +30,19 @@ same and are given in Step 2.
 | Identifiers | User ID | Apple/Google subject identifier + Coiny account id |
 | Identifiers | Device ID | APNs push token registered with the backend |
 | Usage Data | Product Interaction | First-party telemetry events (PRD section 24); bucketed, no amounts, no merchant names |
+| Diagnostics | Performance Data | MetricKit `MXMetricPayload` (G3.10), reduced on device to the `device_metrics` event: launch time, hang time, peak memory, CPU time, scroll hitch ratio, foreground exit counts, app build, OS major. Counts and durations only |
+| Diagnostics | Crash Data | MetricKit `MXDiagnosticPayload` (G3.10): unsymbolicated call stacks (binary UUID + text-segment offset), exception type, signal. The free-form fields are dropped client-side, not uploaded |
 | Purchases | Purchase History | Subscription product id, expiry and original transaction id, stored server-side against the account |
 | Other Data | Other Data Types | Date of birth, entered for Spinwheel identity verification; sent, not stored |
 
 Do **not** declare: Location, Contacts, User Content, Browsing History, Search
-History, Health & Fitness, Diagnostics (no crash SDK is integrated), Sensitive Info, Payment Info (Apple
+History, Health & Fitness, Sensitive Info, Payment Info (Apple
 is merchant of record; we never see payment details).
+
+**Diagnostics moved off that list on 2026-08-23** (G3.10). It read "Diagnostics
+(no crash SDK is integrated)", which was true and is now not: MetricKit is a
+system framework rather than an SDK, and adopting it is still collection. Both
+Diagnostics rows are declared above.
 
 Also do **not** declare **Name** or **Email Address**. Both were listed here
 until 2026-08-23 and were stale by four layers: `SignInView` requests no Apple
@@ -53,7 +60,7 @@ For **every** type declared above:
 
 | ASC question | Answer |
 |---|---|
-| How is this data used? | **App Functionality** (for Product Interaction only: **Analytics** and App Functionality) |
+| How is this data used? | **App Functionality** (for Product Interaction and Performance Data: **Analytics** and App Functionality) |
 | Is this data linked to the user's identity? | **Yes** |
 | Is this data used for tracking? | **No** |
 
@@ -65,7 +72,8 @@ keyed by user id.
 - Every type above appears in `PrivacyInfo.xcprivacy` under
   `NSPrivacyCollectedDataTypes` with `Linked = true`, `Tracking = false`, and
   matching purposes. Verified by counting on 2026-08-23: the manifest has
-  exactly **8** entries matching the **8** rows in Step 1.
+  exactly **10** entries matching the **10** rows in Step 1. (It was 8 and 8
+  earlier the same day, before G3.10 added the two Diagnostics rows.)
 
   This line previously read "exactly 9 entries matching the 9 rows" and that
   was wrong when it was written: there were 10 of each. So the invariant most

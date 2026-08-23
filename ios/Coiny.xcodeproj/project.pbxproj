@@ -30,7 +30,6 @@
 		11375735739E24836B9E9F62 /* DebtPlanSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11BDD7CA3F6FCCA09057A94E /* DebtPlanSection.swift */; };
 		11B44E8D935B3C2E79BB416F /* PokemonCardsViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD8D0DE151F5637A8ADCBB70 /* PokemonCardsViewModelTests.swift */; };
 		13E34CC2B6A97EC072111332 /* API+Polymarket.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7BBBE9DBF704764A61EDB0 /* API+Polymarket.swift */; };
-		143814710188205B69DA86CB /* terms-of-service.md in Resources */ = {isa = PBXBuildFile; fileRef = B826F754577BE09433765F3F /* terms-of-service.md */; };
 		15BC23F94416CD64B0F99590 /* EnergyViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F010A54AD91567CB1A42C4DD /* EnergyViewModelTests.swift */; };
 		165B5A3A66C4DBE2F9753417 /* PetStateDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5043ACB1718911F675E13C0 /* PetStateDecodingTests.swift */; };
 		173CE273EA515CF593B3A218 /* JourneyStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C984EF3F9DF6DB25768C476 /* JourneyStoreTests.swift */; };
@@ -96,6 +95,7 @@
 		65665956BAF079D33681790E /* NetWorthView+NewAssets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C6F512453CA990E88C3A680 /* NetWorthView+NewAssets.swift */; };
 		6673B3C5A8E68BD5050CB46B /* TruelayerViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5135E8290813E446256D3BE9 /* TruelayerViewModelTests.swift */; };
 		68F3B1C2F214EEB1C4834777 /* ManualAssetsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0209196E95540DCFD82D423E /* ManualAssetsViewModel.swift */; };
+		691F223C2C2457A764764C68 /* MetricKitReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D12831079191F05B78D5A8DF /* MetricKitReporter.swift */; };
 		6A1F24CC68A861DB4DDC55AA /* APITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1930DD45F63912C82A22D91 /* APITests.swift */; };
 		6AF6260EB0FEC81C27CD7C50 /* FarmlandViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE56B9302E8CAD1CAD254B84 /* FarmlandViewModel.swift */; };
 		6C33FA777B4231F8FF23A8E3 /* ActivityTabUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1375043E147E354417174A6B /* ActivityTabUITests.swift */; };
@@ -148,8 +148,11 @@
 		B144F63ADEFC7895856B5CA6 /* Telemetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5A5E4FC4D5FB5C2DE9C278F /* Telemetry.swift */; };
 		B274CEBB7A374784FB7CC04D /* NetWorthViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40DB86D50EF0BFB6578C5ECD /* NetWorthViewModelTests.swift */; };
 		B44D95DEE0C06BBD3D13DFAF /* TradingCardsViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C8A559C5C1CE5E41BC91F87 /* TradingCardsViewModelTests.swift */; };
+		B5040095ED1C6559503D1EF3 /* privacy-policy.md in Resources */ = {isa = PBXBuildFile; fileRef = D80EE4C5BEDE04A5B7162189 /* privacy-policy.md */; };
+		B77353D0A045F5E75FEC60F4 /* MetricKitReporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 637BF879F47589497A50353A /* MetricKitReporterTests.swift */; };
 		B7D9EFF6F2021787259829DD /* API+Performance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AFF7161BAE8ED517D1AF774 /* API+Performance.swift */; };
 		B8D7D8D9697B9BBE836BD25F /* HomePresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A427DF82E499F756734DEDD /* HomePresentationTests.swift */; };
+		B8F35FD5262B17D96AB7111F /* terms-of-service.md in Resources */ = {isa = PBXBuildFile; fileRef = ABA51915B5B098AF11AF3A32 /* terms-of-service.md */; };
 		B92C1891AD7B014EC16251AF /* NetWorthCacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89144771F14F6DB623CA1289 /* NetWorthCacheTests.swift */; };
 		B94BFD52DBEBAB21BB375870 /* PetState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97AA2C381CDE92EFC7F64E9E /* PetState.swift */; };
 		BA10386C352B8DAC9398E018 /* OnboardingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CB0CEE47E4F5415EA77F328 /* OnboardingViewModel.swift */; };
@@ -165,7 +168,6 @@
 		C5237D9417EF0455D0DEA686 /* AccessibilityAudit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D9B50E84AD3F895E3DD9F29 /* AccessibilityAudit.swift */; };
 		C6B61D744A511AC9D6D0F26E /* SubscriptionCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FFDEA6743F2696C59BE5D6F /* SubscriptionCatalogTests.swift */; };
 		C7A55A81C43EDBA5D944D007 /* ConnectionRepairViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BA56E7F280F38672F7A1433 /* ConnectionRepairViewModelTests.swift */; };
-		C866BC81F03A4D640A4BB6F0 /* privacy-policy.md in Resources */ = {isa = PBXBuildFile; fileRef = 3FE8C82FDCFDD2F188CEFF7F /* privacy-policy.md */; };
 		CAD485F77D89010A3CB34AFF /* NetWorthView+TruelayerInlines.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5BF95FA0B5D7E297B7E2A7D /* NetWorthView+TruelayerInlines.swift */; };
 		CDA7E73CD7433393C6802C65 /* DebtsAPIDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B936C88F05ABE381C2A2220 /* DebtsAPIDecodingTests.swift */; };
 		CDB86129ABEA33ADF1CEB421 /* JourneyGoalsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 505D386710394AB9D10F96D8 /* JourneyGoalsSection.swift */; };
@@ -264,7 +266,6 @@
 		3ADE20AFA5A21A6E1F362D14 /* HyperliquidView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HyperliquidView.swift; sourceTree = "<group>"; };
 		3CE5426D3D30059484097B7E /* HyperliquidViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HyperliquidViewModelTests.swift; sourceTree = "<group>"; };
 		3ED0858A053C358E8C049590 /* StoreKitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitService.swift; sourceTree = "<group>"; };
-		3FE8C82FDCFDD2F188CEFF7F /* privacy-policy.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "privacy-policy.md"; sourceTree = "<group>"; };
 		40DB86D50EF0BFB6578C5ECD /* NetWorthViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetWorthViewModelTests.swift; sourceTree = "<group>"; };
 		42FEB4D1AEE92851D560B0C6 /* DiscogsViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscogsViewModelTests.swift; sourceTree = "<group>"; };
 		433F14FDF0ADC4362F16C0F8 /* WealthGroups.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WealthGroups.swift; sourceTree = "<group>"; };
@@ -290,6 +291,7 @@
 		5EEA2D2C5FF478E246824F36 /* TelemetryAppOpenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryAppOpenTests.swift; sourceTree = "<group>"; };
 		618CA9077B0177F449506F80 /* Coiny.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Coiny.entitlements; sourceTree = "<group>"; };
 		62C9B4C739423A364897A88D /* DarkModeRenderingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DarkModeRenderingTests.swift; sourceTree = "<group>"; };
+		637BF879F47589497A50353A /* MetricKitReporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricKitReporterTests.swift; sourceTree = "<group>"; };
 		63D1FEEDB72F10002BAC428F /* API+Telemetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Telemetry.swift"; sourceTree = "<group>"; };
 		65284E3BE19D29FB121805ED /* API+ManualAssets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+ManualAssets.swift"; sourceTree = "<group>"; };
 		658AD9ADB0EEB247C3F10450 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -346,6 +348,7 @@
 		A8A82CF82C3C90B06D0E4C4C /* SpinwheelInlineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpinwheelInlineView.swift; sourceTree = "<group>"; };
 		A96683673F59105FD8C490CB /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		AA7BBBE9DBF704764A61EDB0 /* API+Polymarket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Polymarket.swift"; sourceTree = "<group>"; };
+		ABA51915B5B098AF11AF3A32 /* terms-of-service.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "terms-of-service.md"; sourceTree = "<group>"; };
 		AC280DD9C3B60AF909ACAA9B /* API+Hyperliquid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Hyperliquid.swift"; sourceTree = "<group>"; };
 		AD8D0DE151F5637A8ADCBB70 /* PokemonCardsViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PokemonCardsViewModelTests.swift; sourceTree = "<group>"; };
 		AF3AB3B3C4D15F76BFCDEC7E /* KrakenViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KrakenViewModelTests.swift; sourceTree = "<group>"; };
@@ -357,7 +360,6 @@
 		B6A8E10BF5FCB655B6812F7B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B762515DECDB32F8A1DBCF9E /* CoinsViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoinsViewModelTests.swift; sourceTree = "<group>"; };
 		B8258ECA2A45F98233BFA406 /* API+Consent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Consent.swift"; sourceTree = "<group>"; };
-		B826F754577BE09433765F3F /* terms-of-service.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "terms-of-service.md"; sourceTree = "<group>"; };
 		B8611F52E6CEAC6B7A81804A /* PerformanceViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceViewModelTests.swift; sourceTree = "<group>"; };
 		B9D7A31FF840B964A6B679CA /* JourneyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JourneyUITests.swift; sourceTree = "<group>"; };
 		BD7615652A7C923819AF7530 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -371,11 +373,13 @@
 		C8869EB5676B2B0E725F17C8 /* SpendingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendingView.swift; sourceTree = "<group>"; };
 		CC98E27CF369EBBC46D60901 /* CoinbaseViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoinbaseViewModel.swift; sourceTree = "<group>"; };
 		D00CD861FE07BE54C565DBCF /* HyperliquidViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HyperliquidViewModel.swift; sourceTree = "<group>"; };
+		D12831079191F05B78D5A8DF /* MetricKitReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetricKitReporter.swift; sourceTree = "<group>"; };
 		D1930DD45F63912C82A22D91 /* APITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APITests.swift; sourceTree = "<group>"; };
 		D197F19DECBFCBCEEDD9AC57 /* PetStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetStoreTests.swift; sourceTree = "<group>"; };
 		D1E1ABB91618F1BC3D30B604 /* API+NFT.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+NFT.swift"; sourceTree = "<group>"; };
 		D5D7277AC3859C36E13647F2 /* API+Sessions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Sessions.swift"; sourceTree = "<group>"; };
 		D6996CF5AAF711453DA678D4 /* CoinyUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CoinyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D80EE4C5BEDE04A5B7162189 /* privacy-policy.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "privacy-policy.md"; sourceTree = "<group>"; };
 		D8B77884117CC28B5E4C7E35 /* DebtStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebtStoreTests.swift; sourceTree = "<group>"; };
 		D94E31AD4D4658DE75D54FEC /* KrakenViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KrakenViewModel.swift; sourceTree = "<group>"; };
 		DA4113EC84E1619F48C5A0C6 /* DeclaredAssetsSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeclaredAssetsSync.swift; sourceTree = "<group>"; };
@@ -419,13 +423,13 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		045F90641BB63E1E9CCBB050 /* coiny-main */ = {
+		28AE0D20A2D3E26E00D97D2B /* legal */ = {
 			isa = PBXGroup;
 			children = (
-				B197E2CFA6AEAE5DD7675773 /* docs */,
+				D80EE4C5BEDE04A5B7162189 /* privacy-policy.md */,
+				ABA51915B5B098AF11AF3A32 /* terms-of-service.md */,
 			);
-			name = "coiny-main";
-			path = ..;
+			path = legal;
 			sourceTree = "<group>";
 		};
 		28CC9E634DE0D9542CDC5954 /* Models */ = {
@@ -443,15 +447,6 @@
 				433F14FDF0ADC4362F16C0F8 /* WealthGroups.swift */,
 			);
 			path = Models;
-			sourceTree = "<group>";
-		};
-		332887A2A59C0AD18B61FA68 /* legal */ = {
-			isa = PBXGroup;
-			children = (
-				3FE8C82FDCFDD2F188CEFF7F /* privacy-policy.md */,
-				B826F754577BE09433765F3F /* terms-of-service.md */,
-			);
-			path = legal;
 			sourceTree = "<group>";
 		};
 		41A91EE2A947750721D27258 /* CoinyTests */ = {
@@ -487,6 +482,7 @@
 				E32940F01EB606594AC0587A /* LegalDocumentTests.swift */,
 				823FA6E826200014C4EE9D0A /* ManualAssetsViewModelTests.swift */,
 				B1DFC9EF12AEA9D6D6E2FBDB /* MetalsViewModelTests.swift */,
+				637BF879F47589497A50353A /* MetricKitReporterTests.swift */,
 				FB6FB6123E7E7241E0C3C648 /* NetWorthAPIDecodingTests.swift */,
 				89144771F14F6DB623CA1289 /* NetWorthCacheTests.swift */,
 				A02562E9A11DDC09FE8D194E /* NetWorthFixtures.swift */,
@@ -522,9 +518,9 @@
 			isa = PBXGroup;
 			children = (
 				747A3784E052B22EF61C44BB /* Coiny */,
-				045F90641BB63E1E9CCBB050 /* coiny-main */,
 				41A91EE2A947750721D27258 /* CoinyTests */,
 				78DD757E536102792CD73AA5 /* CoinyUITests */,
+				F57A5F448F1F5D9C80C30E84 /* Tamogatchi */,
 				A401DEDD23F35BF62677864A /* Products */,
 			);
 			sourceTree = "<group>";
@@ -554,6 +550,7 @@
 				DA4113EC84E1619F48C5A0C6 /* DeclaredAssetsSync.swift */,
 				289A0FEEDF04BCEAF19628FE /* HTTPClient.swift */,
 				879471FBA14585F06C8CF171 /* Keychain.swift */,
+				D12831079191F05B78D5A8DF /* MetricKitReporter.swift */,
 				EE76DBB2ADBE7304B1D5E143 /* NetWorthCache.swift */,
 				48BF5EFEEECD2DAE48631E34 /* SessionStore.swift */,
 				3ED0858A053C358E8C049590 /* StoreKitService.swift */,
@@ -664,14 +661,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		B197E2CFA6AEAE5DD7675773 /* docs */ = {
-			isa = PBXGroup;
-			children = (
-				332887A2A59C0AD18B61FA68 /* legal */,
-			);
-			path = docs;
-			sourceTree = "<group>";
-		};
 		C0D9804849DF0D6E168F2CD0 /* Onboarding */ = {
 			isa = PBXGroup;
 			children = (
@@ -690,6 +679,23 @@
 				989AA717FF67991167C2039A /* LegalMarkdown.swift */,
 			);
 			path = Legal;
+			sourceTree = "<group>";
+		};
+		F57A5F448F1F5D9C80C30E84 /* Tamogatchi */ = {
+			isa = PBXGroup;
+			children = (
+				F66DCC0F8D457206A58BB79E /* docs */,
+			);
+			name = Tamogatchi;
+			path = ..;
+			sourceTree = "<group>";
+		};
+		F66DCC0F8D457206A58BB79E /* docs */ = {
+			isa = PBXGroup;
+			children = (
+				28AE0D20A2D3E26E00D97D2B /* legal */,
+			);
+			path = docs;
 			sourceTree = "<group>";
 		};
 		FEF95A507C0370119BC55804 /* ViewModels */ = {
@@ -842,8 +848,8 @@
 			files = (
 				8A8F78B146E48EFF8A58F174 /* Assets.xcassets in Resources */,
 				029C9DE542DE9EFC6C2B74E2 /* PrivacyInfo.xcprivacy in Resources */,
-				C866BC81F03A4D640A4BB6F0 /* privacy-policy.md in Resources */,
-				143814710188205B69DA86CB /* terms-of-service.md in Resources */,
+				B5040095ED1C6559503D1EF3 /* privacy-policy.md in Resources */,
+				B8F35FD5262B17D96AB7111F /* terms-of-service.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -906,6 +912,7 @@
 				548569454F7CE7E7EAAB9FF9 /* LegalDocumentTests.swift in Sources */,
 				FD5440E3088C2A67895BA668 /* ManualAssetsViewModelTests.swift in Sources */,
 				105997B692928D0ED76EB7E3 /* MetalsViewModelTests.swift in Sources */,
+				B77353D0A045F5E75FEC60F4 /* MetricKitReporterTests.swift in Sources */,
 				D70F3EF15FE004DBADCB5C1C /* NetWorthAPIDecodingTests.swift in Sources */,
 				B92C1891AD7B014EC16251AF /* NetWorthCacheTests.swift in Sources */,
 				BC9FEF01C74A25160537DE1D /* NetWorthFixtures.swift in Sources */,
@@ -1006,6 +1013,7 @@
 				68F3B1C2F214EEB1C4834777 /* ManualAssetsViewModel.swift in Sources */,
 				C35276938C6B206366D2DE1C /* MetalsView.swift in Sources */,
 				528DD11017726DEE1734B981 /* MetalsViewModel.swift in Sources */,
+				691F223C2C2457A764764C68 /* MetricKitReporter.swift in Sources */,
 				1A756BB48F918CA93A66FACA /* NetWorthCache.swift in Sources */,
 				F9F2B818A2F1E1602720D3E3 /* NetWorthView+CollectibleInlines.swift in Sources */,
 				0CF24FA4098C346E92794323 /* NetWorthView+Groups.swift in Sources */,

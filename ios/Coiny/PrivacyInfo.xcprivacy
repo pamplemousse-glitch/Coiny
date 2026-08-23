@@ -131,6 +131,55 @@
 				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
 			</array>
 		</dict>
+		<!-- Performance data: MetricKit MXMetricPayload (G3.10), reduced on device
+		     to the bounded scalars of the `device_metrics` analytics event:
+		     launch time, hang time, peak memory, CPU time, scroll hitch ratio
+		     and foreground exit counts, plus the app build and OS major they
+		     belong to. Counts and durations only; the schema
+		     (backend/src/analytics/events.ts) carries no string property at all,
+		     so there is no free-form field. MetricKit is a system framework, so
+		     this introduces no vendor and no DPA (legal/service-providers.md is
+		     unchanged). Linked because it is posted to /api/telemetry against
+		     the signed-in account. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePerformanceData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
+		<!-- Crash data: MetricKit MXDiagnosticPayload (G3.10). Declared now, in
+		     the same change as the performance half, so the three privacy
+		     documents move together exactly once. The subscriber that uploads it
+		     lands in the follow-up PR; an over-declared label is not a rejection
+		     risk, whereas a label that lags the collection is.
+		     What this is, precisely: MXCallStackTree.JSONRepresentation carries
+		     binary image name, binary UUID, text-segment offset, address and
+		     sample count. It is UNSYMBOLICATED, so it holds no function names
+		     and no file paths, and symbolication happens off device against our
+		     own dSYM. The free-form fields on MXCrashDiagnostic
+		     (terminationReason, virtualMemoryRegionInfo and
+		     exceptionReason.composedMessage, which Apple's own header says "may
+		     have some pieces redacted") are dropped client-side rather than
+		     uploaded. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeCrashData</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
 		<!-- Other data types: date of birth, entered for Spinwheel identity verification; passed through, not stored -->
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
