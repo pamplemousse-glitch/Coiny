@@ -112,6 +112,26 @@ export const FORBIDDEN_KEYS = [
   'otp',
 ];
 
+/** A judgement call, recorded here so it is cheap to reverse.
+ *
+ *  `asset` and `raw_asset` are NOT on the list above. Three vendor clients log
+ *  the ticker they could not price (`kraken`, `hyperliquid`), and until
+ *  2026-08-22 they interpolated it into the MESSAGE STRING, which is the one
+ *  place no key-based policy can reach. They now pass it as a key, which is the
+ *  fix that matters: whatever we decide about the value, the mechanism can now
+ *  act on it.
+ *
+ *  The reason it is not censored: the line is a fact about OUR pricing
+ *  coverage, not about a person. "We cannot price ASTR" is something we would
+ *  want logged with zero users, and it is the only way to learn which asset to
+ *  add support for. A ticker is also a small closed vocabulary of public
+ *  market instruments, unlike `institution_name`, which names a relationship.
+ *
+ *  If you disagree, the entire fix is adding `'asset', 'raw_asset'` to
+ *  FORBIDDEN_KEYS above. Nothing else changes, and `tests/logger.test.ts`
+ *  will confirm it. That reversibility is the point of moving it out of the
+ *  string in the first place. */
+
 /** The path, with any query string removed.
  *
  *  Deliberately drops the whole query rather than allowlisting parameter

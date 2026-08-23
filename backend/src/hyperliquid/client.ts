@@ -117,7 +117,7 @@ export async function getHyperliquidSpot(
 
     const price = priceOf(entry.coin);
     if (price === null) {
-      log.warn(`[hyperliquid] no mid for spot token ${entry.coin}, balance excluded`);
+      log.warn({ vendor: 'hyperliquid', asset: entry.coin }, 'no mid for spot token, balance excluded');
       continue;
     }
 
