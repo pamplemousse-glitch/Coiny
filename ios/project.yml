@@ -12,6 +12,20 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.10"
+    # Swift 5 language mode with COMPLETE concurrency checking: the compiler
+    # applies every Swift 6 data-isolation rule and reports each violation as a
+    # warning rather than an error, so the diagnostics arrive without the
+    # language-mode flip changing runtime semantics underneath them.
+    #
+    # Deliberately NOT paired with SWIFT_VERSION 6 in the same change. Flipping
+    # both at once makes an isolation error indistinguishable from any other
+    # Swift 6 source break, and there is no intermediate state to bisect
+    # against. Clean under `complete` is the precondition for that flip, not
+    # the same commit as it.
+    #
+    # The target sets SWIFT_TREAT_WARNINGS_AS_ERRORS: YES, so nothing surfaced
+    # here can be deferred: it fails the build until it is fixed.
+    SWIFT_STRICT_CONCURRENCY: complete
     IPHONEOS_DEPLOYMENT_TARGET: "17.0"
     ENABLE_USER_SCRIPT_SANDBOXING: NO
     # Apple Developer Team ID. Empty means device builds cannot sign at all, which

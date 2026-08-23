@@ -102,14 +102,16 @@ extension DeclarationSheet {
 }
 
 enum DeclaredAssetDates {
-    private static let formatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter
-    }()
-
+    /// `ISO8601FormatStyle` is a Sendable value type; the `ISO8601DateFormatter`
+    /// this replaces is a reference type with mutable `formatOptions`, so a
+    /// shared static instance of it is not concurrency-safe under Swift 6
+    /// isolation checking even though it was only ever configured once.
+    ///
+    /// The wire format is unchanged: `.iso8601` and `.withInternetDateTime`
+    /// were verified to produce byte-identical strings, including the `Z`
+    /// suffix the backend's `z.iso.datetime({ offset: true })` requires.
     static func iso(_ date: Date) -> String {
-        formatter.string(from: date)
+        date.formatted(.iso8601)
     }
 }
 
