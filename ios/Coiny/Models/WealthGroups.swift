@@ -78,10 +78,24 @@ enum WealthClass: String, CaseIterable, Identifiable, Sendable {
         case .defi: return "DeFi"
         case .chainWallets: return "On-chain wallets"
         case .kraken: return "Kraken"
-        case .realEstate: return "Real estate"
+        // Localized because the term genuinely differs by market. The brand
+        // names in this switch deliberately are NOT: Coinbase is Coinbase in
+        // every locale, and running a trademark through a translation file
+        // invites someone to "translate" it.
+        case .realEstate:
+            return String(
+                localized: "wealthClass.realEstate",
+                defaultValue: "Real estate",
+                comment: "Residential or commercial property. en-GB says 'Property'."
+            )
         case .vehicles: return "Vehicles"
         case .metals: return "Precious metals"
-        case .sneakers: return "Sneakers"
+        case .sneakers:
+            return String(
+                localized: "wealthClass.sneakers",
+                defaultValue: "Sneakers",
+                comment: "Collectible footwear. en-GB says 'Trainers'."
+            )
         case .pokemonCards: return "Pokemon cards"
         case .tradingCards: return "Trading cards"
         case .coins: return "Graded coins"
