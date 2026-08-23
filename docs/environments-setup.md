@@ -18,13 +18,34 @@
 > | Staging | `coiny-backend` (exists) | `fly.toml`, the default | Live, sandbox keys, Neon `staging` branch |
 > | Production | `coiny-api` (name is a placeholder) | `fly.production.toml` | **Does not exist yet, deliberately** |
 >
-> So: **no staging app needs creating.** Wherever a step below says
-> `coiny-backend-stage`, it means the existing `coiny-backend`. Phase D's
-> `fly apps create` is not needed and Phase I's "wipe and promote" is replaced
-> by creating the production app fresh, with real keys, when they arrive.
+> So: **no staging app needs creating.** Phase D's `fly apps create` is not
+> needed, and Phase I's "wipe and promote" is replaced by creating the
+> production app fresh, with real keys, when they arrive.
 >
-> Everything else here (the secret inventory, the GitHub Environments, the
-> verification checklist, the drift detection) is unchanged and correct.
+> **SECOND CORRECTION, 2026-08-22.** The paragraph that used to sit here said
+> "everything else in this file is unchanged and correct". **That was wrong,
+> and saying it is what let the body rot for eight days**, because it told
+> every reader that the phases below had been checked when only the header
+> had. `handoff-2026-08-21.md` section 0 listed this file as a live trap for
+> that reason.
+>
+> The body has now been walked line by line against `fly apps list`, the repo's
+> two toml files and `.github/workflows/backend-deploy.yml`. What was actually
+> wrong:
+>
+> | Where | Was | Consequence if followed |
+> |---|---|---|
+> | Identifiers table | production = `coiny-backend` | Contradicted this header three lines below it |
+> | Phase B | tokens created for the wrong apps, and stored as `FLY_API_TOKEN` | Deploy fails: the workflow reads `FLY_API_TOKEN_STAGING` / `_PRODUCTION` |
+> | Phase D | create `coiny-backend-stage`, add `fly.staging.toml` | An app and a file that must not exist |
+> | Phase E | secrets onto `coiny-backend-stage` | Command fails, no such app |
+> | Phase F/G | verify and cert `coiny-backend-stage`; staging and production configs swapped | Certs on the wrong app; production deployed with the staging config |
+> | **Phase I step 3** | **production Plaid secrets onto `coiny-backend`, then flip `fly.toml` to `APP_ENV = 'production'`** | **Converts staging into production. The exact mislabelling this header says was fixed** |
+> | **Phase I step 2** | **wipe drops only `public`** | **Leaves `drizzle.__drizzle_migrations`, so the migrator skips everything and production comes up with no `users` table, silently** |
+> | Phase I | nothing created `coiny-api` | The app every production step targets never existed |
+>
+> Do not re-add a sentence asserting the rest of a document is correct unless
+> you have just checked the rest of the document.
 
 The "how" companion to `docs/environments-research.md` (the "why"). Work the
 phases in order; each step is labelled **[Founder]** (dashboard or CLI work
@@ -42,9 +63,8 @@ Known identifiers used throughout (safe to write down, none are secrets):
 | Thing | Value |
 |---|---|
 | GitHub repo | `pamplemousse-glitch/Coiny` (public) |
-| Fly app, production | `coiny-backend` (region `iad`) |
-| Fly app, staging (ALREADY EXISTS) | `coiny-backend` |
-| Fly app, production (do not create yet) | `coiny-api` |
+| Fly app, staging (EXISTS, this is the only one) | `coiny-backend` (region `iad`), config `fly.toml` |
+| Fly app, production (DOES NOT EXIST YET) | `coiny-api`, config `fly.production.toml` |
 | Neon project | `Coiny`, id `noisy-bonus-65551609`, aws-us-east-1, Postgres 17 |
 | Neon branch, production | `production` (default; currently NOT protected) |
 | Neon branch, staging (to create) | `staging` |
@@ -246,17 +266,21 @@ in three places (password manager, Keychain, Fly) and nothing else does.
    does not exist until Phase D; run the staging one after D1.
 
    ```bash
-   fly tokens create deploy -a coiny-backend --name gh-production --expiry 8760h
-   fly tokens create deploy -a coiny-backend-stage --name gh-staging --expiry 8760h
+   fly tokens create deploy -a coiny-api --name gh-production --expiry 8760h
+   fly tokens create deploy -a coiny-backend --name gh-staging --expiry 8760h
    ```
+
+   > **Corrected 2026-08-22.** The app names were the wrong way round here:
+   > `coiny-backend` is STAGING and `coiny-api` is production. The production
+   > token cannot be created until Phase I step 1 creates `coiny-api`.
 
    Each prints a token once. Pipe each directly into GitHub without echoing:
 
    ```bash
-   fly tokens create deploy -a coiny-backend-stage --name gh-staging --expiry 8760h \
-     | gh secret set FLY_API_TOKEN --env staging --repo pamplemousse-glitch/Coiny
-   fly tokens create deploy -a coiny-backend --name gh-production --expiry 8760h \
-     | gh secret set FLY_API_TOKEN --env production --repo pamplemousse-glitch/Coiny
+   fly tokens create deploy -a coiny-backend --name gh-staging --expiry 8760h \
+     | gh secret set FLY_API_TOKEN_STAGING --env staging --repo pamplemousse-glitch/Coiny
+   fly tokens create deploy -a coiny-api --name gh-production --expiry 8760h \
+     | gh secret set FLY_API_TOKEN_PRODUCTION --env production --repo pamplemousse-glitch/Coiny
    ```
 
    The 1-year expiry is a rotation forcing function; calendar it.
@@ -313,15 +337,30 @@ floor) when either cap approaches. Rollback: `neon branches delete staging`.
 
 ## 5. Phase D: Fly staging app and the repo changes
 
-1. **[Founder] Create the app:**
+> **DONE, and not the way this phase described.** Both steps below are
+> obsolete and are kept struck through only so a reader who remembers them
+> knows they were considered and dropped, rather than wondering whether they
+> were forgotten.
+>
+> There is no `coiny-backend-stage` and there must not be: `coiny-backend`
+> IS staging. There is no `fly.staging.toml` and there must not be: the
+> default `fly.toml` is the staging config, which is why a bare `fly deploy`
+> is safe. Verified against `fly apps list` and the repo on 2026-08-22.
+>
+> | File | App | `APP_ENV` | `PLAID_ENV` |
+> |---|---|---|---|
+> | `fly.toml` (the default) | `coiny-backend` | `staging` | `sandbox` |
+> | `fly.production.toml` | `coiny-api` | `production` | `production` |
+
+1. ~~**[Founder] Create the app:**~~
 
    ```bash
-   fly apps create coiny-backend-stage --org personal
+   # OBSOLETE. coiny-backend already exists and is staging.
+   # fly apps create coiny-backend-stage --org personal
    ```
-2. **[Agent] Add `fly.staging.toml`** at the repo root, next to `fly.toml`
-   (which stays production and keeps its committed name so
-   `flyctl deploy` with no flags remains production-correct). Contents
-   mirror `fly.toml` with exactly these differences:
+2. ~~**[Agent] Add `fly.staging.toml`**~~ OBSOLETE. `fly.toml` is the staging
+   config. `fly.production.toml` is the production one, and it already exists.
+   The original text follows for reference only:
 
    ```toml
    app = 'coiny-backend-stage'
@@ -356,11 +395,11 @@ floor) when either cap approaches. Rollback: `neon branches delete staging`.
    and SHA-pinned actions:
 
    - `deploy-staging`: `environment: staging`, runs
-     `flyctl deploy --config fly.staging.toml --remote-only`, automatic.
+     `flyctl deploy --config fly.toml --remote-only`, automatic.
    - `deploy-production`: `needs: deploy-staging`,
      `environment: production` (which enforces the required-reviewer gate
      before the job or its secrets run), runs
-     `flyctl deploy --remote-only`. Every merge to main thus offers a
+     `flyctl deploy --config fly.production.toml --remote-only`. Every merge to main thus offers a
      production deploy that the founder approves in the Actions UI when
      ready and dismisses otherwise; `workflow_dispatch` stays as the manual
      path. **DECISION** (approve-per-merge versus tag-triggered releases):
@@ -369,8 +408,8 @@ floor) when either cap approaches. Rollback: `neon branches delete staging`.
 6. **[Founder] DNS and certs** (after Phase 0 domain purchase):
 
    ```bash
-   fly certs add api.coiny.app -a coiny-backend
-   fly certs add api.stage.coiny.app -a coiny-backend-stage
+   fly certs add api.coiny.app -a coiny-api          # after Phase I step 1
+   fly certs add api.stage.coiny.app -a coiny-backend
    ```
 
    Each prints the CNAME/AAAA records to add at the registrar; then
@@ -379,10 +418,10 @@ floor) when either cap approaches. Rollback: `neon branches delete staging`.
    staging webhook URL in the Plaid dashboard (Developers > Webhooks) for
    the sandbox environment.
 
-Rollback for this phase: `fly apps destroy coiny-backend-stage` and revert
-the repo commits; production's app and workflow behavior are unchanged until
-step 5 merges, and even then `workflow_dispatch` still deploys production
-exactly as today.
+Rollback for this phase: revert the repo commits. There is no app to destroy,
+because this phase no longer creates one. **Never `fly apps destroy
+coiny-backend`**: it is the live staging app, and the original wording told
+you to destroy the wrong thing under its old name.
 
 ---
 
@@ -394,7 +433,7 @@ exactly as today.
 
    ```bash
    source bin/load-secrets.sh
-   fly secrets set -a coiny-backend-stage \
+   fly secrets set -a coiny-backend \
      PLAID_CLIENT_ID="$PLAID_CLIENT_ID" \
      PLAID_SECRET="$PLAID_SECRET" \
      APNS_KEY="$APNS_KEY" APNS_KEY_ID="$APNS_KEY_ID" APNS_TEAM_ID="$APNS_TEAM_ID" \
@@ -405,15 +444,15 @@ exactly as today.
 2. **[Founder] Staging-specific values:**
 
    ```bash
-   fly secrets set -a coiny-backend-stage DATABASE_URL="$STAGING_DATABASE_URL"
-   fly secrets set -a coiny-backend-stage DATA_ENCRYPTION_KEY="$(openssl rand -hex 32)"
+   fly secrets set -a coiny-backend DATABASE_URL="$STAGING_DATABASE_URL"
+   fly secrets set -a coiny-backend DATA_ENCRYPTION_KEY="$(openssl rand -hex 32)"
    ```
 
    The staging encryption key is generated fresh and intentionally NOT
    archived: losing it merely forces staging re-links, and not archiving it
    guarantees it can never be mistaken for the production key.
 3. **[Founder] First staging deploy:**
-   `fly deploy --config fly.staging.toml --remote-only` from the repo root
+   `fly deploy --remote-only   # fly.toml IS the staging config` from the repo root
    (or merge any backend PR and let the new workflow do it).
 
 Rollback: `fly secrets unset`/`set` are idempotent; nothing else consumes
@@ -427,11 +466,11 @@ All **[Founder]**, one sitting:
 
 1. `curl -s https://api.stage.coiny.app/health` returns 200 and reports
    `APP_ENV=staging` (after Phase D4).
-2. Scale-to-zero behaves: `fly machine list -a coiny-backend-stage` shows
+2. Scale-to-zero behaves: `fly machine list -a coiny-backend` shows
    the machine stopped after idle; the curl above cold-starts it.
-3. Migrations ran at release, not boot: `fly releases -a coiny-backend-stage`
+3. Migrations ran at release, not boot: `fly releases -a coiny-backend`
    shows the release command succeeded;
-   `fly logs -a coiny-backend-stage` shows no migration output at server
+   `fly logs -a coiny-backend` shows no migration output at server
    start.
 4. **The two-databases proof.** Create a marker in staging, prove it is
    invisible from production:
@@ -450,7 +489,7 @@ All **[Founder]**, one sitting:
 5. End-to-end sandbox flow: sign in from a Debug build pointed at staging,
    link with Plaid sandbox (`user_good` / `pass_good`), see the number
    render, and confirm the Plaid sandbox webhook arrives in
-   `fly logs -a coiny-backend-stage` (fire one from Plaid Dashboard >
+   `fly logs -a coiny-backend` (fire one from Plaid Dashboard >
    Developers > Sandbox > send test webhook if needed).
 
 ---
@@ -520,46 +559,109 @@ the oldest client talking to it.
 
 ## 10. Phase I: production cutover (gated on Phase 0 approvals)
 
+> **REWRITTEN 2026-08-22.** Every step below used to name `coiny-backend`,
+> because this runbook was written when that app was going to be production.
+> The header correction at the top of the file changed that decision and this
+> phase was never updated, so the two contradicted each other inside one file.
+> Three of the steps were actively dangerous:
+>
+> - step 3 set **production Plaid secrets on the staging app**, and then told
+>   you to edit `fly.toml` so `APP_ENV = 'production'`, which converts staging
+>   INTO production. That is the exact mislabelling this file's own header says
+>   was fixed.
+> - step 2's wipe dropped only the `public` schema, leaving
+>   `drizzle.__drizzle_migrations` intact. The migrator would then see history
+>   it had already applied, skip 0000 upward, and bring production up **with no
+>   `users` table**, silently. `handoff-2026-08-21.md` section 2 flagged this
+>   and it was never carried back here.
+> - step 5's rollback pointed `fly releases` at the wrong app.
+>
+> **Creating `coiny-api` is now step 1**, because it did not exist and no step
+> created it.
+
 Ordered so nothing is ever live-and-broken; each step's rollback given.
 Precondition: Phases A to H done, staging green for at least one real week
 of use, Plaid production access granted, App ID registered.
 
-1. **[Founder] Generate and archive the production
+**Read `APP_ENV`, never `PLAID_ENV`, to decide what an environment is.**
+`fly.toml` ships `PLAID_ENV = 'sandbox'` on staging and production will run
+sandbox Plaid until the production credentials clear review, so `PLAID_ENV`
+says nothing about whether a process is serving real users.
+
+1. **[Founder] Create the production app.** It does not exist; nothing
+   before this step creates it, and every later step targets it by name.
+
+   ```bash
+   fly apps create coiny-api --org personal
+   ```
+
+   Rollback: `fly apps destroy coiny-api`, which is safe while it holds no
+   secrets and serves nothing.
+2. **[Founder] Generate and archive the production
    `DATA_ENCRYPTION_KEY`** before anything else: `openssl rand -hex 32 |
    pbcopy`, paste into the password manager entry, then into Keychain via
    interactive `security add-generic-password -s coiny-data-encryption-key-prod -a coiny -w`
    (interactive `-w` per house rule), then clear the clipboard. It must
    exist in the archive before Fly ever sees it (R-20.3). Rollback: n/a,
    nothing consumes it yet.
-2. **[Founder] Wipe the production database.** It holds only sandbox-era
-   test rows, which the new encryption key would render unreadable anyway:
+3. **[Founder] Wipe the production database.** The Neon `production` branch
+   is still the original May-2026 dev branch: 1 user, 3 `plaid_items` (two
+   holding plaintext access tokens), 67 transactions, and 17 migrations
+   behind. The new encryption key would render those rows unreadable anyway.
+
+   **DROP BOTH SCHEMAS.** Dropping only `public`, which is what this step
+   used to say, leaves `drizzle.__drizzle_migrations` behind. The migrator
+   reads that table, believes every migration has already been applied, skips
+   0000 upward, and production comes up **with no `users` table and no
+   error**. This is the silent-skip failure `tests/migration-journal.test.ts`
+   exists for, arriving through the back door.
 
    ```bash
    neon psql production --project-id noisy-bonus-65551609 \
-     -- -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+     -- -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;
+            DROP SCHEMA IF EXISTS drizzle CASCADE;"
    ```
+
+   Verify before continuing: the branch has no `drizzle` schema and no
+   `public` tables. If either survives, stop.
 
    Rollback: Neon instant restore within the history window (6 hours on
    Free, [Neon backups](https://neon.com/docs/manage/backups)), so schedule
    this step with daylight ahead of it.
-3. **[Founder] Set production Fly secrets** per the Phase 2 table: real
-   `PLAID_SECRET`, the new `DATA_ENCRYPTION_KEY` (from Keychain, not
-   clipboard), production `DATABASE_URL`, TrueLayer live pair when granted,
-   Spinwheel prod key when granted; `fly secrets set -a coiny-backend ...`
-   using the no-echo pattern of Phase E. Update `fly.toml` `[env]`:
-   `PLAID_ENV = 'production'`, `APP_ENV = 'production'`, webhook URL to
-   `api.coiny.app` ([Agent] commits the toml change through a PR).
-   Rollback: reset the secrets to the sandbox set; nothing is serving users
-   yet.
-4. **[Founder] Register the production Plaid webhook URL** in the Plaid
+4. **[Founder] Set production Fly secrets on `coiny-api`,** per the Phase 2
+   table: real `PLAID_SECRET`, the new `DATA_ENCRYPTION_KEY` (from Keychain,
+   not clipboard), production `DATABASE_URL`, `SENTRY_DSN`, TrueLayer live
+   pair when granted, Spinwheel prod key when granted.
+
+   ```bash
+   fly secrets set -a coiny-api ...   # no-echo pattern of Phase E
+   ```
+
+   **Do not edit `fly.toml`.** It is the staging config and must keep
+   `APP_ENV = 'staging'`. Production's environment already lives in
+   `fly.production.toml`, which ships `APP_ENV = 'production'` and needs no
+   change. The old instruction to flip `fly.toml` to production would have
+   converted staging into production while leaving nothing rehearsing
+   releases.
+
+   Rollback: `fly secrets unset -a coiny-api`; nothing is serving users yet.
+5. **[Founder] Register the production Plaid webhook URL** in the Plaid
    dashboard and confirm OAuth institution registration is complete.
-5. **[Founder] Deploy through the gate:** merge the toml PR, approve the
-   `production` job in the Actions UI. The release command migrates the
-   empty database from 0000 upward, which is itself the final end-to-end
-   proof of journal integrity. Rollback: `fly releases -a coiny-backend` +
-   `fly deploy -i <previous-image>`; the DB can be re-wiped freely until
-   the first real user exists.
-6. **[Founder] Production verification checklist:** `/health` 200 with
+6. **[Founder] Deploy through the gate:** approve the `production` job in the
+   Actions UI, which deploys `fly.production.toml` to `coiny-api`. Note that
+   `FLY_API_TOKEN_PRODUCTION` does not exist yet: `backend-deploy.yml` reads
+   it, and the `production` GitHub Environment exists with a required
+   reviewer, but the token has never been created. Create it before this
+   step or the job fails at authentication.
+
+   The release command migrates the empty database from 0000 upward, which is
+   itself the final end-to-end proof of journal integrity, and is why step 3
+   dropping BOTH schemas matters.
+
+   Rollback: `fly releases -a coiny-api` + `fly deploy -i <previous-image>
+   -c fly.production.toml`; the DB can be re-wiped freely until the first
+   real user exists.
+7. **[Founder] Production verification checklist:** `/health` 200 with
    `APP_ENV=production`; the Phase F two-databases proof re-run (the marker
    still exists only in staging); a real bank link with the founder's own
    credentials as user zero; a Plaid production webhook observed in logs;
@@ -568,7 +670,7 @@ of use, Plaid production access granted, App ID registered.
    StoreKit notifications go to the STAGING URL by Phase G4's mapping, so
    verify entitlement grant end-to-end on staging and verify production's
    notification URL simply returns 200 to Apple's initial ping.
-7. **[Founder] Ship:** archive the Release build, submit. From this moment
+8. **[Founder] Ship:** archive the Release build, submit. From this moment
    the §4 rule is in force: nothing flows from `production` downward, the
    staging branch is never reset, and every migration reaching production
    has passed the rehearsal workflow first.

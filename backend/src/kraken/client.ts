@@ -111,7 +111,7 @@ export async function getTotalUsd(
       try {
         total += await convertToUsd(amount, asset);
       } catch {
-        log.warn(`[kraken] fx lookup failed for ${asset}, balance excluded`);
+        log.warn({ vendor: 'kraken', asset }, 'fx lookup failed, balance excluded');
       }
       continue;
     }
@@ -120,7 +120,7 @@ export async function getTotalUsd(
       const price = await getSpotPrice(asset);
       total += amount * price;
     } catch {
-      log.warn(`[kraken] skipping unknown asset ${rawAsset} (normalized: ${asset})`);
+      log.warn({ vendor: 'kraken', asset, raw_asset: rawAsset }, 'skipping unpriceable asset');
     }
   }
 
