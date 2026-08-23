@@ -6,6 +6,7 @@ import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { nftWallets } from '../db/schema.js';
 import { getNftPortfolioValue } from '../nft/client.js';
+import { recordSyncFailure, successPatch } from '../store/connection-health.js';
 import { SYNC_LIMIT } from './rate-limits.js';
 
 const AddWalletBodySchema = z.object({
@@ -76,14 +77,25 @@ export function registerNftApi(app: FastifyInstance): void {
 
     for (const row of rows) {
       try {
-        const valueUsd = await getNftPortfolioValue(row.address, config.ALCHEMY_API_KEY, ethPriceUsd);
-        await db()
-          .update(nftWallets)
-          .set({ lastValueUsd: valueUsd.toString(), lastSyncedAt: now })
-          .where(and(eq(nftWallets.userId, userId), eq(nftWallets.id, row.id)));
-        updated++;
+        try {
+          const valueUsd = await getNftPortfolioValue(row.address, config.ALCHEMY_API_KEY, ethPriceUsd);
+          await db()
+            .update(nftWallets)
+            .set({ lastValueUsd: valueUsd.toString(), ...successPatch(now) })
+            .where(and(eq(nftWallets.userId, userId), eq(nftWallets.id, row.id)));
+          updated++;
+        } catch (err) {
+          req.log.warn({ userId, address: row.address, err }, 'nft wallet sync failed — skipping');
+        }
       } catch (err) {
-        req.log.warn({ userId, address: row.address, err }, 'nft wallet sync failed — skipping');
+        // Per-row, so the broken address is nameable rather than the whole class.
+        await recordSyncFailure(
+          nftWallets,
+          and(eq(nftWallets.userId, userId), eq(nftWallets.id, row.id)),
+          row.consecutiveFailures,
+          err,
+        );
+        throw err;
       }
     }
 

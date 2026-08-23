@@ -53,7 +53,7 @@ import {
 } from '../goals/snapshot.js';
 import type { SpinwheelDebt } from '../spinwheel/client.js';
 import { getClassCache, getPlaidAccountBalances } from '../store/asset-cache.js';
-import { deriveConnectionStatus, isUserActionable } from '../store/connection-health.js';
+import { type ConnectionHealthRow, deriveConnectionStatus, isUserActionable } from '../store/connection-health.js';
 import { declaredNetUsd, listDeclaredAssets, oldestRefreshedAt } from '../store/declared-assets.js';
 import { getCachedLiabilities } from '../store/plaid-liabilities.js';
 import { getRecentOutflows } from '../store/transactions.js';
@@ -836,18 +836,42 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
   // each is wired it appears in this list with no further change, which is the
   // reason the shape is provider-agnostic.
   const connectionHealth: ConnectionHealthEntry[] = [];
-  for (const wallet of zerionRows) {
-    const status = deriveConnectionStatus(wallet);
-    if (status === 'ok') continue;
+
+  /** Push one connection if it is NOT healthy. `label` is what the user reads:
+   *  their own name for the thing where they gave one, else a shortened
+   *  address, else the provider's name. Never a full wallet address, which is a
+   *  permanent global identifier (see truncateAddress). */
+  const pushIfUnhealthy = (provider: string, key: string | number, label: string, row: ConnectionHealthRow): void => {
+    const status = deriveConnectionStatus(row);
+    if (status === 'ok') return;
     connectionHealth.push({
-      id: `zerion:${wallet.id}`,
-      provider: 'zerion',
-      label: wallet.label ?? truncateAddress(wallet.address),
+      id: `${provider}:${key}`,
+      provider,
+      label,
       status,
       actionable: isUserActionable(status),
-      lastSyncedAt: wallet.lastSyncedAt ? wallet.lastSyncedAt.toISOString() : null,
+      lastSyncedAt: row.lastSyncedAt ? row.lastSyncedAt.toISOString() : null,
     });
-  }
+  };
+
+  // Many-per-user connections. This grain is what made gap 2 unanswerable: a
+  // class could only ever say "crypto is degraded", never which of eleven
+  // wallets stopped working.
+  for (const w of zerionRows) pushIfUnhealthy('zerion', w.id, w.label ?? truncateAddress(w.address), w);
+  for (const w of chainRows) pushIfUnhealthy('chain', w.id, w.label ?? `${w.chain} ${truncateAddress(w.address)}`, w);
+  for (const w of nftRows) pushIfUnhealthy('nft', w.id, truncateAddress(w.address), w);
+  for (const w of hlRows) pushIfUnhealthy('hyperliquid', w.id, truncateAddress(w.address), w);
+  for (const w of pmRows) pushIfUnhealthy('polymarket', w.id, truncateAddress(w.walletAddress), w);
+
+  // One-per-user connections. Fewer rows, same question: a credential can lapse
+  // on exactly one of these while every other is fine, and only the user can
+  // fix that one.
+  if (krakenRow) pushIfUnhealthy('kraken', 'me', 'Kraken', krakenRow);
+  if (alpacaRow) pushIfUnhealthy('alpaca', 'me', 'Alpaca', alpacaRow);
+  if (ynabRow) pushIfUnhealthy('ynab', 'me', 'YNAB', ynabRow);
+  if (discogsRow) pushIfUnhealthy('discogs', 'me', 'Discogs', discogsRow);
+  if (kalshiRow) pushIfUnhealthy('kalshi', 'me', 'Kalshi', kalshiRow);
+  if (tlRow) pushIfUnhealthy('truelayer', 'me', 'TrueLayer', tlRow);
 
   // --- Emergency fund coverage (C4) ------------------------------------------
   let liquidCashMonths: number | null = null;

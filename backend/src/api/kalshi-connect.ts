@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { kalshiConnections } from '../db/schema.js';
 import { getBalance, getPortfolioBalance, getPositions } from '../kalshi/client.js';
+import { recordSyncFailure, successPatch } from '../store/connection-health.js';
 import { decryptString, encryptString } from '../util/crypto.js';
 import { SYNC_LIMIT } from './rate-limits.js';
 
@@ -67,15 +68,24 @@ export function registerKalshiConnectApi(app: FastifyInstance): void {
     const [conn] = await db().select().from(kalshiConnections).where(eq(kalshiConnections.userId, userId));
     if (!conn) return reply.status(404).send({ error: 'not connected' });
 
-    const portfolioUsd = await getPortfolioBalance(conn.keyId, decryptString(conn.privateKeyBase64));
+    // Per-connection health (survey gap 2). The catch RETHROWS: the client
+    // still gets its 500 and plugins/error-handler.ts still reports it. This
+    // only adds the durable fact of WHICH connection failed, so the next
+    // GET /api/net-worth can name it instead of saying the class is degraded.
+    try {
+      const portfolioUsd = await getPortfolioBalance(conn.keyId, decryptString(conn.privateKeyBase64));
 
-    await db()
-      .update(kalshiConnections)
-      .set({ lastPortfolioUsd: portfolioUsd.toString(), lastSyncedAt: new Date() })
-      .where(eq(kalshiConnections.userId, userId));
+      await db()
+        .update(kalshiConnections)
+        .set({ lastPortfolioUsd: portfolioUsd.toString(), ...successPatch() })
+        .where(eq(kalshiConnections.userId, userId));
 
-    req.log.info({ userId }, 'kalshi sync complete');
-    return { portfolioUsd };
+      req.log.info({ userId }, 'kalshi sync complete');
+      return { portfolioUsd };
+    } catch (err) {
+      await recordSyncFailure(kalshiConnections, eq(kalshiConnections.userId, userId), conn.consecutiveFailures, err);
+      throw err;
+    }
   });
 
   // GET /api/kalshi/positions — the open contracts behind the portfolio value

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { discogsConnections, discogsPending } from '../db/schema.js';
 import { getAccessToken, getRequestToken, getUsername, syncCollection } from '../discogs/client.js';
+import { recordSyncFailure, successPatch } from '../store/connection-health.js';
 import { decryptString, encryptString } from '../util/crypto.js';
 import { SYNC_LIMIT } from './rate-limits.js';
 
@@ -96,19 +97,28 @@ export function registerDiscogsApi(app: FastifyInstance): void {
     const [conn] = await db().select().from(discogsConnections).where(eq(discogsConnections.userId, userId));
     if (!conn) return reply.status(404).send({ error: 'not connected' });
 
-    const { totalUsd, releaseCount, pricedCount } = await syncCollection(
-      conn.username,
-      decryptString(conn.accessToken),
-      decryptString(conn.accessTokenSecret),
-    );
+    // Per-connection health (survey gap 2). The catch RETHROWS: the client
+    // still gets its 500 and plugins/error-handler.ts still reports it. This
+    // only adds the durable fact of WHICH connection failed, so the next
+    // GET /api/net-worth can name it instead of saying the class is degraded.
+    try {
+      const { totalUsd, releaseCount, pricedCount } = await syncCollection(
+        conn.username,
+        decryptString(conn.accessToken),
+        decryptString(conn.accessTokenSecret),
+      );
 
-    await db()
-      .update(discogsConnections)
-      .set({ lastCollectionUsd: totalUsd.toString(), lastSyncedAt: new Date() })
-      .where(eq(discogsConnections.userId, userId));
+      await db()
+        .update(discogsConnections)
+        .set({ lastCollectionUsd: totalUsd.toString(), ...successPatch() })
+        .where(eq(discogsConnections.userId, userId));
 
-    req.log.info({ userId, releaseCount, pricedCount }, 'discogs sync complete');
-    return { totalUsd, releaseCount, pricedCount };
+      req.log.info({ userId, releaseCount, pricedCount }, 'discogs sync complete');
+      return { totalUsd, releaseCount, pricedCount };
+    } catch (err) {
+      await recordSyncFailure(discogsConnections, eq(discogsConnections.userId, userId), conn.consecutiveFailures, err);
+      throw err;
+    }
   });
 
   // DELETE /api/discogs/connect — remove connection + pending

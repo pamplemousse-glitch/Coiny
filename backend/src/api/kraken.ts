@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { krakenConnections } from '../db/schema.js';
 import { getBalance, getTotalUsd } from '../kraken/client.js';
+import { recordSyncFailure, successPatch } from '../store/connection-health.js';
 import { decryptString, encryptString } from '../util/crypto.js';
 import { SYNC_LIMIT } from './rate-limits.js';
 
@@ -54,28 +55,42 @@ export function registerKrakenApi(app: FastifyInstance): void {
     const [connection] = await db().select().from(krakenConnections).where(eq(krakenConnections.userId, userId));
     if (!connection) return reply.status(404).send({ error: 'not connected' });
 
-    // Import Coinbase spot prices as the price oracle
-    const { getSpotPrices } = await import('../coinbase/client.js');
-    const getSpotPrice = async (asset: string): Promise<number> => {
-      const prices = await getSpotPrices([asset]);
-      const price = prices.get(asset);
-      if (price === undefined) throw new Error(`no price for ${asset}`);
-      return price;
-    };
+    // Per-connection health (survey gap 2). The catch RETHROWS: the client
+    // still gets its 500 and plugins/error-handler.ts still reports it. This
+    // only adds the durable fact of WHICH connection failed, so the next
+    // GET /api/net-worth can name it instead of saying the class is degraded.
+    try {
+      // Import Coinbase spot prices as the price oracle
+      const { getSpotPrices } = await import('../coinbase/client.js');
+      const getSpotPrice = async (asset: string): Promise<number> => {
+        const prices = await getSpotPrices([asset]);
+        const price = prices.get(asset);
+        if (price === undefined) throw new Error(`no price for ${asset}`);
+        return price;
+      };
 
-    const total = await getTotalUsd(
-      decryptString(connection.apiKey),
-      decryptString(connection.privateKey),
-      getSpotPrice,
-    );
+      const total = await getTotalUsd(
+        decryptString(connection.apiKey),
+        decryptString(connection.privateKey),
+        getSpotPrice,
+      );
 
-    await db()
-      .update(krakenConnections)
-      .set({ lastTotalUsd: total.toString(), lastSyncedAt: new Date() })
-      .where(eq(krakenConnections.userId, userId));
+      await db()
+        .update(krakenConnections)
+        .set({ lastTotalUsd: total.toString(), ...successPatch() })
+        .where(eq(krakenConnections.userId, userId));
 
-    req.log.info({ userId }, 'kraken sync complete');
-    return { total };
+      req.log.info({ userId }, 'kraken sync complete');
+      return { total };
+    } catch (err) {
+      await recordSyncFailure(
+        krakenConnections,
+        eq(krakenConnections.userId, userId),
+        connection.consecutiveFailures,
+        err,
+      );
+      throw err;
+    }
   });
 
   // DELETE /api/kraken/connect — remove connection

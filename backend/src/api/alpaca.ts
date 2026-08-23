@@ -5,6 +5,7 @@ import type { AlpacaEnv } from '../alpaca/client.js';
 import { AlpacaError, getEquityUsd, getPositions } from '../alpaca/client.js';
 import { db } from '../db/client.js';
 import { alpacaConnections } from '../db/schema.js';
+import { recordSyncFailure, successPatch } from '../store/connection-health.js';
 import { decryptString, encryptString } from '../util/crypto.js';
 import { SYNC_LIMIT } from './rate-limits.js';
 
@@ -72,12 +73,18 @@ export function registerAlpacaApi(app: FastifyInstance): void {
 
       await db()
         .update(alpacaConnections)
-        .set({ lastEquityUsd: equity.toString(), lastSyncedAt: new Date() })
+        .set({ lastEquityUsd: equity.toString(), ...successPatch() })
         .where(eq(alpacaConnections.userId, userId));
 
       req.log.info({ userId, equity }, 'alpaca sync complete');
       return { equity };
     } catch (err) {
+      // Recorded before the 401 branch, not after: a rejected API key is the
+      // single most user-actionable failure this route has, and it is exactly
+      // the case `deriveConnectionStatus` maps to `reauth_required` and offers
+      // a Reconnect button for. Returning 401 to the client is not a reason to
+      // forget it happened.
+      await recordSyncFailure(alpacaConnections, eq(alpacaConnections.userId, userId), conn.consecutiveFailures, err);
       if (err instanceof AlpacaError && (err.status === 401 || err.status === 403)) {
         return reply.status(401).send({ error: 'Invalid Alpaca API credentials' });
       }

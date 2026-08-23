@@ -8,7 +8,7 @@
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '../src/db/client.js';
-import { zerionWallets } from '../src/db/schema.js';
+import { chainWallets, krakenConnections, zerionWallets } from '../src/db/schema.js';
 import { buildApp } from '../src/server.js';
 import {
   CONNECTION_ERROR_THRESHOLD,
@@ -200,6 +200,75 @@ describe('GET /api/net-worth connectionHealth', () => {
     await app.close();
 
     expect(JSON.stringify(res.json().connectionHealth)).not.toContain(full);
+  });
+});
+
+describe('every provider, not just Zerion', () => {
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  it('names a one-per-user connection whose credential lapsed', async () => {
+    // Kraken is an API-key connection: a rejected key is the most
+    // user-actionable failure it has, and the one that earns a Reconnect.
+    await db().insert(krakenConnections).values({
+      userId: testUserId,
+      apiKey: 'enc',
+      privateKey: 'enc',
+      consecutiveFailures: CONNECTION_ERROR_THRESHOLD,
+      lastErrorClass: 'auth',
+      lastSyncedAt: new Date(),
+    });
+
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    await app.close();
+
+    expect(res.json().connectionHealth).toEqual([
+      expect.objectContaining({ provider: 'kraken', label: 'Kraken', status: 'reauth_required', actionable: true }),
+    ]);
+  });
+
+  it('names the individual chain wallet, not the crypto class', async () => {
+    const [row] = await db()
+      .insert(chainWallets)
+      .values({
+        userId: testUserId,
+        chain: 'polkadot',
+        address: '15oF4uVJwmo0000000000000000000000000000000000000',
+        consecutiveFailures: CONNECTION_ERROR_THRESHOLD,
+        lastErrorClass: '5xx',
+        lastSyncedAt: new Date(),
+      })
+      .returning({ id: chainWallets.id });
+    expect(row).toBeDefined();
+
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    await app.close();
+
+    const entry = res.json().connectionHealth[0];
+    // Chain plus a shortened address: enough to identify which of eleven
+    // wallets, without printing a permanent global identifier.
+    expect(entry.provider).toBe('chain');
+    expect(entry.label).toContain('polkadot');
+    // A vendor-side 5xx is ours to fix, so no prompt is offered.
+    expect(entry.actionable).toBe(false);
+  });
+
+  it('stays silent for a healthy connection of any provider', async () => {
+    await db().insert(krakenConnections).values({
+      userId: testUserId,
+      apiKey: 'enc',
+      privateKey: 'enc',
+      lastSyncedAt: new Date(),
+    });
+
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    await app.close();
+
+    expect(res.json().connectionHealth).toEqual([]);
   });
 });
 

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { ynabConnections } from '../db/schema.js';
+import { recordSyncFailure, successPatch } from '../store/connection-health.js';
 import { decryptString, encryptString } from '../util/crypto.js';
 import {
   exchangeCodeForTokens,
@@ -146,15 +147,24 @@ export function registerYnabApi(app: FastifyInstance): void {
     const [conn] = await db().select().from(ynabConnections).where(eq(ynabConnections.userId, userId));
     if (!conn) return reply.status(404).send({ error: 'not connected' });
 
-    const token = await getTokenForConnection(userId, conn);
-    const total = await getTotalNetWorth(token);
-    await db()
-      .update(ynabConnections)
-      .set({ lastNetWorthUsd: total.toString(), lastSyncedAt: new Date() })
-      .where(eq(ynabConnections.userId, userId));
+    // Per-connection health (survey gap 2). The catch RETHROWS: the client
+    // still gets its 500 and plugins/error-handler.ts still reports it. This
+    // only adds the durable fact of WHICH connection failed, so the next
+    // GET /api/net-worth can name it instead of saying the class is degraded.
+    try {
+      const token = await getTokenForConnection(userId, conn);
+      const total = await getTotalNetWorth(token);
+      await db()
+        .update(ynabConnections)
+        .set({ lastNetWorthUsd: total.toString(), ...successPatch() })
+        .where(eq(ynabConnections.userId, userId));
 
-    req.log.info({ userId }, 'ynab sync complete');
-    return { total };
+      req.log.info({ userId }, 'ynab sync complete');
+      return { total };
+    } catch (err) {
+      await recordSyncFailure(ynabConnections, eq(ynabConnections.userId, userId), conn.consecutiveFailures, err);
+      throw err;
+    }
   });
 
   // DELETE /api/ynab/connect — remove connection
