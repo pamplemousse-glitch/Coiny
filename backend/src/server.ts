@@ -41,6 +41,7 @@ import { registerSneakersApi } from './api/sneakers.js';
 import { registerSpendingApi } from './api/spending.js';
 import { registerSpinwheelApi } from './api/spinwheel.js';
 import { registerSubscriptionsApi } from './api/subscriptions.js';
+import { registerDiagnosticsApi } from './api/diagnostics.js';
 import { registerTelemetryApi } from './api/telemetry.js';
 import { registerTradingCardsApi } from './api/trading-cards.js';
 import { registerTruelayerApi } from './api/truelayer.js';
@@ -278,6 +279,9 @@ async function buildApp(options: BuildAppOptions = {}) {
     registerDebtsApi(scope);
     registerNetWorthApi(scope);
     registerTelemetryApi(scope);
+    // Protected scope: a crash is filed against the session's account, never
+    // against an id in the payload.
+    registerDiagnosticsApi(scope);
   });
 
   return app;

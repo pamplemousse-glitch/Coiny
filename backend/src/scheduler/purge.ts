@@ -31,6 +31,7 @@ import {
   analyticsEvents,
   discogsPending,
   notificationLog,
+  crashDiagnostics,
   opsEvents,
   reactionHistory,
   sessions,
@@ -58,6 +59,12 @@ export const RETENTION = {
    *  rows are about vendors, not people, so nothing about them gets more
    *  valuable with age. */
   opsEventsMs: 90 * DAY_MS,
+  /** MetricKit crash and hang diagnostics (store/crash-diagnostics.ts). Same
+   *  ninety days as ops_events and for the same reason: these rows describe a
+   *  BUILD, not a person, so nothing about them gets more valuable with age,
+   *  and a crash on a build from last quarter is not actionable. Shorter than
+   *  analytics deliberately. */
+  crashDiagnosticsMs: 90 * DAY_MS,
 } as const;
 
 export const PURGE_INTERVAL_MS = DAY_MS;
@@ -69,6 +76,7 @@ export type PurgeSummary = {
   reactions: number;
   analytics: number;
   opsEvents: number;
+  crashDiagnostics: number;
 };
 
 let lastPurgeAt: Date | null = null;
@@ -130,6 +138,11 @@ export async function runRetentionPurge(now: Date = new Date()): Promise<PurgeSu
     .where(lt(opsEvents.at, before(RETENTION.opsEventsMs)))
     .returning({ id: opsEvents.id });
 
+  const crashes = await db()
+    .delete(crashDiagnostics)
+    .where(lt(crashDiagnostics.receivedAt, before(RETENTION.crashDiagnosticsMs)))
+    .returning({ id: crashDiagnostics.id });
+
   lastPurgeAt = now;
 
   return {
@@ -139,5 +152,6 @@ export async function runRetentionPurge(now: Date = new Date()): Promise<PurgeSu
     reactions: reactions.length,
     analytics: analytics.length,
     opsEvents: ops.length,
+    crashDiagnostics: crashes.length,
   };
 }

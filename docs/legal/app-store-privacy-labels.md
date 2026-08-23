@@ -31,7 +31,7 @@ same and are given in Step 2.
 | Identifiers | Device ID | APNs push token registered with the backend |
 | Usage Data | Product Interaction | First-party telemetry events (PRD section 24); bucketed, no amounts, no merchant names |
 | Diagnostics | Performance Data | MetricKit `MXMetricPayload` (G3.10), reduced on device to the `device_metrics` event: launch time, hang time, peak memory, CPU time, scroll hitch ratio, foreground exit counts, app build, OS major. Counts and durations only |
-| Diagnostics | Crash Data | MetricKit `MXDiagnosticPayload` (G3.10): unsymbolicated call stacks (binary UUID + text-segment offset), exception type, signal. The free-form fields are dropped client-side, not uploaded |
+| Diagnostics | Crash Data | MetricKit `MXDiagnosticPayload` (G3.10): unsymbolicated call stacks (binary UUID + text-segment offset), exception type, code and signal, plus a hash grouping repeats of one crash. Covers crashes, hangs, disk-write and CPU exceptions, and launch diagnostics. `terminationReason`, `virtualMemoryRegionInfo` and `exceptionReason` are dropped on the device and rejected again at the route. Live since 2026-08-23 |
 | Purchases | Purchase History | Subscription product id, expiry and original transaction id, stored server-side against the account |
 | Other Data | Other Data Types | Date of birth, entered for Spinwheel identity verification; sent, not stored |
 
