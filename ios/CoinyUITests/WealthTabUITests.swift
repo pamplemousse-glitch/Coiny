@@ -1,15 +1,20 @@
 import XCTest
 
 /// Tests for the Wealth tab (NetWorthView).
+/// See `ActivityTabUITests` for why this is `@MainActor` and why the lifecycle
+/// hook opts in with `MainActor.assumeIsolated` rather than inheriting it.
+@MainActor
 final class WealthTabUITests: XCTestCase {
     private static var app: XCUIApplication!
 
     override class func setUp() {
         super.setUp()
-        app = XCUIApplication()
-        app.launchArguments = ["--ui-testing"]
-        app.launch()
-        Self.app.tabBars.firstMatch.buttons["Wealth"].tap()
+        MainActor.assumeIsolated {
+            app = XCUIApplication()
+            app.launchArguments = ["--ui-testing"]
+            app.launch()
+            Self.app.tabBars.firstMatch.buttons["Wealth"].tap()
+        }
     }
 
     override func setUpWithError() throws {

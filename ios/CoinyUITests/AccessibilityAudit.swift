@@ -12,6 +12,10 @@ import XCTest
 /// Failures are real. If one is not, exclude it here with a written reason
 /// rather than deleting the call, so the exclusion is reviewable.
 extension XCTestCase {
+    /// `@MainActor` because `performAccessibilityAudit` and every `XCUIElement`
+    /// member this reads are main-actor isolated. Every caller is a test method
+    /// in a `@MainActor` class, so this costs nothing at the call sites.
+    @MainActor
     func auditAccessibility(
         _ app: XCUIApplication,
         types: XCUIAccessibilityAuditType = .all,
@@ -45,6 +49,7 @@ extension XCTestCase {
         }
     }
 
+    @MainActor
     private func runAudit(
         _ app: XCUIApplication,
         types: XCUIAccessibilityAuditType,

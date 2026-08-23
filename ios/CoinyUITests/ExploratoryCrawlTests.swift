@@ -17,6 +17,9 @@ import XCTest
 ///
 /// Destructive controls are skipped by label (see `skipped`). Tapping "Delete
 /// account" in a crawl would pass, and leave nothing to crawl.
+/// See `ActivityTabUITests` for why this is `@MainActor` and why the lifecycle
+/// hooks opt in with `MainActor.assumeIsolated` rather than inheriting it.
+@MainActor
 final class ExploratoryCrawlTests: XCTestCase {
     /// Controls that destroy state, leave the app, or start a flow that cannot
     /// complete without a human. Matched case-insensitively as substrings.
@@ -30,7 +33,11 @@ final class ExploratoryCrawlTests: XCTestCase {
     /// One line per control tapped, printed at the end as the crawl report.
     private var log: [String] = []
 
-    override func setUpWithError() throws {
+    // The async lifecycle variants, for the same reason as PaywallUITests: they
+    // inherit the class's `@MainActor` isolation, where the `WithError`
+    // overrides stay nonisolated and would have to send `self` across.
+    override func setUp() async throws {
+        try await super.setUp()
         // A crash mid-crawl is the finding. Keep going so one bad control does
         // not hide the twenty after it.
         continueAfterFailure = true
@@ -40,13 +47,14 @@ final class ExploratoryCrawlTests: XCTestCase {
         XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 20), "app did not reach the tab bar")
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         let report = log.joined(separator: "\n")
         let attachment = XCTAttachment(string: report)
         attachment.name = "crawl-report"
         attachment.lifetime = .keepAlways
         add(attachment)
         print("\n===== CRAWL REPORT =====\n\(report)\n===== END =====\n")
+        try await super.tearDown()
     }
 
     func testCrawlEveryTab() throws {

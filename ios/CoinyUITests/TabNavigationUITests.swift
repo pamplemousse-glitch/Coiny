@@ -2,14 +2,19 @@ import XCTest
 
 /// Verifies that all three tabs exist and are reachable.
 /// The --ui-testing flag bypasses Keychain sign-in so the app opens on RootView.
+/// See `ActivityTabUITests` for why this is `@MainActor` and why the lifecycle
+/// hook opts in with `MainActor.assumeIsolated` rather than inheriting it.
+@MainActor
 final class TabNavigationUITests: XCTestCase {
     private static var app: XCUIApplication!
 
     override class func setUp() {
         super.setUp()
-        app = XCUIApplication()
-        app.launchArguments = ["--ui-testing"]
-        app.launch()
+        MainActor.assumeIsolated {
+            app = XCUIApplication()
+            app.launchArguments = ["--ui-testing"]
+            app.launch()
+        }
     }
 
     override func setUpWithError() throws {
