@@ -203,6 +203,10 @@ final class CoinyThemeContrastTests: XCTestCase {
     /// the dark screen and 1.41:1 on the light one. Opacity over a semantic
     /// colour was the mechanism: it shifts differently per scheme and neither
     /// result was ever looked at.
+    // @MainActor because PaywallView.tierBorderColor is main-actor isolated, as
+    // any SwiftUI view member is. Applied to the test rather than the class so
+    // the colour-maths tests around it stay nonisolated.
+    @MainActor
     func testTierCardBordersClearTheNonTextFloorInBothSchemes() {
         for (name, selected) in [("selected", true), ("unselected", false)] {
             for style in [UIUserInterfaceStyle.light, .dark] {
@@ -221,6 +225,9 @@ final class CoinyThemeContrastTests: XCTestCase {
     /// because `.disabled()` fades a Form row's label to the system tertiary
     /// label. Unavailable still has to be readable: #220 settled this on the
     /// paywall's subscribe button and the same rule applies here.
+    // @MainActor for the same reason as the tier-border test above:
+    // SettingsView.refundLabelColor is a main-actor-isolated view member.
+    @MainActor
     func testRefundRowIsReadableWhetherOrNotARefundIsAvailable() {
         for (name, available) in [("available", true), ("unavailable", false)] {
             for style in [UIUserInterfaceStyle.light, .dark] {

@@ -119,8 +119,12 @@ final class OnboardingViewModelTests: XCTestCase {
     private var api = FakeOnboardingAPI()
     private var transport = RecordingTelemetryTransport()
 
-    override func setUp() {
-        super.setUp()
+    // async throws, not the plain override: XCTestCase declares `setUp()` as
+    // nonisolated, so an override of it stays nonisolated even inside a
+    // @MainActor class and cannot touch these two properties. The async variant
+    // picks up the class's isolation instead.
+    override func setUp() async throws {
+        try await super.setUp()
         api = FakeOnboardingAPI()
         transport = RecordingTelemetryTransport()
     }
