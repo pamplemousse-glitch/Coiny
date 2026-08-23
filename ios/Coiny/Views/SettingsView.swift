@@ -21,6 +21,12 @@ struct SettingsView: View {
     /// Defaults on because consent was given at sign-in; the same key is what
     /// `TelemetryConsent` reads before enqueuing anything.
     @AppStorage(TelemetryConsent.shareUsageDataKey) private var shareUsageData: Bool = true
+    /// Mirrors `AppLock.enabledKey`. Default true matches `AppLock.isEnabled`,
+    /// which treats an absent value as on.
+    @AppStorage(AppLock.enabledKey) private var appLockEnabled: Bool = true
+    /// Optional so the settings screen still renders in previews and tests that
+    /// do not construct a lock.
+    @SwiftUI.Environment(\.appLock) private var appLock
     /// Persisted, not `@State`: a change that never reached the server has to
     /// outlive this sheet, or the next open would pull the stale server value
     /// back over the user's decision.
@@ -232,6 +238,16 @@ extension SettingsView {
 private extension SettingsView {
     var privacySection: some View {
         Section {
+            // Default ON (AppLock.isEnabled treats absent as true), so this row
+            // reads as "turn it off" rather than "discover it exists".
+            Toggle("Require Face ID to open", isOn: $appLockEnabled)
+                .accessibilityIdentifier("settings.appLock")
+                .onChange(of: appLockEnabled) { _, isOn in
+                    // Writing through AppLock rather than letting @AppStorage do
+                    // it alone: turning the lock OFF must also unlock the app
+                    // that is already on screen, which the raw default cannot do.
+                    appLock?.settingChanged(to: isOn)
+                }
             Toggle("Share usage data", isOn: $shareUsageData)
                 .accessibilityIdentifier("settings.shareUsageData")
                 .onChange(of: shareUsageData) { _, isOn in
