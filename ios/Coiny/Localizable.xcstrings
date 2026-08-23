@@ -1,6 +1,42 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "appLock.subtitle.available": {
+      "comment": "Shown on the lock screen when authentication is possible.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use Face ID, Touch ID or your passcode to continue."
+          }
+        }
+      }
+    },
+    "appLock.subtitle.notConfigured": {
+      "comment": "Shown when the device has neither biometrics nor a passcode enrolled.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set a passcode on this iPhone to lock Coiny."
+          }
+        }
+      }
+    },
+    "appLock.subtitle.unavailable": {
+      "comment": "Shown when the authentication policy cannot be evaluated at all.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Authentication is unavailable on this device right now."
+          }
+        }
+      }
+    },
     "assetClass.brokerage": {
       "comment": "Investment account",
       "extractionState": "manual",

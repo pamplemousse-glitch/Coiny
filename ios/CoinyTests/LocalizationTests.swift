@@ -82,6 +82,11 @@ final class LocalizationTests: XCTestCase {
             "assetClass.car", "assetClass.home", "assetClass.studentLoans",
             "assetClass.business", "assetClass.collectibles", "assetClass.other",
             "wealthClass.realEstate", "wealthClass.sneakers",
+            // The app-lock strings. Added with the lock itself, because a
+            // security screen that renders "appLock.subtitle.available" as
+            // literal text is worse than one with no subtitle at all.
+            "appLock.subtitle.available", "appLock.subtitle.notConfigured",
+            "appLock.subtitle.unavailable",
         ]
         for key in keys {
             let value = localized(key, "en")

@@ -41,6 +41,13 @@ struct CoinyApp: App {
     @AppStorage("onboardingComplete") private var onboardingComplete: Bool = false
     @SwiftUI.Environment(\.scenePhase) private var scenePhase
 
+    /// On-device protection (Services/AppLock.swift). UI tests bypass it: they
+    /// cannot satisfy a biometric prompt, and every one of them would otherwise
+    /// stop on the lock screen.
+    @State private var appLock = AppLock(
+        defaults: CoinyApp.isUITesting || CoinyApp.isDebugSessionRun ? UserDefaults(suiteName: "uitest.nolock")! : .standard
+    )
+
     var body: some Scene {
         WindowGroup {
             Group {
@@ -102,6 +109,45 @@ struct CoinyApp: App {
                 Task { await API.shared.signOut() }
                 onboardingComplete = false
                 isSignedIn = false
+            }
+            // The lock and the privacy curtain, OUTSIDE the sign-in branch on
+            // purpose: both must cover the signed-in surface, and neither
+            // should ever sit in front of the sign-in screen, which shows
+            // nothing worth protecting and which the user cannot get past
+            // without authenticating to Apple anyway.
+            .overlay {
+                if isSignedIn && appLock.state != .unlocked {
+                    AppLockScreen(
+                        state: appLock.state,
+                        availability: appLock.availability(),
+                        unlock: { await appLock.authenticate() }
+                    )
+                    .transition(.opacity)
+                }
+            }
+            // Separate overlay, and it must be the OUTERMOST one: the snapshot
+            // iOS takes on the way out captures whatever is on screen, so this
+            // has to cover the lock screen too, not just the app behind it.
+            .overlay {
+                if scenePhase == .inactive && isSignedIn {
+                    PrivacyOverlay()
+                }
+            }
+            .environment(\.appLock, appLock)
+            .animation(.easeInOut(duration: 0.15), value: appLock.state)
+            .onChange(of: scenePhase) { _, current in
+                switch current {
+                case .background: appLock.didEnterBackground()
+                case .active: appLock.willEnterForeground()
+                default: break
+                }
+            }
+            .task {
+                // A cold launch starts locked when the setting is on, so prompt
+                // straight away rather than making the user tap Unlock first.
+                if isSignedIn && appLock.state == .locked {
+                    await appLock.authenticate()
+                }
             }
         }
     }

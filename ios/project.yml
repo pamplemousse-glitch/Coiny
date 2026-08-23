@@ -118,6 +118,11 @@ targets:
         # 2026-08-13: no CoreBluetooth code exists in the app and hardware is
         # parked (vision.md section 8). An unused background mode is an App
         # Review 2.5.4 rejection risk. Restore both when hardware ships.
+        # Required before LocalAuthentication may show a Face ID prompt. Without
+        # it the call does not fail gracefully: iOS terminates the app. Touch ID
+        # and the passcode fallback need no string, which is why an app tested
+        # only on a Touch ID or passcode-only device will not surface this.
+        NSFaceIDUsageDescription: Coiny uses Face ID to unlock your net worth on this device.
         UIBackgroundModes:
           - remote-notification
         UIApplicationSceneManifest:
