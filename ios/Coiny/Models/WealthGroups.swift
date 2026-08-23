@@ -215,6 +215,38 @@ enum WealthPresenter {
         return assetSections.map { ($0.group, $0.includedTotal / total) }
     }
 
+    /// The connections worth interrupting someone about, actionable first.
+    ///
+    /// The split is the one every system in
+    /// `docs/connection-resilience-survey.md` A1 draws, and the one Actual
+    /// Budget encodes in `showAuth`: a lapsed credential gets a Reconnect
+    /// button because only the user can fix it, while a rate limit or a vendor
+    /// outage gets told plainly and no button, because prompting someone to
+    /// reconnect over a transient failure is how a badge gets ignored.
+    static func connectionsNeedingAttention(_ response: NetWorthResponse) -> [ConnectionHealthEntry] {
+        (response.connectionHealth ?? []).sorted { lhs, rhs in
+            if lhs.actionable != rhs.actionable { return lhs.actionable }
+            return lhs.label < rhs.label
+        }
+    }
+
+    /// Copy for one entry. Says what changed and what to do when the user can
+    /// act; says "later" and offers nothing when they cannot.
+    static func connectionMessage(_ entry: ConnectionHealthEntry) -> String {
+        switch entry.status {
+        case .reauthRequired:
+            return "\(entry.label) needs you to sign in again."
+        case .disconnected:
+            return "\(entry.label) was disconnected."
+        case .error:
+            return "Can’t reach \(entry.label) right now."
+        case .pending:
+            return "\(entry.label) hasn’t finished its first sync."
+        default:
+            return "\(entry.label) needs attention."
+        }
+    }
+
     /// Display names for the "n accounts not included" footnote list (S-19).
     static func excludedDisplayNames(_ excluded: ExcludedSummary) -> [String] {
         excluded.classes.map { name in

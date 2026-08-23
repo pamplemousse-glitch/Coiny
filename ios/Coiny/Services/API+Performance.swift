@@ -33,6 +33,26 @@ struct ClassReading: Codable, Equatable, Sendable {
     let status: ClassStatus
 }
 
+/// One connection that is not healthy, from the server's `connectionHealth`
+/// exception report.
+///
+/// `connections` says which providers are linked and `classes` says which asset
+/// classes are trustworthy. Neither can say WHICH of three wallets died, which
+/// is why nothing could prompt about it. This can.
+struct ConnectionHealthEntry: Codable, Equatable, Sendable, Identifiable {
+    let id: String
+    let provider: String
+    /// Display text: a user label, or their own address shortened. Shown back to
+    /// them, never logged.
+    let label: String
+    let status: ClassStatus
+    /// True when the USER is the one who can fix it. Only these earn a prompt:
+    /// a rate limit or a vendor outage is ours, and telling someone to
+    /// reconnect over one trains them to ignore the message.
+    let actionable: Bool
+    let lastSyncedAt: Date?
+}
+
 /// Classes excluded from `total` (failures, revocations, past never-show age).
 struct ExcludedSummary: Codable, Equatable, Sendable {
     let count: Int
@@ -75,6 +95,9 @@ struct NetWorthResponse: Codable {
     /// Per-class `{ value, asOf, status }` readings, keyed by class name.
     let classes: [String: ClassReading]
     let excluded: ExcludedSummary
+    /// Optional so a response from a server that predates the field decodes
+    /// unchanged, and so the existing fixtures need no edit.
+    let connectionHealth: [ConnectionHealthEntry]?
     let generatedAt: Date
     /// Present only on `POST /api/net-worth/refresh` responses:
     /// `refreshed | failed | not_connected | capped`.
@@ -233,6 +256,7 @@ extension NetWorthResponse {
             farmland: farmland, tradingCards: tradingCards, coins: coins, debts: debts,
             liquidCashMonths: liquidCashMonths, accounts: accounts, connections: connections,
             classes: [:], excluded: ExcludedSummary(count: 0, classes: []),
+            connectionHealth: [],
             generatedAt: Date(timeIntervalSince1970: 0), bankRefresh: nil
         )
     }

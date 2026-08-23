@@ -9,6 +9,7 @@ import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '../src/db/client.js';
 import { zerionWallets } from '../src/db/schema.js';
+import { buildApp } from '../src/server.js';
 import {
   CONNECTION_ERROR_THRESHOLD,
   type ConnectionHealthRow,
@@ -17,7 +18,7 @@ import {
   isUserActionable,
   successPatch,
 } from '../src/store/connection-health.js';
-import { resetDatabase, testUserId } from './db-helper.js';
+import { authHeader, resetDatabase, testUserId } from './db-helper.js';
 
 /** A healthy row, so each test states only the field it is about. */
 function row(overrides: Partial<ConnectionHealthRow> = {}): ConnectionHealthRow {
@@ -101,6 +102,104 @@ describe('the patches', () => {
     const patch = failurePatch(2, 'auth');
     expect(patch.consecutiveFailures).toBe(3);
     expect(Object.keys(patch)).not.toContain('lastSyncedAt');
+  });
+});
+
+describe('GET /api/net-worth connectionHealth', () => {
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  it('is an exception report: a healthy account sends an empty array', async () => {
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    await app.close();
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().connectionHealth).toEqual([]);
+  });
+
+  it('names the individual wallet, which is the whole of gap 2', async () => {
+    const [wallet] = await db()
+      .insert(zerionWallets)
+      .values({ userId: testUserId, address: '0xdeadbeef00000000000000000000000000000001' })
+      .returning({ id: zerionWallets.id });
+    for (let i = 0; i < CONNECTION_ERROR_THRESHOLD; i++) {
+      await db().update(zerionWallets).set(failurePatch(i, 'auth')).where(eq(zerionWallets.id, wallet!.id));
+    }
+
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    await app.close();
+
+    const entries = res.json().connectionHealth;
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      provider: 'zerion',
+      status: 'reauth_required',
+      actionable: true,
+    });
+    // Shortened, not the full 42 characters: it is a label, not an identifier.
+    expect(entries[0].label).toBe('0xdead\u20260001');
+  });
+
+  it('reports a vendor-side failure as not actionable, so no prompt is offered', async () => {
+    const [wallet] = await db()
+      .insert(zerionWallets)
+      .values({ userId: testUserId, address: '0xaaa' })
+      .returning({ id: zerionWallets.id });
+    for (let i = 0; i < CONNECTION_ERROR_THRESHOLD; i++) {
+      await db().update(zerionWallets).set(failurePatch(i, '5xx')).where(eq(zerionWallets.id, wallet!.id));
+    }
+
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    await app.close();
+
+    expect(res.json().connectionHealth[0]).toMatchObject({ status: 'error', actionable: false });
+  });
+
+  it('omits a healthy wallet even when a sibling is broken', async () => {
+    const inserted = await db()
+      .insert(zerionWallets)
+      .values([
+        { userId: testUserId, address: '0xhealthy' },
+        { userId: testUserId, address: '0xbroken' },
+      ])
+      .returning({ id: zerionWallets.id, address: zerionWallets.address });
+    const healthy = inserted.find((w) => w.address === '0xhealthy')!;
+    const broken = inserted.find((w) => w.address === '0xbroken')!;
+    await db().update(zerionWallets).set(successPatch()).where(eq(zerionWallets.id, healthy.id));
+    for (let i = 0; i < CONNECTION_ERROR_THRESHOLD; i++) {
+      await db().update(zerionWallets).set(failurePatch(i, 'auth')).where(eq(zerionWallets.id, broken.id));
+    }
+
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    await app.close();
+
+    const entries = res.json().connectionHealth;
+    expect(entries).toHaveLength(1);
+    expect(entries[0].label).toBe('0xbroken');
+  });
+
+  it('never puts a full wallet address in the response', async () => {
+    // A truncated label is what the user reads. The full address is a permanent
+    // global identifier and is on the forbidden list in plugins/logger.ts.
+    const full = '0xdeadbeef00000000000000000000000000000001';
+    const [wallet] = await db()
+      .insert(zerionWallets)
+      .values({ userId: testUserId, address: full })
+      .returning({ id: zerionWallets.id });
+    for (let i = 0; i < CONNECTION_ERROR_THRESHOLD; i++) {
+      await db().update(zerionWallets).set(failurePatch(i, 'auth')).where(eq(zerionWallets.id, wallet!.id));
+    }
+
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+    await app.close();
+
+    expect(JSON.stringify(res.json().connectionHealth)).not.toContain(full);
   });
 });
 

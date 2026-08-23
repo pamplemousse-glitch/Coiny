@@ -310,6 +310,7 @@ struct UITestNetWorthAPI: NetWorthViewModelAPI {
         ),
         classes: classes,
         excluded: ExcludedSummary(count: 0, classes: []),
+        connectionHealth: [],
         generatedAt: asOf,
         bankRefresh: nil
         )
