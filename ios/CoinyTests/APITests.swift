@@ -111,13 +111,47 @@ final class APITests: XCTestCase {
         XCTAssertNil(store.load(), "401 must clear persistent session")
     }
 
-    func testSignOutClearsTokenWithoutNetwork() async {
+    /// Renamed from `testSignOutClearsTokenWithoutNetwork`, which asserted
+    /// `http.requests.count == 0` and was wrong about the code it tested.
+    ///
+    /// `API.signOut()` clears local state and then fires a DETACHED Task that
+    /// POSTs `/api/auth/logout`, deliberately, so the bearer cannot be reused
+    /// server-side. The old assertion therefore passed only by winning a race
+    /// against that task: on a fast machine the assertion ran first and saw
+    /// zero requests. It failed on a loaded CI runner, where the task got there
+    /// first, which is the correct behaviour being reported as a defect.
+    ///
+    /// This asserts the real contract instead, in two halves: local state is
+    /// gone SYNCHRONOUSLY (the user is signed out whether or not the network
+    /// cooperates), and the logout call eventually arrives carrying the old
+    /// token. Waiting for it is what makes this deterministic in both
+    /// directions rather than in one.
+    func testSignOutClearsTokenLocallyAndRevokesItServerSide() async throws {
         let api = makeAPI(seedToken: "tok")
+        http.enqueue(status: 200, json: "{}")
+
         await api.signOut()
+
+        // Local state: immediate, and not contingent on the request.
         let signedIn = await api.isSignedIn
         XCTAssertFalse(signedIn)
         XCTAssertNil(store.load())
-        XCTAssertEqual(http.requests.count, 0)
+
+        // The fire-and-forget revocation: bounded wait, because a detached Task
+        // has no completion to await from here.
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while http.requests.isEmpty, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        XCTAssertEqual(http.requests.count, 1, "signOut must revoke the session server-side")
+        let logout = try XCTUnwrap(http.requests.first)
+        XCTAssertEqual(logout.httpMethod, "POST")
+        XCTAssertEqual(logout.url?.path, "/api/auth/logout")
+        XCTAssertEqual(
+            logout.value(forHTTPHeaderField: "Authorization"), "Bearer tok",
+            "the revocation must carry the token being revoked, not the cleared one"
+        )
     }
 
     // MARK: - Error mapping
