@@ -123,6 +123,53 @@ export const CLIENT_EVENT_SCHEMAS = {
   repair_prompt_shown: z.strictObject({
     item_status: z.enum(['reauth_required', 'expiring', 'revoked', 'error', 'unknown']),
   }),
+  // G3.10: one MetricKit MXMetricPayload, flattened.
+  //
+  // The runbook, 04-performance-reliability §4.13.3 and launch-gap-analysis §7
+  // all say to "post MXMetricPayload to the existing /api/telemetry". Taken
+  // literally that cannot work: a payload is a nested tree of histograms with
+  // units, and this catalog accepts only flat strictObjects whose strings match
+  // the `token` regex. Rather than loosen the catalog (which is the one control
+  // keeping merchant names and emails out of analytics by construction), the
+  // client reduces each payload to the bounded scalars below. Everything here
+  // is a count or a duration; nothing is a string, so there is no free-form
+  // field to scrub.
+  //
+  // Every metric is optional because MetricKit omits whole sections when it has
+  // nothing for them: a payload from a launch-only day carries no animation
+  // metrics at all. An absent field means "not reported", never zero, and the
+  // two must not be conflated when reading these.
+  //
+  // Averages, not percentiles: MXHistogram exposes buckets rather than
+  // quantiles, so the client reports a bucket-weighted mean. Good enough to
+  // trend a regression across builds, not a substitute for a real p50.
+  device_metrics: z.strictObject({
+    // Which build produced these numbers. Without both, a regression cannot be
+    // attributed and the series is only noise. app_build is CFBundleVersion,
+    // stamped from the git commit count by Scripts/stamp-build-number.sh.
+    app_build: z.number().int().min(0).max(10_000_000),
+    os_major: z.number().int().min(15).max(99),
+    // Performance. Bounds are generous on purpose: a value outside the schema
+    // costs the whole event, and a pathological launch is exactly the sample
+    // worth keeping.
+    launch_ms_avg: z.number().int().min(0).max(600_000).optional(),
+    hang_ms_avg: z.number().int().min(0).max(600_000).optional(),
+    peak_memory_mb: z.number().int().min(0).max(65_536).optional(),
+    cpu_ms: z.number().int().min(0).max(86_400_000).optional(),
+    // Scroll hitch time ratio, in parts per million, because the native unit is
+    // a small fraction and this catalog carries integers.
+    scroll_hitch_ppm: z.number().int().min(0).max(1_000_000).optional(),
+    // Foreground exit counts. exit_normal is the denominator for a crash-free
+    // sessions rate; the rest are the numerator, split by cause so "it crashes"
+    // can be told apart from "the watchdog killed it" and "it ran out of
+    // memory", which have nothing to do with each other.
+    exit_normal: z.number().int().min(0).max(100_000).optional(),
+    exit_abnormal: z.number().int().min(0).max(100_000).optional(),
+    exit_memory_limit: z.number().int().min(0).max(100_000).optional(),
+    exit_watchdog: z.number().int().min(0).max(100_000).optional(),
+    exit_bad_access: z.number().int().min(0).max(100_000).optional(),
+    exit_illegal_instruction: z.number().int().min(0).max(100_000).optional(),
+  }),
 } as const;
 
 // --- Server-emitted events (rejected from clients) ---------------------------

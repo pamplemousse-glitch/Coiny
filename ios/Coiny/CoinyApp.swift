@@ -132,11 +132,20 @@ struct CoinyApp: App {
 /// itself for the work that needs it.
 @MainActor
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    /// Held for the app's lifetime: MXMetricManager does not retain its
+    /// subscribers, so a reporter that goes out of scope stops receiving
+    /// payloads silently, with no error and no gap in any log.
+    private let metricKitReporter = MetricKitReporter()
+
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        // G3.10. Subscribe at launch: MetricKit only delivers while at least one
+        // subscriber is registered, and the payload covers the PREVIOUS day, so
+        // a late subscription loses that day rather than deferring it.
+        metricKitReporter.start()
         // Re-register if already authorized (token can rotate between launches).
         // Only makes sense if the user is signed in; the API call will fail silently otherwise.
         Task {
