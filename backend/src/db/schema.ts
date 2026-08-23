@@ -346,6 +346,10 @@ export const spinwheelConnections = pgTable('spinwheel_connections', {
     .references(() => users.id, { onDelete: 'cascade' }),
   spinwheelUserId: text('spinwheel_user_id').notNull(),
   lastCreditScore: integer('last_credit_score'),
+  // Added by 0063, not 0062: 0062's census of which tables already had this
+  // was produced by a regex that ran past the end of the table it was reading,
+  // so this one was recorded as having a column it did not have.
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
   // Per-connection health (0062). See store/connection-health.ts: status is
   // DERIVED from these, never stored, because no vendor here sends a webhook
   // that would make a stored lifecycle a fact rather than a cache.

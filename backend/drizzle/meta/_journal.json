@@ -442,6 +442,13 @@
       "when": 1787381992181,
       "tag": "0062_per_connection_health",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1787464928794,
+      "tag": "0063_spinwheel_last_synced",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,18 @@
+-- The one table migration 0062 missed.
+--
+-- 0062's premise was that eleven of the thirteen connection tables already
+-- recorded `last_synced_at` and only `coinbase_connections` and
+-- `zerion_wallets` lacked it. That census was produced by a regex over
+-- schema.ts whose match ran past the end of the table it was reading, so
+-- `spinwheel_connections` was counted as having a column it does not have.
+--
+-- Found by the TypeScript compiler rather than by re-reading the census:
+-- `ConnectionHealthRow` requires `lastSyncedAt`, so wiring spinwheel into
+-- `/api/net-worth` failed to typecheck. A structural type earning its keep.
+--
+-- Same rationale as 0062 for the other two: without a last-success timestamp
+-- there is no way to tell a fresh value from one that stopped being refreshed
+-- a month ago and nobody noticed.
+--
+-- Idempotent, per the convention 0033 established.
+ALTER TABLE "spinwheel_connections" ADD COLUMN IF NOT EXISTS "last_synced_at" timestamp with time zone;
