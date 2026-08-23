@@ -9,6 +9,9 @@ struct NetWorthView: View {
     @Environment(NetWorthViewModel.self) private var vm
     @State private var repairVM = ConnectionRepairViewModel()
     @State private var showExcludedList = false
+    /// The entry whose Reconnect button was tapped. Drives the repair flow;
+    /// nil when nothing is being repaired.
+    @State private var reconnectTarget: ConnectionHealthEntry?
     /// The flagship number. It was `.system(size: 48)`, the one string in the
     /// app that ignored Dynamic Type entirely (WCAG 1.4.4); onboarding already
     /// scaled the same figure this way at `OnboardingConnectScreens.swift`.
@@ -136,12 +139,42 @@ struct NetWorthView: View {
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
                 .accessibilityLabel(Text("Net worth \(data.total, format: .currency(code: "USD"))"))
+            if !WealthPresenter.connectionsNeedingAttention(data).isEmpty {
+                connectionHealthNotice(data)
+            }
             if !data.excluded.classes.isEmpty {
                 excludedFootnote(data)
             }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
+    }
+
+    /// Survey gap 2: which ONE connection is broken, not just "crypto is off".
+    ///
+    /// Placed above the excluded footnote deliberately. "2 accounts not
+    /// included" tells you a number is wrong; this tells you which thing to
+    /// fix, and only the second is actionable.
+    private func connectionHealthNotice(_ data: NetWorthResponse) -> some View {
+        let entries = WealthPresenter.connectionsNeedingAttention(data)
+        return VStack(alignment: .leading, spacing: 6) {
+            ForEach(entries) { entry in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(WealthPresenter.connectionMessage(entry))
+                        .font(.footnote)
+                        .foregroundStyle(CoinyTheme.ink2)
+                    Spacer(minLength: 0)
+                    // Only when the user is the one who can fix it. Status is
+                    // carried by the text, never by colour alone (PRD 11).
+                    if entry.actionable {
+                        Button("Reconnect") { reconnectTarget = entry }
+                            .font(.footnote.weight(.semibold))
+                            .frame(minHeight: 44)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// S-19: "2 accounts not included", tappable, lists them.

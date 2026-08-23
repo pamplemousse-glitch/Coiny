@@ -53,6 +53,7 @@ import {
 } from '../goals/snapshot.js';
 import type { SpinwheelDebt } from '../spinwheel/client.js';
 import { getClassCache, getPlaidAccountBalances } from '../store/asset-cache.js';
+import { deriveConnectionStatus, isUserActionable } from '../store/connection-health.js';
 import { declaredNetUsd, listDeclaredAssets, oldestRefreshedAt } from '../store/declared-assets.js';
 import { getCachedLiabilities } from '../store/plaid-liabilities.js';
 import { getRecentOutflows } from '../store/transactions.js';
@@ -157,7 +158,37 @@ export type NetWorthResponse = {
   };
   classes: Record<NetWorthClassName, ClassReading>;
   excluded: { count: number; classes: NetWorthClassName[] };
+  /** Individual connections that are NOT healthy (survey gap 2).
+   *
+   *  `connections` above answers "is this provider linked", and `classes`
+   *  answers "is this asset class trustworthy". Neither can say WHICH of a
+   *  user's three wallets died, so neither can be prompted about, which is the
+   *  gap this closes.
+   *
+   *  An EXCEPTION REPORT, not an inventory: a healthy account sends an empty
+   *  array. Same principle as `excluded` and `/health/integrations`, and it
+   *  keeps the payload flat for the common case (engineering-budgets section 1).
+   *
+   *  Additive rather than a change to `connections`, so a shipped client that
+   *  has never heard of this field keeps working unchanged (R-14.2). */
+  connectionHealth: ConnectionHealthEntry[];
   generatedAt: string;
+};
+
+export type ConnectionHealthEntry = {
+  /** Stable across refreshes, so a client can dismiss or track one entry. */
+  id: string;
+  provider: string;
+  /** What to call it on screen. Displayable user financial data: it may appear
+   *  in an API response and must never appear in a log line, the same rule
+   *  `plaid_items.institutionName` carries for the same reason. */
+  label: string;
+  status: ClassStatus;
+  /** True when the USER is the one who can fix it, which is the only case that
+   *  earns a prompt. A rate limit or a vendor outage is ours, and telling
+   *  someone to reconnect over one trains them to ignore the message. */
+  actionable: boolean;
+  lastSyncedAt: string | null;
 };
 
 export type NetWorthAssembly = {
@@ -196,6 +227,14 @@ function num(v: string | null): number | null {
  */
 function credentialHealth(row: { lastErrorClass: string | null } | undefined): 'reauth_required' | null {
   return row?.lastErrorClass === 'auth' ? 'reauth_required' : null;
+}
+
+/** `0x1234…cdef`. The user's own address shown back to them, shortened because
+ *  a 42-character string is not a label. Never logged: a wallet address is a
+ *  permanent global identifier and is on the forbidden list in
+ *  plugins/logger.ts, which is why this is an API-response-only helper. */
+function truncateAddress(address: string): string {
+  return address.length <= 12 ? address : `${address.slice(0, 6)}\u2026${address.slice(-4)}`;
 }
 
 export async function assembleNetWorth(userId: string, now: Date = new Date()): Promise<NetWorthAssembly> {
@@ -789,6 +828,27 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
     }
   }
 
+  // --- Per-connection health (survey gap 2) ----------------------------------
+  //
+  // Only Zerion writes these columns today. The other twelve connection tables
+  // gained them in migration 0062 and their sync routes are not yet wired, so
+  // they contribute nothing here rather than contributing something wrong. As
+  // each is wired it appears in this list with no further change, which is the
+  // reason the shape is provider-agnostic.
+  const connectionHealth: ConnectionHealthEntry[] = [];
+  for (const wallet of zerionRows) {
+    const status = deriveConnectionStatus(wallet);
+    if (status === 'ok') continue;
+    connectionHealth.push({
+      id: `zerion:${wallet.id}`,
+      provider: 'zerion',
+      label: wallet.label ?? truncateAddress(wallet.address),
+      status,
+      actionable: isUserActionable(status),
+      lastSyncedAt: wallet.lastSyncedAt ? wallet.lastSyncedAt.toISOString() : null,
+    });
+  }
+
   // --- Emergency fund coverage (C4) ------------------------------------------
   let liquidCashMonths: number | null = null;
   try {
@@ -926,6 +986,7 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
     },
     classes,
     excluded: { count: excludedClasses.length, classes: excludedClasses },
+    connectionHealth,
     generatedAt: now.toISOString(),
   };
 

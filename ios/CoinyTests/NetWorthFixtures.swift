@@ -48,6 +48,7 @@ enum NetWorthFixtures {
         total: Double = 0,
         classes: [String: ClassReading] = [:],
         excluded: ExcludedSummary? = nil,
+        connectionHealth: [ConnectionHealthEntry] = [],
         generatedAt: Date = Date(timeIntervalSince1970: 1_700_000_000),
         bankRefresh: String? = nil,
         liquidCashMonths: Double? = nil,
@@ -101,6 +102,7 @@ enum NetWorthFixtures {
             ),
             classes: classes,
             excluded: excluded ?? serverExcluded(classes),
+            connectionHealth: connectionHealth,
             generatedAt: generatedAt,
             bankRefresh: bankRefresh
         )

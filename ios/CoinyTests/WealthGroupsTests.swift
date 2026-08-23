@@ -118,6 +118,52 @@ final class WealthGroupsTests: XCTestCase {
         XCTAssertEqual(assets - owed, response.total, accuracy: 0.001)
     }
 
+    // MARK: - Per-connection health (survey gap 2)
+
+    private func entry(
+        _ id: String, label: String, status: ClassStatus, actionable: Bool
+    ) -> ConnectionHealthEntry {
+        ConnectionHealthEntry(
+            id: id, provider: "zerion", label: label, status: status,
+            actionable: actionable, lastSyncedAt: nil
+        )
+    }
+
+    func testConnectionsNeedingAttentionPutsActionableFirst() {
+        // The user can only act on some of these. Burying the one they can fix
+        // under three they cannot is how a prompt gets ignored.
+        let response = NetWorthFixtures.response(connectionHealth: [
+            entry("a", label: "0xaaa…aaa", status: .error, actionable: false),
+            entry("b", label: "0xbbb…bbb", status: .reauthRequired, actionable: true)
+        ])
+        let ordered = WealthPresenter.connectionsNeedingAttention(response)
+        XCTAssertEqual(ordered.map(\.id), ["b", "a"])
+    }
+
+    func testNoConnectionHealthMeansNothingToShow() {
+        // Absent field, from a server that predates it, must not crash or
+        // render an empty banner.
+        XCTAssertTrue(WealthPresenter.connectionsNeedingAttention(NetWorthFixtures.response()).isEmpty)
+    }
+
+    func testMessageSaysWhatToDoOnlyWhenTheUserCanAct() {
+        // Actual Budget's showAuth distinction, in copy: a lapsed credential
+        // says sign in again; an unreachable vendor says we cannot reach it and
+        // asks for nothing.
+        let lapsed = entry("a", label: "Main wallet", status: .reauthRequired, actionable: true)
+        let unreachable = entry("b", label: "Cold wallet", status: .error, actionable: false)
+
+        XCTAssertEqual(WealthPresenter.connectionMessage(lapsed), "Main wallet needs you to sign in again.")
+        XCTAssertEqual(WealthPresenter.connectionMessage(unreachable), "Can’t reach Cold wallet right now.")
+    }
+
+    func testMessageNamesTheConnectionNotTheClass() {
+        // The whole of gap 2: "crypto is broken" was unactionable because it
+        // never said which wallet.
+        let one = entry("a", label: "0xdead…beef", status: .reauthRequired, actionable: true)
+        XCTAssertTrue(WealthPresenter.connectionMessage(one).contains("0xdead…beef"))
+    }
+
     func testGroupsRenderInFixedOrder() {
         let response = NetWorthFixtures.response(classes: [
             "debts": NetWorthFixtures.reading(value: 900, status: .ok),
