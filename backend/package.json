@@ -14,9 +14,9 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "lint": "biome check src tests",
-    "lint:fix": "biome check --write src tests",
-    "format": "biome format --write src tests",
+    "lint": "biome check src tests scripts",
+    "lint:fix": "biome check --write src tests scripts",
+    "format": "biome format --write src tests scripts",
     "db:migrate": "node dist/db/migrate-run.js",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio"

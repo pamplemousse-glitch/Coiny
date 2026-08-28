@@ -5,7 +5,16 @@
     "clientKind": "git"
   },
   "files": {
-    "includes": ["src/**/*.ts", "tests/**/*.ts", "*.ts", "*.json", "!dist", "!drizzle", "!node_modules"]
+    "includes": [
+      "src/**/*.ts",
+      "tests/**/*.ts",
+      "scripts/**/*.ts",
+      "*.ts",
+      "*.json",
+      "!dist",
+      "!drizzle",
+      "!node_modules"
+    ]
   },
   "formatter": {
     "enabled": true,
