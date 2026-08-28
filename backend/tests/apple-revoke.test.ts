@@ -347,7 +347,10 @@ describe('apple authorization code exchange at sign-in', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/auth/apple',
-      payload: { identity_token: 'not.a.real.jwt', user_id: 'sub' },
+      // A nonce IS required (G1.23) and is supplied here. This case is about
+      // authorization_code staying optional, so it must fail at token
+      // verification rather than at the schema, or it stops testing that.
+      payload: { identity_token: 'not.a.real.jwt', user_id: 'sub', nonce: 'a'.repeat(32) },
     });
     // 401 because the identity token is not real; the point is that the schema
     // accepted a body with no authorization_code and got as far as verifying.

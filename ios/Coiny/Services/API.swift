@@ -123,15 +123,22 @@ actor API {
     ///   account deletion needs in order to revoke the Sign in with Apple grant
     ///   (TN3194). It is single-use and expires in five minutes, so it is sent
     ///   here and nowhere else. Optional, and a nil never blocks sign-in.
+    /// - Parameter nonce: the RAW nonce whose SHA-256 was sent to Apple as the
+    ///   request nonce (runbook G1.23). Not optional and with no default: the
+    ///   server rejects a request without it, and a default here would let a
+    ///   future caller omit it and discover that at runtime instead of at
+    ///   compile time.
     func signInWithApple(
         identityToken: String,
         userId: String,
-        authorizationCode: String? = nil
+        authorizationCode: String? = nil,
+        nonce: String
     ) async throws {
         struct Body: Encodable {
             let identity_token: String
             let user_id: String
             let authorization_code: String?
+            let nonce: String
         }
         struct Response: Decodable {
             let token: String
@@ -143,7 +150,8 @@ actor API {
             body: Body(
                 identity_token: identityToken,
                 user_id: userId,
-                authorization_code: authorizationCode
+                authorization_code: authorizationCode,
+                nonce: nonce
             ),
             requiresAuth: false
         )

@@ -72,7 +72,7 @@ final class APITests: XCTestCase {
         let signedInBefore = await api.isSignedIn
         XCTAssertFalse(signedInBefore)
 
-        try await api.signInWithApple(identityToken: "apple-id-token", userId: "apple-sub")
+        try await api.signInWithApple(identityToken: "apple-id-token", userId: "apple-sub", nonce: "test-nonce")
 
         let signedInAfter = await api.isSignedIn
         XCTAssertTrue(signedInAfter)
@@ -302,7 +302,7 @@ final class APITests: XCTestCase {
             {"token": "tok-no-identity", "user_id": "user-456"}
             """)
 
-        try await api.signInWithApple(identityToken: "id-tok", userId: "sub-456")
+        try await api.signInWithApple(identityToken: "id-tok", userId: "sub-456", nonce: "test-nonce")
 
         let request = try XCTUnwrap(http.requests.last)
         let body = try XCTUnwrap(request.httpBody)
@@ -320,7 +320,7 @@ final class APITests: XCTestCase {
         http.enqueue(.ok(status: 401, body: Data("{\"error\":\"invalid token\"}".utf8)))
 
         do {
-            try await api.signInWithApple(identityToken: "bad-tok", userId: "sub")
+            try await api.signInWithApple(identityToken: "bad-tok", userId: "sub", nonce: "test-nonce")
             XCTFail("Expected sign-in to throw on 401")
         } catch {
             // expected
