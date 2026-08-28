@@ -14,16 +14,22 @@ import { initDb } from './client.js';
 import { runMigrations } from './migrate.js';
 
 async function main(): Promise<void> {
-  if (!config.DATABASE_URL) {
-    log.error('migrate: DATABASE_URL is not set, refusing to run');
+  if (!config.DATABASE_URL && !config.MIGRATION_DATABASE_URL) {
+    log.error('migrate: neither MIGRATION_DATABASE_URL nor DATABASE_URL is set, refusing to run');
     process.exit(1);
   }
 
   // Environment name only. Never the connection string: it carries the password
   // and release command output is retained in Fly's logs.
-  log.info(`migrate: starting for app_env=${config.APP_ENV}`);
+  //
+  // Which role was used IS logged, because the failure this guards against is
+  // silent: a production release that quietly ran as the runtime role would
+  // work until the first DDL statement, and "it migrated fine last time" is
+  // then the wrong conclusion to draw.
+  const role = config.MIGRATION_DATABASE_URL ? 'split' : 'single';
+  log.info(`migrate: starting for app_env=${config.APP_ENV} db_role=${role}`);
 
-  await initDb();
+  await initDb('migrator');
   await runMigrations();
 
   log.info('migrate: complete');

@@ -43,6 +43,22 @@ const configSchema = z
 
     DATABASE_URL: z.string().default(''),
 
+    // Connection string for the role that owns the schema and is the ONLY one
+    // allowed to run DDL. Read by `db/migrate-run.ts`, which Fly invokes as the
+    // release command, and by nothing else: the server process never holds it.
+    //
+    // Empty means "use DATABASE_URL for migrations too", which is the single
+    // role setup and what every environment did before this existed. That
+    // fallback is deliberate rather than lazy: tests, local dev and staging do
+    // not benefit from the split, and making it required would have made this
+    // change a migration for environments that gain nothing from it.
+    //
+    // The point of the split is blast radius. With one role, a SQL injection or
+    // a compromised runtime credential can DROP TABLE; with two, the runtime
+    // role has no DDL grant and the migrator credential only exists for the
+    // seconds a release command runs. See docs/database-roles.md for the grants.
+    MIGRATION_DATABASE_URL: z.string().default(''),
+
     APNS_KEY_ID: z.string().default(''),
     APNS_TEAM_ID: z.string().default(''),
     APNS_KEY: z.string().default(''),

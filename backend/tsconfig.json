@@ -14,6 +14,11 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*", "tests/**/*"],
+  // `scripts` is here so `pnpm typecheck` covers it. It was excluded until
+  // 2026-08-28, which meant the encryption-key rotation sweep and the PII
+  // backfill, both of which run by hand against a real database, were the only
+  // code in the repo that nothing typechecked. `tsconfig.build.json` sets its
+  // own `include`, so this does not put scripts into `dist`.
+  "include": ["src/**/*", "tests/**/*", "scripts/**/*"],
   "exclude": ["node_modules", "dist"]
 }
