@@ -25,8 +25,9 @@ same and are given in Step 2.
 | ASC category | ASC data type | What it actually is in Coiny |
 |---|---|---|
 | Contact Info | Phone Number | Entered for Spinwheel SMS identity verification; sent, not stored |
+| Contact Info | Physical Address | The property address entered on `RealEstateView` to value a home. **Stored**, unlike the two pass-through items on this list: `real_estate_assets.address`, with a unique index on (user_id, address) |
 | Financial Info | Credit Info | Credit score from Spinwheel |
-| Financial Info | Other Financial Info | Balances, transactions, liabilities, asset values and identifiers (wallet addresses, property addresses, VINs), goals, net worth history |
+| Financial Info | Other Financial Info | Balances, transactions, liabilities, asset values and identifiers (wallet addresses, VINs), goals, net worth history |
 | Identifiers | User ID | Apple/Google subject identifier + Coiny account id |
 | Identifiers | Device ID | APNs push token registered with the backend |
 | Usage Data | Product Interaction | First-party telemetry events (PRD section 24); bucketed, no amounts, no merchant names |
@@ -38,6 +39,14 @@ same and are given in Step 2.
 Do **not** declare: Location, Contacts, User Content, Browsing History, Search
 History, Health & Fitness, Sensitive Info, Payment Info (Apple
 is merchant of record; we never see payment details).
+
+**Physical Address was added on 2026-08-28** (audit 2.1.3, runbook G3.4). It was
+folded into the Other Financial Info row, which under-declared it: Apple has a
+dedicated Contact Info type for a street address, and `RealEstateView.swift:97`
+collects it with `.textContentType(.fullStreetAddress)`, Apple's own signal for
+exactly this data type. Note it is **not** Location: Apple's Location types are
+about device position, and this is an address the user types about a property
+they may not be standing in.
 
 **Diagnostics moved off that list on 2026-08-23** (G3.10). It read "Diagnostics
 (no crash SDK is integrated)", which was true and is now not: MetricKit is a

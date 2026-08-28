@@ -183,6 +183,31 @@
 				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
 			</array>
 		</dict>
+		<!-- Physical address: the property address entered on RealEstateView to
+		     value a home. Unlike the phone number and date of birth above, this
+		     one IS stored: `real_estate_assets.address` (schema.ts:420) holds it
+		     and `real_estate_assets_user_address_idx` is unique on
+		     (user_id, address), so the column is load-bearing and cannot be
+		     dropped the way users.email was.
+		     RealEstateView.swift:97 collects it with
+		     `.textContentType(.fullStreetAddress)`, which is Apple's own signal
+		     for this data type, so a manifest that omits it disagrees with the
+		     field's declared content type inside the same binary.
+		     Undeclared until 2026-08-28 (audit 2.1.3). A missing data type is
+		     something App Review rejects for, and it blocks the nutrition
+		     labels in G3.2 from being transcribed correctly. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePhysicalAddress</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
 		<!-- Other data types: date of birth, entered for Spinwheel identity verification; passed through, not stored -->
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
