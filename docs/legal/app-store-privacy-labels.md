@@ -80,9 +80,10 @@ keyed by user id.
 
 - Every type above appears in `PrivacyInfo.xcprivacy` under
   `NSPrivacyCollectedDataTypes` with `Linked = true`, `Tracking = false`, and
-  matching purposes. Verified by counting on 2026-08-23: the manifest has
-  exactly **10** entries matching the **10** rows in Step 1. (It was 8 and 8
-  earlier the same day, before G3.10 added the two Diagnostics rows.)
+  matching purposes. Recounted on 2026-08-28: the manifest has exactly **11**
+  entries matching the **11** rows in Step 1. (It was 10 and 10 on 2026-08-23,
+  and 8 and 8 earlier that day before G3.10 added the two Diagnostics rows.
+  G3.4 added Physical Address.)
 
   This line previously read "exactly 9 entries matching the 9 rows" and that
   was wrong when it was written: there were 10 of each. So the invariant most
