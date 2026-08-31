@@ -67,6 +67,24 @@ RUN pnpm install --frozen-lockfile --filter coiny-backend... --prod --node-linke
 FROM node:26-alpine AS runtime
 WORKDIR /app
 
+# Patch the OS packages the base image ships, before anything else.
+#
+# `node:26-alpine` is rebuilt on Node's cadence, not Alpine's, so between an
+# Alpine security release and the next Node image there is a window where the
+# base carries a known-fixed CVE. That window is not hypothetical: it failed
+# the Trivy gate on every open PR, including a docs-only one, with
+# CVE-2026-14456 in libcrypto3/libssl3 (fixed in 3.5.8-r0, base shipped
+# 3.5.7-r0).
+#
+# `apk upgrade` rather than a pinned version, because pinning here means
+# editing the Dockerfile on Alpine's schedule and the pin going stale silently
+# in exactly the same way. This takes whatever the repository considers current
+# at build time, which is what the scanner is comparing against.
+#
+# Note this is the RUNTIME stage only. The builder and deps stages are not
+# shipped, so their packages are not in the scanned image.
+RUN apk upgrade --no-cache
+
 # node:26-alpine bundles npm, which the entrypoint never invokes and which
 # carries its own transitive advisories (brace-expansion, ip-address, sigstore,
 # tar at last scan). Removing it drops those findings and shrinks the attack

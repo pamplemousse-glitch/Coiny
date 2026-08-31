@@ -5,9 +5,9 @@
 //
 //   source bin/load-secrets.sh && pnpm --filter coiny-backend exec tsx scripts/backfill-encrypt-pii.ts
 
+import { backfillEncryptPii } from '../src/db/backfill-encrypt-pii.js';
 import { initDb } from '../src/db/client.js';
 import { runMigrations } from '../src/db/migrate.js';
-import { backfillEncryptPii } from '../src/db/backfill-encrypt-pii.js';
 
 async function main(): Promise<void> {
   await initDb();
