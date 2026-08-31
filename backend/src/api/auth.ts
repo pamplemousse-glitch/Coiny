@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { z } from 'zod';
@@ -25,6 +26,18 @@ const AppleSignInSchema = z.object({
   // is spent at sign-in rather than kept. Optional because the shipped iOS
   // build does not send it and must keep signing in.
   authorization_code: z.string().min(1).max(2048).nullish(),
+  // Replay protection (runbook G1.23). The client generates this, sends
+  // SHA-256(nonce) to Apple as the request nonce, and sends the RAW value
+  // here. Apple echoes the hash verbatim into the token's `nonce` claim, so
+  // only the client that started the flow can produce a matching pair.
+  //
+  // REQUIRED, not optional, and that is the whole point: an optional nonce
+  // protects nothing, because an attacker replaying an intercepted token
+  // simply omits the field and takes the unverified path. Made required while
+  // there are no external testers, since the cost of requiring it only rises.
+  // Bounded because it is hashed, and an unbounded string reaching a hash is
+  // free CPU for anyone who asks.
+  nonce: z.string().min(16).max(256),
 });
 
 const GoogleSignInSchema = z.object({
@@ -52,7 +65,7 @@ export function registerAuthApi(app: FastifyInstance): void {
     const parsed = AppleSignInSchema.safeParse(req.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
-    const { identity_token, user_id, authorization_code } = parsed.data;
+    const { identity_token, user_id, authorization_code, nonce } = parsed.data;
 
     let sub: string;
     try {
@@ -69,6 +82,27 @@ export function registerAuthApi(app: FastifyInstance): void {
         algorithms: ['RS256'],
         audience: config.APPLE_BUNDLE_ID,
       });
+
+      // Apple echoes the request nonce into the claim verbatim, so the value
+      // to match is SHA-256 of the raw nonce the client just sent us. A token
+      // captured from another session carries a different hash and cannot be
+      // replayed here without also holding that session's raw nonce.
+      //
+      // Checked INSIDE the try, before `sub` is trusted, so a token that fails
+      // this leaves by the same 401 path as a token that fails its signature.
+      // A distinct status or message would tell an attacker which of the two
+      // checks they had passed.
+      const expectedNonce = createHash('sha256').update(nonce, 'utf8').digest('hex');
+      const claimedNonce = typeof payload.nonce === 'string' ? payload.nonce : '';
+      const expected = Buffer.from(expectedNonce, 'utf8');
+      const claimed = Buffer.from(claimedNonce, 'utf8');
+      // timingSafeEqual throws on a length mismatch rather than returning
+      // false, so the lengths are compared first. Same shape as the Plaid
+      // webhook body hash in plaid/signature.ts.
+      if (claimed.length !== expected.length || !timingSafeEqual(claimed, expected)) {
+        throw new Error('nonce mismatch');
+      }
+
       sub = payload.sub as string;
     } catch (err) {
       req.log.warn({ err }, 'apple identity token verification failed');

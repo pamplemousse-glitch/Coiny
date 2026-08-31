@@ -1,4 +1,6 @@
 import AuthenticationServices
+import CryptoKit
+import Security
 import SwiftUI
 
 /// Screen 0 (PRD section 5.2). The only screen every user passes, which is why
@@ -21,6 +23,18 @@ struct SignInView: View {
     @State private var errorMessage: String?
     @State private var presentedDocument: LegalDocument?
     @Environment(\.colorScheme) private var colorScheme
+
+    /// The raw nonce for the sign-in currently in flight (runbook G1.23).
+    ///
+    /// Apple receives SHA-256 of this and echoes that hash into the identity
+    /// token's `nonce` claim; the backend recomputes the hash from the raw
+    /// value sent alongside the token and requires the two to match. That is
+    /// what makes an intercepted token useless to anyone who did not start
+    /// this particular flow.
+    ///
+    /// Single-use: cleared as soon as it is spent, so a second sign-in cannot
+    /// reuse the first one's nonce.
+    @State private var currentNonce: String?
 
     /// Line one of `docs/legal/consent-copy.md:20`, verbatim, with both terms
     /// as links. The `coiny://legal/...` scheme is intercepted below and opens
@@ -101,6 +115,22 @@ struct SignInView: View {
                 // audit 2.2.1 found. Adding a scope back means naming the
                 // reader first.
                 request.requestedScopes = []
+
+                // Replay protection (G1.23). Apple copies this value into the
+                // identity token's `nonce` claim, and the backend requires it
+                // to equal SHA-256 of the raw nonce sent with the token. A
+                // token captured from another session carries a different
+                // hash and is refused.
+                //
+                // A nil here means the system RNG failed. The nonce is left
+                // unset and `handle` refuses the sign-in rather than sending a
+                // request that would be rejected anyway: proceeding without
+                // one is the failure this row exists to remove.
+                let nonce = Self.randomNonce()
+                currentNonce = nonce
+                if let nonce {
+                    request.nonce = Self.sha256Hex(nonce)
+                }
             } onCompletion: { result in
                 Task { @MainActor in await handle(result) }
             }
@@ -167,6 +197,34 @@ struct SignInView: View {
         })
     }
 
+    /// 32 bytes from the system CSPRNG, hex encoded.
+    ///
+    /// Hex rather than base64url because the value travels as a JSON string
+    /// and ends up in a JWT claim, and hex has no characters either of those
+    /// layers can transform. 64 characters, inside the backend's 16 to 256
+    /// bound.
+    ///
+    /// Returns nil rather than falling back to a weaker source if the RNG
+    /// fails. A predictable nonce would satisfy every check on both sides
+    /// while providing none of the protection, which is worse than no
+    /// sign-in.
+    private static func randomNonce() -> String? {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else {
+            return nil
+        }
+        return bytes.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Lowercase hex SHA-256, matching what the backend computes with
+    /// `createHash('sha256').update(nonce, 'utf8').digest('hex')`. The two
+    /// encodings have to agree exactly or every sign-in fails closed.
+    private static func sha256Hex(_ input: String) -> String {
+        SHA256.hash(data: Data(input.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+
     private static func legalDocument(for url: URL) -> LegalDocument? {
         guard url.scheme == "coiny", url.host == "legal" else { return nil }
         return LegalDocument(rawValue: String(url.path.dropFirst()))
@@ -185,6 +243,16 @@ struct SignInView: View {
                 return
             }
 
+            // Spent here and cleared, so it cannot be reused by a later
+            // attempt. Absent means `randomNonce` failed above; the backend
+            // would refuse the request anyway, so say so here rather than
+            // sending it.
+            guard let nonce = currentNonce else {
+                errorMessage = "Sign in did not complete. Try again."
+                return
+            }
+            currentNonce = nil
+
             isLoading = true
             errorMessage = nil
             defer { isLoading = false }
@@ -201,7 +269,8 @@ struct SignInView: View {
                 try await API.shared.signInWithApple(
                     identityToken: identityToken,
                     userId: credential.user,
-                    authorizationCode: authorizationCode
+                    authorizationCode: authorizationCode,
+                    nonce: nonce
                 )
             } catch {
                 // 3.6.3b: the raw URLError text is not an instruction. Say what

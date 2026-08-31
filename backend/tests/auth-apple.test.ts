@@ -1,4 +1,4 @@
-import { webcrypto } from 'node:crypto';
+import { createHash, webcrypto } from 'node:crypto';
 import { exportJWK, type JWK, SignJWT } from 'jose';
 import { type Dispatcher, getGlobalDispatcher, MockAgent, setGlobalDispatcher } from 'undici';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -62,12 +62,17 @@ afterEach(async () => {
   setGlobalDispatcher(originalDispatcher);
 });
 
+/** The raw nonce a client would generate, and the value Apple echoes into the
+ *  token's `nonce` claim, which is its SHA-256. */
+const TEST_NONCE = 'test_nonce_0123456789abcdef';
+const TEST_NONCE_HASH = createHash('sha256').update(TEST_NONCE, 'utf8').digest('hex');
+
 /** A well-formed Apple identity token, with individual claims overridable so a
  *  test can break exactly one thing at a time. */
 async function appleToken(
-  overrides: { sub?: string; issuer?: string; audience?: string; expiresIn?: string } = {},
+  overrides: { sub?: string; issuer?: string; audience?: string; expiresIn?: string; nonce?: string } = {},
 ): Promise<string> {
-  return new SignJWT({})
+  return new SignJWT({ nonce: overrides.nonce ?? TEST_NONCE_HASH })
     .setProtectedHeader({ alg: 'RS256', kid: TEST_KID })
     .setSubject(overrides.sub ?? 'apple_sub_valid')
     .setIssuer(overrides.issuer ?? APPLE_ISSUER)
@@ -77,10 +82,16 @@ async function appleToken(
     .sign(privateKey);
 }
 
+// The nonce is spread first so every existing case gets a valid one without
+// restating it, and a case that is specifically about the nonce overrides it.
 async function post(payload: object) {
   const { buildApp } = await import('../src/server.js');
   const app = await buildApp();
-  const res = await app.inject({ method: 'POST', url: '/api/auth/apple', payload });
+  const res = await app.inject({
+    method: 'POST',
+    url: '/api/auth/apple',
+    payload: { nonce: TEST_NONCE, ...payload },
+  });
   await app.close();
   return res;
 }
@@ -191,6 +202,50 @@ describe('POST /api/auth/apple', () => {
     const rows = await db().select().from(users);
     expect(JSON.stringify(rows)).not.toContain('someone@example.com');
     expect(JSON.stringify(rows)).not.toContain('A Real Name');
+  });
+
+  // Runbook G1.23: replay protection. Without these, an identity token
+  // captured from one session is a valid credential in anyone's hands.
+  it('returns 401 when the token nonce does not match the raw nonce sent', async () => {
+    // A token minted for someone else's session: correctly signed by Apple,
+    // correct issuer, audience and sub, but bound to a different nonce. This
+    // is exactly the replay the check exists to stop.
+    const token = await appleToken({ nonce: createHash('sha256').update('a_different_nonce').digest('hex') });
+
+    const res = await post({ identity_token: token, user_id: 'apple_sub_valid', nonce: TEST_NONCE });
+
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('returns 401 when the token carries no nonce claim at all', async () => {
+    const token = await appleToken({ nonce: '' });
+
+    const res = await post({ identity_token: token, user_id: 'apple_sub_valid', nonce: TEST_NONCE });
+
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('returns 400 when the client sends no nonce', async () => {
+    const res = await post({
+      identity_token: await appleToken(),
+      user_id: 'apple_sub_valid',
+      nonce: undefined,
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  // The nonce failure must be indistinguishable from a signature failure, or
+  // the status code tells an attacker which check they have already passed.
+  it('reports a nonce mismatch with the same status as a bad signature', async () => {
+    const badNonce = await post({
+      identity_token: await appleToken({ nonce: 'mismatched' }),
+      user_id: 'apple_sub_valid',
+    });
+    const badToken = await post({ identity_token: 'not.a.jwt', user_id: 'apple_sub_valid' });
+
+    expect(badNonce.statusCode).toBe(badToken.statusCode);
+    expect(badNonce.body).toBe(badToken.body);
   });
 
   // Audit 1.4.1: a database dump must not yield a usable bearer token.
