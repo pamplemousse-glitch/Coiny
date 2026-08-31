@@ -62,46 +62,61 @@ export function registerSneakersApi(app: FastifyInstance): void {
 
   // POST /api/sneakers/sync
   app.post('/api/sneakers/sync', SYNC_LIMIT, async (req: FastifyRequest, reply: FastifyReply) => {
-    const userId = req.user!.id;
-    const rows = await db().select().from(sneakerHoldings).where(eq(sneakerHoldings.userId, userId));
-
-    if (rows.length === 0) return { synced: 0, errors: 0 };
-
-    let synced = 0;
-    let errors = 0;
-    const now = new Date();
-
-    for (const row of rows) {
-      try {
-        const facts = await getSneakerFacts(row.sku, row.size ?? undefined);
-        const price = facts?.priceUsd ?? null;
-        if (price === null) {
-          errors++;
-          continue;
-        }
-        await db()
-          .update(sneakerHoldings)
-          // The image comes from the same response as the price, so it costs
-          // nothing extra. Only overwritten when the vendor sent one: a
-          // response without an image is not a product that lost its picture.
-          .set({
-            lastPriceUsd: price.toString(),
-            lastSyncedAt: now,
-            ...(facts?.imageUrl ? { imageUrl: facts.imageUrl } : {}),
-          })
-          .where(and(eq(sneakerHoldings.userId, userId), eq(sneakerHoldings.id, row.id)));
-        synced++;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (msg.includes('KICKSDB_API_KEY not configured') || msg === 'null') {
-          return reply.status(402).send({ error: 'KICKSDB_API_KEY not configured' });
-        }
-        req.log.warn({ sku: row.sku, err }, 'sneaker price lookup failed');
-        errors++;
-      }
+    const result = await syncSneakers(req.user!.id);
+    if (result.unconfigured) {
+      return reply.status(402).send({ error: 'KICKSDB_API_KEY not configured' });
     }
-
-    req.log.info({ userId, synced, errors }, 'sneakers sync complete');
-    return { synced, errors };
+    req.log.info({ userId: req.user!.id, synced: result.synced, errors: result.errors }, 'sneakers sync complete');
+    return { synced: result.synced, errors: result.errors };
   });
+}
+
+/** Re-price every sneaker holding from KicksDB.
+ *
+ *  Extracted from the route so the scheduler can call it. See
+ *  `sync/price-classes.ts`. One vendor call per holding, which is why this
+ *  class is scheduled weekly rather than daily.
+ *
+ *  A failed lookup for one SKU counts as an error and the sweep continues; a
+ *  missing API key stops the whole run, because every remaining row would fail
+ *  the same way. */
+export async function syncSneakers(userId: string): Promise<{ synced: number; errors: number; unconfigured?: true }> {
+  const rows = await db().select().from(sneakerHoldings).where(eq(sneakerHoldings.userId, userId));
+
+  if (rows.length === 0) return { synced: 0, errors: 0 };
+
+  let synced = 0;
+  let errors = 0;
+  const now = new Date();
+
+  for (const row of rows) {
+    try {
+      const facts = await getSneakerFacts(row.sku, row.size ?? undefined);
+      const price = facts?.priceUsd ?? null;
+      if (price === null) {
+        errors++;
+        continue;
+      }
+      await db()
+        .update(sneakerHoldings)
+        // The image comes from the same response as the price, so it costs
+        // nothing extra. Only overwritten when the vendor sent one: a
+        // response without an image is not a product that lost its picture.
+        .set({
+          lastPriceUsd: price.toString(),
+          lastSyncedAt: now,
+          ...(facts?.imageUrl ? { imageUrl: facts.imageUrl } : {}),
+        })
+        .where(and(eq(sneakerHoldings.userId, userId), eq(sneakerHoldings.id, row.id)));
+      synced++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('KICKSDB_API_KEY not configured') || msg === 'null') {
+        return { synced, errors, unconfigured: true };
+      }
+      errors++;
+    }
+  }
+
+  return { synced, errors };
 }

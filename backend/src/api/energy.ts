@@ -9,6 +9,41 @@ import { SYNC_LIMIT } from './rate-limits.js';
 
 const SUPPORTED_COMMODITIES = Object.keys(EIA_COMMODITIES) as [EiaCommodity, ...EiaCommodity[]];
 
+/** Re-price every energy position from the EIA spot feed.
+ *
+ *  Extracted from the route so the scheduler can call it too. Until it was,
+ *  this class only ever refreshed when the user pulled to refresh, so a
+ *  position could sit at a months-old spot price inside a total the product
+ *  presents as current. See `sync/price-classes.ts`.
+ *
+ *  Takes no logger: the caller logs, because the route wants `req.log` and the
+ *  scheduler wants its own. */
+export async function syncEnergy(userId: string): Promise<{ updated: number; note?: string }> {
+  const rows = await db().select().from(energyPositions).where(eq(energyPositions.userId, userId));
+
+  if (rows.length === 0) return { updated: 0 };
+
+  const prices = await getAllEiaSpotPrices(config.EIA_API_KEY);
+  if (prices.size === 0) return { updated: 0, note: 'EIA_API_KEY not configured or prices unavailable' };
+
+  let updated = 0;
+  const now = new Date();
+
+  for (const row of rows) {
+    const spotPrice = prices.get(row.commodity as EiaCommodity);
+    if (spotPrice === undefined) continue;
+
+    await db()
+      .update(energyPositions)
+      .set({ lastSpotPriceUsd: spotPrice.toString(), lastSyncedAt: now })
+      .where(and(eq(energyPositions.userId, userId), eq(energyPositions.id, row.id)));
+
+    updated++;
+  }
+
+  return { updated };
+}
+
 const AddPositionBodySchema = z.object({
   commodity: z.enum(SUPPORTED_COMMODITIES),
   quantity: z.number().positive(),
@@ -93,30 +128,8 @@ export function registerEnergyApi(app: FastifyInstance): void {
 
   // POST /api/energy/sync
   app.post('/api/energy/sync', SYNC_LIMIT, async (req: FastifyRequest) => {
-    const userId = req.user!.id;
-    const rows = await db().select().from(energyPositions).where(eq(energyPositions.userId, userId));
-
-    if (rows.length === 0) return { updated: 0 };
-
-    const prices = await getAllEiaSpotPrices(config.EIA_API_KEY);
-    if (prices.size === 0) return { updated: 0, note: 'EIA_API_KEY not configured or prices unavailable' };
-
-    let updated = 0;
-    const now = new Date();
-
-    for (const row of rows) {
-      const spotPrice = prices.get(row.commodity as EiaCommodity);
-      if (spotPrice === undefined) continue;
-
-      await db()
-        .update(energyPositions)
-        .set({ lastSpotPriceUsd: spotPrice.toString(), lastSyncedAt: now })
-        .where(and(eq(energyPositions.userId, userId), eq(energyPositions.id, row.id)));
-
-      updated++;
-    }
-
-    req.log.info({ userId, updated }, 'energy positions sync complete');
-    return { updated };
+    const result = await syncEnergy(req.user!.id);
+    req.log.info({ userId: req.user!.id, updated: result.updated }, 'energy positions sync complete');
+    return result;
   });
 }

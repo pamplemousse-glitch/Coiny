@@ -60,51 +60,68 @@ export function registerMetalsApi(app: FastifyInstance): void {
 
   // POST /api/metals/sync
   app.post('/api/metals/sync', SYNC_LIMIT, async (req: FastifyRequest, reply: FastifyReply) => {
-    const userId = req.user!.id;
-    const rows = await db().select().from(metalHoldings).where(eq(metalHoldings.userId, userId));
-
-    // Fetch spot price once per unique metal symbol.
-    const uniqueMetals = [...new Set(rows.map((r) => r.metal))];
-    const spotPrices = new Map<string, { priceUsd: number; asOf: Date | null }>();
-
-    for (const metal of uniqueMetals) {
-      try {
-        const spot = await getMetalSpotPrice(metal);
-        spotPrices.set(metal, spot);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (msg === 'GOLDAPI_API_KEY not configured') {
-          return reply.status(402).send({ error: 'GOLDAPI_API_KEY not configured' });
-        }
-        // Leave metal out of map; its holdings will be counted as errors below.
-      }
+    const result = await syncMetals(req.user!.id);
+    if (result.unconfigured) {
+      return reply.status(402).send({ error: 'GOLDAPI_API_KEY not configured' });
     }
-
-    let synced = 0;
-    let errors = 0;
-    const now = new Date();
-
-    for (const row of rows) {
-      const spot = spotPrices.get(row.metal);
-      if (spot === undefined) {
-        errors++;
-        continue;
-      }
-      const valueUsd = spot.priceUsd * parseFloat(row.weightOz);
-      await db()
-        .update(metalHoldings)
-        .set({
-          lastValueUsd: valueUsd.toString(),
-          lastSyncedAt: now,
-          // The vendor's own quote time when it sent one. Null leaves the
-          // freshness reader on lastSyncedAt, which is the old behaviour.
-          priceAsOf: spot.asOf ?? null,
-        })
-        .where(and(eq(metalHoldings.userId, userId), eq(metalHoldings.id, row.id)));
-      synced++;
-    }
-
-    req.log.info({ userId, synced, errors }, 'metals sync complete');
-    return { synced, errors };
+    req.log.info({ userId: req.user!.id, synced: result.synced, errors: result.errors }, 'metals sync complete');
+    return { synced: result.synced, errors: result.errors };
   });
+}
+
+/** Re-value every metal holding from the GoldAPI spot feed.
+ *
+ *  Extracted from the route so the scheduler can call it. See
+ *  `sync/price-classes.ts`.
+ *
+ *  `unconfigured` rather than a thrown error, because a missing key is not a
+ *  failure of this user's data: the route turns it into a 402 (the caller must
+ *  supply a key) and the scheduler treats it as "skip the whole class", since
+ *  running it for the next user would fail identically and burn a tick doing
+ *  it. */
+export async function syncMetals(userId: string): Promise<{ synced: number; errors: number; unconfigured?: true }> {
+  const rows = await db().select().from(metalHoldings).where(eq(metalHoldings.userId, userId));
+
+  // Fetch spot price once per unique metal symbol.
+  const uniqueMetals = [...new Set(rows.map((r) => r.metal))];
+  const spotPrices = new Map<string, { priceUsd: number; asOf: Date | null }>();
+
+  for (const metal of uniqueMetals) {
+    try {
+      const spot = await getMetalSpotPrice(metal);
+      spotPrices.set(metal, spot);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg === 'GOLDAPI_API_KEY not configured') {
+        return { synced: 0, errors: 0, unconfigured: true };
+      }
+      // Leave metal out of map; its holdings will be counted as errors below.
+    }
+  }
+
+  let synced = 0;
+  let errors = 0;
+  const now = new Date();
+
+  for (const row of rows) {
+    const spot = spotPrices.get(row.metal);
+    if (spot === undefined) {
+      errors++;
+      continue;
+    }
+    const valueUsd = spot.priceUsd * parseFloat(row.weightOz);
+    await db()
+      .update(metalHoldings)
+      .set({
+        lastValueUsd: valueUsd.toString(),
+        lastSyncedAt: now,
+        // The vendor's own quote time when it sent one. Null leaves the
+        // freshness reader on lastSyncedAt, which is the old behaviour.
+        priceAsOf: spot.asOf ?? null,
+      })
+      .where(and(eq(metalHoldings.userId, userId), eq(metalHoldings.id, row.id)));
+    synced++;
+  }
+
+  return { synced, errors };
 }
