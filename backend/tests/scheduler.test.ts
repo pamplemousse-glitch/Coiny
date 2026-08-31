@@ -94,8 +94,29 @@ describe('runSchedulerTick', () => {
     await enqueueItemRemoval({ itemId: 'item_stuck', accessToken: 'access-sandbox-stuck' });
     mockedItemRemove.mockResolvedValue({ request_id: 'req_rm' });
 
+    // `enqueueItemRemoval` stamps `lastAttemptAt` from the REAL clock, while
+    // the tick below runs at a synthetic time derived from NOW. Those are two
+    // different clocks, and comparing across them is what made this test fail
+    // for a 15-minute window every day.
+    //
+    // The arithmetic: attempts = 1, so removalBackoffMs is 15 minutes, and the
+    // tick ran at NOW + 1h = today 24:00 UTC. The row was therefore only due
+    // while the real clock was before 23:45 UTC. CI runs landing between
+    // 23:45 and midnight failed on exactly this assertion, and PRs merged
+    // earlier in the day passed.
+    //
+    // Pinning `lastAttemptAt` into the tick's own frame makes both sides of
+    // the comparison synthetic, so the result no longer depends on what time
+    // the suite happens to run.
+    const { db } = await import('../src/db/client.js');
+    const { plaidRemovalQueue } = await import('../src/db/schema.js');
+    await db()
+      .update(plaidRemovalQueue)
+      .set({ lastAttemptAt: new Date(NOW.getTime() - HOUR) });
+
     const { runSchedulerTick } = await import('../src/scheduler/index.js');
-    // An hour on, so the row's first backoff has elapsed.
+    // Two hours past the row's stamped attempt, so the 15-minute first backoff
+    // has elapsed by a wide margin regardless of wall-clock time.
     const summary = await runSchedulerTick(new Date(NOW.getTime() + HOUR));
 
     expect(mockedItemRemove).toHaveBeenCalledWith('access-sandbox-stuck');
