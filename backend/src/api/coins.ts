@@ -95,38 +95,48 @@ export function registerCoinsApi(app: FastifyInstance): void {
 
   // POST /api/coins/sync
   app.post('/api/coins/sync', SYNC_LIMIT, async (req: FastifyRequest) => {
-    const userId = req.user!.id;
-    const rows = await db().select().from(coinHoldings).where(eq(coinHoldings.userId, userId));
+    const result = await syncCoins(req.user!.id);
+    req.log.info({ userId: req.user!.id, ...result }, 'coins sync complete');
+    return result;
+  });
+}
 
-    if (rows.length === 0) return { updated: 0 };
+/** Re-price every graded coin from the PCGS price guide.
+ *
+ *  Extracted from the route so the scheduler can call it. See
+ *  `sync/price-classes.ts`. Price guides move slowly, which is why this is
+ *  scheduled weekly rather than daily. */
+// `errors` is optional, and the empty case omits it, because this is the route's
+// response body and the extraction had to be shape-preserving. Adding the key
+// unconditionally looked harmless and broke three tests that pin the contract.
+export async function syncCoins(userId: string): Promise<{ updated: number; errors?: number }> {
+  const rows = await db().select().from(coinHoldings).where(eq(coinHoldings.userId, userId));
 
-    let updated = 0;
-    let errors = 0;
-    const now = new Date();
+  if (rows.length === 0) return { updated: 0 };
 
-    for (const row of rows) {
-      const facts = await getPcgsCoinFacts(row.pcgsNo, row.gradeNo, row.plusGrade, config.PCGS_API_KEY).catch(
-        () => null,
-      );
+  let updated = 0;
+  let errors = 0;
+  const now = new Date();
 
-      if (facts === null || facts.priceGuideUsd === null) {
-        errors++;
-        continue;
-      }
+  for (const row of rows) {
+    const facts = await getPcgsCoinFacts(row.pcgsNo, row.gradeNo, row.plusGrade, config.PCGS_API_KEY).catch(() => null);
 
-      await db()
-        .update(coinHoldings)
-        .set({
-          lastPriceGuideUsd: facts.priceGuideUsd.toString(),
-          coinName: facts.name ?? row.coinName,
-          lastSyncedAt: now,
-        })
-        .where(and(eq(coinHoldings.userId, userId), eq(coinHoldings.id, row.id)));
-
-      updated++;
+    if (facts === null || facts.priceGuideUsd === null) {
+      errors++;
+      continue;
     }
 
-    req.log.info({ userId, updated, errors }, 'coins sync complete');
-    return { updated, errors };
-  });
+    await db()
+      .update(coinHoldings)
+      .set({
+        lastPriceGuideUsd: facts.priceGuideUsd.toString(),
+        coinName: facts.name ?? row.coinName,
+        lastSyncedAt: now,
+      })
+      .where(and(eq(coinHoldings.userId, userId), eq(coinHoldings.id, row.id)));
+
+    updated++;
+  }
+
+  return { updated, errors };
 }

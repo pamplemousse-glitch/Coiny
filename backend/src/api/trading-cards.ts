@@ -104,44 +104,57 @@ export function registerTradingCardsApi(app: FastifyInstance): void {
 
   // POST /api/trading-cards/sync
   app.post('/api/trading-cards/sync', SYNC_LIMIT, async (req: FastifyRequest) => {
-    const userId = req.user!.id;
-    const rows = await db().select().from(tradingCardHoldings).where(eq(tradingCardHoldings.userId, userId));
+    const result = await syncTradingCards(req.user!.id);
+    req.log.info({ userId: req.user!.id, ...result }, 'trading cards sync complete');
+    return result;
+  });
+}
 
-    if (rows.length === 0) return { updated: 0 };
+/** Re-price every trading card from TCGapi.
+ *
+ *  Extracted from the route so the scheduler can call it. See
+ *  `sync/price-classes.ts`.
+ *
+ *  One vendor call per card, against a free tier of 100 requests a day, which
+ *  is the binding constraint on how often this can be scheduled. Weekly. */
+// `errors` optional and omitted when there is nothing to price: this is the
+// route's response body, so the extraction had to preserve its shape exactly.
+export async function syncTradingCards(userId: string): Promise<{ updated: number; errors?: number }> {
+  const rows = await db().select().from(tradingCardHoldings).where(eq(tradingCardHoldings.userId, userId));
 
-    let updated = 0;
-    let errors = 0;
-    const now = new Date();
+  if (rows.length === 0) return { updated: 0 };
 
-    for (const row of rows) {
-      const facts = await getTradingCard(
-        row.cardName,
-        row.game,
-        row.setName ?? null,
-        row.isFoil,
-        config.TCGAPI_KEY,
-      ).catch(() => null);
+  let updated = 0;
+  let errors = 0;
+  const now = new Date();
 
-      const price = facts?.priceUsd ?? null;
-      if (price === null) {
-        errors++;
-        continue;
-      }
+  for (const row of rows) {
+    const facts = await getTradingCard(
+      row.cardName,
+      row.game,
+      row.setName ?? null,
+      row.isFoil,
+      config.TCGAPI_KEY,
+    ).catch(() => null);
 
-      await db()
-        .update(tradingCardHoldings)
-        // Image rides along in the same response; only written when present.
-        .set({
-          lastPriceUsd: price.toString(),
-          lastSyncedAt: now,
-          ...(facts?.imageUrl ? { imageUrl: facts.imageUrl } : {}),
-        })
-        .where(and(eq(tradingCardHoldings.userId, userId), eq(tradingCardHoldings.id, row.id)));
-
-      updated++;
+    const price = facts?.priceUsd ?? null;
+    if (price === null) {
+      errors++;
+      continue;
     }
 
-    req.log.info({ userId, updated, errors }, 'trading cards sync complete');
-    return { updated, errors };
-  });
+    await db()
+      .update(tradingCardHoldings)
+      // Image rides along in the same response; only written when present.
+      .set({
+        lastPriceUsd: price.toString(),
+        lastSyncedAt: now,
+        ...(facts?.imageUrl ? { imageUrl: facts.imageUrl } : {}),
+      })
+      .where(and(eq(tradingCardHoldings.userId, userId), eq(tradingCardHoldings.id, row.id)));
+
+    updated++;
+  }
+
+  return { updated, errors };
 }

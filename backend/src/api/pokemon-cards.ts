@@ -88,37 +88,51 @@ export function registerPokemonCardsApi(app: FastifyInstance): void {
   });
 
   app.post('/api/pokemon-cards/sync', SYNC_LIMIT, async (req) => {
-    const userId = req.user!.id;
-    const apiKey = config.POKEMONPRICETRACKER_API_KEY;
-
-    const rows = await db().select().from(pokemonCardHoldings).where(eq(pokemonCardHoldings.userId, userId));
-
-    if (rows.length === 0) return { updated: 0 };
-
-    let updated = 0;
-    let errors = 0;
-
-    await Promise.all(
-      rows.map(async (row) => {
-        const facts = await getPokemonCard(row.cardName, row.setName, row.variant, apiKey);
-        const price = facts?.priceUsd ?? null;
-        if (price === null) {
-          errors++;
-          return;
-        }
-        await db()
-          .update(pokemonCardHoldings)
-          // Image rides along in the same response; only written when present.
-          .set({
-            lastPriceUsd: price.toString(),
-            lastSyncedAt: new Date(),
-            ...(facts?.imageUrl ? { imageUrl: facts.imageUrl } : {}),
-          })
-          .where(eq(pokemonCardHoldings.id, row.id));
-        updated++;
-      }),
-    );
-
-    return { updated, errors };
+    return syncPokemonCards(req.user!.id);
   });
+}
+
+/** Re-price every Pokemon card from PokemonPriceTracker.
+ *
+ *  Extracted from the route so the scheduler can call it. See
+ *  `sync/price-classes.ts`.
+ *
+ *  Note this one fans out with `Promise.all` rather than looping, unlike its
+ *  siblings. Fine at a handful of cards; if a collection gets large this is the
+ *  class most likely to trip a vendor rate limit, and the fix is a concurrency
+ *  bound here rather than a longer interval in the registry. */
+// `errors` optional and omitted when there is nothing to price: this is the
+// route's response body, so the extraction had to preserve its shape exactly.
+export async function syncPokemonCards(userId: string): Promise<{ updated: number; errors?: number }> {
+  const apiKey = config.POKEMONPRICETRACKER_API_KEY;
+
+  const rows = await db().select().from(pokemonCardHoldings).where(eq(pokemonCardHoldings.userId, userId));
+
+  if (rows.length === 0) return { updated: 0 };
+
+  let updated = 0;
+  let errors = 0;
+
+  await Promise.all(
+    rows.map(async (row) => {
+      const facts = await getPokemonCard(row.cardName, row.setName, row.variant, apiKey);
+      const price = facts?.priceUsd ?? null;
+      if (price === null) {
+        errors++;
+        return;
+      }
+      await db()
+        .update(pokemonCardHoldings)
+        // Image rides along in the same response; only written when present.
+        .set({
+          lastPriceUsd: price.toString(),
+          lastSyncedAt: new Date(),
+          ...(facts?.imageUrl ? { imageUrl: facts.imageUrl } : {}),
+        })
+        .where(eq(pokemonCardHoldings.id, row.id));
+      updated++;
+    }),
+  );
+
+  return { updated, errors };
 }

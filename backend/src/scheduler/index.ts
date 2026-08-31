@@ -39,6 +39,7 @@ import { retryBudgetStats } from '../resilience/retry-budget.js';
 import { getClassCacheForUsers } from '../store/asset-cache.js';
 import { usersMissingDailyPoint } from '../store/goals.js';
 import { recordOpsEvent } from '../store/ops.js';
+import { type PriceSyncSummary, runPriceSync } from '../sync/price-classes.js';
 import { type HealthSweepSummary, isHealthSweepDue, runConnectionHealthSweep } from './plaid-health.js';
 import { drainPlaidRemovalQueue, type RemovalDrainSummary } from './plaid-removals.js';
 import { isPurgeDue, type PurgeSummary, runRetentionPurge } from './purge.js';
@@ -137,6 +138,11 @@ export type TickSummary = {
   removals: RemovalDrainSummary;
   /** Null on the ticks that were not the day's health-sweep tick. */
   health: HealthSweepSummary | null;
+  /** Every tick. Unlike the purge and the health sweep this has no daily gate
+   *  of its own: each price class carries its own interval and the due query
+   *  returns nobody on the ticks where nothing has aged out, which is most of
+   *  them. */
+  priceSync: PriceSyncSummary;
 };
 
 export async function runSchedulerTick(
@@ -153,6 +159,7 @@ export async function runSchedulerTick(
       purge: null,
       removals: emptyDrain(),
       health: null,
+      priceSync: emptyPriceSync(),
     };
   }
   inFlight = true;
@@ -164,6 +171,7 @@ export async function runSchedulerTick(
     purge: null,
     removals: emptyDrain(),
     health: null,
+    priceSync: emptyPriceSync(),
   };
   const startedTick = Date.now();
 
@@ -192,6 +200,25 @@ export async function runSchedulerTick(
         log.warn({ user_id: userId, asset_class: cls, err }, 'scheduled refresh failed');
       }
     });
+
+    // Price-recompute classes: metals, energy, farmland, sneakers, coins and
+    // both card vendors. Until this existed they refreshed ONLY when the user
+    // pulled to refresh that specific class, so a third of a net worth could
+    // sit weeks old inside a total the product presents as current.
+    //
+    // Runs after the vendor refreshes and before the goal pass, so the daily
+    // point is derived from prices this tick has already updated rather than
+    // from yesterday's. Isolated like every other unit.
+    try {
+      summary.priceSync = await runPriceSync(now);
+      if (summary.priceSync.attempted > 0 || summary.priceSync.unconfigured.length > 0) {
+        log.info({ ...summary.priceSync }, 'price_sync_completed');
+      }
+    } catch (err) {
+      log.warn({ err }, 'price sync sweep failed');
+      captureError(err, { task: 'price_sync' });
+      await recordOpsEvent({ severity: 'error', kind: 'task_failed', detail: { task: 'price_sync' } });
+    }
 
     const dueUsers = await findUsersDueDailyGoalRefresh(now);
     await runWithConcurrency(CONCURRENCY, dueUsers, async (userId) => {
@@ -323,6 +350,10 @@ export async function runSchedulerTick(
 
 function emptyDrain(): RemovalDrainSummary {
   return { attempted: 0, removed: 0, alreadyGone: 0, failed: 0 };
+}
+
+function emptyPriceSync(): PriceSyncSummary {
+  return { attempted: 0, refreshed: 0, failed: 0, unconfigured: [] };
 }
 
 type RefreshUnit = { userId: string; cls: ScheduledClass };

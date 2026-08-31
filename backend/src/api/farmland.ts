@@ -94,35 +94,44 @@ export function registerFarmlandApi(app: FastifyInstance): void {
 
   // POST /api/farmland/sync
   app.post('/api/farmland/sync', SYNC_LIMIT, async (req: FastifyRequest) => {
-    const userId = req.user!.id;
-    const rows = await db().select().from(farmlandParcels).where(eq(farmlandParcels.userId, userId));
+    const result = await syncFarmland(req.user!.id);
+    req.log.info({ userId: req.user!.id, updated: result.updated }, 'farmland parcels sync complete');
+    return result;
+  });
+}
 
-    if (rows.length === 0) return { updated: 0 };
+/** Re-price every farmland parcel from USDA NASS.
+ *
+ *  Extracted from the route so the scheduler can call it. One price lookup per
+ *  distinct state rather than per parcel, which is why the cache is inside the
+ *  loop rather than around it. See `sync/price-classes.ts`. */
+export async function syncFarmland(userId: string): Promise<{ updated: number }> {
+  const rows = await db().select().from(farmlandParcels).where(eq(farmlandParcels.userId, userId));
 
-    let updated = 0;
-    const now = new Date();
-    const priceCache = new Map<string, number | null>();
+  if (rows.length === 0) return { updated: 0 };
 
-    for (const row of rows) {
-      const stateCode = row.stateCode.toUpperCase();
+  let updated = 0;
+  const now = new Date();
+  const priceCache = new Map<string, number | null>();
 
-      if (!priceCache.has(stateCode)) {
-        const price = await getFarmlandPricePerAcre(stateCode, config.USDA_NASS_API_KEY).catch(() => null);
-        priceCache.set(stateCode, price);
-      }
+  for (const row of rows) {
+    const stateCode = row.stateCode.toUpperCase();
 
-      const pricePerAcre = priceCache.get(stateCode) ?? null;
-      if (pricePerAcre === null) continue;
-
-      await db()
-        .update(farmlandParcels)
-        .set({ lastPricePerAcreUsd: pricePerAcre.toString(), lastSyncedAt: now })
-        .where(and(eq(farmlandParcels.userId, userId), eq(farmlandParcels.id, row.id)));
-
-      updated++;
+    if (!priceCache.has(stateCode)) {
+      const price = await getFarmlandPricePerAcre(stateCode, config.USDA_NASS_API_KEY).catch(() => null);
+      priceCache.set(stateCode, price);
     }
 
-    req.log.info({ userId, updated }, 'farmland parcels sync complete');
-    return { updated };
-  });
+    const pricePerAcre = priceCache.get(stateCode) ?? null;
+    if (pricePerAcre === null) continue;
+
+    await db()
+      .update(farmlandParcels)
+      .set({ lastPricePerAcreUsd: pricePerAcre.toString(), lastSyncedAt: now })
+      .where(and(eq(farmlandParcels.userId, userId), eq(farmlandParcels.id, row.id)));
+
+    updated++;
+  }
+
+  return { updated };
 }
