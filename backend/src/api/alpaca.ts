@@ -5,6 +5,7 @@ import type { AlpacaEnv } from '../alpaca/client.js';
 import { AlpacaError, getEquityUsd, getPositions } from '../alpaca/client.js';
 import { db } from '../db/client.js';
 import { alpacaConnections } from '../db/schema.js';
+import type { VendorSyncResult } from '../store/connection-health.js';
 import { recordSyncFailure, successPatch } from '../store/connection-health.js';
 import { decryptString, encryptString } from '../util/crypto.js';
 import { SYNC_LIMIT } from './rate-limits.js';
@@ -61,30 +62,16 @@ export function registerAlpacaApi(app: FastifyInstance): void {
   // POST /api/alpaca/sync — fetch live equity from Alpaca and cache it
   app.post('/api/alpaca/sync', SYNC_LIMIT, async (req: FastifyRequest, reply: FastifyReply) => {
     const userId = req.user!.id;
-    const [conn] = await db().select().from(alpacaConnections).where(eq(alpacaConnections.userId, userId));
-    if (!conn) return reply.status(404).send({ error: 'not connected' });
-
     try {
-      const equity = await getEquityUsd(
-        decryptString(conn.apiKeyId),
-        decryptString(conn.apiSecretKey),
-        conn.env as AlpacaEnv,
-      );
+      const result = await syncAlpaca(userId);
+      if (result.status === 'not_connected') return reply.status(404).send({ error: 'not connected' });
 
-      await db()
-        .update(alpacaConnections)
-        .set({ lastEquityUsd: equity.toString(), ...successPatch() })
-        .where(eq(alpacaConnections.userId, userId));
-
-      req.log.info({ userId, equity }, 'alpaca sync complete');
-      return { equity };
+      req.log.info({ userId, equity: result.body.equity }, 'alpaca sync complete');
+      return result.body;
     } catch (err) {
-      // Recorded before the 401 branch, not after: a rejected API key is the
-      // single most user-actionable failure this route has, and it is exactly
-      // the case `deriveConnectionStatus` maps to `reauth_required` and offers
-      // a Reconnect button for. Returning 401 to the client is not a reason to
-      // forget it happened.
-      await recordSyncFailure(alpacaConnections, eq(alpacaConnections.userId, userId), conn.consecutiveFailures, err);
+      // The failure is already recorded inside syncAlpaca; this is only the
+      // status-code mapping, which belongs to the route and not to a scheduled
+      // run that has nobody to answer with a 401.
       if (err instanceof AlpacaError && (err.status === 401 || err.status === 403)) {
         return reply.status(401).send({ error: 'Invalid Alpaca API credentials' });
       }
@@ -128,4 +115,39 @@ export function registerAlpacaApi(app: FastifyInstance): void {
     req.log.info({ userId }, 'alpaca disconnected');
     return reply.status(204).send();
   });
+}
+
+/**
+ * The Alpaca sync, extracted from its route so the scheduler can run it
+ * unattended (sync/credential-vendors.ts). The route keeps the 401 mapping,
+ * which is a fact about HTTP and not about the sync.
+ *
+ * The failure is recorded BEFORE the caller gets to map it to a status code,
+ * exactly as it was before: a rejected API key is the single most
+ * user-actionable failure this vendor has, and it is precisely the case
+ * `deriveConnectionStatus` turns into `reauth_required` with a Reconnect
+ * button. Answering the client with a 401 is not a reason to forget it
+ * happened, and neither is being a scheduled run with no client at all.
+ */
+export async function syncAlpaca(userId: string): Promise<VendorSyncResult<{ equity: number }>> {
+  const [conn] = await db().select().from(alpacaConnections).where(eq(alpacaConnections.userId, userId));
+  if (!conn) return { status: 'not_connected' };
+
+  try {
+    const equity = await getEquityUsd(
+      decryptString(conn.apiKeyId),
+      decryptString(conn.apiSecretKey),
+      conn.env as AlpacaEnv,
+    );
+
+    await db()
+      .update(alpacaConnections)
+      .set({ lastEquityUsd: equity.toString(), ...successPatch() })
+      .where(eq(alpacaConnections.userId, userId));
+
+    return { status: 'synced', updated: 1, body: { equity } };
+  } catch (err) {
+    await recordSyncFailure(alpacaConnections, eq(alpacaConnections.userId, userId), conn.consecutiveFailures, err);
+    throw err;
+  }
 }

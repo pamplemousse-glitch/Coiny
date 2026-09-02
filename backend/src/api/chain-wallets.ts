@@ -18,7 +18,9 @@ import { getSpotPrices } from '../coinbase/client.js';
 import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { chainWallets } from '../db/schema.js';
+import type { VendorSyncResult } from '../store/connection-health.js';
 import { recordSyncFailure, successPatch } from '../store/connection-health.js';
+import { log } from '../util/log.js';
 import { SYNC_LIMIT } from './rate-limits.js';
 
 // Maps chain identifier to the Coinbase spot price symbol.
@@ -213,88 +215,107 @@ export function registerChainWalletsApi(app: FastifyInstance): void {
   // Fetches live native balances via chain-specific clients, converts to USD, and persists.
   app.post('/api/chain-wallets/sync', SYNC_LIMIT, async (req: FastifyRequest) => {
     const userId = req.user!.id;
-    const rows = await db().select().from(chainWallets).where(eq(chainWallets.userId, userId));
+    const result = await syncChainWallets(userId);
+    if (result.status === 'not_connected') return { updated: 0 };
 
-    if (rows.length === 0) return { updated: 0 };
-
-    const symbols = [...new Set(rows.map((r) => CHAIN_SYMBOLS[r.chain]).filter((s): s is string => !!s))];
-    const prices = symbols.length > 0 ? await getSpotPrices(symbols) : new Map<string, number>();
-
-    let updated = 0;
-    let unpriced = 0;
-    let unresolved = 0;
-    const now = new Date();
-
-    for (const row of rows) {
-      try {
-        const chainBalance = await fetchChainBalance(row.chain, row.address);
-        const nativeBalance = chainBalance?.total ?? null;
-
-        // The balance half of the same rule the price half enforces below: a
-        // balance we could not read is NOT a balance of zero. Every chain client
-        // used to answer 0 for a missing API key, an upstream outage or a shape
-        // it did not recognise, and 0 is not null, so those sailed past this
-        // guard and were multiplied by a good price and persisted. An expired
-        // Blockfrost key was enough to write a user's whole ADA position to
-        // nothing, with no error raised anywhere.
-        if (nativeBalance === null) {
-          unresolved++;
-          req.log.warn({ userId, chain: row.chain }, 'balance unresolved for chain; leaving last known balance');
-          continue;
-        }
-
-        const symbol = CHAIN_SYMBOLS[row.chain];
-        const price = symbol ? prices.get(symbol) : undefined;
-
-        // An unpriced coin is NOT a coin worth nothing.
-        //
-        // This used to be `prices.get(symbol) ?? 0`, so a missing price produced
-        // balanceUsd = 0 and PERSISTED it over the last known good value. And
-        // getSpotPrices never throws: its own contract is "symbols that fail are
-        // omitted", so a Coinbase outage returns an empty map and every one of
-        // the sixteen chains here would have been written to zero at once, with
-        // no error anywhere. A user's whole crypto column could go to nothing
-        // because a third party had a bad minute.
-        //
-        // Skipping leaves the previous balance and `lastSyncedAt` untouched, so
-        // the value reads as stale (which it is) rather than as zero (which it
-        // is not). Same reasoning the Hyperliquid client already applies to a
-        // token with no mid.
-        if (price === undefined) {
-          unpriced++;
-          req.log.warn({ userId, chain: row.chain }, 'no spot price for chain; leaving last known balance');
-          continue;
-        }
-
-        const balanceUsd = nativeBalance * price;
-        const stakedUsd = chainBalance?.staked ?? null;
-
-        await db()
-          .update(chainWallets)
-          .set({
-            lastBalanceUsd: balanceUsd.toString(),
-            ...successPatch(now),
-            // Null stays null: unknown staking is recorded as unknown rather
-            // than written as zero, the same rule as the balance itself.
-            lastStakedUsd: stakedUsd !== null ? (stakedUsd * price).toString() : null,
-          })
-          .where(and(eq(chainWallets.userId, userId), eq(chainWallets.id, row.id)));
-
-        updated++;
-      } catch (err) {
-        // Per-wallet. A user with eleven chains and one dead RPC gets the
-        // dead one named, rather than a crypto class that reads degraded.
-        await recordSyncFailure(
-          chainWallets,
-          and(eq(chainWallets.userId, userId), eq(chainWallets.id, row.id)),
-          row.consecutiveFailures,
-          err,
-        );
-        throw err;
-      }
-    }
-
-    req.log.info({ userId, updated, unpriced, unresolved }, 'chain wallets sync complete');
-    return { updated, unpriced, unresolved };
+    req.log.info({ userId, ...result.body }, 'chain wallets sync complete');
+    return result.body;
   });
+}
+
+/**
+ * The chain wallet sync, extracted from its route so the scheduler can run it
+ * unattended (sync/credential-vendors.ts).
+ *
+ * Two invariants survive the move unchanged, and both exist because breaking
+ * them wrote a user's holdings to zero: a balance we could not READ is not a
+ * balance of zero, and a coin we could not PRICE is not a coin worth nothing.
+ * Both cases skip the row, which leaves the previous value and its real age in
+ * place, so the number reads stale rather than wrong. That matters more under
+ * the scheduler than it did under the route, because nobody is watching.
+ */
+export async function syncChainWallets(
+  userId: string,
+): Promise<VendorSyncResult<{ updated: number; unpriced: number; unresolved: number }>> {
+  const rows = await db().select().from(chainWallets).where(eq(chainWallets.userId, userId));
+  if (rows.length === 0) return { status: 'not_connected' };
+
+  const symbols = [...new Set(rows.map((r) => CHAIN_SYMBOLS[r.chain]).filter((s): s is string => !!s))];
+  const prices = symbols.length > 0 ? await getSpotPrices(symbols) : new Map<string, number>();
+
+  let updated = 0;
+  let unpriced = 0;
+  let unresolved = 0;
+  const now = new Date();
+
+  for (const row of rows) {
+    try {
+      const chainBalance = await fetchChainBalance(row.chain, row.address);
+      const nativeBalance = chainBalance?.total ?? null;
+
+      // The balance half of the same rule the price half enforces below: a
+      // balance we could not read is NOT a balance of zero. Every chain client
+      // used to answer 0 for a missing API key, an upstream outage or a shape
+      // it did not recognise, and 0 is not null, so those sailed past this
+      // guard and were multiplied by a good price and persisted. An expired
+      // Blockfrost key was enough to write a user's whole ADA position to
+      // nothing, with no error raised anywhere.
+      if (nativeBalance === null) {
+        unresolved++;
+        log.warn({ user_id: userId, chain: row.chain }, 'balance unresolved for chain; leaving last known balance');
+        continue;
+      }
+
+      const symbol = CHAIN_SYMBOLS[row.chain];
+      const price = symbol ? prices.get(symbol) : undefined;
+
+      // An unpriced coin is NOT a coin worth nothing.
+      //
+      // This used to be `prices.get(symbol) ?? 0`, so a missing price produced
+      // balanceUsd = 0 and PERSISTED it over the last known good value. And
+      // getSpotPrices never throws: its own contract is "symbols that fail are
+      // omitted", so a Coinbase outage returns an empty map and every one of
+      // the sixteen chains here would have been written to zero at once, with
+      // no error anywhere. A user's whole crypto column could go to nothing
+      // because a third party had a bad minute.
+      //
+      // Skipping leaves the previous balance and `lastSyncedAt` untouched, so
+      // the value reads as stale (which it is) rather than as zero (which it
+      // is not). Same reasoning the Hyperliquid client already applies to a
+      // token with no mid.
+      if (price === undefined) {
+        unpriced++;
+        log.warn({ user_id: userId, chain: row.chain }, 'no spot price for chain; leaving last known balance');
+        continue;
+      }
+
+      const balanceUsd = nativeBalance * price;
+      const stakedUsd = chainBalance?.staked ?? null;
+
+      await db()
+        .update(chainWallets)
+        .set({
+          lastBalanceUsd: balanceUsd.toString(),
+          ...successPatch(now),
+          // Null stays null: unknown staking is recorded as unknown rather
+          // than written as zero, the same rule as the balance itself.
+          lastStakedUsd: stakedUsd !== null ? (stakedUsd * price).toString() : null,
+        })
+        .where(and(eq(chainWallets.userId, userId), eq(chainWallets.id, row.id)));
+
+      updated++;
+    } catch (err) {
+      // Per-wallet. A user with eleven chains and one dead RPC gets the
+      // dead one named, rather than a crypto class that reads degraded.
+      await recordSyncFailure(
+        chainWallets,
+        and(eq(chainWallets.userId, userId), eq(chainWallets.id, row.id)),
+        row.consecutiveFailures,
+        err,
+      );
+      throw err;
+    }
+  }
+
+  return { status: 'synced', updated, body: { updated, unpriced, unresolved } };
 }

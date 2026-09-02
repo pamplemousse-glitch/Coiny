@@ -10,10 +10,30 @@ import SwiftUI
 /// Tab switch and process death both return to collapsed (`isExpanded` is
 /// plain @State and resets in `onDisappear`). The creature is the only
 /// affordance that expands (R-4.1b): no chevron, no "View plan" button.
+///
+/// REFRESHES ON EVENTS, NOT ON A TIMER (runbook G1.10, audit 4.10.2, 4.10.3,
+/// 6.5.9). This view used to run `while !Task.isCancelled { sleep 30; refresh }`
+/// for its whole lifetime, and SwiftUI keeps tab content alive, so it kept
+/// polling `GET /api/pets` while the user sat on Activity or Wealth: 120
+/// requests an hour of foreground use, no `scenePhase` gate, no backoff, no
+/// stop condition.
+///
+/// It was also a WCAG 2.2.2 failure. Every thirty seconds the Window's label,
+/// the speech line and the rung block were rebuilt, VoiceOver focus returned to
+/// the top, and any part-read announcement was cut off. A screen reader user
+/// could not finish reading Home.
+///
+/// The pet only changes when a reaction fires, and a reaction sends a push. The
+/// push trigger in `CoinyApp` already refreshed on `coinyPushReceived`, so the
+/// timer was a second, worse copy of a mechanism the app already had. What is
+/// left is that push, plus a refresh when Home becomes visible and when the app
+/// returns to the foreground: every one of them is a moment the pet may
+/// actually have changed.
 struct HomeView: View {
     @Environment(PetStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.scenePhase) private var scenePhase
 
     /// True while Home is the selected tab. Driven by RootView rather than
     /// `onDisappear`, which does not fire reliably for a TabView child.
@@ -57,18 +77,20 @@ struct HomeView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
-        .sheet(isPresented: Bindable(connectFlow).isPresentingLink) {
-            if let session = connectFlow.session {
-                session.sheet()
+        // onDismiss is the only signal when the user swipes Link away without
+        // LinkKit reporting an exit; without it the flow waits forever and no
+        // link_result is ever recorded.
+        .sheet(
+            isPresented: Bindable(connectFlow).isPresentingLink,
+            onDismiss: { connectFlow.linkSheetDismissed() },
+            content: {
+                if let session = connectFlow.session {
+                    session.sheet()
+                }
             }
-        }
+        )
         .task {
             connectFlow.onLinked = { Task { await store.refresh() } }
-            // CoinyApp triggers the first load; this loop keeps Home fresh.
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(30))
-                await store.refresh()
-            }
         }
         .onChange(of: store.pet?.lastReactionAt) { oldValue, newValue in
             guard let newValue, let oldValue, newValue != oldValue else { return }
@@ -77,7 +99,20 @@ struct HomeView: View {
         .onChange(of: isVisible) { _, nowVisible in
             // Tab switch returns to collapsed (R-4.1a). No animation: the
             // surface is offscreen when this fires.
-            if !nowVisible { isExpanded = false }
+            guard nowVisible else {
+                isExpanded = false
+                return
+            }
+            Task { await store.refresh() }
+        }
+        // Coming back from the background is the other moment the pet may have
+        // changed while nobody was looking. `previous != .active` rather than
+        // `previous == .background`: Control Centre and the app switcher pass
+        // through .inactive, and a refresh there is free and harmless, unlike
+        // the app_open event in CoinyApp which must not count those.
+        .onChange(of: scenePhase) { previous, current in
+            guard previous != .active, current == .active, isVisible else { return }
+            Task { await store.refresh() }
         }
         .onDisappear {
             isExpanded = false
@@ -158,7 +193,7 @@ struct HomeView: View {
             Spacer(minLength: 20)
 
             if let rung = HomePresentation.activeRungDisplay(for: pet) {
-                ActiveRungBlock(rung: rung)
+                ActiveRungBlock(rung: rung, ageLabel: HomePresentation.dataAgeLabel(for: pet))
                     .padding(.horizontal, 24)
                     .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("home.rung.active")
@@ -192,15 +227,25 @@ struct HomeView: View {
     private var actionArea: some View {
         switch HomePresentation.primaryAction(for: pet) {
         case .connectAccount:
-            Button {
-                connectFlow.start()
-            } label: {
-                Text(connectFlow.isLoading ? "Opening Link…" : "Connect an account")
-                    .frame(minHeight: 50)
+            VStack(spacing: 12) {
+                Button {
+                    connectFlow.start()
+                } label: {
+                    Text(connectFlow.isLoading ? "Opening Link…" : "Connect an account")
+                        .frame(minHeight: 50)
+                }
+                .buttonStyle(.coinyFilled)
+                .disabled(connectFlow.isLoading)
+                .accessibilityIdentifier("home.action.connect")
+                // Only a real failure lands here; abandonment leaves the
+                // button alone and says nothing (G2.15).
+                if let error = connectFlow.errorMessage {
+                    CoinyErrorLine(message: error, actionTitle: "Try again") {
+                        connectFlow.start()
+                    }
+                    .accessibilityIdentifier("home.connect.error")
+                }
             }
-            .buttonStyle(.coinyFilled)
-            .disabled(connectFlow.isLoading)
-            .accessibilityIdentifier("home.action.connect")
         case nil:
             // Keeps the rung block from sitting on the tab bar.
             Color.clear.frame(height: 50)
@@ -266,6 +311,9 @@ struct HomeView: View {
 /// detail line. Indeterminate reads "too early to say", never zero.
 private struct ActiveRungBlock: View {
     let rung: ActiveRungDisplay
+    /// The age of the money in `detailLine` (R-8.2). Nil when there is no
+    /// figure on screen to label.
+    var ageLabel: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -299,6 +347,15 @@ private struct ActiveRungBlock: View {
                     Text(detail)
                         .font(.subheadline)
                         .foregroundStyle(CoinyTheme.ink2)
+                    // R-8.2: the figure above is real money and carried no age
+                    // anywhere on this screen. Wealth labelled every class;
+                    // Home, the default tab, labelled nothing.
+                    if let ageLabel {
+                        Text(ageLabel)
+                            .font(.caption)
+                            .foregroundStyle(CoinyTheme.ink3)
+                            .accessibilityIdentifier("home.rung.age")
+                    }
                 }
             }
         }

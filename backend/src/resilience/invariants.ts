@@ -52,6 +52,21 @@ export type InvariantViolation =
   /** A value fell by more than the collapse threshold in one refresh. The
    *  Polkadot signature. */
   | 'value_collapsed'
+  /** A value MULTIPLIED in one refresh. The other half of the same bug.
+   *
+   *  Every check here used to be one-sided, and a unit error is not: it breaks
+   *  in whichever direction the units moved. This codebase already divides by
+   *  1000 for YNAB milliunits (`api/ynab.ts`) and reads Kalshi in cents, and a
+   *  chain balance is native units multiplied by a price, so a vendor that
+   *  starts answering in cents, or in wei, or a decimals field that changes,
+   *  multiplies a balance by exactly 100, 1e9 or 1e18. A detector that only
+   *  watched for the number getting smaller would have called that a good day.
+   *
+   *  It is the more dangerous direction, too. A collapse looks alarming and
+   *  gets reported by the user; an inflated net worth looks like good news, so
+   *  nobody complains, and the product's one job is to be the number you can
+   *  trust. */
+  | 'value_inflated'
   /** A non-zero value became EXACTLY zero. The signature of #289, where all
    *  thirteen chain clients returned 0 on every failure path and an expired key
    *  silently wrote a user's whole position to zero. `null` means unknown and
@@ -68,6 +83,33 @@ export type InvariantCheck = {
   /** Rounded to whole percent: this goes in an ops event, and a full-precision
    *  ratio of two balances is closer to a balance than it needs to be. */
   dropPercent: number | null;
+  /** How many times the value multiplied, rounded to a whole number, for
+   *  `value_inflated` only. The magnitude is the diagnosis: 100 is a
+   *  cents-for-dollars mistake, 1000 is milliunits, 1e18 is wei. Rounded for
+   *  the same reason `dropPercent` is. */
+  growthFactor?: number;
+};
+
+export type InvariantThresholds = {
+  /** Fraction of value lost that counts as a collapse, e.g. 0.9 for "lost 90%
+   *  or more". Deliberately far above normal market movement: a threshold that
+   *  fires on a bad day in the market is a threshold that gets muted, and a
+   *  muted alert is worse than none because it reads as coverage. */
+  collapseRatio: number;
+  /** Multiple of the previous value that counts as an inflation, e.g. 100 for
+   *  "a hundred times what it was". Set at the smallest unit error rather than
+   *  at "a suspiciously good day", because those are different questions: a
+   *  portfolio can double, and no portfolio multiplies by a hundred between two
+   *  refreshes. */
+  spikeRatio: number;
+  /** Previous value below which inflation is not checked at all.
+   *
+   *  Without a floor this fires constantly on honest behaviour: a wallet
+   *  holding $2 that receives $500 has grown 250 times and nothing is wrong.
+   *  A unit error is proportional, so it trips the same ratio at any size,
+   *  which means the floor costs almost nothing in detection and removes the
+   *  entire class of false positive that would get the alert muted. */
+  minPreviousUsd: number;
 };
 
 /**
@@ -78,15 +120,13 @@ export type InvariantCheck = {
  * exact zero is reported as `zero_from_non_zero` rather than as a 100%
  * collapse, because the two have different causes and different fixes.
  *
- * @param collapseRatio fraction of value lost that counts as a collapse, e.g.
- *   0.9 for "lost 90% or more". Deliberately far above normal market movement:
- *   a threshold that fires on a bad day in the market is a threshold that gets
- *   muted, and a muted alert is worse than none because it reads as coverage.
+ * TWO-SIDED. It was not, and a unit error is: it breaks in whichever direction
+ * the units moved, and the upward direction is the one nobody reports.
  */
 export function checkValueTransition(
   previous: number | null,
   next: number | null,
-  collapseRatio: number,
+  thresholds: InvariantThresholds,
 ): InvariantCheck | null {
   // Nothing to compare against: a first fetch is a profile, not an alarm. The
   // drift-monitoring literature is unanimous on this, and a canary that alerts
@@ -102,8 +142,19 @@ export function checkValueTransition(
   if (next === 0) return { violation: 'zero_from_non_zero', dropPercent: 100 };
 
   const lost = (previous - next) / previous;
-  if (lost >= collapseRatio) {
+  if (lost >= thresholds.collapseRatio) {
     return { violation: 'value_collapsed', dropPercent: Math.round(lost * 100) };
+  }
+
+  // The other direction. Guarded by the floor rather than by a bigger ratio,
+  // because the false positives here are small balances doing ordinary things
+  // and no ratio separates those from a unit error.
+  if (previous >= thresholds.minPreviousUsd && next / previous >= thresholds.spikeRatio) {
+    return {
+      violation: 'value_inflated',
+      dropPercent: null,
+      growthFactor: Math.round(next / previous),
+    };
   }
 
   return null;

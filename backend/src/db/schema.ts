@@ -60,6 +60,32 @@ export const users = pgTable(
   (t) => [uniqueIndex('users_apple_sub_idx').on(t.appleSub), uniqueIndex('users_google_sub_idx').on(t.googleSub)],
 );
 
+// Deletion tombstones (migration 0067, audit rows 2.9.4 and 5.9.6).
+//
+// The privacy notice promises that backups are never used to restore a deleted
+// account. Nothing enforced that: the cascade removed the user row and left no
+// trace, so restoring any copy resurrects every account deleted since the copy
+// was taken and no list existed to re-delete them from. This table is that
+// list, and `scripts/purge-resurrected-users.ts` is what applies it.
+//
+// No foreign key, by construction: the row it names is already gone, and a
+// cascade would destroy the one record that has to outlive the user. That also
+// means nothing keeps it in step with `users` automatically, so the write lives
+// inside `deleteUser`'s transaction (store/users.ts) rather than at any route.
+//
+// An id and a date and nothing else. The date is not bookkeeping: it is what
+// lets the tombstone itself be dropped once no backup old enough to resurrect
+// that user survives, so "deleted" does not quietly become a permanent record
+// of the person (store/deleted-users.ts, pruneExpiredTombstones).
+export const deletedUserIds = pgTable(
+  'deleted_user_ids',
+  {
+    userId: text('user_id').primaryKey(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('deleted_user_ids_deleted_at_idx').on(t.deletedAt)],
+);
+
 export const sessions = pgTable(
   'sessions',
   {
@@ -1035,6 +1061,41 @@ export const derivedState = pgTable('derived_state', {
 // Rungs never un-complete: a user who clears rung 3 and later takes on new
 // high-APR debt keeps the completion (and the creature's stage), while the rung
 // reopens as an active task. Progress is permanent, problems are current.
+// Sampled server-side request latency (migration 0069, runbook G1.22, audit
+// rows 4.5.3 and 4.13.4).
+//
+// `engineering-budgets.md` §1 states every latency budget as a p95 and says it
+// is measured by piping `fly logs` through a percentile script "until the
+// telemetry table exists". That script does not exist, and Fly keeps a short
+// rolling buffer with no query interface, so a weekly p95 could not be
+// reconstructed after the fact. This is that table.
+//
+// NO USER COLUMN, deliberately, and for two independent reasons:
+//
+//   A duration is a fact about the SERVER. `analytics_events` is consent-gated,
+//   so timings there would let one person's usage-sharing preference decide
+//   whether we can see our own p95, which is the same incoherence store/ops.ts
+//   refuses for vendor outages.
+//
+//   Route plus timestamp per user IS a behavioural trail: which screens someone
+//   opened and when. Collecting a browsing history in order to measure a server
+//   is not a trade worth making.
+//
+// `route` is the PATTERN Fastify matched, never the resolved URL, so no
+// identifier can reach this table even by accident.
+export const requestSamples = pgTable(
+  'request_samples',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+    route: text('route').notNull(),
+    method: text('method').notNull(),
+    status: integer('status').notNull(),
+    durationMs: integer('duration_ms').notNull(),
+  },
+  (t) => [index('request_samples_route_at_idx').on(t.route, t.at), index('request_samples_at_idx').on(t.at)],
+);
+
 export const ladderState = pgTable('ladder_state', {
   userId: text('user_id')
     .primaryKey()
@@ -1049,6 +1110,19 @@ export const ladderState = pgTable('ladder_state', {
   // without re-running the Plaid fan-out, and so a declaration change can
   // re-evaluate the ladder against the freshest known financial inputs.
   inputs: jsonb('inputs').$type<LadderContext>(),
+  // How old the numbers those inputs were derived from are: the oldest `asOf`
+  // among the classes included in the total, decided in networth/read.ts where
+  // that rule already lives (migration 0068, R-8.2).
+  //
+  // NOT the same as `updatedAt`, and the difference is the entire point.
+  // `updatedAt` is when we last recomputed; this is when the money was last
+  // actually true. A ladder recomputed five minutes ago from a Plaid item that
+  // died a week ago has a fresh `updatedAt` and week-old numbers, and Home
+  // would have shown the second as if it were the first.
+  //
+  // Null means UNKNOWN, never fresh: either a contributing class had no
+  // timestamp of its own, or the row predates this column.
+  inputsAsOf: timestamp('inputs_as_of', { withTimezone: true }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

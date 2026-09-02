@@ -151,6 +151,29 @@ enum HomePresentation {
         )
     }
 
+    /// The staleness line for Home's money figures (R-8.2: never an unlabelled
+    /// stale value).
+    ///
+    /// Home shows real money in the rung detail line ("$7,440 of $12,000") and
+    /// carried no `asOf` anywhere on the screen, while Wealth labelled every
+    /// class. Home is the default tab, so the surface most people look at was
+    /// the one surface with no way to tell a fresh number from a month-old one.
+    ///
+    /// Returns nil when there is no money on screen to label: a rung with no
+    /// detail line, or an indeterminate one, states no figure and a date under
+    /// it would be a label attached to nothing.
+    ///
+    /// Says "age unknown" rather than nothing when the server has no timestamp.
+    /// Silence there would read as fresh, which is the failure being fixed.
+    /// Uses `WealthPresenter.asOfLabel` rather than its own formatter so both
+    /// surfaces phrase the same fact the same way.
+    static func dataAgeLabel(for pet: PetState?, now: Date = Date()) -> String? {
+        guard let pet else { return nil }
+        guard activeRungDisplay(for: pet)?.detailLine != nil else { return nil }
+        guard let asOf = pet.dataAsOf else { return "age unknown" }
+        return WealthPresenter.asOfLabel(asOf, now: now)
+    }
+
     // MARK: - Journey rows
 
     static func journeyRows(for pet: PetState?) -> [JourneyRow] {
