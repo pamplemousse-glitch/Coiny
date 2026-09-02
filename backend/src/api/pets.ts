@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { ladderView, reevaluateWithDeclarations } from '../goals/refresh.js';
 import { getDeclarations, updateDeclarations } from '../store/declarations.js';
-import { getDerivedState, getLadderInputs, getLadderState, getPetStage } from '../store/goals.js';
+import { getDerivedState, getLadderInputs, getLadderInputsAsOf, getLadderState, getPetStage } from '../store/goals.js';
 import { getGoals, getState, PetGoalsSchema, updateGoals } from '../store/pet.js';
 
 // Declared ladder targets. Rates are fractions of take-home (0 to 1, exclusive
@@ -22,10 +22,11 @@ export function registerPetsApi(app: FastifyInstance): void {
   // (which GET /api/net-worth triggers) has run for this user.
   app.get('/api/pets', async (req: FastifyRequest) => {
     const userId = req.user!.id;
-    const [legacy, ladder, inputs, derived, stage, declarations] = await Promise.all([
+    const [legacy, ladder, inputs, inputsAsOf, derived, stage, declarations] = await Promise.all([
       getState(userId),
       getLadderState(userId),
       getLadderInputs(userId),
+      getLadderInputsAsOf(userId),
       getDerivedState(userId),
       getPetStage(userId),
       getDeclarations(userId),
@@ -37,6 +38,11 @@ export function registerPetsApi(app: FastifyInstance): void {
       derived,
       declarations,
       ladder: ladderView(ladder, inputs),
+      // R-8.2: Home shows real money in its rung detail line and had nothing
+      // anywhere on the screen saying when that was true. This is the age of
+      // the money, not the age of the recomputation, and null means UNKNOWN
+      // rather than fresh (see store/goals.ts).
+      dataAsOf: inputsAsOf ? inputsAsOf.toISOString() : null,
     };
   });
 

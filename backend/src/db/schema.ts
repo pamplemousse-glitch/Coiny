@@ -1110,6 +1110,19 @@ export const ladderState = pgTable('ladder_state', {
   // without re-running the Plaid fan-out, and so a declaration change can
   // re-evaluate the ladder against the freshest known financial inputs.
   inputs: jsonb('inputs').$type<LadderContext>(),
+  // How old the numbers those inputs were derived from are: the oldest `asOf`
+  // among the classes included in the total, decided in networth/read.ts where
+  // that rule already lives (migration 0068, R-8.2).
+  //
+  // NOT the same as `updatedAt`, and the difference is the entire point.
+  // `updatedAt` is when we last recomputed; this is when the money was last
+  // actually true. A ladder recomputed five minutes ago from a Plaid item that
+  // died a week ago has a fresh `updatedAt` and week-old numbers, and Home
+  // would have shown the second as if it were the first.
+  //
+  // Null means UNKNOWN, never fresh: either a contributing class had no
+  // timestamp of its own, or the row predates this column.
+  inputsAsOf: timestamp('inputs_as_of', { withTimezone: true }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -197,6 +197,20 @@ export type NetWorthAssembly = {
   /** True when any connected class is excluded from the total. A degraded
    *  total must never be persisted as the milestone baseline. */
   degraded: boolean;
+  /**
+   * How old the figures behind the total are: the OLDEST `asOf` among the
+   * classes included in it, or null when at least one contributing class has no
+   * timestamp at all.
+   *
+   * Computed here rather than by any caller, because this is the one place that
+   * already knows which classes are in the total and what each one's age is.
+   * A second copy of that rule would be the exact drift `connection-health.ts`
+   * refuses to create with `deriveConnectionStatus`.
+   *
+   * Null means the age is UNKNOWN, which is not the same as fresh and must not
+   * render as "just now".
+   */
+  inputsAsOf: Date | null;
 };
 
 type SimpleRow = { valueUsd: number | null; syncedAt: Date | null };
@@ -835,10 +849,32 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
   // --- Total: included classes only ------------------------------------------
   const excludedClasses: NetWorthClassName[] = [];
   let total = 0;
+  // The age of the whole number, for surfaces that show one figure rather than
+  // a per-class table (R-8.2: never an unlabelled stale value, and Home shows
+  // real money in its rung detail line). Oldest among the classes that are IN
+  // the total, which is the same rule `rollupRows` applies one level down:
+  // staleness must never be understated, and a class that is excluded is
+  // already reported separately rather than silently ageing the rest.
+  //
+  // A contributing class with no timestamp leaves this null, meaning "age
+  // unknown", which is a different thing from "fresh" and must render
+  // differently.
+  let oldestIncludedAsOf: Date | null = null;
+  let anyIncludedWithoutAsOf = false;
   for (const name of Object.keys(classes) as NetWorthClassName[]) {
     const c = classes[name];
     if (includedInTotal(c.status)) {
       total += name === 'debts' ? -(c.value ?? 0) : (c.value ?? 0);
+      // Bank carries no value of its own (its money lives per account), so a
+      // null value there is bookkeeping and not a contribution to age.
+      if (c.value !== null) {
+        if (c.asOf === null) {
+          anyIncludedWithoutAsOf = true;
+        } else {
+          const at = new Date(c.asOf);
+          if (oldestIncludedAsOf === null || at < oldestIncludedAsOf) oldestIncludedAsOf = at;
+        }
+      }
     } else if (c.status !== 'not_connected') {
       excludedClasses.push(name);
     }
@@ -1038,5 +1074,13 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
     generatedAt: now.toISOString(),
   };
 
-  return { response, goalInputs, degraded: excludedClasses.length > 0 };
+  return {
+    response,
+    goalInputs,
+    degraded: excludedClasses.length > 0,
+    // Unknown beats optimistic: one contributing class with no timestamp makes
+    // the whole figure's age unknowable, and saying "as of just now" about it
+    // would be the unlabelled stale value R-8.2 exists to prevent.
+    inputsAsOf: anyIncludedWithoutAsOf ? null : oldestIncludedAsOf,
+  };
 }
