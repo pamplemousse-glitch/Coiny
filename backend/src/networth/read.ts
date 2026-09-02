@@ -733,11 +733,27 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
       )
     : reading(null, null, 'not_connected');
 
-  // Vinyl (Discogs): register row DR-10 pins the served value to 0 until
+  // Vinyl (Discogs): register row DR-10 withholds the served value until
   // written permission plus attribution plus the six-hour display rule exist.
-  // The connection is reported so the UI can explain why no value appears.
+  // The connection is still reported so the UI can explain why no value appears.
+  //
+  // This used to be `reading(0, null, 'ok')`, which is the defect audit 2.13
+  // names: a connected user's records were reported as WORTH ZERO, with the
+  // status that means "this number is good". A withheld value and a value of
+  // zero are different facts, and `ok` asserted the wrong one into the total.
+  //
+  // `stale_excluded` because it is the one status that carries the three
+  // properties this state needs: the value is null, it is out of `total`, and
+  // it lands in `excluded.classes` so the UI has something to explain rather
+  // than a silent hole. The word is imprecise, since nothing here is stale, but
+  // the alternatives are worse: `error` blames a vendor that did nothing wrong,
+  // `not_connected` denies a connection the user made, and a new status decodes
+  // as `.stale` on the client anyway (API+Performance.swift:20-26), so it would
+  // buy the same rendering for an API change. Revisit when iOS carries a case
+  // for "withheld", or delete all of it when Discogs answers the permission
+  // request drafted in vendor-outreach.md §1.
   const [discogsRow] = discogsRows;
-  classes.vinyl = discogsRow ? reading(0, null, 'ok') : reading(null, null, 'not_connected');
+  classes.vinyl = discogsRow ? reading(null, null, 'stale_excluded') : reading(null, null, 'not_connected');
 
   const [kalshiRow] = kalshiRows;
   classes.kalshi = kalshiRow
