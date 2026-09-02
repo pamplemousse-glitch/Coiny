@@ -158,19 +158,37 @@ struct AlpacaView: View {
                 } header: {
                     Text("API Key ID")
                 } footer: {
-                    Text("Found in your Alpaca dashboard under API Keys.")
-                        .font(.caption2)
+                    // The scope instruction, not just where to find the key
+                    // (runbook G2.12, audit 2.6.7). `privacy-policy.md` already
+                    // tells the user we instruct them to create read-only keys
+                    // for Kraken, Kalshi and Alpaca; Kraken said it and these
+                    // two did not, which made the sentence in the policy false
+                    // for the two vendors whose keys can carry TRADE rights.
+                    Text(
+                        "Found in your Alpaca dashboard under API Keys. "
+                            + "Create the key with **read-only** access. Coiny reads "
+                            + "positions and balances and never places orders."
+                    )
+                    .font(.caption2)
                 }
                 Section("API Secret Key") {
                     SecureField("Secret key", text: $apiSecretKey)
                         .autocorrectionDisabled()
                 }
-                Section("Environment") {
+                Section {
                     Picker("Environment", selection: $selectedEnv) {
                         Text("Paper (simulation)").tag("paper")
                         Text("Live").tag("live")
                     }
                     .pickerStyle(.segmented)
+                } header: {
+                    Text("Environment")
+                } footer: {
+                    // Live is the one that touches real money, and it is the
+                    // option a reader skims past. Naming the consequence beside
+                    // the switch is the whole mitigation.
+                    Text("Live keys reach a real brokerage account. Read-only access is enough for either.")
+                        .font(.caption2)
                 }
             }
             .navigationTitle("Connect Alpaca")
