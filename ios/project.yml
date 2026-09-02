@@ -127,17 +127,26 @@ targets:
           - remote-notification
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
-    entitlements:
-      path: Coiny/Coiny.entitlements
-      properties:
-        aps-environment: development
-        # Without this the SignInWithAppleButton on the first screen builds,
-        # installs, and then fails at runtime with ASAuthorizationError 1000.
-        # It must be declared here rather than in Coiny.entitlements or the
-        # Xcode capabilities UI, because xcodegen rewrites that file on every
-        # generate. Requires the capability enabled on the App ID in the portal.
-        com.apple.developer.applesignin:
-          - Default
+    # NO `entitlements:` block, deliberately. XcodeGen generates exactly one
+    # entitlements file per target and writes CODE_SIGN_ENTITLEMENTS into EVERY
+    # configuration, which silently overrides a per-config override and cannot
+    # express "development for Debug, production for Release". That distinction
+    # is not cosmetic: TestFlight builds always use production APNs, and a
+    # Release build carrying `development` registers a sandbox token that
+    # api.push.apple.com rejects with 400 BadDeviceToken. Push dies silently.
+    #
+    # So both files are checked in and hand-maintained, and the configurations
+    # below choose between them. Removing the block is also what makes hand
+    # maintenance safe: the reason `com.apple.developer.applesignin` used to be
+    # declared here was that xcodegen rewrote the file on every generate. It no
+    # longer does, so the capability lives in the two files instead.
+    #
+    # Sign in with Apple still requires the capability enabled on the App ID in
+    # the portal; without it the button builds, installs, and fails at runtime
+    # with ASAuthorizationError 1000.
+    #
+    # CoinyTests/EntitlementsParityTests.swift fails if the two files drift on
+    # anything other than aps-environment.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.coiny.ios
@@ -193,6 +202,26 @@ targets:
         # build compiles and signs fine and simply cannot reach a backend.
         Release:
           COINY_API_BASE_URL: https:/$()/coiny-api.fly.dev
+          # TestFlight and App Store builds ALWAYS use production APNs; there
+          # is no way to upload a build that pushes against sandbox. The
+          # generated Coiny.entitlements says `development`, which is right for
+          # Debug and silently fatal for Release: the device registers a
+          # SANDBOX token, the production backend sends to api.push.apple.com,
+          # and APNs answers 400 BadDeviceToken. Push dies with no error the
+          # user or the server can see.
+          #
+          # backend/src/push/apns.ts already assumes the correspondence
+          # "Release -> production -> production". This is what makes that
+          # sentence true; before it, the app half was development on every
+          # configuration.
+          #
+          # Two files because XcodeGen writes exactly one entitlements file per
+          # target and cannot vary it by configuration.
+          # CoinyTests/EntitlementsParityTests.swift fails if they drift on
+          # anything but aps-environment.
+          CODE_SIGN_ENTITLEMENTS: Coiny/CoinyRelease.entitlements
+        Debug:
+          CODE_SIGN_ENTITLEMENTS: Coiny/Coiny.entitlements
     dependencies:
       - package: LinkKit
         product: LinkKit
