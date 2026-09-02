@@ -47,6 +47,14 @@ export const users = pgTable(
     // (docs/legal/consent-copy.md §2). A client-only flag would stop the client
     // queue and leave every server-emitted event still writing.
     analyticsOptOut: boolean('analytics_opt_out').notNull().default(false),
+    // Seeded for App Review (migration 0066, decision B9). Set only by
+    // `POST /api/review/demo-seed`, and read to keep a reviewer out of
+    // analytics and out of any consumer count. That second use is the reason
+    // it exists: the FTC Safeguards thresholds and the state privacy-law
+    // thresholds both count CONSUMERS, and a reviewer is not one. Counting
+    // them would pull a compliance obligation forward by an account that
+    // belongs to Apple.
+    isDemo: boolean('is_demo').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('users_apple_sub_idx').on(t.appleSub), uniqueIndex('users_google_sub_idx').on(t.googleSub)],
