@@ -41,7 +41,12 @@ export async function resetDatabase(): Promise<void> {
     // table skip the analytics consent gate), so it has no FK path to users
     // and the cascade cannot reach it. The design property and the truncation
     // requirement are the same property seen from two sides.
-    sql`TRUNCATE sessions, reaction_history, processed_events, plaid_items, plaid_removal_queue, ops_events, category_overrides, device_tokens, transactions, pet_state, app_store_notifications, users RESTART IDENTITY CASCADE`,
+    //
+    // deleted_user_ids is the third, and the same shape again: it carries no
+    // foreign key BECAUSE the row it names is already gone (store/
+    // deleted-users.ts), so nothing cascades into it and a tombstone left by
+    // one test would make the next test's user look deleted.
+    sql`TRUNCATE sessions, reaction_history, processed_events, plaid_items, plaid_removal_queue, ops_events, deleted_user_ids, category_overrides, device_tokens, transactions, pet_state, app_store_notifications, users RESTART IDENTITY CASCADE`,
   );
   _resetOverrideCache();
 
