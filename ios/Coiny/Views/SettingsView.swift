@@ -17,6 +17,9 @@ struct SettingsView: View {
     @State private var revokedCount = 0
     @State private var repairVM = ConnectionRepairViewModel()
     @State private var presentedDocument: LegalDocument?
+    /// Taps on the version row; five opens the App Review seed prompt.
+    @State private var versionTapCount = 0
+    @State private var showReviewSeed = false
     /// The "Share usage data" toggle (docs/legal/consent-copy.md section 2).
     /// Defaults on because consent was given at sign-in; the same key is what
     /// `TelemetryConsent` reads before enqueuing anything.
@@ -98,6 +101,21 @@ struct SettingsView: View {
                         Text(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0")
                             .font(.caption.monospaced())
                             .foregroundStyle(CoinyTheme.ink2)
+                    }
+                    // Five taps opens the App Review demo-seed prompt (R-15.7,
+                    // decision B9). Discoverable from the App Review notes and
+                    // not by accident. It is not a security boundary: the
+                    // backend requires a session and a shared code, and 404s
+                    // when no code is configured. This only keeps a real user
+                    // from stumbling into a button that replaces their balance
+                    // sheet with fake data.
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        versionTapCount += 1
+                        if versionTapCount >= 5 {
+                            versionTapCount = 0
+                            showReviewSeed = true
+                        }
                     }
                 }
                 .listRowBackground(CoinyTheme.surface)
@@ -212,6 +230,14 @@ struct SettingsView: View {
         // sheet above already owns the Form's slot.
         .sheet(item: $presentedDocument) { document in
             LegalDocumentView(document: document)
+        }
+        .sheet(isPresented: $showReviewSeed) {
+            AppReviewSeedSheet {
+                // Refresh so the reviewer sees the seeded balance sheet
+                // immediately rather than having to work out that a pull to
+                // refresh is required.
+                Task { await store.refresh() }
+            }
         }
     }
 }

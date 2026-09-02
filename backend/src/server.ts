@@ -38,6 +38,7 @@ import { registerPlaidRecurringApi } from './api/plaid-recurring.js';
 import { registerPokemonCardsApi } from './api/pokemon-cards.js';
 import { registerPolymarketApi } from './api/polymarket.js';
 import { registerRealEstateApi } from './api/real-estate.js';
+import { registerReviewApi } from './api/review.js';
 import { registerSneakersApi } from './api/sneakers.js';
 import { registerSpendingApi } from './api/spending.js';
 import { registerSpinwheelApi } from './api/spinwheel.js';
@@ -249,6 +250,7 @@ async function buildApp(options: BuildAppOptions = {}) {
     registerPetsApi(scope);
     registerGoalsApi(scope);
     registerSpendingApi(scope);
+    registerReviewApi(scope);
     registerOverridesApi(scope);
     registerDevicesApi(scope);
     registerSubscriptionsApi(scope);

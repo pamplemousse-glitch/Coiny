@@ -463,6 +463,13 @@
       "when": 1788308309292,
       "tag": "0065_encrypt_credit_score",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1788309234067,
+      "tag": "0066_demo_account_marker",
+      "breakpoints": true
     }
   ]
 }

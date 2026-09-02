@@ -141,6 +141,18 @@ const configSchema = z
     // not the Android client ID. When empty, /api/auth/google returns 503.
     GOOGLE_AUTH_CLIENT_ID: z.string().default(''),
 
+    // Shared secret that lets an App Review reviewer seed their own freshly
+    // created account with demo data (decision B9, Apple 2.1). Given to Apple
+    // in the App Review notes and rotated after each review cycle.
+    //
+    // Empty means the route returns 404, which is the correct default: outside
+    // a review window the endpoint should not exist as far as any caller can
+    // tell. It never mints a session and it only ever writes to the CALLING
+    // user, so the worst a leaked code buys is the ability to fill your own
+    // account with fake assets. That is deliberate: defect D1 was an
+    // unauthenticated session mint, and nothing here may reopen it.
+    REVIEW_DEMO_CODE: z.string().default(''),
+
     // Sentry error tracking (docs/launch-gap-analysis.md section 9, resolved
     // 2026-08-21 in favour of adopting it with the full compliance set rather
     // than staying first-party).
