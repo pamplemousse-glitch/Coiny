@@ -821,4 +821,60 @@ describe('POST /api/net-worth/refresh goal system refresh', () => {
 
     await app.close();
   });
+  // Audit 2.13. A connected Discogs account used to report `reading(0, null,
+  // 'ok')`: the user's records valued at ZERO, carrying the status that means
+  // "this number is good". Register row DR-10 withholds the value until the
+  // licensing work lands, and a withheld value is not a value of zero.
+  describe('vinyl (Discogs) while the value is withheld', () => {
+    async function connectDiscogs() {
+      const { db } = await import('../src/db/client.js');
+      const { discogsConnections } = await import('../src/db/schema.js');
+      await db().insert(discogsConnections).values({
+        userId: testUserId,
+        username: 'vinyl_fan',
+        accessToken: 'enc',
+        accessTokenSecret: 'enc',
+      });
+    }
+
+    it('does not report the collection as worth zero', async () => {
+      await connectDiscogs();
+      const { buildApp } = await import('../src/server.js');
+      const app = await buildApp();
+
+      const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+      const vinyl = res.json<NetWorthBody>().classes.vinyl;
+
+      expect(vinyl).toBeDefined();
+      expect(vinyl!.value).toBeNull();
+      expect(vinyl!.status).not.toBe('ok');
+
+      await app.close();
+    });
+
+    it('names vinyl in excluded so the UI can explain the gap', async () => {
+      await connectDiscogs();
+      const { buildApp } = await import('../src/server.js');
+      const app = await buildApp();
+
+      const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+      const body = res.json<NetWorthBody>();
+
+      expect(body.excluded.classes).toContain('vinyl');
+
+      await app.close();
+    });
+
+    it('still reports the connection rather than pretending it is absent', async () => {
+      await connectDiscogs();
+      const { buildApp } = await import('../src/server.js');
+      const app = await buildApp();
+
+      const res = await app.inject({ method: 'GET', url: '/api/net-worth', headers: authHeader() });
+
+      expect(res.json<NetWorthBody>().classes.vinyl?.status).not.toBe('not_connected');
+
+      await app.close();
+    });
+  });
 });
