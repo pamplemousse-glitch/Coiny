@@ -37,6 +37,7 @@ import {
   sessions,
   spinwheelPending,
 } from '../db/schema.js';
+import { pruneRequestSamples } from '../observability/request-samples.js';
 import { pruneExpiredTombstones, TOMBSTONE_RETENTION_DAYS } from '../store/deleted-users.js';
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -66,6 +67,12 @@ export const RETENTION = {
    *  and a crash on a build from last quarter is not actionable. Shorter than
    *  analytics deliberately. */
   crashDiagnosticsMs: 90 * DAY_MS,
+  /** Sampled request latency (observability/request-samples.ts). Thirty days
+   *  covers "what was the p95 last week" and the month-over-month comparison
+   *  that follows it, which is the longest question anyone asks of a latency
+   *  series. These rows describe the SERVER and carry no user column, so
+   *  nothing about them gets more valuable with age. */
+  requestSamplesMs: 30 * DAY_MS,
   // Deletion tombstones are NOT here. Their window is the backup retention
   // window, not a privacy window chosen from the schedule, so it lives beside
   // the table in store/deleted-users.ts (TOMBSTONE_RETENTION_DAYS) where the
@@ -86,6 +93,8 @@ export type PurgeSummary = {
   /** Deletion tombstones dropped because no surviving backup is old enough to
    *  resurrect the account they name (store/deleted-users.ts). */
   tombstones: number;
+  /** Sampled request latencies past the window (observability/request-samples.ts). */
+  latencySamples: number;
 };
 
 let lastPurgeAt: Date | null = null;
@@ -158,6 +167,12 @@ export async function runRetentionPurge(now: Date = new Date()): Promise<PurgeSu
   // was supposed to end.
   const tombstones = await pruneExpiredTombstones(TOMBSTONE_RETENTION_DAYS, now);
 
+  // The highest-volume thing this pass touches: one row per request rather than
+  // one per event. Bounded by a stated window rather than a cap on the table,
+  // because a cap evicts the oldest rows first and would quietly shorten every
+  // trend it was meant to preserve.
+  const latencySamples = await pruneRequestSamples(before(RETENTION.requestSamplesMs));
+
   lastPurgeAt = now;
 
   return {
@@ -169,5 +184,6 @@ export async function runRetentionPurge(now: Date = new Date()): Promise<PurgeSu
     opsEvents: ops.length,
     crashDiagnostics: crashes.length,
     tombstones,
+    latencySamples,
   };
 }

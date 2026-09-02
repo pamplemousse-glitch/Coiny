@@ -290,6 +290,17 @@ const configSchema = z
     // the 72 s keep-alive idle timeout, so idle pooled connections are still
     // closed by keep-alive rather than by this.
     REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+
+    // Fraction of requests whose latency is written to `request_samples`
+    // (observability/request-samples.ts, runbook G1.22). 1.0 because audit row
+    // 4.13.4 recommends exactly that for thirty testers: at this volume the
+    // exact p95 is affordable, and a sampled one at this sample size is mostly
+    // noise. Lower it when the volume stops being small; it is one value and
+    // nothing downstream assumes 100%.
+    //
+    // 0 disables the hook entirely, which is what tests that count database
+    // writes want.
+    REQUEST_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(1),
     CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
 
     // Coinbase Advanced Trade API (ECDSA key pair).

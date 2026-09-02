@@ -46,7 +46,15 @@ export async function resetDatabase(): Promise<void> {
     // foreign key BECAUSE the row it names is already gone (store/
     // deleted-users.ts), so nothing cascades into it and a tombstone left by
     // one test would make the next test's user look deleted.
-    sql`TRUNCATE sessions, reaction_history, processed_events, plaid_items, plaid_removal_queue, ops_events, deleted_user_ids, category_overrides, device_tokens, transactions, pet_state, app_store_notifications, users RESTART IDENTITY CASCADE`,
+    //
+    // request_samples is the fourth. It has no user column by design
+    // (observability/request-samples.ts: a duration is a fact about the server,
+    // and route-plus-timestamp against a person is a browsing history), so the
+    // cascade cannot reach it. It also fills faster than any of the others,
+    // because the onResponse hook records a row for every app.inject in the
+    // suite, and a leaked row is a latency sample the next test's percentile
+    // silently includes.
+    sql`TRUNCATE sessions, reaction_history, processed_events, plaid_items, plaid_removal_queue, ops_events, deleted_user_ids, request_samples, category_overrides, device_tokens, transactions, pet_state, app_store_notifications, users RESTART IDENTITY CASCADE`,
   );
   _resetOverrideCache();
 
