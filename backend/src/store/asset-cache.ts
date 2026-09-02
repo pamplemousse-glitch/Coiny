@@ -12,7 +12,7 @@ import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { assetClassCache, plaidAccountBalances } from '../db/schema.js';
 import { checkValueTransition } from '../resilience/invariants.js';
-import { recordOpsEvent } from './ops.js';
+import { recordInvariantViolation, recordOpsEvent } from './ops.js';
 
 export type PlaidAccountBalanceRow = typeof plaidAccountBalances.$inferSelect;
 export type AssetClassCacheRow = typeof assetClassCache.$inferSelect;
@@ -113,17 +113,26 @@ export async function recordClassSuccess(
     .from(assetClassCache)
     .where(and(eq(assetClassCache.userId, userId), eq(assetClassCache.assetClass, assetClass)));
 
-  const violation = checkValueTransition(
-    previous?.valueUsd != null ? Number(previous.valueUsd) : null,
-    args.valueUsd,
-    config.INVARIANT_COLLAPSE_RATIO,
-  );
+  const violation = checkValueTransition(previous?.valueUsd != null ? Number(previous.valueUsd) : null, args.valueUsd, {
+    collapseRatio: config.INVARIANT_COLLAPSE_RATIO,
+    spikeRatio: config.INVARIANT_SPIKE_RATIO,
+    minPreviousUsd: config.INVARIANT_MIN_PREVIOUS_USD,
+  });
   if (violation !== null) {
-    await recordOpsEvent({
-      severity: 'warn',
-      kind: 'invariant_violated',
-      errorClass: violation.violation,
-      detail: { asset_class: assetClass, drop_percent: violation.dropPercent },
+    // Recorded through the breadth-aware path rather than straight to
+    // recordOpsEvent: the same violation hitting several accounts in an hour
+    // is the one signal that separates "a user sold everything" from "we
+    // shipped a bug", which is the distinction invariants.ts says it cannot
+    // make from inside one account.
+    await recordInvariantViolation({
+      assetClass,
+      violation: violation.violation,
+      detail: {
+        drop_percent: violation.dropPercent,
+        ...(violation.growthFactor !== undefined ? { growth_factor: violation.growthFactor } : {}),
+      },
+      breadthThreshold: config.INVARIANT_BREADTH_THRESHOLD,
+      windowMinutes: config.INVARIANT_BREADTH_WINDOW_MINUTES,
     });
   }
 
