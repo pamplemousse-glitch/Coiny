@@ -160,8 +160,86 @@ jobs:
           path: ios/TestResults.xcresult
           retention-days: 7
 
+  # Compiles the app in the configuration that actually ships.
+  #
+  # This is not redundant with `test` above, which builds Debug. Release
+  # compiles a DIFFERENT SOURCE SET: every `#if DEBUG` file is excluded, so a
+  # symbol that only exists in a debug-only file, or a Release-only
+  # optimisation error, is invisible to the test job by construction. The App
+  # Review demo-seed path is the live example: `API+Debug.swift` is wrapped in
+  # `#if DEBUG` and `API+Review.swift` deliberately is not, because App Review
+  # reviews the release binary. Only this job proves that separation holds.
+  #
+  # It is also the prerequisite for every performance number in audit 4.11:
+  # Debug binaries are not comparable to shipped ones, so a launch time
+  # measured against the test job's build measures nothing about the product.
+  #
+  # Simulator destination and signing off, so this needs no certificates and no
+  # secrets. It is a COMPILE gate, not a distribution step; archiving is the
+  # founder's Xcode Organizer flow and stays there.
+  release-build:
+    needs: changes
+    if: needs.changes.outputs.has_ios == 'true'
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      SCHEME: Coiny
+      XCODE_MAJOR: "26"
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      # Same selection rule as `test`. Duplicated rather than shared because
+      # GitHub Actions has no YAML anchors and a composite action for six lines
+      # would be harder to read than the repetition. If the major moves, it
+      # moves in both places, which `toolchain-drift` also checks.
+      - name: Select latest Xcode ${{ env.XCODE_MAJOR }}.x
+        run: |
+          set -euo pipefail
+          XCODE_PATH=$(ls -d /Applications/Xcode_${XCODE_MAJOR}*.app 2>/dev/null | sort -V | tail -1 || true)
+          if [ -z "${XCODE_PATH:-}" ]; then
+            echo "::error::No Xcode ${XCODE_MAJOR}.x on this runner image. Available:"
+            ls -d /Applications/Xcode*.app
+            exit 1
+          fi
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+          echo "Using $XCODE_PATH"
+
+      - name: Install build tools
+        run: brew install xcodegen xcbeautify
+
+      - name: Cache SwiftPM dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+          key: spm-release-${{ runner.os }}-${{ hashFiles('ios/project.yml') }}
+          restore-keys: |
+            spm-release-${{ runner.os }}-
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build (Release)
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Coiny.xcodeproj \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination "generic/platform=iOS Simulator" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            | xcbeautify --renderer github-actions
+
   result:
-    needs: [changes, test]
+    needs: [changes, test, release-build]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -171,8 +249,9 @@ jobs:
             echo "No iOS changes – skipping."
             exit 0
           fi
-          if [[ "${{ needs.test.result }}" == "success" ]]; then
+          if [[ "${{ needs.test.result }}" == "success" \
+             && "${{ needs.release-build.result }}" == "success" ]]; then
             exit 0
           fi
-          echo "iOS tests ${{ needs.test.result }}."
+          echo "iOS tests ${{ needs.test.result }}, release build ${{ needs.release-build.result }}."
           exit 1
