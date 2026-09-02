@@ -57,11 +57,18 @@ struct HomeView: View {
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
-        .sheet(isPresented: Bindable(connectFlow).isPresentingLink) {
-            if let session = connectFlow.session {
-                session.sheet()
+        // onDismiss is the only signal when the user swipes Link away without
+        // LinkKit reporting an exit; without it the flow waits forever and no
+        // link_result is ever recorded.
+        .sheet(
+            isPresented: Bindable(connectFlow).isPresentingLink,
+            onDismiss: { connectFlow.linkSheetDismissed() },
+            content: {
+                if let session = connectFlow.session {
+                    session.sheet()
+                }
             }
-        }
+        )
         .task {
             connectFlow.onLinked = { Task { await store.refresh() } }
             // CoinyApp triggers the first load; this loop keeps Home fresh.
@@ -192,15 +199,25 @@ struct HomeView: View {
     private var actionArea: some View {
         switch HomePresentation.primaryAction(for: pet) {
         case .connectAccount:
-            Button {
-                connectFlow.start()
-            } label: {
-                Text(connectFlow.isLoading ? "Opening Link…" : "Connect an account")
-                    .frame(minHeight: 50)
+            VStack(spacing: 12) {
+                Button {
+                    connectFlow.start()
+                } label: {
+                    Text(connectFlow.isLoading ? "Opening Link…" : "Connect an account")
+                        .frame(minHeight: 50)
+                }
+                .buttonStyle(.coinyFilled)
+                .disabled(connectFlow.isLoading)
+                .accessibilityIdentifier("home.action.connect")
+                // Only a real failure lands here; abandonment leaves the
+                // button alone and says nothing (G2.15).
+                if let error = connectFlow.errorMessage {
+                    CoinyErrorLine(message: error, actionTitle: "Try again") {
+                        connectFlow.start()
+                    }
+                    .accessibilityIdentifier("home.connect.error")
+                }
             }
-            .buttonStyle(.coinyFilled)
-            .disabled(connectFlow.isLoading)
-            .accessibilityIdentifier("home.action.connect")
         case nil:
             // Keeps the rung block from sitting on the tab bar.
             Color.clear.frame(height: 50)

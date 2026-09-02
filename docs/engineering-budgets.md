@@ -179,7 +179,7 @@ Mechanics: an `analytics_events` table in the existing Postgres (`user_id`, `eve
 |---|---|---|---|
 | `signup_completed` | First session created (backend, `api/auth.ts`) | `method` | Denominator for everything; defines the cohort week |
 | `onboarding_declared` | Declare step submitted | `classes[]`, `class_count`, per-class bucketed value | Declared-to-connected numerator source list |
-| `link_opened` | Any provider connect flow presented (iOS) | `provider`, `source` (onboarding, prompt, settings) | Funnel top |
+| `link_opened` | Any provider connect flow presented (iOS) | `provider`, `source` (onboarding, prompt, settings, home) | Funnel top |
 | `link_result` | Link flow exits (iOS) | `provider`, `status` (success, abandoned, error), `exit_status` and `view_name` where the SDK exposes them: Plaid Link's `onExit` metadata carries "the point of the Link flow where the user abandoned" and `onEvent` carries `viewName` ([measuring conversion](https://plaid.com/docs/link/measuring-conversion/)) | Where the funnel leaks, per institution step |
 | `account_connected` | First successful data fetch for a new connection (backend) | `provider`, `asset_class`, `nth_connection` | Declared-to-connected numerator; cost model (connections are the billing unit) |
 | `first_number_shown` | First net-worth render after signup (iOS) | `seconds_since_signup`, `class_count` | The 90-second promise (PRD §2.3) |

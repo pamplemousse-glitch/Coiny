@@ -64,7 +64,10 @@ export const CLIENT_EVENT_SCHEMAS = {
   }),
   link_opened: z.strictObject({
     provider: token,
-    source: z.enum(['onboarding', 'prompt', 'settings']),
+    // 'home' is the standalone connect action on Home, which is neither the
+    // onboarding funnel nor a repair prompt. Without it the enum rejects the
+    // event and Home's connect attempts are invisible to the funnel.
+    source: z.enum(['onboarding', 'prompt', 'settings', 'home']),
   }),
   link_result: z.strictObject({
     provider: token,
