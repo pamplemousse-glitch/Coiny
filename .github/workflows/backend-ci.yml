@@ -18,6 +18,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # The journal check below compares this branch against origin/main,
+          # which a depth-1 clone does not have.
+          fetch-depth: 0
 
       # Runs before anything installs, because a mismatch here means every step
       # after it is proving something about a runtime production does not use.
@@ -25,6 +29,19 @@ jobs:
       # places Node's version is declared.
       - name: Node version agrees with the Dockerfile
         run: bin/check-node-versions.sh
+
+      # The one migration check that a unit test cannot do.
+      #
+      # `backend/tests/migration-journal.test.ts` guards ordering WITHIN a
+      # branch and is thorough. It cannot see a second branch, so two journals
+      # that are each internally monotonic can still merge into one where an
+      # entry sits below the watermark and is silently skipped. That is a
+      # relationship between branches, so it has to be checked against main.
+      #
+      # Added after a near miss: a branch cut from main added 0066 while 0065
+      # was still in flight in an open PR.
+      - name: Migration journal is ordered against main
+        run: bin/check-migration-journal.sh
 
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86  # v6.0.10
         with:
