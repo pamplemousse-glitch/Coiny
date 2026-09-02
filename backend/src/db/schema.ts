@@ -345,7 +345,12 @@ export const spinwheelConnections = pgTable('spinwheel_connections', {
     .primaryKey()
     .references(() => users.id, { onDelete: 'cascade' }),
   spinwheelUserId: text('spinwheel_user_id').notNull(),
-  lastCreditScore: integer('last_credit_score'),
+  // AES-256-GCM envelope, not an integer (migration 0065, audit 1.3.1). It was
+  // the one plaintext field sitting beside the encrypted Plaid token and the
+  // encrypted merchant names, and the audit calls it the single most sensitive
+  // scalar in the database. Read and written only through
+  // `store/spinwheel.ts`, which owns the encode/decode so no caller can forget.
+  lastCreditScore: text('last_credit_score'),
   // Added by 0063, not 0062: 0062's census of which tables already had this
   // was produced by a regex that ran past the end of the table it was reading,
   // so this one was recorded as having a column it did not have.

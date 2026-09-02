@@ -15,6 +15,7 @@ import {
 } from '../spinwheel/client.js';
 import { ingestSpinwheelDebts, upsertSourceDebts } from '../store/debts.js';
 import { recordReaction } from '../store/pet.js';
+import { decodeScore, setLastCreditScore } from '../store/spinwheel.js';
 
 const CREDIT_SCORE_REACTION_THRESHOLD = 20;
 
@@ -131,8 +132,12 @@ export function registerSpinwheelApi(app: FastifyInstance): void {
       typeof result === 'object' && result !== null && 'score' in result
         ? ((result as { score?: number }).score ?? null)
         : null;
-    if (score !== null && connection.lastCreditScore !== null && connection.lastCreditScore !== undefined) {
-      const delta = score - connection.lastCreditScore;
+    // Decrypted through the store, never read off the row: the column holds a
+    // ciphertext envelope since migration 0065, so comparing `connection
+    // .lastCreditScore` directly would subtract a number from a base64 string.
+    const previousScore = decodeScore(connection.lastCreditScore ?? null);
+    if (score !== null && previousScore !== null) {
+      const delta = score - previousScore;
       if (Math.abs(delta) >= CREDIT_SCORE_REACTION_THRESHOLD) {
         const type = delta > 0 ? 'credit_score_improved' : 'credit_score_dropped';
         const reaction = evaluateExternalEvent({
@@ -149,10 +154,7 @@ export function registerSpinwheelApi(app: FastifyInstance): void {
       }
     }
     if (score !== null) {
-      await db()
-        .update(spinwheelConnections)
-        .set({ lastCreditScore: score })
-        .where(eq(spinwheelConnections.userId, userId));
+      await setLastCreditScore(userId, score);
     }
 
     return result;
