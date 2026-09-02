@@ -39,6 +39,7 @@ import { retryBudgetStats } from '../resilience/retry-budget.js';
 import { getClassCacheForUsers } from '../store/asset-cache.js';
 import { usersMissingDailyPoint } from '../store/goals.js';
 import { recordOpsEvent } from '../store/ops.js';
+import { type CredentialSyncSummary, runCredentialSync } from '../sync/credential-vendors.js';
 import { type PriceSyncSummary, runPriceSync } from '../sync/price-classes.js';
 import { type HealthSweepSummary, isHealthSweepDue, runConnectionHealthSweep } from './plaid-health.js';
 import { drainPlaidRemovalQueue, type RemovalDrainSummary } from './plaid-removals.js';
@@ -143,6 +144,10 @@ export type TickSummary = {
    *  returns nobody on the ticks where nothing has aged out, which is most of
    *  them. */
   priceSync: PriceSyncSummary;
+  /** Every tick, like priceSync and for the same reason: each vendor carries
+   *  its own interval and the due query returns nobody on the ticks where
+   *  nothing has aged out. */
+  credentialSync: CredentialSyncSummary;
 };
 
 export async function runSchedulerTick(
@@ -160,6 +165,7 @@ export async function runSchedulerTick(
       removals: emptyDrain(),
       health: null,
       priceSync: emptyPriceSync(),
+      credentialSync: emptyCredentialSync(),
     };
   }
   inFlight = true;
@@ -172,6 +178,7 @@ export async function runSchedulerTick(
     removals: emptyDrain(),
     health: null,
     priceSync: emptyPriceSync(),
+    credentialSync: emptyCredentialSync(),
   };
   const startedTick = Date.now();
 
@@ -218,6 +225,27 @@ export async function runSchedulerTick(
       log.warn({ err }, 'price sync sweep failed');
       captureError(err, { task: 'price_sync' });
       await recordOpsEvent({ severity: 'error', kind: 'task_failed', detail: { task: 'price_sync' } });
+    }
+
+    // Credential vendors: Kraken, Alpaca, Kalshi, Hyperliquid, chain wallets,
+    // NFTs, Polymarket, TrueLayer, Discogs and YNAB. The other half of the
+    // problem the price sweep fixed, deliberately deferred at the time because
+    // a scheduled run against a per-user credential can discover an expired
+    // grant, which is a fact about that user and not a failure of ours.
+    //
+    // `reauthRequired` is therefore logged and NOT sent to Sentry: the
+    // connection is already showing reauth_required in the app, and the next
+    // thing that happens is the user tapping Reconnect.
+    try {
+      summary.credentialSync = await runCredentialSync(now);
+      const cs = summary.credentialSync;
+      if (cs.attempted > 0 || cs.abandoned.length > 0) {
+        log.info({ ...cs }, 'credential_sync_completed');
+      }
+    } catch (err) {
+      log.warn({ err }, 'credential sync sweep failed');
+      captureError(err, { task: 'credential_sync' });
+      await recordOpsEvent({ severity: 'error', kind: 'task_failed', detail: { task: 'credential_sync' } });
     }
 
     const dueUsers = await findUsersDueDailyGoalRefresh(now);
@@ -354,6 +382,10 @@ function emptyDrain(): RemovalDrainSummary {
 
 function emptyPriceSync(): PriceSyncSummary {
   return { attempted: 0, refreshed: 0, failed: 0, unconfigured: [] };
+}
+
+function emptyCredentialSync(): CredentialSyncSummary {
+  return { attempted: 0, refreshed: 0, failed: 0, reauthRequired: 0, abandoned: [] };
 }
 
 type RefreshUnit = { userId: string; cls: ScheduledClass };

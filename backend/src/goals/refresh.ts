@@ -51,6 +51,11 @@ export type GoalRefreshInputs = {
    *  goals report a null pace, never a zero-based one. The nightly scheduler
    *  should always pass this. */
   accountBalances?: Record<string, number> | null;
+  /** How old the money behind these inputs is: the oldest `asOf` among the
+   *  classes in the total, decided by `assembleNetWorth`. Optional so existing
+   *  callers keep compiling; omitted or null is recorded as UNKNOWN, which the
+   *  client renders differently from fresh (R-8.2). */
+  inputsAsOf?: Date | null;
 };
 
 export type GoalRefreshResult = {
@@ -94,7 +99,7 @@ export async function refreshGoalSystem(
   };
 
   const ladder = await refreshLadder(userId, context, now);
-  await saveLadderInputs(userId, context, now);
+  await saveLadderInputs(userId, context, now, inputs.inputsAsOf ?? null);
 
   // Layer 2 and 3: target-goal pace (R-7.8) and guardrail periods (R-7.11,
   // R-7.12). Runs inside this seam so the nightly job gets it by calling

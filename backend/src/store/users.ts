@@ -4,6 +4,7 @@ import { db } from '../db/client.js';
 import { petState, users } from '../db/schema.js';
 import { decryptString, encryptString } from '../util/crypto.js';
 import { trackServerEvent } from './analytics.js';
+import { recordUserDeletion } from './deleted-users.js';
 import { forgetAppStoreIdentifiers } from './entitlements.js';
 import { clearUserEvents } from './events.js';
 
@@ -133,8 +134,17 @@ export async function setAnalyticsOptOut(userId: string, optOut: boolean): Promi
 //
 // Both run before the delete and neither throws on an empty result, so a user
 // with no subscription and no synced transactions costs two no-op statements.
+//
+// The delete is paired with a tombstone (store/deleted-users.ts) in ONE
+// transaction. The pairing is the point: a deletion whose tombstone is missing
+// is an account a restore brings back, and a tombstone whose deletion rolled
+// back would re-delete a live account the next time the sweep runs. Neither is
+// acceptable, so neither is allowed to happen alone.
 export async function deleteUser(id: string): Promise<void> {
   await clearUserEvents(id);
   await forgetAppStoreIdentifiers(id);
-  await db().delete(users).where(eq(users.id, id));
+  await db().transaction(async (tx) => {
+    await recordUserDeletion(id, tx);
+    await tx.delete(users).where(eq(users.id, id));
+  });
 }

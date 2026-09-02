@@ -112,6 +112,20 @@ urgent. Everything below section 1 can be done in any order once unblocked.
 - `contact@athanorworks.com` must receive mail.
 - Used by both legal documents and the App Store listing.
 
+### 2.7 Generate the backup keypair, about 5 minutes
+
+- `.github/workflows/backup.yml` takes an encrypted `pg_dump` of production
+  every night and keeps it for 30 days. It **skips with a warning** until this
+  is done, so nothing is red and nothing is running.
+- Full commands in `docs/backup-runbook.md`, "The founder step, once". Two
+  minutes of `openssl`, one Keychain entry (`coiny-backup-private-key`), one
+  GitHub secret (`BACKUP_PUBLIC_KEY`).
+- The private half must never reach CI. That is the design: a compromised
+  runner can write backups and cannot read them.
+- Until it runs, Neon's six-hour window is the entire backup story, and the
+  privacy policy's "30 days" sentence describes something that has never
+  happened.
+
 ### 2.3 Send the Discogs email
 - Draft is ready in `scratchpad/vendor-outreach.md`.
 - Discogs marketplace prices are Restricted Data and need **written**

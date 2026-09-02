@@ -6,6 +6,7 @@ import { db } from '../db/client.js';
 import { truelayerConnections } from '../db/schema.js';
 import { convertToUsd } from '../fx/client.js';
 import { revokeTrueLayer } from '../revoke/upstream.js';
+import type { VendorSyncResult } from '../store/connection-health.js';
 import { recordSyncFailure, successPatch } from '../store/connection-health.js';
 import type { TrueLayerEnv } from '../truelayer/client.js';
 import { buildAuthUrl, exchangeCode, getAccounts, getBalance } from '../truelayer/client.js';
@@ -80,52 +81,11 @@ export function registerTruelayerApi(app: FastifyInstance): void {
   // convert to USD via Frankfurter, and cache the USD total in lastBalanceGbp.
   app.post('/api/truelayer/sync', SYNC_LIMIT, async (req: FastifyRequest, reply: FastifyReply) => {
     const userId = req.user!.id;
-    const [conn] = await db().select().from(truelayerConnections).where(eq(truelayerConnections.userId, userId));
+    const result = await syncTruelayer(userId);
+    if (result.status === 'not_connected') return reply.status(404).send({ error: 'not connected' });
 
-    if (!conn) return reply.status(404).send({ error: 'not connected' });
-
-    // Per-connection health (survey gap 2). The catch RETHROWS: the client
-    // still gets its 500 and plugins/error-handler.ts still reports it. This
-    // only adds the durable fact of WHICH connection failed, so the next
-    // GET /api/net-worth can name it instead of saying the class is degraded.
-    try {
-      const accessToken = await getTrueLayerAccessToken(userId, conn);
-      const env = config.TRUELAYER_ENV as TrueLayerEnv;
-
-      const accounts = await getAccounts(accessToken, env);
-
-      let totalGbp = 0;
-      await Promise.allSettled(
-        accounts.map(async (acct) => {
-          try {
-            const balance = await getBalance(accessToken, acct.accountId, env);
-            totalGbp += balance;
-          } catch {
-            // individual account balance failure is non-fatal; skip it
-          }
-        }),
-      );
-
-      // Convert the raw GBP sum to USD using live ECB rates via Frankfurter.
-      // lastBalanceGbp stores USD post-conversion (column name kept for schema compat).
-      const totalUsd = await convertToUsd(totalGbp, 'GBP');
-
-      await db()
-        .update(truelayerConnections)
-        .set({ lastBalanceGbp: totalUsd.toString(), ...successPatch() })
-        .where(eq(truelayerConnections.userId, userId));
-
-      req.log.info({ userId }, 'truelayer sync complete');
-      return { balanceGbp: totalGbp, balanceUsd: totalUsd };
-    } catch (err) {
-      await recordSyncFailure(
-        truelayerConnections,
-        eq(truelayerConnections.userId, userId),
-        conn.consecutiveFailures,
-        err,
-      );
-      throw err;
-    }
+    req.log.info({ userId }, 'truelayer sync complete');
+    return result.body;
   });
 
   // DELETE /api/truelayer/connect — revoke the grant upstream, then remove the row.
@@ -138,4 +98,60 @@ export function registerTruelayerApi(app: FastifyInstance): void {
     req.log.info({ userId, revocation: outcome.result }, 'truelayer disconnected');
     return reply.status(204).send();
   });
+}
+
+/**
+ * The TrueLayer sync, extracted from its route so the scheduler can run it
+ * unattended (sync/credential-vendors.ts). Behaviour is unchanged.
+ *
+ * This is the one vendor here whose grant genuinely expires on a clock:
+ * `getTrueLayerAccessToken` refreshes when it can, and when the refresh token
+ * itself has lapsed the failure is an `auth` class, which
+ * `deriveConnectionStatus` turns into `reauth_required`. That is the case a
+ * scheduled run exists to find, because otherwise nothing discovers it until
+ * the user opens Wealth and wonders why the number stopped moving.
+ */
+export async function syncTruelayer(
+  userId: string,
+): Promise<VendorSyncResult<{ balanceGbp: number; balanceUsd: number }>> {
+  const [conn] = await db().select().from(truelayerConnections).where(eq(truelayerConnections.userId, userId));
+  if (!conn) return { status: 'not_connected' };
+
+  try {
+    const accessToken = await getTrueLayerAccessToken(userId, conn);
+    const env = config.TRUELAYER_ENV as TrueLayerEnv;
+
+    const accounts = await getAccounts(accessToken, env);
+
+    let totalGbp = 0;
+    await Promise.allSettled(
+      accounts.map(async (acct) => {
+        try {
+          const balance = await getBalance(accessToken, acct.accountId, env);
+          totalGbp += balance;
+        } catch {
+          // individual account balance failure is non-fatal; skip it
+        }
+      }),
+    );
+
+    // Convert the raw GBP sum to USD using live ECB rates via Frankfurter.
+    // lastBalanceGbp stores USD post-conversion (column name kept for schema compat).
+    const totalUsd = await convertToUsd(totalGbp, 'GBP');
+
+    await db()
+      .update(truelayerConnections)
+      .set({ lastBalanceGbp: totalUsd.toString(), ...successPatch() })
+      .where(eq(truelayerConnections.userId, userId));
+
+    return { status: 'synced', updated: 1, body: { balanceGbp: totalGbp, balanceUsd: totalUsd } };
+  } catch (err) {
+    await recordSyncFailure(
+      truelayerConnections,
+      eq(truelayerConnections.userId, userId),
+      conn.consecutiveFailures,
+      err,
+    );
+    throw err;
+  }
 }

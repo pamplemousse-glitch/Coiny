@@ -45,6 +45,7 @@
 // does not re-derive that guarantee, it inherits it.
 
 import type { FastifyInstance, FastifyReply } from 'fastify';
+import { type BudgetBreach, breachedBudgets } from '../observability/request-samples.js';
 import { openBreakers } from '../resilience/circuit-breaker.js';
 import { retryBudgetStats } from '../resilience/retry-budget.js';
 import { vendorFailureRollup } from '../store/ops.js';
@@ -84,6 +85,17 @@ export type IntegrationsHealthBody = {
   /** Vendors in trouble, worst first. A healthy system returns an empty list,
    *  which is the point: this is an exception report, not an inventory. */
   integrations: IntegrationHealth[];
+  /**
+   * Routes whose p95 is over the budget `engineering-budgets.md` §1 sets for
+   * them (runbook G1.22). Empty when healthy, like `integrations`, and here for
+   * the same reason: the transport, the schedule and the monitor already exist,
+   * so a budget that nothing could check becomes one that fails a URL.
+   *
+   * Route patterns and numbers only. Nothing here is not already public: the
+   * routes are the ones the app calls, and there is no user column in
+   * `request_samples` to leak from.
+   */
+  slow_routes: BudgetBreach[];
 };
 
 /**
@@ -155,11 +167,18 @@ export async function buildIntegrationsHealth(now: Date = new Date()): Promise<I
   }
 
   const integrations = [...byKey.values()].sort((a, b) => b.failures - a.failures || a.key.localeCompare(b.key));
+  const slowRoutes = await breachedBudgets(since, now);
 
   return {
+    // A breached latency budget does NOT flip `ok`. The monitor watching this
+    // URL pages on `ok: false`, and a route that is slow is not a route that is
+    // down: waking someone at 3am because the p95 drifted past 400 ms is how
+    // the page for a real outage gets ignored. The breach is reported and
+    // readable; escalating it is a separate decision with a separate threshold.
     ok: integrations.every((i) => i.status !== 'down'),
     window_ms: HEALTH_WINDOW_MS,
     integrations,
+    slow_routes: slowRoutes,
   };
 }
 
@@ -172,7 +191,9 @@ export function registerIntegrationsHealth(app: FastifyInstance): void {
       // The database is how this endpoint sees anything, so losing it means the
       // answer is unknown rather than healthy. 503 is the honest reply, and it
       // is the same reply the monitor already understands.
-      return reply.status(503).send({ ok: false, window_ms: HEALTH_WINDOW_MS, integrations: [], error: 'unavailable' });
+      return reply
+        .status(503)
+        .send({ ok: false, window_ms: HEALTH_WINDOW_MS, integrations: [], slow_routes: [], error: 'unavailable' });
     }
 
     // 503 so a free uptime monitor needs no body parsing and no scripting: the

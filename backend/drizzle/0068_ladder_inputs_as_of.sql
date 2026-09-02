@@ -1,0 +1,16 @@
+-- How old the numbers behind the ladder are (R-8.2).
+--
+-- R-8.2 is "never an unlabelled stale value: every displayed value carries
+-- asOf". Wealth honours it per class. Home does not: its rung detail line shows
+-- real money ("$7,440 of $12,000") with nothing anywhere on the screen saying
+-- when that was true, and Home is the default tab.
+--
+-- The value is the OLDEST asOf among the classes included in the total, decided
+-- in networth/read.ts where that rule already lives, and written here at the
+-- moment the ladder is evaluated so the read path needs no extra query and no
+-- second copy of the rule.
+--
+-- Nullable, and null means UNKNOWN rather than fresh: a contributing class with
+-- no timestamp of its own makes the whole figure's age unknowable, and rows
+-- written before this column existed have no answer either.
+ALTER TABLE "ladder_state" ADD COLUMN IF NOT EXISTS "inputs_as_of" timestamp with time zone;

@@ -470,6 +470,27 @@
       "when": 1788309234067,
       "tag": "0066_demo_account_marker",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1788373775430,
+      "tag": "0067_deleted_user_tombstones",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1788380216893,
+      "tag": "0068_ladder_inputs_as_of",
+      "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1788384244115,
+      "tag": "0069_request_samples",
+      "breakpoints": true
     }
   ]
 }
