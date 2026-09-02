@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	RELEASE entitlements. The only difference from Coiny.entitlements is
+	aps-environment, and that difference is the whole point of the file.
+
+	TestFlight and App Store builds ALWAYS use the production APNs
+	environment; there is no way to upload a TestFlight build that pushes
+	against sandbox. A Release build carrying `development` registers a
+	SANDBOX device token, the production backend sends to
+	api.push.apple.com, and APNs answers 400 BadDeviceToken. Push is then
+	silently dead on every TestFlight build, with no error anywhere the
+	user or the server can see.
+
+	This is exactly the pairing backend/src/push/apns.ts already reasons
+	about. Its comment states the intended correspondence:
+
+	    Debug -> staging -> development/sandbox
+	    Release -> production -> production
+
+	The backend half was correct. The app half was not: project.yml set
+	`aps-environment: development` unconditionally, so the second line was
+	false and the backend was choosing the right gateway for a token the
+	app never issued.
+
+	Hand-maintained rather than generated, because XcodeGen writes exactly
+	one entitlements file per target and cannot vary it by configuration.
+	CoinyTests/EntitlementsParityTests.swift fails if this file and
+	Coiny.entitlements drift on anything other than aps-environment, so a
+	capability added to project.yml cannot silently go missing from Release
+	builds.
+	-->
+	<key>aps-environment</key>
+	<string>production</string>
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+</dict>
+</plist>

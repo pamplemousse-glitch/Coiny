@@ -55,6 +55,7 @@
 		2D79C1AE725A2F0207E9245A /* FarmlandViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F85559CFD70FC379B8FFAC58 /* FarmlandViewModelTests.swift */; };
 		2DEB609DEA7DF5FC55C4547E /* API+Wealth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81CC75C64283FC4C17486D50 /* API+Wealth.swift */; };
 		2DF0A90FFD4986E5627D8D61 /* PolymarketViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 494CFC8859C818D5EEE329D9 /* PolymarketViewModel.swift */; };
+		2EAA9E6ED0C1F17445F63CC9 /* EntitlementsParityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7E2D9C865899C360F9A8603 /* EntitlementsParityTests.swift */; };
 		2F5887ACF18E5A3B893965B7 /* PokemonCardsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B37C0E6815BDEC877A224FD /* PokemonCardsViewModel.swift */; };
 		3437220EC5AD8D76BCAD466F /* API+Goals.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04777967A1F371FC2875D9D0 /* API+Goals.swift */; };
 		34D65611599646CD96381B25 /* HyperliquidViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CE5426D3D30059484097B7E /* HyperliquidViewModelTests.swift */; };
@@ -371,6 +372,7 @@
 		AF3AB3B3C4D15F76BFCDEC7E /* KrakenViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KrakenViewModelTests.swift; sourceTree = "<group>"; };
 		B017F4E8C665C42D356DE250 /* ChainWalletsViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChainWalletsViewModelTests.swift; sourceTree = "<group>"; };
 		B1511858B95CE2674F62C8BA /* RealEstateViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealEstateViewModel.swift; sourceTree = "<group>"; };
+		B1D9D326117C7F6C2C75691F /* CoinyRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CoinyRelease.entitlements; sourceTree = "<group>"; };
 		B1DFC9EF12AEA9D6D6E2FBDB /* MetalsViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalsViewModelTests.swift; sourceTree = "<group>"; };
 		B52F2C8D5C291C6BC47B2D5F /* SessionStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStoreTests.swift; sourceTree = "<group>"; };
 		B5A5E4FC4D5FB5C2DE9C278F /* Telemetry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Telemetry.swift; sourceTree = "<group>"; };
@@ -397,6 +399,7 @@
 		D5D7277AC3859C36E13647F2 /* API+Sessions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Sessions.swift"; sourceTree = "<group>"; };
 		D6996CF5AAF711453DA678D4 /* CoinyUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CoinyUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D6F43C3D3B80FA8A06A9BA78 /* API+Review.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Review.swift"; sourceTree = "<group>"; };
+		D7E2D9C865899C360F9A8603 /* EntitlementsParityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntitlementsParityTests.swift; sourceTree = "<group>"; };
 		D80EE4C5BEDE04A5B7162189 /* privacy-policy.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "privacy-policy.md"; sourceTree = "<group>"; };
 		D8B77884117CC28B5E4C7E35 /* DebtStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebtStoreTests.swift; sourceTree = "<group>"; };
 		D94E31AD4D4658DE75D54FEC /* KrakenViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KrakenViewModel.swift; sourceTree = "<group>"; };
@@ -491,6 +494,7 @@
 				42FEB4D1AEE92851D560B0C6 /* DiscogsViewModelTests.swift */,
 				F010A54AD91567CB1A42C4DD /* EnergyViewModelTests.swift */,
 				256737A898ABFE3AAE532BE6 /* EntitlementsAPITests.swift */,
+				D7E2D9C865899C360F9A8603 /* EntitlementsParityTests.swift */,
 				379B5721C69742E028B2E3B1 /* FakeHTTPClient.swift */,
 				F85559CFD70FC379B8FFAC58 /* FarmlandViewModelTests.swift */,
 				3A427DF82E499F756734DEDD /* HomePresentationTests.swift */,
@@ -597,6 +601,7 @@
 				B6A8E10BF5FCB655B6812F7B /* Assets.xcassets */,
 				618CA9077B0177F449506F80 /* Coiny.entitlements */,
 				180CBB3806803A3DAFA9428B /* CoinyApp.swift */,
+				B1D9D326117C7F6C2C75691F /* CoinyRelease.entitlements */,
 				1660ED70D8D82F79BF9545EF /* Info.plist */,
 				3CEFA51693BE1BADFFD47590 /* Localizable.xcstrings */,
 				658AD9ADB0EEB247C3F10450 /* PrivacyInfo.xcprivacy */,
@@ -933,6 +938,7 @@
 				1A6E5EF1B36D5F5A4D3189AD /* DiscogsViewModelTests.swift in Sources */,
 				15BC23F94416CD64B0F99590 /* EnergyViewModelTests.swift in Sources */,
 				53F46E76103EE7E941A7910A /* EntitlementsAPITests.swift in Sources */,
+				2EAA9E6ED0C1F17445F63CC9 /* EntitlementsParityTests.swift in Sources */,
 				586CE43DD4EB9EFE69894F03 /* FakeHTTPClient.swift in Sources */,
 				2D79C1AE725A2F0207E9245A /* FarmlandViewModelTests.swift in Sources */,
 				B8D7D8D9697B9BBE836BD25F /* HomePresentationTests.swift in Sources */,
@@ -1296,7 +1302,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Coiny/Coiny.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Coiny/CoinyRelease.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				COINY_API_BASE_URL = "https:/$()/coiny-api.fly.dev";
