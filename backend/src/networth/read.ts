@@ -846,11 +846,17 @@ export async function assembleNetWorth(userId: string, now: Date = new Date()): 
 
   // --- Per-connection health (survey gap 2) ----------------------------------
   //
-  // Only Zerion writes these columns today. The other twelve connection tables
-  // gained them in migration 0062 and their sync routes are not yet wired, so
-  // they contribute nothing here rather than contributing something wrong. As
-  // each is wired it appears in this list with no further change, which is the
-  // reason the shape is provider-agnostic.
+  // Every connection table that carries the 0062 columns writes them now: the
+  // ten credential vendors through `recordSyncFailure` in their extracted
+  // syncs, Zerion, Coinbase and Spinwheel through `networth/refresh.ts`. This
+  // comment used to say only Zerion did, which was already untrue when it was
+  // written and made this list look like a stub rather than the real exception
+  // report the Reconnect button on Wealth is built on.
+  //
+  // Plaid items are deliberately NOT here. They have a stored lifecycle driven
+  // by ITEM webhooks and a repair path nothing else has (Link update mode), so
+  // they get their own prompt rather than a row in a list whose only remedy is
+  // "go and connect it again".
   const connectionHealth: ConnectionHealthEntry[] = [];
 
   /** Push one connection if it is NOT healthy. `label` is what the user reads:
