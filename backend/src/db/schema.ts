@@ -60,6 +60,32 @@ export const users = pgTable(
   (t) => [uniqueIndex('users_apple_sub_idx').on(t.appleSub), uniqueIndex('users_google_sub_idx').on(t.googleSub)],
 );
 
+// Deletion tombstones (migration 0067, audit rows 2.9.4 and 5.9.6).
+//
+// The privacy notice promises that backups are never used to restore a deleted
+// account. Nothing enforced that: the cascade removed the user row and left no
+// trace, so restoring any copy resurrects every account deleted since the copy
+// was taken and no list existed to re-delete them from. This table is that
+// list, and `scripts/purge-resurrected-users.ts` is what applies it.
+//
+// No foreign key, by construction: the row it names is already gone, and a
+// cascade would destroy the one record that has to outlive the user. That also
+// means nothing keeps it in step with `users` automatically, so the write lives
+// inside `deleteUser`'s transaction (store/users.ts) rather than at any route.
+//
+// An id and a date and nothing else. The date is not bookkeeping: it is what
+// lets the tombstone itself be dropped once no backup old enough to resurrect
+// that user survives, so "deleted" does not quietly become a permanent record
+// of the person (store/deleted-users.ts, pruneExpiredTombstones).
+export const deletedUserIds = pgTable(
+  'deleted_user_ids',
+  {
+    userId: text('user_id').primaryKey(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('deleted_user_ids_deleted_at_idx').on(t.deletedAt)],
+);
+
 export const sessions = pgTable(
   'sessions',
   {

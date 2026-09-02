@@ -90,12 +90,28 @@ The decryptability check is the one that distinguishes a real recovery from a
 restored-but-worthless database. If it is the only failure, the problem is the
 key, not the restore, and re-restoring will not help.
 
-### 4. Record the result
+### 4. Re-apply deletions, before any traffic
+
+A restore brings back every account deleted since the timestamp you restored to.
+The privacy policy says backups are never used to restore a deleted account, and
+`deleted_user_ids` (migration 0067) plus this sweep is what makes that true.
+
+```bash
+source bin/load-secrets.sh && pnpm --filter coiny-backend exec \
+  tsx scripts/purge-resurrected-users.ts --dry-run
+# then the same command without --dry-run
+```
+
+Counts only, never ids. Zero is the expected result inside a six-hour window;
+non-zero is the number of people whose deletion this restore would have undone.
+`docs/backup-runbook.md` owns the reasoning.
+
+### 5. Record the result
 
 Stop the timer. Write the measured wall clock into `engineering-budgets.md` §7,
 replacing the unrehearsed 4-hour figure, and note the date of the drill.
 
-### 5. Clean up
+### 6. Clean up
 
 Delete the `staging_old_{timestamp}` branch Neon left behind, or it counts
 against the Free plan's branch allowance and becomes a second copy of
