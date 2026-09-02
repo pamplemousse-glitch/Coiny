@@ -81,6 +81,40 @@ final class EntitlementsParityTests: XCTestCase {
         }
     }
 
+    /// The tests above read the two FILES, which is not sufficient on its own.
+    ///
+    /// Re-adding an `entitlements:` block to `project.yml` would make XcodeGen
+    /// generate one file and write `CODE_SIGN_ENTITLEMENTS` into every
+    /// configuration, silently collapsing Release back onto the development
+    /// entitlement. Both files would still exist on disk and every test above
+    /// would still pass, while push was dead on TestFlight again.
+    ///
+    /// So this asserts the wiring, not just the contents.
+    func testProjectYmlWiresEntitlementsPerConfiguration() throws {
+        let projectYml = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("project.yml")
+        let yaml = try String(contentsOf: projectYml, encoding: .utf8)
+
+        XCTAssertTrue(
+            yaml.contains("CODE_SIGN_ENTITLEMENTS: Coiny/CoinyRelease.entitlements"),
+            "Release must point at CoinyRelease.entitlements, or it inherits the development aps-environment "
+                + "and push dies silently on TestFlight."
+        )
+        XCTAssertTrue(
+            yaml.contains("CODE_SIGN_ENTITLEMENTS: Coiny/Coiny.entitlements"),
+            "Debug must point at Coiny.entitlements explicitly, since there is no generated default any more."
+        )
+        // The block XcodeGen would use to overwrite both of the above.
+        XCTAssertFalse(
+            yaml.contains("\n    entitlements:\n"),
+            "project.yml has an `entitlements:` block again. XcodeGen writes CODE_SIGN_ENTITLEMENTS into EVERY "
+                + "configuration from it, which silently overrides the per-config paths and collapses Release back "
+                + "onto the development entitlement."
+        )
+    }
+
     /// Sign in with Apple is the app's ONLY login. If the entitlement is
     /// missing the button builds, installs, and fails at runtime with
     /// ASAuthorizationError 1000, which is a fully broken app that compiles.
