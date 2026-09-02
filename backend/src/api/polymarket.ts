@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { polymarketAccounts } from '../db/schema.js';
 import { getPortfolioValue } from '../polymarket/client.js';
+import type { VendorSyncResult } from '../store/connection-health.js';
 import { recordSyncFailure, successPatch } from '../store/connection-health.js';
 import { SYNC_LIMIT } from './rate-limits.js';
 
@@ -63,32 +64,8 @@ export function registerPolymarketApi(app: FastifyInstance): void {
   // Fetches live position values from the Polymarket Data API and persists them.
   app.post('/api/polymarket/sync', SYNC_LIMIT, async (req: FastifyRequest) => {
     const userId = req.user!.id;
-    const rows = await db().select().from(polymarketAccounts).where(eq(polymarketAccounts.userId, userId));
-
-    if (rows.length === 0) return { updated: 0 };
-
-    let updated = 0;
-    const now = new Date();
-
-    for (const row of rows) {
-      try {
-        const valueUsd = await getPortfolioValue(row.walletAddress);
-        await db()
-          .update(polymarketAccounts)
-          .set({ lastValueUsd: valueUsd.toString(), ...successPatch(now) })
-          .where(and(eq(polymarketAccounts.userId, userId), eq(polymarketAccounts.id, row.id)));
-        updated++;
-      } catch (err) {
-        // Per-row, so the broken address is nameable rather than the whole class.
-        await recordSyncFailure(
-          polymarketAccounts,
-          and(eq(polymarketAccounts.userId, userId), eq(polymarketAccounts.id, row.id)),
-          row.consecutiveFailures,
-          err,
-        );
-        throw err;
-      }
-    }
+    const result = await syncPolymarket(userId);
+    const updated = result.status === 'synced' ? result.updated : 0;
 
     req.log.info({ userId, updated }, 'polymarket sync complete');
     return { updated };
@@ -102,4 +79,39 @@ export function registerPolymarketApi(app: FastifyInstance): void {
       accounts: rows.length,
     };
   });
+}
+
+/**
+ * The Polymarket sync, extracted from its route so the scheduler can run it
+ * unattended (sync/credential-vendors.ts). Per-address, same shape and same
+ * first-failure-ends-the-run behaviour as Hyperliquid.
+ */
+export async function syncPolymarket(userId: string): Promise<VendorSyncResult<{ updated: number }>> {
+  const rows = await db().select().from(polymarketAccounts).where(eq(polymarketAccounts.userId, userId));
+  if (rows.length === 0) return { status: 'not_connected' };
+
+  let updated = 0;
+  const now = new Date();
+
+  for (const row of rows) {
+    try {
+      const valueUsd = await getPortfolioValue(row.walletAddress);
+      await db()
+        .update(polymarketAccounts)
+        .set({ lastValueUsd: valueUsd.toString(), ...successPatch(now) })
+        .where(and(eq(polymarketAccounts.userId, userId), eq(polymarketAccounts.id, row.id)));
+      updated++;
+    } catch (err) {
+      // Per-row, so the broken address is nameable rather than the whole class.
+      await recordSyncFailure(
+        polymarketAccounts,
+        and(eq(polymarketAccounts.userId, userId), eq(polymarketAccounts.id, row.id)),
+        row.consecutiveFailures,
+        err,
+      );
+      throw err;
+    }
+  }
+
+  return { status: 'synced', updated, body: { updated } };
 }

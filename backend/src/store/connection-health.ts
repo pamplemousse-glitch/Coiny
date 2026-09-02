@@ -157,6 +157,28 @@ export function failurePatch(
   return { lastAttemptAt: at, lastErrorClass: errorClass, consecutiveFailures: previousFailures + 1 };
 }
 
+/**
+ * What one vendor sync reports back.
+ *
+ * Exists because these syncs now have two callers with different needs. The
+ * route turns `not_connected` into a 404 and `body` into its JSON response;
+ * the scheduler (sync/credential-vendors.ts) needs to tell "there was nothing
+ * to sync" apart from "it synced", and must never treat the first as an error.
+ * Before the extraction that distinction lived in a `reply.status(404)` call,
+ * which a scheduled run cannot make.
+ *
+ * `body` is per-vendor on purpose: each route already had a response shape its
+ * client depends on (`{ total }`, `{ equity }`, `{ updated }`), and flattening
+ * them into one shape here would be an API break bought for nothing.
+ *
+ * A vendor FAILURE is not in this union. It throws, exactly as it did from
+ * inside the route, because the error itself carries what went wrong and
+ * `plugins/error-handler.ts` still has to see it.
+ */
+export type VendorSyncResult<TBody extends object = Record<string, never>> =
+  | { status: 'not_connected' }
+  | { status: 'synced'; updated: number; body: TBody };
+
 /** The connection tables that carry the 0062 health columns and are synced by a
  *  user-triggered route. A union rather than a generic `PgTable`, so `.set()`
  *  below stays type-checked against the real columns instead of being cast. */

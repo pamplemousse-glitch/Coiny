@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { config } from '../config.js';
 import { db } from '../db/client.js';
 import { ynabConnections } from '../db/schema.js';
+import type { VendorSyncResult } from '../store/connection-health.js';
 import { recordSyncFailure, successPatch } from '../store/connection-health.js';
 import { decryptString, encryptString } from '../util/crypto.js';
 import {
@@ -144,27 +145,11 @@ export function registerYnabApi(app: FastifyInstance): void {
   // POST /api/ynab/sync — cache total net worth from YNAB
   app.post('/api/ynab/sync', SYNC_LIMIT, async (req: FastifyRequest, reply: FastifyReply) => {
     const userId = req.user!.id;
-    const [conn] = await db().select().from(ynabConnections).where(eq(ynabConnections.userId, userId));
-    if (!conn) return reply.status(404).send({ error: 'not connected' });
+    const result = await syncYnab(userId);
+    if (result.status === 'not_connected') return reply.status(404).send({ error: 'not connected' });
 
-    // Per-connection health (survey gap 2). The catch RETHROWS: the client
-    // still gets its 500 and plugins/error-handler.ts still reports it. This
-    // only adds the durable fact of WHICH connection failed, so the next
-    // GET /api/net-worth can name it instead of saying the class is degraded.
-    try {
-      const token = await getTokenForConnection(userId, conn);
-      const total = await getTotalNetWorth(token);
-      await db()
-        .update(ynabConnections)
-        .set({ lastNetWorthUsd: total.toString(), ...successPatch() })
-        .where(eq(ynabConnections.userId, userId));
-
-      req.log.info({ userId }, 'ynab sync complete');
-      return { total };
-    } catch (err) {
-      await recordSyncFailure(ynabConnections, eq(ynabConnections.userId, userId), conn.consecutiveFailures, err);
-      throw err;
-    }
+    req.log.info({ userId }, 'ynab sync complete');
+    return result.body;
   });
 
   // DELETE /api/ynab/connect — remove connection
@@ -174,4 +159,35 @@ export function registerYnabApi(app: FastifyInstance): void {
     req.log.info({ userId }, 'ynab disconnected');
     return reply.status(204).send();
   });
+}
+
+/**
+ * The YNAB sync, extracted from its route so the scheduler can run it
+ * unattended (sync/credential-vendors.ts). Behaviour is unchanged.
+ *
+ * YNAB is the tenth vendor in a list the handoff called nine. It has the same
+ * health columns and the same manual-only refresh as the other nine, and
+ * nothing in `networth/refresh.ts` ever touches `ynab_connections`, so a YNAB
+ * user's budget total sat exactly as stale as a Kraken user's balance. Left out
+ * of the list, not out of the gap.
+ */
+export async function syncYnab(userId: string): Promise<VendorSyncResult<{ total: number }>> {
+  const [conn] = await db().select().from(ynabConnections).where(eq(ynabConnections.userId, userId));
+  if (!conn) return { status: 'not_connected' };
+
+  // Per-connection health (survey gap 2). The catch RETHROWS: the caller still
+  // gets its error and plugins/error-handler.ts still reports it.
+  try {
+    const token = await getTokenForConnection(userId, conn);
+    const total = await getTotalNetWorth(token);
+    await db()
+      .update(ynabConnections)
+      .set({ lastNetWorthUsd: total.toString(), ...successPatch() })
+      .where(eq(ynabConnections.userId, userId));
+
+    return { status: 'synced', updated: 1, body: { total } };
+  } catch (err) {
+    await recordSyncFailure(ynabConnections, eq(ynabConnections.userId, userId), conn.consecutiveFailures, err);
+    throw err;
+  }
 }

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { hyperliquidAccounts } from '../db/schema.js';
 import { getHyperliquidState } from '../hyperliquid/client.js';
+import type { VendorSyncResult } from '../store/connection-health.js';
 import { recordSyncFailure, successPatch } from '../store/connection-health.js';
 import { SYNC_LIMIT } from './rate-limits.js';
 
@@ -63,48 +64,64 @@ export function registerHyperliquidApi(app: FastifyInstance): void {
   // Fetches live account values from Hyperliquid and persists them.
   app.post('/api/hyperliquid/sync', SYNC_LIMIT, async (req: FastifyRequest) => {
     const userId = req.user!.id;
-    const rows = await db().select().from(hyperliquidAccounts).where(eq(hyperliquidAccounts.userId, userId));
-
-    if (rows.length === 0) return { updated: 0 };
-
-    let updated = 0;
-    const now = new Date();
-
-    for (const row of rows) {
-      try {
-        const state = await getHyperliquidState(row.address);
-        // Perps account value PLUS spot token balances. This used to store the
-        // perps figure alone, so an address holding spot tokens had them counted
-        // nowhere: no error, no warning, simply absent from net worth.
-        //
-        // Deliberately reusing the existing column rather than adding one. The
-        // column means "what this Hyperliquid address is worth", and it was
-        // answering that question wrongly; a migration would only let both
-        // answers coexist. See docs/integration-api-audit.md.
-        //
-        // Each term is coerced: a NaN here does not throw, it stringifies to
-        // "NaN", and the numeric column stores NULL. That turns "we could not
-        // price one token" into "this account is worth nothing", silently.
-        const safe = (n: number): number => (Number.isFinite(n) ? n : 0);
-        const totalUsd = safe(state.accountValue) + safe(state.spotValueUsd);
-        await db()
-          .update(hyperliquidAccounts)
-          .set({ lastAccountValueUsd: totalUsd.toString(), ...successPatch(now) })
-          .where(and(eq(hyperliquidAccounts.userId, userId), eq(hyperliquidAccounts.id, row.id)));
-        updated++;
-      } catch (err) {
-        // Per-row, so the broken address is nameable rather than the whole class.
-        await recordSyncFailure(
-          hyperliquidAccounts,
-          and(eq(hyperliquidAccounts.userId, userId), eq(hyperliquidAccounts.id, row.id)),
-          row.consecutiveFailures,
-          err,
-        );
-        throw err;
-      }
-    }
+    const result = await syncHyperliquid(userId);
+    const updated = result.status === 'synced' ? result.updated : 0;
 
     req.log.info({ userId, updated }, 'hyperliquid sync complete');
     return { updated };
   });
+}
+
+/**
+ * The Hyperliquid sync, extracted from its route so the scheduler can run it
+ * unattended (sync/credential-vendors.ts).
+ *
+ * Per-address rather than per-user: the health columns live on the address row,
+ * so a broken address is nameable instead of the whole class going degraded.
+ * The first failure still ends the run and rethrows, which is what the route
+ * did and what a scheduled run wants too: the addresses share a vendor, and one
+ * that is refusing us is likely refusing us for all of them.
+ */
+export async function syncHyperliquid(userId: string): Promise<VendorSyncResult<{ updated: number }>> {
+  const rows = await db().select().from(hyperliquidAccounts).where(eq(hyperliquidAccounts.userId, userId));
+  if (rows.length === 0) return { status: 'not_connected' };
+
+  let updated = 0;
+  const now = new Date();
+
+  for (const row of rows) {
+    try {
+      const state = await getHyperliquidState(row.address);
+      // Perps account value PLUS spot token balances. This used to store the
+      // perps figure alone, so an address holding spot tokens had them counted
+      // nowhere: no error, no warning, simply absent from net worth.
+      //
+      // Deliberately reusing the existing column rather than adding one. The
+      // column means "what this Hyperliquid address is worth", and it was
+      // answering that question wrongly; a migration would only let both
+      // answers coexist. See docs/integration-api-audit.md.
+      //
+      // Each term is coerced: a NaN here does not throw, it stringifies to
+      // "NaN", and the numeric column stores NULL. That turns "we could not
+      // price one token" into "this account is worth nothing", silently.
+      const safe = (n: number): number => (Number.isFinite(n) ? n : 0);
+      const totalUsd = safe(state.accountValue) + safe(state.spotValueUsd);
+      await db()
+        .update(hyperliquidAccounts)
+        .set({ lastAccountValueUsd: totalUsd.toString(), ...successPatch(now) })
+        .where(and(eq(hyperliquidAccounts.userId, userId), eq(hyperliquidAccounts.id, row.id)));
+      updated++;
+    } catch (err) {
+      // Per-row, so the broken address is nameable rather than the whole class.
+      await recordSyncFailure(
+        hyperliquidAccounts,
+        and(eq(hyperliquidAccounts.userId, userId), eq(hyperliquidAccounts.id, row.id)),
+        row.consecutiveFailures,
+        err,
+      );
+      throw err;
+    }
+  }
+
+  return { status: 'synced', updated, body: { updated } };
 }
