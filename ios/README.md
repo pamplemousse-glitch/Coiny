@@ -72,6 +72,68 @@ xcodebuild \
   build
 ```
 
+## The gate, which is what CI runs
+
+Run this before opening a PR, and run it AFTER the last edit.
+
+```
+xcrun simctl shutdown all                    # see the note below
+cd ios && xcodegen generate                  # after adding or moving any file
+swiftlint lint --strict Coiny                # ios-ci.yml runs exactly this
+
+UDID=$(xcrun simctl list devices available --json \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; \
+                runtimes=sorted([k for k in d if "iOS" in k]); \
+                devs=[x for r in runtimes for x in d[r] if x.get("isAvailable") and "iPhone" in x["name"]]; \
+                print(devs[0]["udid"])')
+
+xcodebuild test \
+  -project Coiny.xcodeproj -scheme Coiny -sdk iphonesimulator \
+  -destination "platform=iOS Simulator,id=$UDID" \
+  -resultBundlePath TestResults.xcresult \
+  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+  CODE_SIGN_IDENTITY="" CODE_SIGN_ENTITLEMENTS="" \
+  > /tmp/ios-test.log 2>&1; echo "EXIT=$?"
+```
+
+**No `-only-testing:CoinyTests`.** That flag runs the unit target alone, which
+is about 614 fast tests and roughly twenty seconds, and it SKIPS `CoinyUITests`
+entirely: the accessibility audits, the paywall's legally required links, the
+tab navigation. CI runs the whole scheme. A session ran the narrow form on six
+iOS PRs, called the gate green, and found out from CI on the seventh (#362).
+The unit target on its own is a fine inner loop; it is not the gate.
+
+**Never behind a pipe.** `xcodebuild ... | xcbeautify` reports xcbeautify's exit
+code, which is 0. Redirect and echo `$?`, the same rule the backend gate follows.
+
+**Shut the simulators down first.** Leftover booted devices are the single
+biggest source of timing failures in the UI tests, and they also poison the
+backend's PGlite suite through machine load.
+
+### When a UI test fails
+
+Read the result bundle before believing the summary line. The log prints
+`XCTAssertTrue failed` with no context, and the bundle says which line:
+
+```
+xcrun xcresulttool get test-results tests --path TestResults.xcresult --format json
+```
+
+Two failures look identical in the log and mean opposite things:
+
+- **A failure inside `setUp`** is navigation or launch timing, not the thing the
+  test is named after. `PaywallUITests.swift:33` is a `waitForExistence` on the
+  Settings navigation bar; when it times out, the paywall was never reached and
+  the accessibility audit never ran. That is a flake, and the tell is that the
+  other tests in the same class share that `setUp` and passed.
+- **A failure inside the test body** is real. For the audits specifically,
+  `CoinyUITests/AccessibilityAudit.swift` already distinguishes a finding from
+  `Code=-56` ("audit failed to complete in time") and retries once on the
+  timeout only, so a reported finding has survived that filter.
+
+Re-run the job to tell them apart rather than asserting flake: `gh run rerun
+<run-id> --failed`.
+
 ## Install + launch in Simulator (CLI)
 
 ```
