@@ -9,8 +9,12 @@ struct NetWorthView: View {
     @Environment(NetWorthViewModel.self) private var vm
     @State private var repairVM = ConnectionRepairViewModel()
     @State private var showExcludedList = false
-    /// The entry whose Reconnect button was tapped. Drives the repair flow;
-    /// nil when nothing is being repaired.
+    /// The entry whose Reconnect button was tapped. Presents the accounts
+    /// directory scrolled to that provider; nil when nothing is being repaired.
+    ///
+    /// This used to be set and never read. Nothing in the app observed it, so
+    /// the Reconnect button on the one screen that names a broken connection
+    /// did nothing at all.
     @State private var reconnectTarget: ConnectionHealthEntry?
     /// The flagship number. It was `.system(size: 48)`, the one string in the
     /// app that ignored Dynamic Type entirely (WCAG 1.4.4); onboarding already
@@ -39,6 +43,34 @@ struct NetWorthView: View {
             if let session = repairVM.session {
                 session.sheet()
             }
+        }
+        // Everything that is not Plaid repairs by reconnecting, which means the
+        // screen that made the connection. Plaid never appears here: it has
+        // Link update mode and its own prompt, and the server keeps its items
+        // out of `connectionHealth` for exactly that reason.
+        //
+        // A provider this build does not recognise opens the directory
+        // unscrolled rather than nowhere: the server can ship a new one before
+        // the app knows where to send it, and the accounts screen is still the
+        // right place to be.
+        .sheet(item: $reconnectTarget) { entry in
+            NavigationStack {
+                ManageAccountsView(focus: ConnectionRepairRoute.section(for: entry.provider))
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Done") { reconnectTarget = nil }
+                        }
+                    }
+            }
+            // Re-injected rather than inherited. The sheet is a new
+            // presentation context and the directory cannot render without it.
+            .environment(vm)
+        }
+        .onChange(of: reconnectTarget) { _, target in
+            // The sheet closing is the only signal that a repair may have
+            // happened: these vendors have no callback and no webhook, so the
+            // numbers are re-read on dismissal rather than on success.
+            if target == nil { Task { await vm.load() } }
         }
     }
 

@@ -48,6 +48,7 @@
 		20F517BEBCCF57EEF08D9D18 /* CreatureWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DC3F2AED38087E149BEBF64 /* CreatureWindow.swift */; };
 		21F174C46BF8BF6F3229578E /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3FF4A43F181F21963F8104F /* PaywallView.swift */; };
 		220920B25D14BDCECE977BC9 /* TruelayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18AAE0E838B59D15092CC506 /* TruelayerViewModel.swift */; };
+		222F58B920C65D3BA46B4110 /* ConnectionRepairRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87EAF1660D8D60644775E743 /* ConnectionRepairRouteTests.swift */; };
 		22DD3783B968DB6C61DA739A /* DarkModeRenderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62C9B4C739423A364897A88D /* DarkModeRenderingTests.swift */; };
 		2710ACBD593C5409B8EC24C1 /* DebtPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A036120391C5D8C970CDFE5 /* DebtPresentationTests.swift */; };
 		275CC33CEE3B9B10378CEF72 /* ViewSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8973AFCF92D287621A176B77 /* ViewSmokeTests.swift */; };
@@ -72,6 +73,7 @@
 		457956A739E5E9E53948F14F /* TargetGoals.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B824BAA59C514595D639350 /* TargetGoals.swift */; };
 		4697735618CC62AA1873D44E /* CoinbaseViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C89B7BBEFA53BE9D727F1A1 /* CoinbaseViewModelTests.swift */; };
 		46C660E196041E36E451159C /* AppLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92F01776EAAA26FF831B236D /* AppLock.swift */; };
+		46EF950BAE637D4298262000 /* ConnectionRepairRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C4360423022950F5F4A0D7 /* ConnectionRepairRoute.swift */; };
 		4887E84F9604FB4286CD1F47 /* CoinyTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AE46D8172612594E679EF5A /* CoinyTheme.swift */; };
 		48A0B70757F046C4FEBCFDE4 /* OnboardingViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C0336E1DC0E43C3546544A9 /* OnboardingViewModelTests.swift */; };
 		49605D7EAB8872075DC99F24 /* CreaturePlaceholderArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CF3B9CB6ADCE331E98E1D43 /* CreaturePlaceholderArt.swift */; };
@@ -330,6 +332,7 @@
 		851CD4156E2005F77706A82A /* API+Debug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Debug.swift"; sourceTree = "<group>"; };
 		86BD77DFAC2D741C86C45C1B /* SubscriptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionsView.swift; sourceTree = "<group>"; };
 		879471FBA14585F06C8CF171 /* Keychain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Keychain.swift; sourceTree = "<group>"; };
+		87EAF1660D8D60644775E743 /* ConnectionRepairRouteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionRepairRouteTests.swift; sourceTree = "<group>"; };
 		89144771F14F6DB623CA1289 /* NetWorthCacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetWorthCacheTests.swift; sourceTree = "<group>"; };
 		8973AFCF92D287621A176B77 /* ViewSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewSmokeTests.swift; sourceTree = "<group>"; };
 		8A036120391C5D8C970CDFE5 /* DebtPresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebtPresentationTests.swift; sourceTree = "<group>"; };
@@ -384,6 +387,7 @@
 		B9D7A31FF840B964A6B679CA /* JourneyUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JourneyUITests.swift; sourceTree = "<group>"; };
 		BD7615652A7C923819AF7530 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		C0845CBE9430D01E8553CC30 /* ManualAssetsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualAssetsView.swift; sourceTree = "<group>"; };
+		C0C4360423022950F5F4A0D7 /* ConnectionRepairRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionRepairRoute.swift; sourceTree = "<group>"; };
 		C104CD7196BD12428D6AC151 /* VehiclesViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehiclesViewModelTests.swift; sourceTree = "<group>"; };
 		C12C0A2DFEC71B90CE63DB87 /* ChainWalletsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChainWalletsViewModel.swift; sourceTree = "<group>"; };
 		C25CD58983B1DE8884967F35 /* PaywallUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallUITests.swift; sourceTree = "<group>"; };
@@ -460,6 +464,7 @@
 		28CC9E634DE0D9542CDC5954 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				C0C4360423022950F5F4A0D7 /* ConnectionRepairRoute.swift */,
 				684858149CD173ED09BB9F7B /* DebtPresentation.swift */,
 				5B65907D7899776DD5BB0C2D /* DeclaredAssets.swift */,
 				49E0CC343227D7D67FB083BB /* HomePresentation.swift */,
@@ -486,6 +491,7 @@
 				B762515DECDB32F8A1DBCF9E /* CoinsViewModelTests.swift */,
 				DDCC857A4023EBFEB99C929F /* CoinyThemeContrastTests.swift */,
 				FC324A490720F8A379B9E832 /* ConnectAccountFlowTests.swift */,
+				87EAF1660D8D60644775E743 /* ConnectionRepairRouteTests.swift */,
 				9BA56E7F280F38672F7A1433 /* ConnectionRepairViewModelTests.swift */,
 				FCF5D47BB976E867580484C1 /* CrashDiagnosticsTests.swift */,
 				62C9B4C739423A364897A88D /* DarkModeRenderingTests.swift */,
@@ -931,6 +937,7 @@
 				FC2DB1160F3F632335CC4951 /* CoinsViewModelTests.swift in Sources */,
 				BFA7E639197CBAA87F96AC0D /* CoinyThemeContrastTests.swift in Sources */,
 				055C4E099CF80BED2CDBEBF6 /* ConnectAccountFlowTests.swift in Sources */,
+				222F58B920C65D3BA46B4110 /* ConnectionRepairRouteTests.swift in Sources */,
 				C7A55A81C43EDBA5D944D007 /* ConnectionRepairViewModelTests.swift in Sources */,
 				E6D35B96A86DBE67410BAB7A /* CrashDiagnosticsTests.swift in Sources */,
 				22DD3783B968DB6C61DA739A /* DarkModeRenderingTests.swift in Sources */,
@@ -1027,6 +1034,7 @@
 				19468B4AECB775A370C6395C /* CoinyComponents.swift in Sources */,
 				4887E84F9604FB4286CD1F47 /* CoinyTheme.swift in Sources */,
 				AC0574D2EB9BDEFFE07F88FB /* ConnectAccountFlow.swift in Sources */,
+				46EF950BAE637D4298262000 /* ConnectionRepairRoute.swift in Sources */,
 				AD4B609E5537D4EFE2EE7D93 /* ConnectionRepairViewModel.swift in Sources */,
 				AB1DB4B082CEAD8A4195BEE0 /* CrashDiagnostics.swift in Sources */,
 				49605D7EAB8872075DC99F24 /* CreaturePlaceholderArt.swift in Sources */,
