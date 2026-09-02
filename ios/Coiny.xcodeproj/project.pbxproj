@@ -14,6 +14,7 @@
 		0481404D14A5FF8B874C8CAC /* API+ChainWallets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17BE22059E3B6AC1DDB47214 /* API+ChainWallets.swift */; };
 		049280CF0928B96EDE8B010A /* AlpacaViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A1E7F4A5A7BE14C4CBB1764 /* AlpacaViewModel.swift */; };
 		04CDD2A22017BA2F8744CAC5 /* API+Sessions.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5D7277AC3859C36E13647F2 /* API+Sessions.swift */; };
+		055C4E099CF80BED2CDBEBF6 /* ConnectAccountFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC324A490720F8A379B9E832 /* ConnectAccountFlowTests.swift */; };
 		062E3A2367AABA402708CED9 /* StoreKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED0858A053C358E8C049590 /* StoreKitService.swift */; };
 		0713E8EFDC954F3034FEB34F /* JourneyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC98E62A262444F9ABC04A99 /* JourneyStore.swift */; };
 		071AE3704E1FA8543020F522 /* API.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18E99499DA3CE01DE33AAB7B /* API.swift */; };
@@ -431,6 +432,7 @@
 		F94C0FE6B70F56084D65746B /* NftViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NftViewModel.swift; sourceTree = "<group>"; };
 		FA7FF7020479D78C12B2B789 /* API+Alpaca.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Alpaca.swift"; sourceTree = "<group>"; };
 		FB6FB6123E7E7241E0C3C648 /* NetWorthAPIDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetWorthAPIDecodingTests.swift; sourceTree = "<group>"; };
+		FC324A490720F8A379B9E832 /* ConnectAccountFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectAccountFlowTests.swift; sourceTree = "<group>"; };
 		FCF5D47BB976E867580484C1 /* CrashDiagnosticsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrashDiagnosticsTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -483,6 +485,7 @@
 				2C89B7BBEFA53BE9D727F1A1 /* CoinbaseViewModelTests.swift */,
 				B762515DECDB32F8A1DBCF9E /* CoinsViewModelTests.swift */,
 				DDCC857A4023EBFEB99C929F /* CoinyThemeContrastTests.swift */,
+				FC324A490720F8A379B9E832 /* ConnectAccountFlowTests.swift */,
 				9BA56E7F280F38672F7A1433 /* ConnectionRepairViewModelTests.swift */,
 				FCF5D47BB976E867580484C1 /* CrashDiagnosticsTests.swift */,
 				62C9B4C739423A364897A88D /* DarkModeRenderingTests.swift */,
@@ -927,6 +930,7 @@
 				4697735618CC62AA1873D44E /* CoinbaseViewModelTests.swift in Sources */,
 				FC2DB1160F3F632335CC4951 /* CoinsViewModelTests.swift in Sources */,
 				BFA7E639197CBAA87F96AC0D /* CoinyThemeContrastTests.swift in Sources */,
+				055C4E099CF80BED2CDBEBF6 /* ConnectAccountFlowTests.swift in Sources */,
 				C7A55A81C43EDBA5D944D007 /* ConnectionRepairViewModelTests.swift in Sources */,
 				E6D35B96A86DBE67410BAB7A /* CrashDiagnosticsTests.swift in Sources */,
 				22DD3783B968DB6C61DA739A /* DarkModeRenderingTests.swift in Sources */,
