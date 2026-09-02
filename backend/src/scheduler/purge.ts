@@ -37,6 +37,7 @@ import {
   sessions,
   spinwheelPending,
 } from '../db/schema.js';
+import { pruneExpiredTombstones, TOMBSTONE_RETENTION_DAYS } from '../store/deleted-users.js';
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -65,6 +66,11 @@ export const RETENTION = {
    *  and a crash on a build from last quarter is not actionable. Shorter than
    *  analytics deliberately. */
   crashDiagnosticsMs: 90 * DAY_MS,
+  // Deletion tombstones are NOT here. Their window is the backup retention
+  // window, not a privacy window chosen from the schedule, so it lives beside
+  // the table in store/deleted-users.ts (TOMBSTONE_RETENTION_DAYS) where the
+  // reasoning that ties it to R-20.1's 30 days can be read. Pruning still runs
+  // as part of this pass; only the number lives elsewhere.
 } as const;
 
 export const PURGE_INTERVAL_MS = DAY_MS;
@@ -77,6 +83,9 @@ export type PurgeSummary = {
   analytics: number;
   opsEvents: number;
   crashDiagnostics: number;
+  /** Deletion tombstones dropped because no surviving backup is old enough to
+   *  resurrect the account they name (store/deleted-users.ts). */
+  tombstones: number;
 };
 
 let lastPurgeAt: Date | null = null;
@@ -143,6 +152,12 @@ export async function runRetentionPurge(now: Date = new Date()): Promise<PurgeSu
     .where(lt(crashDiagnostics.receivedAt, before(RETENTION.crashDiagnosticsMs)))
     .returning({ id: crashDiagnostics.id });
 
+  // A tombstone stops being useful once no backup old enough to resurrect that
+  // user survives. Keeping them past that turns the record of a deletion into a
+  // permanent list of everyone who ever left, which is the thing the deletion
+  // was supposed to end.
+  const tombstones = await pruneExpiredTombstones(TOMBSTONE_RETENTION_DAYS, now);
+
   lastPurgeAt = now;
 
   return {
@@ -153,5 +168,6 @@ export async function runRetentionPurge(now: Date = new Date()): Promise<PurgeSu
     analytics: analytics.length,
     opsEvents: ops.length,
     crashDiagnostics: crashes.length,
+    tombstones,
   };
 }

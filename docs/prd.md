@@ -572,7 +572,7 @@ Short by design: this is a thin client on a cached API, and §8/§16 carry the s
 
 ## 20. Reliability: backup, restore, RPO, RTO
 
-`docs/engineering-budgets.md` §7 owns the numbers (RPO, RTO, rehearsal cadence, key survivability). Requirements folded in: **R-20.1** [Unbuilt, MAJOR before first tester] nightly encrypted `pg_dump` via CI cron, 30-day retention, because Neon Free's PITR window alone cannot cover corruption discovered late; **R-20.2** [Unbuilt] one restore rehearsal before the first tester and quarterly after (restore into a scratch branch, run migrations, assert row counts, decrypt one token with the prod key, check `net_worth_daily` max date); **R-20.3** [Built by config, verify at each rehearsal] `DATA_ENCRYPTION_KEY` exists in exactly two places, Fly secrets and the founder's Keychain; losing it makes every stored token garbage and every user re-links everything.
+`docs/engineering-budgets.md` §7 owns the numbers (RPO, RTO, rehearsal cadence, key survivability). Requirements folded in: **R-20.1** [Built 2026-09-02, inert until the founder generates the keypair] nightly encrypted `pg_dump` via CI cron, 30-day retention, because Neon Free's PITR window alone cannot cover corruption discovered late. `.github/workflows/backup.yml` dumps the Neon `production` branch straight down a pipe into `backend/scripts/backup-encrypt.ts`, which gzips and AES-256-GCMs it under a per-dump key wrapped to `BACKUP_PUBLIC_KEY`; the private half never enters CI. Deletion tombstones (`deleted_user_ids`, migration 0067) ship with it, because a 30-day dump without them makes "backups are never used to restore a deleted account" false. `docs/backup-runbook.md` is the procedure; **R-20.2** [Unbuilt] one restore rehearsal before the first tester and quarterly after (restore into a scratch branch, run migrations, assert row counts, decrypt one token with the prod key, check `net_worth_daily` max date); **R-20.3** [Built by config, verify at each rehearsal] `DATA_ENCRYPTION_KEY` exists in exactly two places, Fly secrets and the founder's Keychain; losing it makes every stored token garbage and every user re-links everything.
 
 ## 21. Security and threat model
 
@@ -1091,7 +1091,7 @@ Verified against source on 2026-08-13 after the `integration/night-build` block 
 | R-17.3 | Discogs suppression | **Built** | `vinylTotal` pinned to 0 (`net-worth.ts:392-407`); test in `discogs.test.ts` |
 | R-17.4 | YNAB footer | Unbuilt, MINOR | No footer string in repo |
 | R-18.1 | Client cache hygiene | Unbuilt | No client cache exists |
-| R-20.1 to R-20.3 | Backups, rehearsal, key | Unbuilt / config-only | No dump workflow in `.github/workflows` |
+| R-20.1 to R-20.3 | Backups, rehearsal, key | R-20.1 built, waiting on one founder step | `.github/workflows/backup.yml` plus `backend/src/backup/envelope.ts`; skips until `BACKUP_PUBLIC_KEY` exists (`docs/backup-runbook.md`). R-20.2 rehearsal harness is `scripts/verify-restore.ts`; R-20.3 stays config-only |
 | R-21.1 | Crypto opt-in no-op | Unbuilt, MINOR | Silent pass-through (`util/crypto.ts:9-14,24-32`) |
 | R-21.2 | MFA verification | Unverified | Dashboard check, not code |
 | R-21.3 | Webhook replay claim | Unbuilt, MINOR | Transactions idempotent only |
