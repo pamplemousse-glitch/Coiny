@@ -5,6 +5,11 @@ import SwiftUI
 /// account", never as an empty section on Wealth). Pushed from the Wealth
 /// screen; the Wealth screen itself renders only the six groups.
 struct ManageAccountsView: View {
+    /// Scroll here on appear. Set when the screen is opened by a Reconnect
+    /// button on Wealth, so the broken thing is the thing on screen rather than
+    /// something twenty sections down a list of twenty-six.
+    var focus: ManageAccountsSection?
+
     @Environment(NetWorthViewModel.self) private var vm
     @State private var coinbaseVM = CoinbaseViewModel()
     @State private var zerionVM = ZerionViewModel()
@@ -97,40 +102,49 @@ struct ManageAccountsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case let .loaded(data):
-            ScrollView {
-                // Zero spacing: CoinySection carries its own leading gap, so
-                // the container adding more would double it.
-                VStack(spacing: 0) {
-                    bankSection(data)
-                    investmentsSection(data)
-                    cryptoSection(data)
-                    defiSection(data)
-                    chainWalletsSection(data)
-                    hyperliquidSection(data)
-                    nftSection(data)
-                    alpacaSection(data)
-                    manualAssetsSection(data)
-                    metalsSection(data)
-                    realEstateSection(data)
-                    vehiclesSection(data)
-                    sneakersSection(data)
-                    discogsSection(data)
-                    krakenSection(data)
-                    ynabSection(data)
-                    kalshiSection(data)
-                    polymarketSection(data)
-                    truelayerSection(data)
-                    pokemonCardsSection(data)
-                    energySection(data)
-                    farmlandSection(data)
-                    tradingCardsSection(data)
-                    coinsSection(data)
-                    debtsSection(data)
-                    performanceSection()
-                    Spacer(minLength: 32)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    // Zero spacing: CoinySection carries its own leading gap, so
+                    // the container adding more would double it.
+                    VStack(spacing: 0) {
+                        bankSection(data).id(ManageAccountsSection.bank)
+                        investmentsSection(data).id(ManageAccountsSection.investments)
+                        cryptoSection(data).id(ManageAccountsSection.crypto)
+                        defiSection(data).id(ManageAccountsSection.defi)
+                        chainWalletsSection(data).id(ManageAccountsSection.chainWallets)
+                        hyperliquidSection(data).id(ManageAccountsSection.hyperliquid)
+                        nftSection(data).id(ManageAccountsSection.nft)
+                        alpacaSection(data).id(ManageAccountsSection.alpaca)
+                        manualAssetsSection(data).id(ManageAccountsSection.manualAssets)
+                        metalsSection(data).id(ManageAccountsSection.metals)
+                        realEstateSection(data).id(ManageAccountsSection.realEstate)
+                        vehiclesSection(data).id(ManageAccountsSection.vehicles)
+                        sneakersSection(data).id(ManageAccountsSection.sneakers)
+                        discogsSection(data).id(ManageAccountsSection.discogs)
+                        krakenSection(data).id(ManageAccountsSection.kraken)
+                        ynabSection(data).id(ManageAccountsSection.ynab)
+                        kalshiSection(data).id(ManageAccountsSection.kalshi)
+                        polymarketSection(data).id(ManageAccountsSection.polymarket)
+                        truelayerSection(data).id(ManageAccountsSection.truelayer)
+                        pokemonCardsSection(data).id(ManageAccountsSection.pokemonCards)
+                        energySection(data).id(ManageAccountsSection.energy)
+                        farmlandSection(data).id(ManageAccountsSection.farmland)
+                        tradingCardsSection(data).id(ManageAccountsSection.tradingCards)
+                        coinsSection(data).id(ManageAccountsSection.coins)
+                        debtsSection(data).id(ManageAccountsSection.debts)
+                        performanceSection().id(ManageAccountsSection.performance)
+                        Spacer(minLength: 32)
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 8)
                 }
-                .padding(.horizontal)
-                .padding(.top, 8)
+                // After the sections exist, not before: scrolling to an id that
+                // has not been laid out yet is a no-op, which is how a Reconnect
+                // tap silently lands at the top of a twenty-six section list.
+                .onAppear {
+                    guard let focus else { return }
+                    proxy.scrollTo(focus, anchor: .top)
+                }
             }
 
         case let .failed(message):

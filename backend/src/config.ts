@@ -185,6 +185,25 @@ const configSchema = z
     // because it reads as coverage. The Polkadot incident was a ~99% drop.
     INVARIANT_COLLAPSE_RATIO: z.coerce.number().positive().max(1).default(0.9),
 
+    // The other direction, added because every check here was one-sided and a
+    // unit error is not. A vendor that starts answering in cents multiplies a
+    // balance by exactly 100; milliunits by 1000; wei by 1e18. 100 is therefore
+    // the smallest real unit error and the right threshold: it is not "a
+    // suspiciously good day", which is a different question a portfolio can
+    // legitimately answer yes to.
+    INVARIANT_SPIKE_RATIO: z.coerce.number().min(2).default(100),
+    // Below this, inflation is not checked at all. A wallet holding $2 that
+    // receives $500 has grown 250 times and nothing is wrong. A unit error is
+    // proportional so it trips the same ratio at any size, which makes the
+    // floor nearly free in detection and removes the whole class of false
+    // positive that gets an alert muted.
+    INVARIANT_MIN_PREVIOUS_USD: z.coerce.number().nonnegative().default(100),
+    // How many users' worth of the SAME violation, in the same class, inside
+    // the window, before it stops being "someone sold everything" and becomes
+    // "we shipped a bug". One is a person; several at once is a deploy.
+    INVARIANT_BREADTH_THRESHOLD: z.coerce.number().int().min(2).default(3),
+    INVARIANT_BREADTH_WINDOW_MINUTES: z.coerce.number().int().positive().default(60),
+
     // Retry throttling, gRFC A6's token bucket (src/resilience/retry-budget.ts).
     //
     // 20 tokens with a threshold at half means a vendor gets ten retryable
