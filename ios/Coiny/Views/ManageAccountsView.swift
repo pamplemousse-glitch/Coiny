@@ -104,9 +104,22 @@ struct ManageAccountsView: View {
         case let .loaded(data):
             ScrollViewReader { proxy in
                 ScrollView {
+                    // LAZY, not a plain VStack (runbook G3.13, audit 4.4.3).
+                    // Every section's body is built eagerly inside a VStack, and
+                    // these sections contain per-account, per-holding and
+                    // per-position rows: a brokerage with 200 holdings
+                    // constructed 200 views before the first frame of a screen
+                    // that shows about four of them. LazyVStack builds a section
+                    // when it is about to be seen.
+                    //
+                    // The `.id()` anchors still work: ScrollViewReader can scroll
+                    // to an id inside a LazyVStack, which is the case that makes
+                    // this worth checking rather than assuming, because a
+                    // Reconnect tap depends on it (ConnectionRepairRoute).
+                    //
                     // Zero spacing: CoinySection carries its own leading gap, so
                     // the container adding more would double it.
-                    VStack(spacing: 0) {
+                    LazyVStack(spacing: 0) {
                         bankSection(data).id(ManageAccountsSection.bank)
                         investmentsSection(data).id(ManageAccountsSection.investments)
                         cryptoSection(data).id(ManageAccountsSection.crypto)
