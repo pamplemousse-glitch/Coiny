@@ -27,10 +27,12 @@
 // to run unattended.
 //
 // The credential-based vendors (Kraken, Alpaca, Kalshi, Hyperliquid, chain
-// wallets, NFTs, Polymarket, TrueLayer, Discogs) are a different shape: a
-// scheduled run can discover an expired grant, which has to feed connection
-// health and the reconnect surface rather than just counting an error. They are
-// a separate change, deliberately.
+// wallets, NFTs, Polymarket, TrueLayer, Discogs, and YNAB, which this paragraph
+// used to omit) are a different shape: a scheduled run can discover an expired
+// grant, which has to feed connection health and the reconnect surface rather
+// than just counting an error. They were a separate change, deliberately, and
+// that change is now `sync/credential-vendors.ts`. Add a price feed here; add a
+// per-user credential there.
 //
 // ---------------------------------------------------------------------------
 // Due-ness comes from the holdings tables, not from a new cache
