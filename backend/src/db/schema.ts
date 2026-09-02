@@ -1061,6 +1061,41 @@ export const derivedState = pgTable('derived_state', {
 // Rungs never un-complete: a user who clears rung 3 and later takes on new
 // high-APR debt keeps the completion (and the creature's stage), while the rung
 // reopens as an active task. Progress is permanent, problems are current.
+// Sampled server-side request latency (migration 0069, runbook G1.22, audit
+// rows 4.5.3 and 4.13.4).
+//
+// `engineering-budgets.md` §1 states every latency budget as a p95 and says it
+// is measured by piping `fly logs` through a percentile script "until the
+// telemetry table exists". That script does not exist, and Fly keeps a short
+// rolling buffer with no query interface, so a weekly p95 could not be
+// reconstructed after the fact. This is that table.
+//
+// NO USER COLUMN, deliberately, and for two independent reasons:
+//
+//   A duration is a fact about the SERVER. `analytics_events` is consent-gated,
+//   so timings there would let one person's usage-sharing preference decide
+//   whether we can see our own p95, which is the same incoherence store/ops.ts
+//   refuses for vendor outages.
+//
+//   Route plus timestamp per user IS a behavioural trail: which screens someone
+//   opened and when. Collecting a browsing history in order to measure a server
+//   is not a trade worth making.
+//
+// `route` is the PATTERN Fastify matched, never the resolved URL, so no
+// identifier can reach this table even by accident.
+export const requestSamples = pgTable(
+  'request_samples',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+    route: text('route').notNull(),
+    method: text('method').notNull(),
+    status: integer('status').notNull(),
+    durationMs: integer('duration_ms').notNull(),
+  },
+  (t) => [index('request_samples_route_at_idx').on(t.route, t.at), index('request_samples_at_idx').on(t.at)],
+);
+
 export const ladderState = pgTable('ladder_state', {
   userId: text('user_id')
     .primaryKey()

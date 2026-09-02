@@ -53,6 +53,7 @@ import { registerZerionApi } from './api/zerion.js';
 import { config } from './config.js';
 import { initDb } from './db/client.js';
 import { runMigrations } from './db/migrate.js';
+import { recordRequestSample } from './observability/request-samples.js';
 import { registerAuthPlugin } from './plugins/auth.js';
 import { registerCompression } from './plugins/compression.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
@@ -175,6 +176,36 @@ async function buildApp(options: BuildAppOptions = {}) {
       return req.ip;
     },
   });
+
+  // Latency sampling (runbook G1.22, audit 4.5.3 and 4.13.4).
+  //
+  // `onResponse` rather than `onSend`: it fires after the response is fully
+  // written, so the number includes serialisation and compression, which is
+  // what a client actually waits for. `reply.elapsedTime` is Fastify's own
+  // measurement from the start of the request, so nothing here has to track a
+  // start time or get it wrong.
+  //
+  // THE ROUTE PATTERN, never `req.url`. `routeOptions.url` is
+  // '/api/plaid/items/:itemId'; the raw URL carries the item id, and one
+  // careless field is how an identifier ends up in a table that was designed
+  // to have none (store/request-samples.ts explains why it has no user column
+  // either). An unmatched request has no pattern and is recorded as
+  // 'unmatched', which keeps 404 floods from creating a row per path probed.
+  //
+  // Registered before the routes and outside every scope, so it sees all three.
+  // Fire-and-forget: the response has already been sent, and awaiting a write
+  // here would hold the request open to record how long it took.
+  if (config.REQUEST_SAMPLE_RATE > 0) {
+    app.addHook('onResponse', async (req, reply) => {
+      if (config.REQUEST_SAMPLE_RATE < 1 && Math.random() >= config.REQUEST_SAMPLE_RATE) return;
+      void recordRequestSample({
+        route: req.routeOptions?.url ?? 'unmatched',
+        method: req.method,
+        status: reply.statusCode,
+        durationMs: reply.elapsedTime,
+      });
+    });
+  }
 
   // Unauthenticated routes.
   //
