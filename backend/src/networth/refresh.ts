@@ -450,10 +450,14 @@ export function crossedMilestone(prev: number, current: number): number | null {
  *  milestone baseline is NOT advanced: a total that shrank because a vendor
  *  died must never become the baseline that a later recovery "crosses". */
 export async function runGoalRefreshFromCache(userId: string, now: Date = new Date()): Promise<void> {
-  const { goalInputs, degraded } = await assembleNetWorth(userId, now);
+  const { goalInputs, degraded, inputsAsOf } = await assembleNetWorth(userId, now);
   const total = goalInputs.netWorth?.totalUsd ?? 0;
 
-  await refreshGoalSystem(userId, goalInputs, now);
+  // Carried through so Home can label its figures with the age of the money
+  // rather than the age of the recomputation (R-8.2). The two differ by exactly
+  // the amount that matters: a ladder recomputed five minutes ago from a vendor
+  // that died last week.
+  await refreshGoalSystem(userId, { ...goalInputs, inputsAsOf }, now);
 
   if (degraded) return;
 

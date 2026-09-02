@@ -165,7 +165,7 @@ struct HomeView: View {
             Spacer(minLength: 20)
 
             if let rung = HomePresentation.activeRungDisplay(for: pet) {
-                ActiveRungBlock(rung: rung)
+                ActiveRungBlock(rung: rung, ageLabel: HomePresentation.dataAgeLabel(for: pet))
                     .padding(.horizontal, 24)
                     .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("home.rung.active")
@@ -283,6 +283,9 @@ struct HomeView: View {
 /// detail line. Indeterminate reads "too early to say", never zero.
 private struct ActiveRungBlock: View {
     let rung: ActiveRungDisplay
+    /// The age of the money in `detailLine` (R-8.2). Nil when there is no
+    /// figure on screen to label.
+    var ageLabel: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -316,6 +319,15 @@ private struct ActiveRungBlock: View {
                     Text(detail)
                         .font(.subheadline)
                         .foregroundStyle(CoinyTheme.ink2)
+                    // R-8.2: the figure above is real money and carried no age
+                    // anywhere on this screen. Wealth labelled every class;
+                    // Home, the default tab, labelled nothing.
+                    if let ageLabel {
+                        Text(ageLabel)
+                            .font(.caption)
+                            .foregroundStyle(CoinyTheme.ink3)
+                            .accessibilityIdentifier("home.rung.age")
+                    }
                 }
             }
         }

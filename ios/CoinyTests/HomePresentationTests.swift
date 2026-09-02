@@ -11,7 +11,8 @@ final class HomePresentationTests: XCTestCase {
         mood: Int = 60,
         stage: Int? = 4,
         ladder: LadderSnapshot? = nil,
-        reactions: [ReactionRecord] = []
+        reactions: [ReactionRecord] = [],
+        dataAsOf: Date? = nil
     ) -> PetState {
         PetState(
             healthScore: 70,
@@ -22,7 +23,8 @@ final class HomePresentationTests: XCTestCase {
             stage: stage,
             derived: nil,
             declarations: nil,
-            ladder: ladder
+            ladder: ladder,
+            dataAsOf: dataAsOf
         )
     }
 
@@ -233,5 +235,68 @@ final class HomePresentationTests: XCTestCase {
             HomePresentation.windowAccessibilityLabel(for: p),
             "Coiny is doing fine. Rung 5, Sheltered, too early to say."
         )
+    }
+
+    // MARK: - Staleness (R-8.2)
+    //
+    // Home shows real money in the rung detail line and carried no age
+    // anywhere on the screen, while Wealth labelled every class. Home is the
+    // default tab, so the surface most people look at was the one surface
+    // where a month-old number looked exactly like a fresh one.
+
+    private var moneyLadder: LadderSnapshot {
+        ladder(
+            currentRung: 4,
+            statuses: [0: .completed, 4: .active],
+            active: activeRung(id: 4, name: "Buffer", progress: 0.62, target: 12_000, gap: 4560)
+        )
+    }
+
+    func testLabelsTheAgeOfTheMoneyOnScreen() throws {
+        let now = Date(timeIntervalSince1970: 1_756_800_000)
+        let p = pet(ladder: moneyLadder, dataAsOf: now.addingTimeInterval(-3600))
+        let label = try XCTUnwrap(HomePresentation.dataAgeLabel(for: p, now: now))
+
+        // Same phrasing Wealth uses, from the same formatter: two surfaces
+        // saying one fact two ways is how a user learns to trust neither.
+        XCTAssertEqual(label, WealthPresenter.asOfLabel(now.addingTimeInterval(-3600), now: now))
+    }
+
+    func testSaysAgeUnknownRatherThanNothingWhenTheServerHasNoTimestamp() {
+        let p = pet(ladder: moneyLadder, dataAsOf: nil)
+
+        // Silence would read as fresh, which is the exact failure being fixed.
+        XCTAssertEqual(HomePresentation.dataAgeLabel(for: p), "age unknown")
+    }
+
+    func testNoLabelWhenThereIsNoFigureToLabel() {
+        // An indeterminate rung states no number, so a date under it would be
+        // a label attached to nothing.
+        let indeterminate = ladder(
+            currentRung: 2,
+            statuses: [0: .completed, 2: .active],
+            active: activeRung(id: 2, name: "Match", indeterminate: true)
+        )
+        let p = pet(ladder: indeterminate, dataAsOf: Date())
+
+        XCTAssertNil(HomePresentation.dataAgeLabel(for: p))
+    }
+
+    func testNoLabelBeforeThePetLoads() {
+        XCTAssertNil(HomePresentation.dataAgeLabel(for: nil))
+    }
+
+    func testNoLabelForANewUserWithNoLadderYet() {
+        // Rung 0 from the catalog has no progress and no detail line.
+        XCTAssertNil(HomePresentation.dataAgeLabel(for: pet(ladder: nil, dataAsOf: Date())))
+    }
+
+    func testOldMoneyIsLabelledWithADateRatherThanATime() throws {
+        let now = Date(timeIntervalSince1970: 1_756_800_000)
+        let p = pet(ladder: moneyLadder, dataAsOf: now.addingTimeInterval(-30 * 24 * 3600))
+        let label = try XCTUnwrap(HomePresentation.dataAgeLabel(for: p, now: now))
+
+        // A month-old figure must not read like something from this afternoon.
+        XCTAssertFalse(label.contains(":"))
     }
 }

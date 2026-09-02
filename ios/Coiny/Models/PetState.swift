@@ -20,6 +20,17 @@ struct PetState: Codable, Hashable, Sendable {
     let declarations: LadderDeclarations?
     /// The Foundation Ladder; null until the pipeline has run.
     let ladder: LadderSnapshot?
+    /// How old the money behind the ladder's figures is (R-8.2, backend
+    /// `ladder_state.inputs_as_of`).
+    ///
+    /// NOT when the ladder was recomputed. A ladder recomputed five minutes ago
+    /// from a bank that stopped syncing last week has a fresh recomputation and
+    /// week-old money, and Home showed the second as if it were the first.
+    ///
+    /// Nil means UNKNOWN, never fresh: a contributing class carried no
+    /// timestamp, or the row predates the column. Rendering nil as "just now"
+    /// reintroduces exactly the unlabelled stale value R-8.2 forbids.
+    let dataAsOf: Date?
 
     init(
         healthScore: Int,
@@ -30,7 +41,8 @@ struct PetState: Codable, Hashable, Sendable {
         stage: Int? = nil,
         derived: DerivedState? = nil,
         declarations: LadderDeclarations? = nil,
-        ladder: LadderSnapshot? = nil
+        ladder: LadderSnapshot? = nil,
+        dataAsOf: Date? = nil
     ) {
         self.healthScore = healthScore
         self.mood = mood
@@ -41,6 +53,7 @@ struct PetState: Codable, Hashable, Sendable {
         self.derived = derived
         self.declarations = declarations
         self.ladder = ladder
+        self.dataAsOf = dataAsOf
     }
 }
 
