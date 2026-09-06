@@ -162,6 +162,7 @@
 		B274CEBB7A374784FB7CC04D /* NetWorthViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40DB86D50EF0BFB6578C5ECD /* NetWorthViewModelTests.swift */; };
 		B44D95DEE0C06BBD3D13DFAF /* TradingCardsViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C8A559C5C1CE5E41BC91F87 /* TradingCardsViewModelTests.swift */; };
 		B5040095ED1C6559503D1EF3 /* privacy-policy.md in Resources */ = {isa = PBXBuildFile; fileRef = D80EE4C5BEDE04A5B7162189 /* privacy-policy.md */; };
+		B66F4C1966D01C72DBC7FFCB /* API+Devices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A5AAE491CF3FC66E5F8B8BB /* API+Devices.swift */; };
 		B77353D0A045F5E75FEC60F4 /* MetricKitReporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 637BF879F47589497A50353A /* MetricKitReporterTests.swift */; };
 		B7D9EFF6F2021787259829DD /* API+Performance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AFF7161BAE8ED517D1AF774 /* API+Performance.swift */; };
 		B8D7D8D9697B9BBE836BD25F /* HomePresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A427DF82E499F756734DEDD /* HomePresentationTests.swift */; };
@@ -255,6 +256,7 @@
 		180CBB3806803A3DAFA9428B /* CoinyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoinyApp.swift; sourceTree = "<group>"; };
 		18AAE0E838B59D15092CC506 /* TruelayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TruelayerViewModel.swift; sourceTree = "<group>"; };
 		18E99499DA3CE01DE33AAB7B /* API.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = API.swift; sourceTree = "<group>"; };
+		1A5AAE491CF3FC66E5F8B8BB /* API+Devices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Devices.swift"; sourceTree = "<group>"; };
 		1A7BC569B5DF82AA7830B167 /* NetWorthView+WealthInlines.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NetWorthView+WealthInlines.swift"; sourceTree = "<group>"; };
 		1AFF7161BAE8ED517D1AF774 /* API+Performance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API+Performance.swift"; sourceTree = "<group>"; };
 		1B37C0E6815BDEC877A224FD /* PokemonCardsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PokemonCardsViewModel.swift; sourceTree = "<group>"; };
@@ -573,6 +575,7 @@
 				EA4AC9A8DBDB1C7AB14F3885 /* API+Debts.swift */,
 				851CD4156E2005F77706A82A /* API+Debug.swift */,
 				08172A6F4FFB01B390CE0A0A /* API+DeclaredAssets.swift */,
+				1A5AAE491CF3FC66E5F8B8BB /* API+Devices.swift */,
 				5605A11743B20DDCC732C327 /* API+Diagnostics.swift */,
 				8F16045707E63611441C83A7 /* API+Entitlements.swift */,
 				04777967A1F371FC2875D9D0 /* API+Goals.swift */,
@@ -1008,6 +1011,7 @@
 				A8542D7ADE27B6C25B215498 /* API+Debts.swift in Sources */,
 				813D469E426EAA9446238594 /* API+Debug.swift in Sources */,
 				415C104F9ABF53BD3FBDD3D8 /* API+DeclaredAssets.swift in Sources */,
+				B66F4C1966D01C72DBC7FFCB /* API+Devices.swift in Sources */,
 				F8558B11667A0D5762D35E49 /* API+Diagnostics.swift in Sources */,
 				28A8527C9AAB24590B65BDAC /* API+Entitlements.swift in Sources */,
 				3437220EC5AD8D76BCAD466F /* API+Goals.swift in Sources */,
@@ -1321,7 +1325,7 @@
 				CODE_SIGN_ENTITLEMENTS = Coiny/CoinyRelease.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				COINY_API_BASE_URL = "https:/$()/coiny-api.fly.dev";
+				COINY_API_BASE_URL = "https:/$()/coiny-backend.fly.dev";
 				CURRENT_PROJECT_VERSION = 1;
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				INFOPLIST_FILE = Coiny/Info.plist;

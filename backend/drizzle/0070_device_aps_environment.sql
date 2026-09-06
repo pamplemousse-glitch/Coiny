@@ -1,0 +1,22 @@
+-- Which APNs environment issued each device token.
+--
+-- `push/apns.ts` chose the gateway from APP_ENV, and its own comment named the
+-- assumption that made that safe: "Debug -> staging -> development/sandbox,
+-- Release -> production -> production ... If a Release build is ever pointed at
+-- staging, this has to become a per-token column instead."
+--
+-- That day is here. The TestFlight build for the internal test points at
+-- staging, so one backend now serves both halves at once: TestFlight builds
+-- signed with CoinyRelease.entitlements hold PRODUCTION tokens, and the Debug
+-- builds run from Xcode against the same staging host hold SANDBOX ones. No
+-- single value of APP_ENV is right for both, and the wrong one is not an error
+-- anybody sees: APNs answers a mismatched pairing with 400 BadDeviceToken and
+-- the push is simply never delivered.
+--
+-- Nullable on purpose, exactly like `timezone` above it. Tokens registered by
+-- builds older than this column have no value, and the dispatcher falls back to
+-- the old APP_ENV heuristic for them rather than guessing a gateway. Once no
+-- null rows remain the fallback can go.
+--
+-- Idempotent, per the convention 0033 established.
+ALTER TABLE "device_tokens" ADD COLUMN IF NOT EXISTS "aps_environment" text;

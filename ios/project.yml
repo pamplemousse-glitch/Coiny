@@ -196,12 +196,30 @@ targets:
         # is never the default; the failure mode of forgetting is fake data, not
         # someone's real accounts.
         #
-        # NOTE: the host must exist before an archive is useful. `coiny-api` is
-        # created by `fly apps create coiny-api` and deployed with
-        # `fly deploy -c fly.production.toml`; until that has happened a Release
-        # build compiles and signs fine and simply cannot reach a backend.
+        # TEMPORARILY STAGING, for the internal TestFlight run.
+        #
+        # This deliberately breaks the rule the comment above states, so it says
+        # why and what undoes it. `coiny-api` does not exist: `fly apps list`
+        # returns only `coiny-backend`. A Release build pointed at the
+        # production host therefore compiles, signs, uploads and installs, and
+        # then cannot reach a backend at all, which is not a testable app.
+        #
+        # Standing production up early would not help. `fly.production.toml`
+        # runs PLAID_ENV=sandbox until Plaid's production review clears, so
+        # testers would link the same synthetic accounts through a second
+        # environment that costs money and holds nothing real.
+        #
+        # So testers get staging and Plaid sandbox (user_good / pass_good). The
+        # failure mode of this line is fake data, which is the direction the
+        # rest of the codebase already chooses everywhere.
+        #
+        # REVERT THIS to coiny-api.fly.dev when production exists, in the same
+        # change that runs `fly apps create coiny-api` and
+        # `fly deploy -c fly.production.toml`. Nothing else in the app needs to
+        # move with it; push already keys off the per-token aps_environment
+        # column (migration 0070) rather than the server's own APP_ENV.
         Release:
-          COINY_API_BASE_URL: https:/$()/coiny-api.fly.dev
+          COINY_API_BASE_URL: https:/$()/coiny-backend.fly.dev
           # TestFlight and App Store builds ALWAYS use production APNs; there
           # is no way to upload a build that pushes against sandbox. The
           # generated Coiny.entitlements says `development`, which is right for

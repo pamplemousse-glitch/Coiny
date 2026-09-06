@@ -156,3 +156,73 @@ describe('sendApnsPush — send path', () => {
     await expect(sendApnsPush('aabbcc', 'Title', 'Body')).rejects.toThrow('connection refused');
   });
 });
+
+// The correspondence "APP_ENV decides the gateway" held only while Debug builds
+// talked to staging and Release builds talked to production. Pointing the
+// TestFlight build at staging ended that: one backend now holds production
+// tokens (TestFlight) and sandbox tokens (Xcode Debug) at the same time, and
+// sending either to the other's host is a 400 BadDeviceToken that nothing
+// surfaces to a user or a dashboard.
+describe('apnsHostFor — per-token routing', () => {
+  afterEach(() => {
+    vi.resetModules();
+    mockConnect.mockReset();
+  });
+
+  async function getHostFor(appEnv: string) {
+    vi.doMock('../src/config.js', () => ({
+      config: {
+        APNS_KEY: TEST_PEM,
+        APNS_KEY_ID: 'test-kid',
+        APNS_TEAM_ID: 'test-team',
+        APNS_BUNDLE_ID: 'app.coiny.ios',
+        NODE_ENV: 'production',
+        APP_ENV: appEnv,
+      },
+    }));
+    const { apnsHostFor } = await import('../src/push/apns.js');
+    return apnsHostFor;
+  }
+
+  it('sends a production token to the production host even on staging', async () => {
+    const apnsHostFor = await getHostFor('staging');
+    expect(apnsHostFor('production')).toBe('api.push.apple.com');
+  });
+
+  it('sends a development token to the sandbox host even on production', async () => {
+    const apnsHostFor = await getHostFor('production');
+    expect(apnsHostFor('development')).toBe('api.sandbox.push.apple.com');
+  });
+
+  // The whole point: both at once, from one server.
+  it('routes both token kinds correctly from a single staging backend', async () => {
+    const apnsHostFor = await getHostFor('staging');
+    expect(apnsHostFor('production')).toBe('api.push.apple.com');
+    expect(apnsHostFor('development')).toBe('api.sandbox.push.apple.com');
+  });
+
+  // Tokens predating migration 0070. They can only have come from a build made
+  // while the old correspondence held, so the old heuristic is right for them.
+  it('falls back to APP_ENV for a token with no recorded environment', async () => {
+    expect((await getHostFor('staging'))(null)).toBe('api.sandbox.push.apple.com');
+    vi.resetModules();
+    expect((await getHostFor('production'))(null)).toBe('api.push.apple.com');
+  });
+
+  it('actually connects to the production host for a production token on staging', async () => {
+    vi.doMock('../src/config.js', () => ({
+      config: {
+        APNS_KEY: TEST_PEM,
+        APNS_KEY_ID: 'test-kid',
+        APNS_TEAM_ID: 'test-team',
+        APNS_BUNDLE_ID: 'app.coiny.ios',
+        NODE_ENV: 'production',
+        APP_ENV: 'staging',
+      },
+    }));
+    mockConnect.mockReturnValue(makeSession(200) as never);
+    const { sendApnsPush } = await import('../src/push/apns.js');
+    await sendApnsPush('aabbcc', 'Title', 'Body', 'production');
+    expect(mockConnect).toHaveBeenCalledWith('https://api.push.apple.com');
+  });
+});
