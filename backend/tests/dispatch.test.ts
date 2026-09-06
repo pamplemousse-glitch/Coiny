@@ -68,8 +68,8 @@ describe('dispatchReaction', () => {
 
   it('sends APNs push to all iOS device tokens for a pushable event', async () => {
     mockedListDeviceTokens.mockResolvedValue([
-      { token: 'token-a', platform: 'ios' },
-      { token: 'token-b', platform: 'ios' },
+      { token: 'token-a', platform: 'ios', apsEnvironment: null },
+      { token: 'token-b', platform: 'ios', apsEnvironment: null },
     ]);
     mockedSendApnsPush.mockResolvedValue(undefined);
 
@@ -81,18 +81,20 @@ describe('dispatchReaction', () => {
       'token-a',
       expect.stringContaining('celebrating'),
       expect.any(String),
+      null,
     );
     expect(mockedSendApnsPush).toHaveBeenCalledWith(
       'token-b',
       expect.stringContaining('celebrating'),
       expect.any(String),
+      null,
     );
   });
 
   // The reason field carries merchant names and amounts. A push body renders on
   // the lock screen, so it must never contain them.
   it('never puts the reaction reason in the push body', async () => {
-    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios', apsEnvironment: null }]);
     mockedSendApnsPush.mockResolvedValue(undefined);
 
     dispatchReaction('user-1', REACTION, 'goal_achieved');
@@ -120,7 +122,7 @@ describe('dispatchReaction', () => {
 
   it('does not push when the notification budget is exhausted', async () => {
     mockedCanSendPush.mockResolvedValue(false);
-    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios', apsEnvironment: null }]);
 
     dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
@@ -131,7 +133,7 @@ describe('dispatchReaction', () => {
   // Pushability is the event's contract row, not the animation. A paycheck is
   // routine (push 'no') no matter what the creature does on screen.
   it('does not push for events outside the contract allowlist', async () => {
-    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios', apsEnvironment: null }]);
 
     dispatchReaction('user-1', { ...REACTION, animation: 'happy' }, 'paycheck_received');
     await flushAll();
@@ -144,7 +146,7 @@ describe('dispatchReaction', () => {
   // animation (concerned) is one that other events push with. The old
   // animation-based allowlist could not express this; the event contract can.
   it('never pushes overspend_vs_plan even with a concerned animation', async () => {
-    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios', apsEnvironment: null }]);
 
     dispatchReaction(
       'user-1',
@@ -158,7 +160,7 @@ describe('dispatchReaction', () => {
   });
 
   it('pushes bill_overdue with the same concerned animation', async () => {
-    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios', apsEnvironment: null }]);
     mockedSendApnsPush.mockResolvedValue(undefined);
 
     dispatchReaction(
@@ -172,7 +174,7 @@ describe('dispatchReaction', () => {
   });
 
   it('does not push for an unknown event type', async () => {
-    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios', apsEnvironment: null }]);
 
     dispatchReaction('user-1', REACTION, 'some_future_event');
     await flushAll();
@@ -182,7 +184,7 @@ describe('dispatchReaction', () => {
   });
 
   it('records the notification only when a push was delivered', async () => {
-    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios', apsEnvironment: null }]);
     mockedSendApnsPush.mockResolvedValue(undefined);
 
     dispatchReaction('user-1', REACTION, 'goal_achieved');
@@ -192,7 +194,7 @@ describe('dispatchReaction', () => {
   });
 
   it('does not record the notification when every push fails', async () => {
-    mockedListDeviceTokens.mockResolvedValue([{ token: 'bad-token', platform: 'ios' }]);
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'bad-token', platform: 'ios', apsEnvironment: null }]);
     mockedSendApnsPush.mockRejectedValue(new Error('BadDeviceToken'));
 
     dispatchReaction('user-1', REACTION, 'goal_achieved');
@@ -201,8 +203,38 @@ describe('dispatchReaction', () => {
     expect(mockedRecordNotification).not.toHaveBeenCalled();
   });
 
+  // Migration 0070. The dispatcher must hand each token its OWN environment,
+  // not one server-wide value: during the internal TestFlight run a single
+  // staging backend holds production tokens (TestFlight installs) and sandbox
+  // tokens (Xcode Debug installs), and the two need different APNs hosts.
+  it('passes each token its own aps environment', async () => {
+    mockedListDeviceTokens.mockResolvedValue([
+      { token: 'token-testflight', platform: 'ios', apsEnvironment: 'production' },
+      { token: 'token-xcode', platform: 'ios', apsEnvironment: 'development' },
+    ]);
+    mockedSendApnsPush.mockResolvedValue(undefined);
+
+    dispatchReaction('user-1', REACTION, 'goal_achieved');
+    await flushAll();
+
+    expect(mockedSendApnsPush).toHaveBeenCalledWith(
+      'token-testflight',
+      expect.any(String),
+      expect.any(String),
+      'production',
+    );
+    expect(mockedSendApnsPush).toHaveBeenCalledWith(
+      'token-xcode',
+      expect.any(String),
+      expect.any(String),
+      'development',
+    );
+  });
+
   it('does not push when there are no device tokens', async () => {
-    mockedListDeviceTokens.mockResolvedValue([] as { token: string; platform: string }[]);
+    mockedListDeviceTokens.mockResolvedValue(
+      [] as { token: string; platform: string; apsEnvironment: string | null }[],
+    );
 
     dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
@@ -211,7 +243,7 @@ describe('dispatchReaction', () => {
   });
 
   it('skips non-iOS tokens', async () => {
-    mockedListDeviceTokens.mockResolvedValue([{ token: 'android-token', platform: 'android' }]);
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'android-token', platform: 'android', apsEnvironment: null }]);
 
     dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
@@ -220,7 +252,7 @@ describe('dispatchReaction', () => {
   });
 
   it('logs APNs push failures but does not throw', async () => {
-    mockedListDeviceTokens.mockResolvedValue([{ token: 'bad-token', platform: 'ios' }]);
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'bad-token', platform: 'ios', apsEnvironment: null }]);
     mockedSendApnsPush.mockRejectedValue(new Error('APNs 400 for token bad-tok…: BadDeviceToken'));
 
     dispatchReaction('user-1', REACTION, 'goal_achieved');
@@ -239,7 +271,7 @@ describe('dispatchReaction', () => {
   });
 
   it('falls back to a generic title for an animation with no push copy', async () => {
-    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios', apsEnvironment: null }]);
     mockedSendApnsPush.mockResolvedValue(undefined);
 
     dispatchReaction('user-1', { ...REACTION, animation: 'happy' }, 'goal_achieved');
@@ -253,7 +285,7 @@ describe('dispatchReaction', () => {
   it('suppresses the push at 22:00 in the device timezone (Asia/Tokyo)', async () => {
     vi.setSystemTime(new Date('2026-08-13T13:00:00Z')); // 22:00 in Asia/Tokyo
     mockedLatestDeviceTimezone.mockResolvedValue('Asia/Tokyo');
-    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios', apsEnvironment: null }]);
 
     dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
@@ -264,7 +296,7 @@ describe('dispatchReaction', () => {
   it('delivers the push at 09:00 in the device timezone (Asia/Tokyo)', async () => {
     vi.setSystemTime(new Date('2026-08-13T00:00:00Z')); // 09:00 in Asia/Tokyo
     mockedLatestDeviceTimezone.mockResolvedValue('Asia/Tokyo');
-    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios', apsEnvironment: null }]);
     mockedSendApnsPush.mockResolvedValue(undefined);
 
     dispatchReaction('user-1', REACTION, 'goal_achieved');
@@ -277,7 +309,7 @@ describe('dispatchReaction', () => {
   // zone and never fall back to UTC or the server's zone.
   it('suppresses the push when no device timezone is stored', async () => {
     mockedLatestDeviceTimezone.mockResolvedValue(null);
-    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios', apsEnvironment: null }]);
 
     dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
@@ -287,7 +319,7 @@ describe('dispatchReaction', () => {
 
   it('logs quiet_hours_unknown_tz when no device timezone is stored', async () => {
     mockedLatestDeviceTimezone.mockResolvedValue(null);
-    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios', apsEnvironment: null }]);
     dispatchReaction('user-1', REACTION, 'goal_achieved');
     await flushAll();
 
@@ -297,7 +329,7 @@ describe('dispatchReaction', () => {
 
   // R-9.7: no emoji in any user-facing string. The titles used to carry them.
   it('sends emoji-free push titles and bodies', async () => {
-    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios' }]);
+    mockedListDeviceTokens.mockResolvedValue([{ token: 'token-a', platform: 'ios', apsEnvironment: null }]);
     mockedSendApnsPush.mockResolvedValue(undefined);
 
     dispatchReaction('user-1', REACTION, 'goal_achieved');

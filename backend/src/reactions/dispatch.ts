@@ -84,7 +84,10 @@ async function fanOutPush(userId: string, reaction: Reaction, eventType: string)
 
     const title = PUSH_TITLES[reaction.animation] ?? 'Coiny reacted';
     const body = PUSH_BODIES[reaction.animation] ?? 'Come see.';
-    const results = await Promise.allSettled(ios.map((t) => sendApnsPush(t.token, title, body)));
+    // Each token carries the APNs environment its build was signed for; one
+    // user can hold both at once (a TestFlight install and an Xcode Debug
+    // install of the same account), and they need different gateways.
+    const results = await Promise.allSettled(ios.map((t) => sendApnsPush(t.token, title, body, t.apsEnvironment)));
 
     const delivered = results.some((r) => r.status === 'fulfilled');
     if (delivered) {

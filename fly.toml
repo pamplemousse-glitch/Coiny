@@ -44,8 +44,18 @@ primary_region = 'iad'
   force_https = true
   auto_stop_machines = 'suspend'
   auto_start_machines = true
-  # Staging is idle almost all the time and nobody is watching a cold start.
-  min_machines_running = 0
+  # Was 0, on the reasoning that staging is idle and nobody watches a cold
+  # start. That stopped being true when staging became the backend for the
+  # internal TestFlight run.
+  #
+  # The cost was not the cold start, it was the scheduler. With no machine
+  # running there is no 15-minute tick, so nothing refreshes: /health/scheduler
+  # answered 503 with a last_tick_at three days old. Testers would see numbers
+  # that only move when someone opens the app, which is precisely the product
+  # claim under test.
+  #
+  # Back to 0 when the testers move to production.
+  min_machines_running = 1
 
   [[http_service.checks]]
     grace_period = '15s'

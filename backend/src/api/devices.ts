@@ -16,6 +16,11 @@ const PostBodySchema = z.object({
     .max(64)
     .refine(isValidTimeZone, { message: 'not a valid IANA timezone identifier' })
     .optional(),
+  // The app reports its own `aps-environment` entitlement, which is the only
+  // thing that decides which APNs host will accept this token. Optional because
+  // builds older than migration 0070 do not send it; push/apns.ts falls back to
+  // the APP_ENV heuristic for those rather than guessing a gateway.
+  apsEnvironment: z.enum(['development', 'production']).optional(),
 });
 
 export function registerDevicesApi(app: FastifyInstance): void {
@@ -24,7 +29,10 @@ export function registerDevicesApi(app: FastifyInstance): void {
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
     await upsertDeviceToken({ ...parsed.data, userId: req.user!.id });
-    req.log.info({ platform: parsed.data.platform }, 'device push token registered');
+    req.log.info(
+      { platform: parsed.data.platform, aps_environment: parsed.data.apsEnvironment ?? 'unreported' },
+      'device push token registered',
+    );
     return { ok: true };
   });
 }

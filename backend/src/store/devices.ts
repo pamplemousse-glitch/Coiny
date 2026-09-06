@@ -10,15 +10,23 @@ export async function upsertDeviceToken(args: {
   // undefined member, and exactOptionalPropertyTypes makes that distinct
   // from a merely absent property.
   timezone?: string | undefined;
+  apsEnvironment?: 'development' | 'production' | undefined;
 }): Promise<void> {
   // On re-registration, only overwrite the stored timezone when the client sent
   // one: an older app build re-registering without the field must not erase a
-  // timezone a newer build already captured (R-9.3).
-  const set: { platform: string; updatedAt: Date; timezone?: string } = {
+  // timezone a newer build already captured (R-9.3). Same rule for
+  // apsEnvironment, for the same reason.
+  const set: {
+    platform: string;
+    updatedAt: Date;
+    timezone?: string;
+    apsEnvironment?: 'development' | 'production';
+  } = {
     platform: args.platform,
     updatedAt: new Date(),
   };
   if (args.timezone !== undefined) set.timezone = args.timezone;
+  if (args.apsEnvironment !== undefined) set.apsEnvironment = args.apsEnvironment;
 
   await db()
     .insert(deviceTokens)
@@ -27,6 +35,7 @@ export async function upsertDeviceToken(args: {
       platform: args.platform,
       userId: args.userId,
       timezone: args.timezone ?? null,
+      apsEnvironment: args.apsEnvironment ?? null,
     })
     .onConflictDoUpdate({
       target: deviceTokens.token,
@@ -34,9 +43,15 @@ export async function upsertDeviceToken(args: {
     });
 }
 
-export async function listDeviceTokens(userId: string): Promise<{ token: string; platform: string }[]> {
+export async function listDeviceTokens(
+  userId: string,
+): Promise<{ token: string; platform: string; apsEnvironment: string | null }[]> {
   const rows = await db()
-    .select({ token: deviceTokens.token, platform: deviceTokens.platform })
+    .select({
+      token: deviceTokens.token,
+      platform: deviceTokens.platform,
+      apsEnvironment: deviceTokens.apsEnvironment,
+    })
     .from(deviceTokens)
     .where(eq(deviceTokens.userId, userId));
   return rows;

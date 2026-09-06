@@ -301,6 +301,15 @@ export const deviceTokens = pgTable('device_tokens', {
   // Nullable: tokens from older app builds have none, and the dispatcher
   // suppresses pushes rather than guessing a zone.
   timezone: text('timezone'),
+  // 'development' or 'production': which APNs environment issued this token,
+  // reported by the app from its own `aps-environment` entitlement. This is the
+  // only thing that decides which APNs host will accept it, and it is a
+  // property of the BUILD, not of the server: staging serves TestFlight builds
+  // (production tokens) and Xcode Debug builds (sandbox tokens) at the same
+  // time. Nullable for the same reason as `timezone`: tokens from builds older
+  // than migration 0070 have none, and push/apns.ts falls back to the old
+  // APP_ENV heuristic rather than guessing.
+  apsEnvironment: text('aps_environment'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
