@@ -306,8 +306,16 @@ export async function recordNetWorthDaily(
 
 export type NetWorthPoint = { date: string; totalUsd: number; byClass: Record<string, number> };
 
-export async function getNetWorthSeries(userId: string, days: number): Promise<NetWorthPoint[]> {
-  const cutoff = new Date();
+/** `now` is injectable because the cutoff is derived from it. Defaulting to the
+ *  real clock inside the function made the tests depend on the date they were run
+ *  on: they seeded points in August, passed for thirty days, and then failed
+ *  permanently once the window moved past them. */
+export async function getNetWorthSeries(
+  userId: string,
+  days: number,
+  now: Date = new Date(),
+): Promise<NetWorthPoint[]> {
+  const cutoff = new Date(now);
   cutoff.setDate(cutoff.getDate() - days);
   const rows = await db()
     .select()
