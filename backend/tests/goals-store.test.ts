@@ -15,7 +15,7 @@ describe('net worth time series', () => {
     await recordNetWorthDaily(testUserId, '2026-08-12', 51_000, { bank: 51_000 });
 
     expect(await netWorthPointCount(testUserId)).toBe(1);
-    const series = await getNetWorthSeries(testUserId, 30);
+    const series = await getNetWorthSeries(testUserId, 30, NOW);
     expect(series[0]?.totalUsd).toBe(51_000);
   });
 
@@ -25,7 +25,7 @@ describe('net worth time series', () => {
     await recordNetWorthDaily(testUserId, '2026-08-09', 1, {});
     await recordNetWorthDaily(testUserId, '2026-08-12', 3, {});
 
-    const series = await getNetWorthSeries(testUserId, 30);
+    const series = await getNetWorthSeries(testUserId, 30, NOW);
     expect(series.map((p) => p.totalUsd)).toEqual([1, 2, 3]);
   });
 
