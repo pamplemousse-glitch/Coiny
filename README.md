@@ -10,7 +10,8 @@ and a BLE-connected carry device. Coiny reacts in real time to your
 financial behavior with animations, lights, sounds and haptics, celebrating
 good habits and showing concern when you stray from your goals.
 
-**Status:** Phase 1 backend live. Phase 2 hardware in planning.
+**Status:** Phase 1 backend live. Phase 2 hardware is planned and unwritten — there is
+no firmware in this repo yet.
 
 ---
 
@@ -45,7 +46,6 @@ Coiny/
 ├── mobile/         # Expo (React Native + TypeScript)
 ├── ios/            # Native iOS (SwiftUI)
 ├── android/        # Native Android
-├── firmware/       # nRF52840 + Zephyr (Phase 2; M5StickS3 ESP32-S3 for prototyping)
 ├── shared/         # Cross-package TS types (placeholder)
 ├── hardware/case/  # OpenSCAD enclosure designs
 ├── bin/            # Local helper scripts (load-secrets.sh)
